@@ -77,11 +77,9 @@
         }
     };
 
-    $bookingUrl = function ($showtime) {
-        return $showtime
-            ? url('/booking/select-seat?showtime_id=' . $showtime->id)
-            : url('/booking/select-seat');
-    };
+    $bookingUrl = fn ($showtime) => $showtime
+        ? route('user.bookings.selectSeat', $showtime)
+        : route('user.movies.index');
 
     $homeShowtimeUrl = function (array $params = []) {
         return route('home', array_filter($params, fn ($value) => filled($value))) . '#home-showtime-calendar';
