@@ -82,10 +82,7 @@ class MovieController extends Controller
 
         $movie = Movie::create($validated);
 
-        // Sync genres
-        if (!empty($validated['genres'])) {
-            $movie->genres()->sync($validated['genres']);
-        }
+        $movie->genres()->sync($validated['genres'] ?? []);
 
         return redirect()
             ->route('admin.movies.index')
@@ -163,12 +160,7 @@ class MovieController extends Controller
 
         $movie->update($validated);
 
-        // Sync genres
-        if (isset($validated['genres'])) {
-            $movie->genres()->sync($validated['genres']);
-        } else {
-            $movie->genres()->detach();
-        }
+        $movie->genres()->sync($validated['genres'] ?? []);
 
         return redirect()
             ->route('admin.movies.index')
