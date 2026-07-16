@@ -1,26 +1,46 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Form quáº£n lÃ½ - MovieMate')
-@section('page-title', 'ThÃªm/Sá»­a dá»¯ liá»‡u')
+@section('title', 'Thêm Thể Loại')
 
 @section('content')
+<div class="container mx-auto py-6">
+    <h1 class="text-2xl font-bold mb-4">Thêm Thể Loại</h1>
 
-<div class="mx-auto max-w-4xl rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <h1 class="text-3xl font-black">Form nháº­p dá»¯ liá»‡u</h1>
-    <p class="mt-2 text-gray-400">Giao diá»‡n form máº«u cho chá»©c nÄƒng quáº£n trá»‹.</p>
+    @if ($errors->any())
+        <div class="bg-red-100 text-red-800 p-3 rounded mb-4">
+            <ul class="list-disc list-inside">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
-    <form class="mt-8 grid gap-5 md:grid-cols-2">
-        <input placeholder="TÃªn" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <input placeholder="MÃ£ / slug" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <input placeholder="ThÃ´ng tin phá»¥" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]"><option>Tráº¡ng thÃ¡i hoáº¡t Ä‘á»™ng</option></select>
-        <textarea rows="6" placeholder="MÃ´ táº£" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18] md:col-span-2"></textarea>
+    <form action="{{ route('admin.genres.store') }}" method="POST" class="space-y-4">
+        @csrf
 
-        <div class="flex gap-4 md:col-span-2">
-            <button type="button" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-8 py-4 font-bold">LÆ°u dá»¯ liá»‡u</button>
-            <a href="/admin/dashboard" class="rounded-2xl border border-white/10 px-8 py-4 font-bold">Há»§y</a>
+        <div>
+            <label class="block font-medium">Tên *</label>
+            <input type="text" name="name" value="{{ old('name') }}" required
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Slug (để trống để tự tạo)</label>
+            <input type="text" name="slug" value="{{ old('slug') }}"
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Mô tả</label>
+            <textarea name="description" rows="4"
+                      class="w-full border rounded px-3 py-2">{{ old('description') }}</textarea>
+        </div>
+
+        <div class="flex space-x-4">
+            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Lưu</button>
+            <a href="{{ route('admin.genres.index') }}" class="bg-gray-600 text-white px-4 py-2 rounded">Hủy</a>
         </div>
     </form>
 </div>
-
 @endsection
