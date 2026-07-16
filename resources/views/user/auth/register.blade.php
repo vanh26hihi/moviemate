@@ -16,3 +16,9 @@
                 <p class="surface-muted text-base">Trở thành thành viên để nhận ưu đãi đặc quyền và trải nghiệm đặt vé nhanh chóng.</p>
             </div>
         </div>
+        <div class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10">
+            <div class="w-full max-w-md">
+                <div class="mb-7">
+                    <h1 class="text-2xl md:text-3xl font-bold app-heading mb-2">Đăng ký tài khoản</h1>
+                    <p class="app-text-muted text-sm">Tạo tài khoản MovieMate chỉ trong vài bước.</p>
+                </div>
