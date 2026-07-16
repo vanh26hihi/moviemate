@@ -1,34 +1,69 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Chi tiáº¿t phim - MovieMate')
-@section('page-title', 'Chi tiáº¿t phim')
+@section('title', 'Chi Tiết Phim')
 
 @section('content')
+<div class="container mx-auto py-6">
+    <h1 class="text-2xl font-bold mb-4">Chi Tiết Phim: {{ $movie->title }}</h1>
 
-<div class="rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
-        <img src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=600&auto=format&fit=crop" class="h-[420px] w-full rounded-3xl object-cover">
-
+    <div class="grid grid-cols-2 gap-4">
         <div>
-            <span class="rounded-full bg-green-500/20 px-4 py-2 text-sm font-bold text-green-400">Äang chiáº¿u</span>
-            <h1 class="mt-5 text-5xl font-black">Thanh GÆ°Æ¡m Diá»‡t Quá»·</h1>
-            <p class="mt-5 max-w-3xl leading-8 text-gray-300">
-                MÃ´ táº£ phim máº«u dÃ¹ng cho trang quáº£n trá»‹. Admin cÃ³ thá»ƒ xem thÃ´ng tin chi tiáº¿t, chá»‰nh sá»­a hoáº·c táº¡o mÃ´ táº£ báº±ng AI.
-            </p>
-
-            <div class="mt-8 grid gap-4 md:grid-cols-4">
-                <div class="rounded-2xl bg-[#080A12] p-4"><p class="text-sm text-gray-400">Thá»ƒ loáº¡i</p><p class="font-bold">HÃ nh Ä‘á»™ng</p></div>
-                <div class="rounded-2xl bg-[#080A12] p-4"><p class="text-sm text-gray-400">Thá»i lÆ°á»£ng</p><p class="font-bold">115 phÃºt</p></div>
-                <div class="rounded-2xl bg-[#080A12] p-4"><p class="text-sm text-gray-400">VÃ© bÃ¡n</p><p class="font-bold">520</p></div>
-                <div class="rounded-2xl bg-[#080A12] p-4"><p class="text-sm text-gray-400">Doanh thu</p><p class="font-bold text-[#FF7A18]">46.8M</p></div>
-            </div>
-
-            <div class="mt-8 flex gap-4">
-                <a href="/admin/movies/1/edit" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-8 py-4 font-bold">Sá»­a phim</a>
-                <a href="/admin/movies" class="rounded-2xl border border-white/10 px-8 py-4 font-bold">Quay láº¡i</a>
-            </div>
+            <strong>Slug:</strong> {{ $movie->slug }}
         </div>
+        <div>
+            <strong>Trạng thái:</strong> {{ $movie->status }}
+        </div>
+        <div>
+            <strong>Country:</strong> {{ $movie->country ?? 'N/A' }}
+        </div>
+        <div>
+            <strong>Duration:</strong> {{ $movie->duration ?? 'N/A' }} phút
+        </div>
+        <div>
+            <strong>Age Rating:</strong> {{ $movie->age_rating ?? 'N/A' }}
+        </div>
+        <div>
+            <strong>Release Date:</strong> {{ $movie->release_date ? $movie->release_date->format('Y-m-d') : 'N/A' }}
+        </div>
+        <div class="col-span-2">
+            <strong>Mô tả:</strong>
+            <p class="mt-1">{{ $movie->description ?? 'Chưa có mô tả.' }}</p>
+        </div>
+        <div class="col-span-2">
+            <strong>Thể loại:</strong>
+            <p>{{ $movie->genres->pluck('name')->join(', ') }}</p>
+        </div>
+        @if($movie->poster)
+            <div class="col-span-2">
+                <strong>Poster:</strong><br>
+                <img src="{{ asset('storage/' . $movie->poster) }}" alt="Poster" class="max-w-xs">
+            </div>
+        @endif
+        @if($movie->cover_image)
+            <div class="col-span-2">
+                <strong>Cover Image:</strong><br>
+                <img src="{{ asset('storage/' . $movie->cover_image) }}" alt="Cover" class="max-w-xs">
+            </div>
+        @endif
+        @if($movie->trailer_url)
+            <div class="col-span-2">
+                <strong>Trailer:</strong>
+                <a href="{{ $movie->trailer_url }}" target="_blank" class="text-blue-600 underline">
+                    Xem Trailer
+                </a>
+            </div>
+        @endif
+    </div>
+
+    <div class="mt-6 flex space-x-4">
+        <a href="{{ route('admin.movies.edit', $movie) }}" class="bg-yellow-600 text-white px-4 py-2 rounded">Sửa</a>
+        <form action="{{ route('admin.movies.destroy', $movie) }}" method="POST"
+              onsubmit="return confirm('Bạn có chắc muốn xóa phim này?');" class="inline">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded">Xóa</button>
+        </form>
+        <a href="{{ route('admin.movies.index') }}" class="bg-gray-600 text-white px-4 py-2 rounded">Quay lại</a>
     </div>
 </div>
-
 @endsection
