@@ -61,7 +61,16 @@
                         </button>
                     </div>
                 </div>
-
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <div class="relative flex items-center justify-center w-5 h-5 rounded bg-dark-main border border-dark-border group-hover:border-brand-start transition-colors">
+                            <input type="checkbox" name="remember" value="1" class="peer sr-only">
+                            <i class="ph-bold ph-check text-white text-xs opacity-0 peer-checked:opacity-100 transition-opacity"></i>
+                            <div class="absolute inset-0 rounded bg-brand-start opacity-0 peer-checked:opacity-100 -z-10 transition-opacity"></div>
+                        </div>
+                        <span class="text-sm text-text-sub group-hover:text-white transition-colors">Ghi nhớ đăng nhập</span>
+                    </label>
+                </div>
     </button>
     
 </body>
