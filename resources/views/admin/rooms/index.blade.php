@@ -1,61 +1,101 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Quáº£n lÃ½ phÃ²ng chiáº¿u - MovieMate')
-@section('page-title', 'Quáº£n lÃ½ phÃ²ng chiáº¿u')
+@section('title', 'Quản lý phòng chiếu - MovieMate Admin')
+@section('page-title', 'Quản lý phòng chiếu')
 
 @section('content')
-
-<div class="rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+<div class="space-y-6">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-            <h1 class="text-3xl font-black">Quáº£n lÃ½ phÃ²ng chiáº¿u</h1>
-            <p class="mt-2 text-gray-400">Danh sÃ¡ch phÃ²ng chiáº¿u</p>
+            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Cinema rooms</p>
+            <h1 class="text-3xl font-extrabold app-text">Phòng chiếu</h1>
+            <p class="app-muted mt-2">Quản lý phòng, loại phòng và sơ đồ ghế theo từng rạp.</p>
         </div>
-
-        <a href="/admin/rooms/create" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-5 py-3 text-sm font-bold">
-            ThÃªm phÃ²ng
+        <a href="{{ route('admin.rooms.create') }}" class="btn-primary">
+            <i class="ph-bold ph-plus"></i> Thêm phòng
         </a>
     </div>
 
-    <div class="mb-6 grid gap-4 md:grid-cols-4">
-        <input placeholder="TÃ¬m kiáº¿m..." class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18] md:col-span-2">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18]">
-            <option>Tráº¡ng thÃ¡i</option>
-            <option>Äang hoáº¡t Ä‘á»™ng</option>
-            <option>Táº¡m khÃ³a</option>
-        </select>
-        <button class="rounded-2xl border border-white/10 px-5 py-3 font-bold hover:border-[#FF7A18]">Lá»c</button>
-    </div>
+    @if(session('success'))
+        <div class="rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-bold">
+            {{ session('success') }}
+        </div>
+    @endif
 
-    <div class="overflow-x-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
-            <thead class="text-gray-400">
-                <tr class="border-b border-white/10">
-                    <th class="py-4">#</th>
-                    <th>TÃªn</th>
-                    <th>ThÃ´ng tin</th>
-                    <th>NgÃ y táº¡o</th>
-                    <th>Tráº¡ng thÃ¡i</th>
-                    <th class="text-right">HÃ nh Ä‘á»™ng</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (range(1,8) as $i)
-                    <tr class="border-b border-white/5">
-                        <td class="py-4 font-bold">{{ $i }}</td>
-                        <td class="font-bold">Dá»¯ liá»‡u máº«u {{ $i }}</td>
-                        <td class="text-gray-400">ThÃ´ng tin chi tiáº¿t cá»§a báº£n ghi {{ $i }}</td>
-                        <td>20/05/2026</td>
-                        <td><span class="rounded-full bg-green-500/20 px-3 py-1 text-xs font-bold text-green-400">Hoáº¡t Ä‘á»™ng</span></td>
-                        <td class="text-right">
-                            <a href="#" class="mr-3 text-[#FF7A18]">Sá»­a</a>
-                            <a href="#" class="text-red-400">XÃ³a</a>
-                        </td>
+    <div class="cinema-card overflow-hidden">
+        <div class="p-5 border-b app-border">
+            <form method="GET" action="{{ route('admin.rooms.index') }}" class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+                <label class="flex items-center gap-3 px-4 app-input border app-border rounded-2xl">
+                    <i class="ph ph-magnifying-glass app-muted"></i>
+                    <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Tìm tên phòng..." class="w-full bg-transparent app-text focus:outline-none py-3">
+                </label>
+                <button type="submit" class="btn-secondary !rounded-2xl">
+                    <i class="ph ph-funnel"></i> Lọc
+                </button>
+            </form>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Rạp</th>
+                        <th>Tên phòng</th>
+                        <th>Loại</th>
+                        <th>Số ghế</th>
+                        <th>Trạng thái</th>
+                        <th class="text-right">Thao tác</th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @forelse($rooms as $room)
+                        <tr>
+                            <td class="app-muted">#{{ $room->id }}</td>
+                            <td>
+                                <p class="font-bold app-text">{{ $room->cinema->name ?? '-' }}</p>
+                                <p class="text-xs app-muted">{{ $room->cinema->city ?? '' }}</p>
+                            </td>
+                            <td class="font-extrabold">{{ $room->name }}</td>
+                            <td>{{ $room->room_type }}</td>
+                            <td>{{ $room->total_seats }}</td>
+                            <td>
+                                @if($room->status === 'active')
+                                    <span class="status-badge text-success bg-success/10">Hoạt động</span>
+                                @else
+                                    <span class="status-badge text-warning bg-warning/10">Tạm ngưng</span>
+                                @endif
+                            </td>
+                            <td>
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ route('admin.seats.manage', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
+                                        <i class="ph ph-armchair"></i> Ghế
+                                    </a>
+                                    <a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
+                                        <i class="ph ph-pencil-simple"></i> Sửa
+                                    </a>
+                                    <form action="{{ route('admin.rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phòng này?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:bg-error hover:border-error hover:text-white transition-colors">
+                                            <i class="ph ph-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="text-center app-muted py-10">Không có phòng nào.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        <div class="p-5 border-t app-border">
+            {{ $rooms->links() }}
+        </div>
     </div>
 </div>
-
 @endsection
