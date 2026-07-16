@@ -1,138 +1,122 @@
 @extends('layouts.user')
 
-@section('title', 'Chi tiết phim - MovieMate')
+@section('title', $movie->title . ' - MovieMate')
 
 @section('content')
-
-<section class="relative min-h-screen overflow-hidden bg-[#080A12]">
-
-    <div class="absolute inset-x-0 top-0 h-[650px]">
-        <img
-            src="https://images.unsplash.com/photo-1440404653325-ab127d49abc1?q=80&w=1600&auto=format&fit=crop"
-            class="h-full w-full object-cover opacity-40"
-            alt="Cover"
-        >
-        <div class="absolute inset-0 bg-gradient-to-r from-[#080A12] via-[#080A12]/90 to-[#080A12]/50"></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-[#080A12] via-transparent to-transparent"></div>
-    </div>
-
-    <div class="relative mx-auto max-w-[1440px] px-6 py-16 lg:px-10">
-
-        <div class="grid gap-10 lg:grid-cols-[360px_1fr]">
-
-            <div>
-                <div class="overflow-hidden rounded-[30px] border border-white/10 bg-white/10 p-3 shadow-2xl shadow-red-500/20 backdrop-blur">
-                    <img
-                        src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=700&auto=format&fit=crop"
-                        class="h-[540px] w-full rounded-[24px] object-cover"
-                        alt="Poster"
-                    >
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-1">
+                <div class="poster-frame rounded-2xl overflow-hidden app-card border app-border">
+                    <img src="{{ $movie->poster ? asset('storage/' . $movie->poster) : asset('images/placeholder.png') }}"
+                         alt="{{ $movie->title }}"
+                         class="w-full h-full object-cover">
                 </div>
             </div>
 
-            <div class="pt-10">
-                <div class="mb-5 flex flex-wrap gap-3">
-                    <span class="rounded-full bg-green-500 px-4 py-2 text-sm font-bold">
-                        Đang chiếu
+            <div class="lg:col-span-2">
+                <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <span class="{{ $movie->status === 'now_showing' ? 'bg-brand-start' : 'bg-ai-start' }} text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                        {{ $movie->status === 'now_showing' ? 'Đang chiếu' : 'Sắp chiếu' }}
                     </span>
-                    <span class="rounded-full bg-white/10 px-4 py-2 text-sm font-bold">
-                        T16
-                    </span>
-                    <span class="rounded-full bg-yellow-500/20 px-4 py-2 text-sm font-bold text-yellow-300">
-                        ⭐ 4.8
+                    <span class="border app-border app-text text-xs font-bold px-3 py-1 rounded-full">
+                        {{ $movie->age_rating }}
                     </span>
                 </div>
 
-                <h1 class="text-5xl font-black leading-tight md:text-7xl">
-                    Thanh Gươm Diệt Quỷ
-                </h1>
+                <h1 class="text-3xl md:text-5xl font-bold app-text mb-4">{{ $movie->title }}</h1>
 
-                <p class="mt-5 max-w-3xl text-lg leading-8 text-gray-300">
-                    Một cuộc phiêu lưu đầy kịch tính, nơi các nhân vật phải chiến đấu để bảo vệ những điều quan trọng nhất.
-                    Bộ phim mang đến trải nghiệm điện ảnh hấp dẫn với hình ảnh mãn nhãn và cảm xúc mạnh mẽ.
-                </p>
-
-                <div class="mt-8 grid max-w-3xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p class="text-sm text-gray-400">Thể loại</p>
-                        <h3 class="mt-1 font-bold">Hành động</h3>
+                <div class="flex flex-wrap items-center gap-5 text-sm app-muted mb-6">
+                    <div class="flex items-center gap-2">
+                        <i class="ph ph-clock text-lg"></i> {{ $movie->duration }} phút
                     </div>
-
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p class="text-sm text-gray-400">Thời lượng</p>
-                        <h3 class="mt-1 font-bold">115 phút</h3>
+                    <div class="flex items-center gap-2">
+                        <i class="ph ph-calendar-blank text-lg"></i>
+                        Khởi chiếu:
+                        {{ $movie->release_date ? $movie->release_date->format('d/m/Y') : 'Chưa xác định' }}
                     </div>
-
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p class="text-sm text-gray-400">Quốc gia</p>
-                        <h3 class="mt-1 font-bold">Nhật Bản</h3>
-                    </div>
-
-                    <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <p class="text-sm text-gray-400">Khởi chiếu</p>
-                        <h3 class="mt-1 font-bold">20/05/2026</h3>
+                    <div class="flex items-center gap-2">
+                        <i class="ph ph-globe-hemisphere-west text-lg"></i> {{ $movie->country ?? 'Đang cập nhật' }}
                     </div>
                 </div>
 
-                <div class="mt-9 flex flex-wrap gap-4">
-                    <a href="#showtimes" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-8 py-4 font-bold shadow-xl shadow-red-500/30 transition hover:scale-105">
-                        Đặt vé ngay
+                <div class="app-card border app-border rounded-2xl p-5 mb-6">
+                    <h2 class="text-xl font-bold app-text mb-3 border-l-4 border-brand-start pl-3">Nội dung phim</h2>
+                    <p class="app-muted leading-relaxed">
+                        {{ $movie->description ?? 'Nội dung phim đang được cập nhật.' }}
+                    </p>
+
+                    <div class="mt-4 flex flex-wrap gap-2 text-sm">
+                        @forelse($movie->genres as $genre)
+                            <span class="px-3 py-1 app-secondary border app-border rounded-lg app-muted">
+                                {{ $genre->name }}
+                            </span>
+                        @empty
+                            <span class="app-muted">Chưa cập nhật thể loại</span>
+                        @endforelse
+                    </div>
+                </div>
+
+                @if($movie->trailer_url)
+                    <a href="{{ $movie->trailer_url }}" target="_blank"
+                       class="inline-flex items-center gap-2 px-5 py-3 app-card border app-border app-text rounded-xl hover:border-brand-start hover:text-brand-start transition-colors">
+                        <i class="ph-fill ph-play-circle text-2xl"></i> Xem trailer
                     </a>
-
-                    <button class="rounded-2xl border border-white/10 bg-white/5 px-8 py-4 font-bold transition hover:border-[#FF7A18] hover:text-[#FF7A18]">
-                        Xem trailer
-                    </button>
-
-                    <a href="/ai/recommend" class="rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] px-8 py-4 font-bold shadow-xl shadow-purple-500/30 transition hover:scale-105">
-                        Hỏi AI về phim này
-                    </a>
-                </div>
+                @endif
             </div>
-
         </div>
 
-        <div id="showtimes" class="mt-24 rounded-[32px] border border-white/10 bg-[#151A27] p-8">
-            <div class="mb-8">
-                <p class="mb-2 text-sm font-bold uppercase tracking-[0.3em] text-[#FF7A18]">Showtimes</p>
-                <h2 class="text-4xl font-black">Lịch chiếu</h2>
-            </div>
+        <section id="showtimes" class="mt-12">
+            <h2 class="text-2xl font-bold app-text mb-6 border-l-4 border-brand-start pl-4">Lịch chiếu</h2>
 
-            <div class="mb-8 flex gap-4 overflow-x-auto pb-2">
-                @foreach (['Hôm nay', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'] as $day)
-                    <button class="min-w-[130px] rounded-2xl border border-white/10 bg-[#080A12] p-4 text-left transition hover:border-[#FF7A18] hover:bg-[#FF7A18]/10">
-                        <p class="font-bold">{{ $day }}</p>
-                        <p class="mt-1 text-sm text-gray-400">20/05</p>
-                    </button>
-                @endforeach
-            </div>
-
-            @foreach (range(1, 3) as $c)
-                <div class="mb-6 rounded-[24px] border border-white/10 bg-[#080A12] p-6">
-                    <div class="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-                        <div>
-                            <h3 class="text-2xl font-black">MovieMate Cinema {{ $c }}</h3>
-                            <p class="mt-2 text-sm text-gray-400">Tầng 5, Vincom Bà Triệu, Hà Nội</p>
-                        </div>
-
-                        <span class="rounded-full bg-green-500/20 px-4 py-2 text-sm font-bold text-green-400">
-                            Còn vé
-                        </span>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3">
-                        @foreach (['09:30', '11:45', '14:00', '18:30', '20:45', '22:30'] as $time)
-                            <a href="/booking/select-seat"
-                               class="rounded-xl border border-white/10 px-5 py-3 font-bold transition hover:border-[#FF7A18] hover:bg-gradient-to-r hover:from-[#FF3D57] hover:to-[#FF7A18]">
-                                {{ $time }}
-                            </a>
-                        @endforeach
+            @if($showtimes->isEmpty())
+                <div class="app-card border app-border rounded-2xl p-6 app-muted">
+                    Hiện chưa có suất chiếu khả dụng.
+                </div>
+            @else
+                <div class="app-card border app-border rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="app-secondary">
+                                <tr>
+                                    <th class="px-4 py-3 app-text text-sm font-semibold">Ngày</th>
+                                    <th class="px-4 py-3 app-text text-sm font-semibold">Giờ</th>
+                                    <th class="px-4 py-3 app-text text-sm font-semibold">Rạp / Phòng</th>
+                                    <th class="px-4 py-3 app-text text-sm font-semibold">Giá thường</th>
+                                    <th class="px-4 py-3 app-text text-sm font-semibold">Giá VIP</th>
+                                    <th class="px-4 py-3 app-text text-sm font-semibold text-right">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($showtimes as $show)
+                                    <tr class="border-t app-border">
+                                        <td class="px-4 py-3 app-text">
+                                            {{ $show->show_date->format('d/m/Y') }}
+                                        </td>
+                                        <td class="px-4 py-3 app-text font-bold text-brand-start">
+                                            {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
+                                        </td>
+                                        <td class="px-4 py-3 app-muted">
+                                            {{ $show->cinema->name }} / {{ $show->room->name }}
+                                        </td>
+                                        <td class="px-4 py-3 app-text">
+                                            {{ number_format($show->price, 0, ',', '.') }}đ
+                                        </td>
+                                        <td class="px-4 py-3 app-text">
+                                            {{ number_format($show->vip_price ?? $show->price, 0, ',', '.') }}đ
+                                        </td>
+                                        <td class="px-4 py-3 text-right">
+                                            <a href="{{ route('user.bookings.selectSeat', $show->id) }}"
+                                               class="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-semibold text-sm hover:shadow-lg hover:shadow-brand-start/30 transition-all">
+                                                Chọn ghế
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            @endforeach
-
-        </div>
-
+            @endif
+        </section>
     </div>
-</section>
-
 @endsection
