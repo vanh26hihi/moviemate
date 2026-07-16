@@ -242,7 +242,7 @@ class BookingController extends Controller
      */
     public function success(Booking $booking)
     {
-        abort_unless($booking->user_id === Auth::id(), 403);
+        abort_unless($booking->user_id === null || $booking->user_id === Auth::id(), 403);
 
         $booking->load([
             'user',
