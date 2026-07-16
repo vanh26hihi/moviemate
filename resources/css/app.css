@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -6,6 +7,434 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+
+    --color-dark-main:   #080A12;
+    --color-dark-sub:    #0B0F1A;
+    --color-dark-card:   #151A27;
+    --color-dark-border: #2D3343;
+
+    --color-text-main: #FFFFFF;
+    --color-text-sub:  #9CA3AF;
+
+    --color-brand-start: #FF3D57;
+    --color-brand-end:   #FF7A18;
+
+    --color-ai-start: #7C3AED;
+    --color-ai-end:   #2563EB;
+
+    --color-success: #22C55E;
+    --color-warning: #F59E0B;
+    --color-error:   #EF4444;
+}
+
+:root {
+    --bg-main:       #080A12;
+    --bg-secondary:  #0B0F1A;
+    --card-bg:       #151A27;
+    --border-color:  rgba(255, 255, 255, 0.10);
+    --text-primary:  #FFFFFF;
+    --text-muted:    #9CA3AF;
+    --input-bg:      #0B0F1A;
+    --sidebar-bg:    #151A27;
+    --header-bg:     rgba(8, 10, 18, 0.86);
+    --scrollbar-thumb: #2D3343;
+    color-scheme: dark;
+}
+
+html.light {
+    --bg-main:       #F8FAFC;
+    --bg-secondary:  #FFFFFF;
+    --card-bg:       #FFFFFF;
+    --border-color:  rgba(15, 23, 42, 0.12);
+    --text-primary:  #0F172A;
+    --text-muted:    #64748B;
+    --input-bg:      #F8FAFC;
+    --sidebar-bg:    #FFFFFF;
+    --header-bg:     rgba(255, 255, 255, 0.92);
+    --scrollbar-thumb: #CBD5E1;
+    color-scheme: light;
+}
+
+.app-bg        { background-color: var(--bg-main); color: var(--text-primary); }
+.app-secondary { background-color: var(--bg-secondary); }
+.app-card      { background-color: var(--card-bg); border-color: var(--border-color); }
+.app-border    { border-color: var(--border-color); }
+.app-text      { color: var(--text-primary); }
+.app-muted     { color: var(--text-muted); }
+.app-input     { background-color: var(--input-bg); border-color: var(--border-color); color: var(--text-primary); }
+.app-sidebar   { background-color: var(--sidebar-bg); border-color: var(--border-color); }
+.app-header    { background-color: var(--header-bg); border-color: var(--border-color); }
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 5.5rem;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    body {
+        background:
+            radial-gradient(circle at top left, rgba(255, 61, 87, 0.06), transparent 28rem),
+            radial-gradient(circle at top right, rgba(124, 58, 237, 0.06), transparent 28rem),
+            var(--bg-main);
+        color: var(--text-primary);
+        font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        overflow-x: clip;
+        min-height: 100vh;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    img,
+    video,
+    canvas,
+    svg {
+        max-width: 100%;
+    }
+
+    ::selection {
+        background-color: #FF3D57;
+        color: #ffffff;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+}
+
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+.showtime-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.showtime-section {
+    isolation: isolate;
+}
+
+.primary-gradient {
+    background: linear-gradient(135deg, var(--color-brand-start), var(--color-brand-end));
+}
+
+.ai-gradient {
+    background: linear-gradient(135deg, var(--color-ai-start), var(--color-ai-end));
+}
+
+.cinema-surface {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 18rem),
+        radial-gradient(circle at 12% 0%, rgba(255, 61, 87, 0.12), transparent 24rem),
+        radial-gradient(circle at 88% 0%, rgba(124, 58, 237, 0.10), transparent 22rem),
+        var(--bg-main);
+}
+
+.cinema-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 1.25rem;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.20);
+}
+
+.cinema-input {
+    width: 100%;
+    border-radius: 0.9rem;
+    border: 1px solid var(--border-color);
+    background-color: var(--input-bg);
+    color: var(--text-primary);
+    padding: 0.78rem 1rem;
+    outline: none;
+    transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+
+.cinema-input:focus {
+    border-color: var(--color-brand-start);
+    box-shadow: 0 0 0 4px rgba(255, 61, 87, 0.12);
+}
+
+.cinema-label {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--color-brand-start), var(--color-brand-end));
+    color: #fff;
+    font-weight: 800;
+    padding: 0.75rem 1.15rem;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(255, 61, 87, 0.24);
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    font-weight: 700;
+    padding: 0.75rem 1.15rem;
+    transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+}
+
+.btn-secondary:hover {
+    border-color: var(--color-brand-start);
+    color: var(--color-brand-start);
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    white-space: nowrap;
+}
+
+.admin-table thead th {
+    background-color: var(--bg-secondary);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.9rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.admin-table tbody td {
+    color: var(--text-primary);
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.admin-table tbody tr {
+    transition: background-color .18s ease;
+}
+
+.admin-table tbody tr:hover {
+    background-color: rgba(255, 61, 87, 0.045);
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    border: 1px solid currentColor;
+}
+
+.fallback-poster {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    padding: 1.25rem;
+    text-align: center;
+    color: #fff;
+    background:
+        radial-gradient(circle at 50% 34%, rgba(255, 61, 87, 0.34), transparent 28%),
+        linear-gradient(145deg, #151A27, #2D3343 55%, #080A12);
+}
+
+.fallback-poster i {
+    color: var(--color-brand-start);
+    font-size: 2.4rem;
+}
+
+.fallback-poster span {
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.hero-title {
+    line-height: 1.18;
+    padding-bottom: 0.08em;
+    overflow-wrap: anywhere;
+}
+
+.movie-card {
+    min-width: 0;
+}
+
+.movie-poster,
+.poster-frame {
+    aspect-ratio: 2 / 3;
+    background:
+        radial-gradient(circle at 50% 36%, rgba(255, 61, 87, 0.20), transparent 26%),
+        linear-gradient(145deg, #151A27, #2D3343 55%, #080A12);
+    position: relative;
+    overflow: hidden;
+}
+
+.movie-poster {
+    width: 100%;
+}
+
+.poster-frame::before,
+.movie-poster::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: rgba(255, 255, 255, 0.52);
+    font-weight: 800;
+    letter-spacing: 0;
+    z-index: 0;
+}
+
+.movie-poster img,
+.poster-frame img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    z-index: 1;
+}
+
+.payment-badges {
+    max-width: 100%;
+}
+
+.payment-badge {
+    white-space: nowrap;
+}
+
+.safe-break {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.admin-shell,
+.staff-shell {
+    min-width: 0;
+}
+
+@media (max-width: 640px) {
+    .hero-title {
+        line-height: 1.24;
+    }
+
+    .chat-shell {
+        height: calc(100dvh - 7.5rem);
+        min-height: 32rem;
+    }
+}
+
+@supports not (overflow-x: clip) {
+    body {
+        overflow-x: hidden;
+    }
+}
+
+html.light .app-header {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 1px 24px rgba(15, 23, 42, 0.08);
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+    color: #94a3b8;
+}
+
+html.light input[type="date"] {
+    color-scheme: light;
+}
+
+html.light .app-card {
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07), 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+html.light .cinema-card {
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+html.light .cinema-surface {
+    background:
+        radial-gradient(circle at 12% 0%, rgba(255, 61, 87, 0.10), transparent 24rem),
+        radial-gradient(circle at 88% 0%, rgba(124, 58, 237, 0.08), transparent 22rem),
+        var(--bg-main);
+}
+
+html.light .bg-dark-card,
+html.light .bg-dark-card\/50,
+html.light .bg-dark-card\/80,
+html.light .bg-dark-card\/90 {
+    background-color: var(--card-bg);
+}
+
+html.light .bg-dark-main,
+html.light .bg-dark-main\/30,
+html.light .bg-dark-main\/50 {
+    background-color: var(--input-bg);
+}
+
+html.light .bg-dark-sub,
+html.light .bg-dark-border {
+    background-color: #E2E8F0;
+}
+
+html.light .border-dark-border {
+    border-color: var(--border-color);
+}
+
+html.light .text-text-main,
+html.light .text-white {
+    color: var(--text-primary);
+}
+
+html.light .text-text-sub,
+html.light .placeholder-text-sub\/50::placeholder {
+    color: var(--text-muted);
+}
+
+html.light [class*="from-brand-start"][class*="to-brand-end"],
+html.light [class*="from-ai-start"][class*="to-ai-end"],
+html.light .bg-brand-start,
+html.light .bg-ai-start,
+html.light .bg-success,
+html.light .bg-error {
+    color: #ffffff;
+}
+
+html.light .bg-gradient-to-br.from-dark-card.to-dark-main,
+html.light .bg-gradient-to-br.from-dark-card.to-\[\#1E1B4B\],
+html.light .bg-gradient-to-br.from-\[\#1E1B4B\].to-dark-main {
+    background-image: linear-gradient(135deg, var(--card-bg), var(--bg-secondary));
+}
+
+html.light .bg-gradient-to-tr.from-dark-main.via-dark-main.to-dark-sub {
+    background-image: linear-gradient(to top right, var(--bg-main), var(--bg-main), var(--bg-secondary));
 }

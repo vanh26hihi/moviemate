@@ -175,6 +175,8 @@
     </div>
 </section>
 
+@include('user.partials.showtime-section')
+
 <section class="bg-[#0B0F1A] py-20">
     <div class="mx-auto max-w-[1440px] px-6 lg:px-10">
         <div class="mb-12 text-center">
