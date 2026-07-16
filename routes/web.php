@@ -25,17 +25,17 @@ Route::get('/movies', [MovieController::class, 'index'])->name('user.movies.inde
 
 Route::get('/movies/{slug}', [MovieController::class, 'show'])->name('user.movies.show');
 
-Route::get('/booking/select-seat', function () {
-    return view('user.bookings.select-seat');
-})->name('user.bookings.selectSeat');
+Route::get('/booking/select-seat/{showtime}', [BookingController::class, 'selectSeat'])
+    ->name('user.bookings.selectSeat');
 
-Route::get('/booking/checkout', function () {
-    return view('user.bookings.checkout');
-})->name('user.bookings.checkout');
+Route::get('/booking/checkout/{showtime}', [BookingController::class, 'checkout'])
+    ->name('user.bookings.checkout');
 
-Route::get('/booking/success', function () {
-    return view('user.bookings.success');
-})->name('user.bookings.success');
+Route::post('/booking/store', [BookingController::class, 'store'])
+    ->name('user.bookings.store');
+
+Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
+    ->name('user.bookings.success');
 
 Route::get('/my-ticket', function () {
     return view('user.bookings.ticket');
