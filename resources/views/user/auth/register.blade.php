@@ -30,3 +30,17 @@
 
                 <form action="{{ route('register.post') }}" method="POST" class="space-y-4">
                     @csrf
+<div>
+                        <label for="name" class="block text-sm font-semibold app-text-soft mb-1.5">Họ và tên</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="ph ph-user app-text-muted text-lg"></i>
+                            </div>
+                            <input type="text" id="name" name="name" value="{{ old('name') }}"
+                                   class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
+                                   placeholder="VD: Nguyễn Văn A" required>
+                        </div>
+                        @error('name')
+                            <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
+                        @enderror
+                    </div>
