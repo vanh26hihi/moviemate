@@ -44,3 +44,17 @@
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
                         @enderror
                     </div>
+                    <div>
+                        <label for="email" class="block text-sm font-semibold app-text-soft mb-1.5">Email</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="ph ph-envelope app-text-muted text-lg"></i>
+                            </div>
+                            <input type="email" id="email" name="email" value="{{ old('email') }}"
+                                   class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
+                                   placeholder="Nhập email của bạn" required>
+                        </div>
+                        @error('email')
+                            <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
+                        @enderror
+                    </div>
