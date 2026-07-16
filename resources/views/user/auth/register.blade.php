@@ -3,3 +3,12 @@
 @section('title', 'Đăng ký - MovieMate')
 
 @section('content')
+<div class="min-h-[calc(100svh-4rem)] md:min-h-[calc(100svh-5rem)] flex">
+        <div class="hidden lg:flex w-1/2 relative dark-surface border-r border-white/10 overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)]/40 to-transparent z-10"></div>
+            <img src="https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
+                 alt="Cinema" class="w-full h-full object-cover opacity-40">
+            <div class="absolute bottom-16 left-12 right-12 z-20">
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-ai-start/20 border border-ai-start/50 text-ai-start text-sm font-medium mb-5 backdrop-blur-sm">
+                    <i class="ph-fill ph-sparkle"></i> Trải nghiệm AI tích hợp
+                </div>
