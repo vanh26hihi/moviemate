@@ -72,3 +72,7 @@
                         </label>
                         <a href="#" class="text-sm font-semibold text-brand-start hover:text-brand-end">Quên mật khẩu?</a>
                     </div>
+                    <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5 text-sm">
+                        Đăng nhập
+                    </button>
+                </form>
