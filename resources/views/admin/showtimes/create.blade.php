@@ -102,7 +102,8 @@
             .then(data => {
                 roomSelect.innerHTML = '<option value="">-- Chọn phòng --</option>' + data.map(room => {
                     const selected = String(selectedRoomId || '') === String(room.id) ? 'selected' : '';
-                    return `<option value="${room.id}" ${selected}>${room.name}</option>`;
+                    const label = room.room_type ? `${room.name} (${room.room_type})` : room.name;
+                    return `<option value="${room.id}" ${selected}>${label}</option>`;
                 }).join('');
             })
             .catch(() => roomSelect.innerHTML = '<option value="">-- Lỗi tải phòng --</option>');

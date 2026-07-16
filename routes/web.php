@@ -58,7 +58,10 @@ Route::get('/profile', function () {
 })->name('user.profile');
 
 Route::get('/api/cinemas/{cinema}/rooms', function (App\Models\Cinema $cinema) {
-    return $cinema->rooms()->select('id', 'name')->get();
+    return $cinema->rooms()
+        ->select('id', 'name', 'room_type')
+        ->orderBy('name')
+        ->get();
 })->name('api.cinemas.rooms');
 
 Route::prefix('admin')->name('admin.')->group(function () {
