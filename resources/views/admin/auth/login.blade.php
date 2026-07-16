@@ -21,6 +21,16 @@
         <div class="absolute bottom-0 left-0 w-[600px] h-[600px] bg-ai-start/10 rounded-full blur-[120px] translate-y-1/3 -translate-x-1/3"></div>
         <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
     </div>
+    <div class="w-full max-w-md relative z-20">
+        
+        <div class="text-center mb-10">
+            <div class="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-dark-card border border-dark-border shadow-2xl mb-6 relative overflow-hidden group">
+                <div class="absolute inset-0 bg-gradient-to-tr from-brand-start/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <i class="ph-fill ph-film-strip text-5xl text-brand-start"></i>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">MovieMate Admin</h1>
+            <p class="text-text-sub">Hệ thống quản trị đặt vé xem phim</p>
+        </div>
     </button>
     
 </body>
