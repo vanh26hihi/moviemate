@@ -33,7 +33,7 @@ class MovieController extends Controller
      */
     public function create()
     {
-        $genres = Genre::all();
+        $genres = Genre::orderBy('name')->get();
         return view('admin.movies.create', compact('genres'));
     }
 
@@ -106,7 +106,7 @@ class MovieController extends Controller
      */
     public function edit(Movie $movie)
     {
-        $genres = Genre::all();
+        $genres = Genre::orderBy('name')->get();
         $movie->load('genres');
         return view('admin.movies.edit', compact('movie', 'genres'));
     }
