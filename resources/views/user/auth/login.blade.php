@@ -46,3 +46,16 @@
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
                         @enderror
                     </div>
+                    <div>
+                        <label for="password" class="block text-sm font-semibold app-text-soft mb-2">Mật khẩu</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="ph ph-lock-key app-text-muted text-lg"></i>
+                            </div>
+                            <input type="password" id="password" name="password"
+                                   class="app-input w-full pl-11 pr-11 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
+                                   placeholder="Nhập mật khẩu" required>
+                            <button type="button" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu">
+                                <i class="ph ph-eye text-lg"></i>
+                            </button>
+                        </div>
