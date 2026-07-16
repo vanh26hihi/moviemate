@@ -12,3 +12,7 @@
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-ai-start/20 border border-ai-start/50 text-ai-start text-sm font-medium mb-5 backdrop-blur-sm">
                     <i class="ph-fill ph-sparkle"></i> Trải nghiệm AI tích hợp
                 </div>
+                <h2 class="text-3xl font-bold text-white mb-3 leading-tight">Tham gia cộng đồng<br>yêu điện ảnh.</h2>
+                <p class="surface-muted text-base">Trở thành thành viên để nhận ưu đãi đặc quyền và trải nghiệm đặt vé nhanh chóng.</p>
+            </div>
+        </div>
