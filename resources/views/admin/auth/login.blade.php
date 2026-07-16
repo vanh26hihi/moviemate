@@ -31,6 +31,22 @@
             <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">MovieMate Admin</h1>
             <p class="text-text-sub">Hệ thống quản trị đặt vé xem phim</p>
         </div>
+        <div class="bg-dark-card/80 backdrop-blur-xl border border-dark-border rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+            <!-- Top line highlight -->
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-start to-brand-end"></div>
+
+            <form action="{{ route('login.post') }}" method="POST" class="space-y-6">
+                @csrf
+                
+                <div>
+                    <label for="email" class="block text-sm font-medium text-text-sub mb-2">Email quản trị</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <i class="ph ph-envelope-simple text-text-sub text-lg"></i>
+                        </div>
+                        <input type="email" id="email" name="email" value="{{ old('email', 'admin@example.com') }}" class="w-full pl-11 pr-4 py-3.5 bg-dark-main border border-dark-border rounded-xl text-white focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors placeholder-text-sub/50" placeholder="admin@example.com" required>
+                    </div>
+                </div>
     </button>
     
 </body>
