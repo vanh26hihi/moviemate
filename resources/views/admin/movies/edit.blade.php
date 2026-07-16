@@ -1,52 +1,122 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Form phim - MovieMate')
-@section('page-title', 'ThÃªm/Sá»­a phim')
+@section('title', 'Sửa Phim')
 
 @section('content')
+<div class="container mx-auto py-6">
+    <h1 class="text-2xl font-bold mb-4">Sửa Phim: {{ $movie->title }}</h1>
 
-<div class="rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <div class="mb-8">
-        <h1 class="text-3xl font-black">ThÃ´ng tin phim</h1>
-        <p class="mt-2 text-gray-400">Nháº­p thÃ´ng tin phim, poster, trailer vÃ  mÃ´ táº£.</p>
-    </div>
+    @if ($errors->any())
+        <div class="bg-red-100 text-red-800 p-3 rounded mb-4">
+            <ul class="list-disc list-inside">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
-    <div class="grid gap-8 lg:grid-cols-[1fr_360px]">
-        <form class="space-y-5">
-            <div class="grid gap-4 md:grid-cols-2">
-                <input placeholder="TÃªn phim" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-                <input placeholder="Slug" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-                <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]"><option>Thá»ƒ loáº¡i</option></select>
-                <input placeholder="Quá»‘c gia" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-                <input placeholder="Thá»i lÆ°á»£ng" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-                <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]"><option>Äá»™ tuá»•i</option><option>P</option><option>T13</option><option>T16</option><option>T18</option></select>
-                <input type="date" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-                <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]"><option>Äang chiáº¿u</option><option>Sáº¯p chiáº¿u</option><option>Ngá»«ng chiáº¿u</option></select>
+    <form action="{{ route('admin.movies.update', $movie) }}" method="POST"
+          enctype="multipart/form-data" class="space-y-4">
+        @csrf
+        @method('PUT')
+
+        <div>
+            <label class="block font-medium">Tiêu đề *</label>
+            <input type="text" name="title" value="{{ old('title', $movie->title) }}" required
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Slug (để trống để tự tạo)</label>
+            <input type="text" name="slug" value="{{ old('slug', $movie->slug) }}"
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Mô tả</label>
+            <textarea name="description" rows="4"
+                      class="w-full border rounded px-3 py-2">{{ old('description', $movie->description) }}</textarea>
+        </div>
+
+        <div class="flex space-x-4">
+            <div class="w-1/2">
+                <label class="block font-medium">Poster hiện tại</label>
+                @if($movie->poster)
+                    <img src="{{ asset('storage/' . $movie->poster) }}" alt="Poster" class="h-32 mb-2">
+                @else
+                    <p>Chưa có poster.</p>
+                @endif
+                <input type="file" name="poster" accept="image/*" class="w-full">
             </div>
 
-            <input placeholder="Trailer URL" class="w-full rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-
-            <textarea rows="8" placeholder="MÃ´ táº£ phim" class="w-full rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]"></textarea>
-
-            <div class="flex flex-wrap gap-4">
-                <button type="button" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-8 py-4 font-bold">LÆ°u phim</button>
-                <a href="/admin/ai/movie-content" class="rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] px-8 py-4 font-bold">Táº¡o mÃ´ táº£ báº±ng AI</a>
-                <a href="/admin/movies" class="rounded-2xl border border-white/10 px-8 py-4 font-bold">Há»§y</a>
-            </div>
-        </form>
-
-        <div class="space-y-5">
-            <div class="rounded-[24px] border border-white/10 bg-[#080A12] p-5">
-                <h2 class="mb-4 font-black">Poster phim</h2>
-                <div class="flex h-80 items-center justify-center rounded-2xl border-2 border-dashed border-white/10 text-gray-400">Upload poster</div>
-            </div>
-
-            <div class="rounded-[24px] border border-white/10 bg-[#080A12] p-5">
-                <h2 class="mb-4 font-black">Banner phim</h2>
-                <div class="flex h-40 items-center justify-center rounded-2xl border-2 border-dashed border-white/10 text-gray-400">Upload banner</div>
+            <div class="w-1/2">
+                <label class="block font-medium">Cover Image hiện tại</label>
+                @if($movie->cover_image)
+                    <img src="{{ asset('storage/' . $movie->cover_image) }}" alt="Cover" class="h-32 mb-2">
+                @else
+                    <p>Chưa có cover image.</p>
+                @endif
+                <input type="file" name="cover_image" accept="image/*" class="w-full">
             </div>
         </div>
-    </div>
-</div>
 
+        <div>
+            <label class="block font-medium">Trailer URL</label>
+            <input type="url" name="trailer_url" value="{{ old('trailer_url', $movie->trailer_url) }}"
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Country</label>
+            <input type="text" name="country" value="{{ old('country', $movie->country) }}"
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Duration (phút)</label>
+            <input type="number" name="duration" value="{{ old('duration', $movie->duration) }}"
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Age Rating</label>
+            <input type="text" name="age_rating" value="{{ old('age_rating', $movie->age_rating) }}"
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Release Date</label>
+            <input type="date" name="release_date" value="{{ old('release_date', $movie->release_date ? $movie->release_date->format('Y-m-d') : '') }}"
+                   class="w-full border rounded px-3 py-2">
+        </div>
+
+        <div>
+            <label class="block font-medium">Status *</label>
+            <select name="status" required class="w-full border rounded px-3 py-2">
+                <option value="now_showing" {{ old('status', $movie->status) == 'now_showing' ? 'selected' : '' }}>Now Showing</option>
+                <option value="coming_soon" {{ old('status', $movie->status) == 'coming_soon' ? 'selected' : '' }}>Coming Soon</option>
+                <option value="stopped" {{ old('status', $movie->status) == 'stopped' ? 'selected' : '' }}>Stopped</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="block font-medium">Thể loại</label>
+            <select name="genres[]" multiple class="w-full border rounded px-3 py-2">
+                @foreach($genres as $genre)
+                    <option value="{{ $genre->id }}"
+                        {{ (collect(old('genres', $movie->genres->pluck('id')->toArray()))->contains($genre->id)) ? 'selected' : '' }}>
+                        {{ $genre->name }}
+                    </option>
+                @endforeach
+            </select>
+            <small class="text-gray-600">Giữ Ctrl (Windows) hoặc Cmd (Mac) để chọn nhiều.</small>
+        </div>
+
+        <div class="flex space-x-4">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Cập nhật</button>
+            <a href="{{ route('admin.movies.index') }}" class="bg-gray-600 text-white px-4 py-2 rounded">Hủy</a>
+        </div>
+    </form>
+</div>
 @endsection
