@@ -138,6 +138,8 @@ class BookingController extends Controller
             'seat_ids.required' => 'Vui lòng chọn ít nhất một ghế.',
             'seat_ids.array' => 'Dữ liệu ghế không hợp lệ.',
             'seat_ids.*.distinct' => 'Danh sách ghế bị trùng.',
+            'payment_method.required' => 'Vui lòng chọn phương thức thanh toán.',
+            'payment_method.in' => 'Phương thức thanh toán không hợp lệ.',
         ]);
 
         $booking = DB::transaction(function () use ($validated) {
