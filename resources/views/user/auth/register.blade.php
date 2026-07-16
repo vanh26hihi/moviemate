@@ -22,3 +22,11 @@
                     <h1 class="text-2xl md:text-3xl font-bold app-heading mb-2">Đăng ký tài khoản</h1>
                     <p class="app-text-muted text-sm">Tạo tài khoản MovieMate chỉ trong vài bước.</p>
                 </div>
+                @if($errors->any())
+                    <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-semibold">
+                        {{ $errors->first() }}
+                    </div>
+                @endif
+
+                <form action="{{ route('register.post') }}" method="POST" class="space-y-4">
+                    @csrf
