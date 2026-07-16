@@ -115,3 +115,11 @@
                         Tạo tài khoản
                     </button>
                 </form>
+                <p class="mt-6 text-center text-sm app-text-muted">
+                    Đã có tài khoản?
+                    <a href="{{ route('login') }}" class="font-bold text-brand-start hover:text-brand-end ml-1">Đăng nhập</a>
+                </p>
+            </div>
+        </div>
+    </div>
+@endsection
