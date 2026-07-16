@@ -47,6 +47,21 @@
                         <input type="email" id="email" name="email" value="{{ old('email', 'admin@example.com') }}" class="w-full pl-11 pr-4 py-3.5 bg-dark-main border border-dark-border rounded-xl text-white focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors placeholder-text-sub/50" placeholder="admin@example.com" required>
                     </div>
                 </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label for="password" class="block text-sm font-medium text-text-sub">Mật khẩu</label>
+                    </div>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <i class="ph ph-lock-key text-text-sub text-lg"></i>
+                        </div>
+                        <input type="password" id="password" name="password" class="w-full pl-11 pr-11 py-3.5 bg-dark-main border border-dark-border rounded-xl text-white focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors placeholder-text-sub/50" placeholder="••••••••" required>
+                        <button type="button" class="absolute inset-y-0 right-0 pr-4 flex items-center text-text-sub hover:text-white transition-colors">
+                            <i class="ph ph-eye text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
     </button>
     
 </body>
