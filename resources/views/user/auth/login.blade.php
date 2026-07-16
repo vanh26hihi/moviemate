@@ -13,3 +13,9 @@
                 <p class="surface-muted text-base">Hàng ngàn bộ phim bom tấn và tính năng AI đề xuất thông minh đang chờ đón bạn.</p>
             </div>
         </div>
+        <div class="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10">
+            <div class="w-full max-w-md">
+                <div class="mb-8">
+                    <h1 class="text-2xl md:text-3xl font-bold app-heading mb-2">Đăng nhập</h1>
+                    <p class="app-text-muted text-sm">Chào mừng bạn quay lại với MovieMate.</p>
+                </div>
