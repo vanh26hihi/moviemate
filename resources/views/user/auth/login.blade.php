@@ -76,3 +76,27 @@
                         Đăng nhập
                     </button>
                 </form>
+                <div class="mt-6 relative">
+                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t app-border"></div></div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-3 app-bg app-text-muted">Hoặc đăng nhập với</span>
+                    </div>
+                </div>
+
+                <div class="mt-5 grid grid-cols-2 gap-3">
+                    <button type="button" class="flex items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted hover:app-text hover:border-brand-start transition-colors text-sm font-medium">
+                        <i class="ph-fill ph-google-logo text-lg"></i> Google
+                    </button>
+                    <button type="button" class="flex items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted hover:app-text hover:border-brand-start transition-colors text-sm font-medium">
+                        <i class="ph-fill ph-facebook-logo text-lg text-blue-500"></i> Facebook
+                    </button>
+                </div>
+
+                <p class="mt-6 text-center text-sm app-text-muted">
+                    Chưa có tài khoản?
+                    <a href="{{ route('register') }}" class="font-bold text-brand-start hover:text-brand-end ml-1">Đăng ký ngay</a>
+                </p>
+            </div>
+        </div>
+    </div>
+@endsection
