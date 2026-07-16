@@ -14,6 +14,13 @@
         aria-label="Đổi giao diện sáng/tối" aria-pressed="false">
         <span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span>
         <span class="theme-text hidden sm:inline text-xs font-medium">Tối</span>
+
+        <!-- Background Effects -->
+    <div class="absolute inset-0 z-0">
+        <div class="absolute top-0 right-0 w-[800px] h-[800px] bg-brand-start/10 rounded-full blur-[150px] -translate-y-1/2 translate-x-1/3"></div>
+        <div class="absolute bottom-0 left-0 w-[600px] h-[600px] bg-ai-start/10 rounded-full blur-[120px] translate-y-1/3 -translate-x-1/3"></div>
+        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+    </div>
     </button>
     
 </body>
