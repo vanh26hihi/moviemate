@@ -24,3 +24,8 @@
                         {{ session('success') }}
                     </div>
                 @endif
+                @if($errors->any())
+                    <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-semibold">
+                        {{ $errors->first() }}
+                    </div>
+                @endif
