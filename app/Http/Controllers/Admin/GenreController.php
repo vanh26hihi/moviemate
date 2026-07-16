@@ -111,8 +111,11 @@ class GenreController extends Controller
      */
     public function destroy(Genre $genre)
     {
-        // Detach movies first to keep pivot table clean
-        $genre->movies()->detach();
+        if ($genre->movies()->exists()) {
+            return redirect()
+                ->route('admin.genres.index')
+                ->with('error', 'Không thể xóa thể loại đang được gắn với phim.');
+        }
 
         $genre->delete();
 
