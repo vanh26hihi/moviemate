@@ -1,61 +1,64 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Quáº£n lÃ½ thá»ƒ loáº¡i - MovieMate')
-@section('page-title', 'Quáº£n lÃ½ thá»ƒ loáº¡i')
+@section('title', 'Quản lý Thể Loại')
 
 @section('content')
+<div class="container mx-auto py-6">
+    <h1 class="text-2xl font-bold mb-4">Quản lý Thể Loại</h1>
 
-<div class="rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-            <h1 class="text-3xl font-black">Quáº£n lÃ½ thá»ƒ loáº¡i</h1>
-            <p class="mt-2 text-gray-400">Danh sÃ¡ch thá»ƒ loáº¡i phim</p>
+    @if(session('success'))
+        <div class="bg-green-100 text-green-800 p-3 rounded mb-4">
+            {{ session('success') }}
         </div>
+    @endif
 
-        <a href="/admin/genres/create" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-5 py-3 text-sm font-bold">
-            ThÃªm thá»ƒ loáº¡i
+    <div class="flex justify-between mb-4">
+        <form method="GET" action="{{ route('admin.genres.index') }}" class="flex space-x-2">
+            <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Tìm kiếm tên..."
+                   class="border rounded px-3 py-1">
+            <button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded">Tìm</button>
+        </form>
+        <a href="{{ route('admin.genres.create') }}" class="bg-green-600 text-white px-4 py-2 rounded">
+            Thêm mới
         </a>
     </div>
 
-    <div class="mb-6 grid gap-4 md:grid-cols-4">
-        <input placeholder="TÃ¬m kiáº¿m..." class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18] md:col-span-2">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18]">
-            <option>Tráº¡ng thÃ¡i</option>
-            <option>Äang hoáº¡t Ä‘á»™ng</option>
-            <option>Táº¡m khÃ³a</option>
-        </select>
-        <button class="rounded-2xl border border-white/10 px-5 py-3 font-bold hover:border-[#FF7A18]">Lá»c</button>
-    </div>
-
-    <div class="overflow-x-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
-            <thead class="text-gray-400">
-                <tr class="border-b border-white/10">
-                    <th class="py-4">#</th>
-                    <th>TÃªn</th>
-                    <th>ThÃ´ng tin</th>
-                    <th>NgÃ y táº¡o</th>
-                    <th>Tráº¡ng thÃ¡i</th>
-                    <th class="text-right">HÃ nh Ä‘á»™ng</th>
+    <table class="w-full table-auto border-collapse">
+        <thead class="bg-gray-200">
+            <tr>
+                <th class="border px-4 py-2">#</th>
+                <th class="border px-4 py-2">Tên</th>
+                <th class="border px-4 py-2">Slug</th>
+                <th class="border px-4 py-2">Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($genres as $genre)
+                <tr>
+                    <td class="border px-4 py-2">{{ $genre->id }}</td>
+                    <td class="border px-4 py-2">{{ $genre->name }}</td>
+                    <td class="border px-4 py-2">{{ $genre->slug }}</td>
+                    <td class="border px-4 py-2 space-x-2">
+                        <a href="{{ route('admin.genres.edit', $genre) }}" class="text-yellow-600">Sửa</a>
+                        <form action="{{ route('admin.genres.destroy', $genre) }}" method="POST"
+                              class="inline"
+                              onsubmit="return confirm('Bạn có chắc muốn xóa thể loại này?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-red-600">Xóa</button>
+                        </form>
+                    </td>
                 </tr>
-            </thead>
-            <tbody>
-                @foreach (range(1,8) as $i)
-                    <tr class="border-b border-white/5">
-                        <td class="py-4 font-bold">{{ $i }}</td>
-                        <td class="font-bold">Dá»¯ liá»‡u máº«u {{ $i }}</td>
-                        <td class="text-gray-400">ThÃ´ng tin chi tiáº¿t cá»§a báº£n ghi {{ $i }}</td>
-                        <td>20/05/2026</td>
-                        <td><span class="rounded-full bg-green-500/20 px-3 py-1 text-xs font-bold text-green-400">Hoáº¡t Ä‘á»™ng</span></td>
-                        <td class="text-right">
-                            <a href="#" class="mr-3 text-[#FF7A18]">Sá»­a</a>
-                            <a href="#" class="text-red-400">XÃ³a</a>
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
+            @empty
+                <tr>
+                    <td colspan="4" class="border px-4 py-2 text-center">Không có thể loại nào.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+
+    <div class="mt-4">
+        {{ $genres->links() }}
     </div>
 </div>
-
 @endsection
