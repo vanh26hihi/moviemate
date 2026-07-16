@@ -58,3 +58,17 @@
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
                         @enderror
                     </div>
+                    <div>
+                        <label for="phone" class="block text-sm font-semibold app-text-soft mb-1.5">Số điện thoại</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="ph ph-phone app-text-muted text-lg"></i>
+                            </div>
+                            <input type="tel" id="phone" name="phone" value="{{ old('phone') }}"
+                                   class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
+                                   placeholder="09xx xxx xxx">
+                        </div>
+                        @error('phone')
+                            <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
+                        @enderror
+                    </div>
