@@ -86,7 +86,7 @@ class ShowtimeController extends Controller
 
         // Ensure room belongs to selected cinema
         $room = Room::findOrFail($validated['room_id']);
-        if ($room->cinema_id != $validated['cinema_id']) {
+        if ((int) $room->cinema_id !== (int) $validated['cinema_id']) {
             return back()->withErrors(['room_id' => 'Phòng không thuộc rạp đã chọn.'])
                          ->withInput();
         }
@@ -152,7 +152,7 @@ class ShowtimeController extends Controller
 
         // Ensure room belongs to selected cinema
         $room = Room::findOrFail($validated['room_id']);
-        if ($room->cinema_id != $validated['cinema_id']) {
+        if ((int) $room->cinema_id !== (int) $validated['cinema_id']) {
             return back()->withErrors(['room_id' => 'Phòng không thuộc rạp đã chọn.'])
                          ->withInput();
         }
