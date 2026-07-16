@@ -100,3 +100,18 @@
                                    placeholder="Nhập lại mật khẩu" required>
                         </div>
                     </div>
+<div class="flex items-start pt-1">
+                        <input id="terms" name="terms" type="checkbox" value="1" required
+                               class="h-4 w-4 rounded border-dark-border bg-dark-main text-brand-start focus:ring-brand-start mt-0.5 flex-shrink-0">
+                        <label for="terms" class="ml-2 text-sm app-text-muted leading-relaxed cursor-pointer">
+                            Tôi đồng ý với <a href="#" class="text-brand-start hover:text-brand-end">Điều khoản dịch vụ</a> và <a href="#" class="text-brand-start hover:text-brand-end">Chính sách bảo mật</a>
+                        </label>
+                    </div>
+                    @error('terms')
+                        <p class="text-xs font-semibold text-error">{{ $message }}</p>
+                    @enderror
+
+                    <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5 text-sm mt-2">
+                        Tạo tài khoản
+                    </button>
+                </form>
