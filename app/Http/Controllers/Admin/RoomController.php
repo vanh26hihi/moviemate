@@ -1,1 +1,148 @@
-\n<?php\n\nnamespace App\\Http\\Controllers\\Admin;\n\nuse App\\Http\\Controllers\\Controller;\nuse App\\Models\\Room;\nuse App\\Models\\Cinema;\nuse Illuminate\\Http\\Request;\n\nclass RoomController extends Controller\n{\n    /**\n     * Display a listing of rooms.\n     */\n    public function index(Request $request)\n    {\n        $query = Room::with('cinema');\n\n        if ($search = $request->query('search')) {\n            $query->where('name', 'like', \"%{$search}%\");\n        }\n\n        $rooms = $query->orderBy('name')->paginate(15)->withQueryString();\n\n        return view('admin.rooms.index', compact('rooms', 'search'));\n    }\n\n    /**\n     * Show the form for creating a new room.\n     */\n    public function create()\n    {\n        $cinemas = Cinema::all();\n        return view('admin.rooms.create', compact('cinemas'));\n    }\n\n    /**\n     * Store a newly created room.\n     */\n    public function store(Request $request)\n    {\n        $validated = $request->validate([\n            'cinema_id'   => 'required|exists:cinemas,id',\n            'name'        => 'required|string|max:255',\n            'room_type'   => 'required|string|max:50',\n            'total_seats' => 'required|integer|min:0',\n            'status'      => 'required|in:active,inactive',\n        ]);\n\n        Room::create($validated);\n\n        return redirect()\n            ->route('admin.rooms.index')\n            ->with('success', 'Room created successfully.');\n    }\n\n    /**\n     * Display the specified room.\n     */\n    public function show(Room $room)\n    {\n        $room->load('cinema', 'seats');\n        return view('admin.rooms.show', compact('room'));\n    }\n\n    /**\n     * Show the form for editing the specified room.\n     */\n    public function edit(Room $room)\n    {\n        $cinemas = Cinema::all();\n        return view('admin.rooms.edit', compact('room', 'cinemas'));\n    }\n\n    /**\n     * Update the specified room.\n     */\n    public function update(Request $request, Room $room)\n    {\n        $validated = $request->validate([\n            'cinema_id'   => 'required|exists:cinemas,id',\n            'name'        => 'required|string|max:255',\n            'room_type'   => 'required|string|max:50',\n            'total_seats' => 'required|integer|min:0',\n            'status'      => 'required|in:active,inactive',\n        ]);\n\n        $room->update($validated);\n\n        return redirect()\n            ->route('admin.rooms.index')\n            ->with('success', 'Room updated successfully.');\n    }\n\n    /**\n     * Remove the specified room.\n     */\n    public function destroy(Room $room)\n    {\n        // delete seats belonging to this room\n        $room->seats()->delete();\n\n        $room->delete();\n\n        return redirect()\n            ->route('admin.rooms.index')\n            ->with('success', 'Room deleted successfully.');\n    }\n}\n
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Room;
+use App\Models\Cinema;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class RoomController extends Controller
+{
+    /**
+     * Display a listing of rooms.
+     */
+    public function index(Request $request)
+    {
+        $query = Room::with('cinema');
+
+        $search = $request->query('search');
+
+        if ($search) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $rooms = $query->orderBy('name')
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('admin.rooms.index', compact('rooms', 'search'));
+    }
+
+    /**
+     * Show the form for creating a new room.
+     */
+    public function create()
+    {
+        $cinemas = Cinema::orderBy('name')->get();
+
+        return view('admin.rooms.create', compact('cinemas'));
+    }
+
+    /**
+     * Store a newly created room.
+     */
+    public function store(Request $request)
+    {
+        $request->merge([
+            'room_type' => $this->normalizeRoomType($request->input('room_type')),
+        ]);
+
+        $validated = $request->validate([
+            'cinema_id'   => ['required', 'exists:cinemas,id'],
+            'name'        => ['required', 'string', 'max:255'],
+            'room_type'   => ['required', Rule::in(['2D', '3D', 'IMAX'])],
+            'total_seats' => ['required', 'integer', 'min:0'],
+            'status'      => ['required', 'in:active,inactive'],
+        ]);
+
+        Room::create($validated);
+
+        return redirect()
+            ->route('admin.rooms.index')
+            ->with('success', 'Thêm phòng chiếu thành công.');
+    }
+
+    /**
+     * Display the specified room.
+     */
+    public function show(Room $room)
+    {
+        $room->load(['cinema', 'seats']);
+
+        return view('admin.rooms.show', compact('room'));
+    }
+
+    /**
+     * Show the form for editing the specified room.
+     */
+    public function edit(Room $room)
+    {
+        $cinemas = Cinema::orderBy('name')->get();
+
+        return view('admin.rooms.edit', compact('room', 'cinemas'));
+    }
+
+    /**
+     * Update the specified room.
+     */
+    public function update(Request $request, Room $room)
+    {
+        $request->merge([
+            'room_type' => $this->normalizeRoomType($request->input('room_type')),
+        ]);
+
+        $validated = $request->validate([
+            'cinema_id'   => ['required', 'exists:cinemas,id'],
+            'name'        => ['required', 'string', 'max:255'],
+            'room_type'   => ['required', Rule::in(['2D', '3D', 'IMAX'])],
+            'total_seats' => ['required', 'integer', 'min:0'],
+            'status'      => ['required', 'in:active,inactive'],
+        ]);
+
+        $room->update($validated);
+
+        return redirect()
+            ->route('admin.rooms.index')
+            ->with('success', 'Cập nhật phòng chiếu thành công.');
+    }
+
+    /**
+     * Remove the specified room.
+     */
+    public function destroy(Room $room)
+    {
+        $room->seats()->delete();
+
+        $room->delete();
+
+        return redirect()
+            ->route('admin.rooms.index')
+            ->with('success', 'Xóa phòng chiếu thành công.');
+    }
+
+    private function normalizeRoomType(?string $roomType): ?string
+    {
+        if ($roomType === null) {
+            return null;
+        }
+
+        $value = trim($roomType);
+        $upper = mb_strtoupper($value, 'UTF-8');
+
+        if (str_starts_with($upper, '2D')) {
+            return '2D';
+        }
+
+        if (str_starts_with($upper, '3D')) {
+            return '3D';
+        }
+
+        if (str_contains($upper, 'IMAX')) {
+            return 'IMAX';
+        }
+
+        return $value;
+    }
+}
