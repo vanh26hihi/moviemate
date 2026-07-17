@@ -16,4 +16,13 @@ class OrderController extends Controller
         $items = FoodItem::whereIn('id', array_keys($cart))->get()->keyBy('id');
         return view('foods.cart', compact('cart', 'items'));
     }
+     public function checkout()
+    {
+        $cart = session()->get('food_cart', []);
+        if (empty($cart)) {
+            return redirect()->route('foods.index')->with('error', 'Giỏ hàng trống');
+        }
+        $items = FoodItem::whereIn('id', array_keys($cart))->get()->keyBy('id');
+        return view('foods.checkout', compact('cart', 'items'));
+    }
 }
