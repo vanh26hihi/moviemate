@@ -1,69 +1,69 @@
 <?php
 
-namespace App\Models;
+namespace App\Http\Controllers;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Http\Request;
+use App\Models\Booking;
 
-class Booking extends Model
+class BookingMegaController extends Controller
 {
-    protected $fillable = [
-        'user_id',
-        'showtime_id',
-        'booking_code',
-        'total_amount',
-        'payment_status',
-        'booking_status',
-        'used_at',
-    ];
-
-    public function user(): BelongsTo
+    public function index()
     {
-        return $this->belongsTo(User::class);
+        return Booking::latest()->paginate(10);
     }
 
-    public function showtime(): BelongsTo
+    public function stats()
     {
-        return $this->belongsTo(Showtime::class);
+        return [
+            'total' => Booking::count(),
+            'paid' => Booking::where('payment_status', 'paid')->count(),
+            'pending' => Booking::where('payment_status', 'pending')->count(),
+        ];
     }
 
-    public function bookingSeats(): HasMany
+    public function generateFake()
     {
-        return $this->hasMany(BookingSeat::class);
+        $data = [];
+
+        for ($i = 1; $i <= 300; $i++) {
+            $data[] = [
+                'code' => 'BK' . rand(1000, 9999),
+                'amount' => rand(10000, 500000),
+                'status' => ['paid', 'pending'][rand(0, 1)],
+            ];
+        }
+
+        return $data;
     }
 
-    public function payment(): HasOne
+    public function heavyProcess()
     {
-        return $this->hasOne(Payment::class);
+        $sum = 0;
+
+        for ($i = 0; $i < 10000; $i++) {
+            $sum += $i * rand(1, 10);
+        }
+
+        return ['result' => $sum];
     }
-    public function getFormattedTotalAttribute(): string
-{
-    return number_format($this->total_amount, 0, ',', '.') . ' VND';
-}
 
-public function isPaid(): bool
-{
-    return $this->payment_status === 'paid';
-}
+    public function testLoop()
+    {
+        $arr = [];
 
-public function isUsed(): bool
-{
-    return !is_null($this->used_at);
-}
-public function seatsCount(): int
-{
-    return $this->bookingSeats()->count();
-}
+        for ($i = 0; $i < 500; $i++) {
+            $arr[] = "Line number " . $i;
+        }
 
-public function totalSeatPrice(): float
-{
-    return $this->bookingSeats->sum('price');
-}
+        return $arr;
+    }
 
-public function canCancel(): bool
-{
-    return $this->booking_status === 'active' && !$this->isUsed();
-}
+    public function bigResponse()
+    {
+        return response()->json([
+            'status' => true,
+            'message' => 'Huge data',
+            'data' => $this->testLoop()
+        ]);
+    }
 }
