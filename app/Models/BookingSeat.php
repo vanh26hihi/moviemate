@@ -22,4 +22,18 @@ class BookingSeat extends Model
     {
         return $this->belongsTo(Seat::class);
     }
+    public function scopePaid($query)
+{
+    return $query->where('payment_status', 'paid');
+}
+
+public function scopePending($query)
+{
+    return $query->where('payment_status', 'pending');
+}
+
+public function scopeToday($query)
+{
+    return $query->whereDate('created_at', now());
+}
 }
