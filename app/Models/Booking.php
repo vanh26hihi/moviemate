@@ -52,4 +52,18 @@ public function isUsed(): bool
 {
     return !is_null($this->used_at);
 }
+public function seatsCount(): int
+{
+    return $this->bookingSeats()->count();
+}
+
+public function totalSeatPrice(): float
+{
+    return $this->bookingSeats->sum('price');
+}
+
+public function canCancel(): bool
+{
+    return $this->booking_status === 'active' && !$this->isUsed();
+}
 }
