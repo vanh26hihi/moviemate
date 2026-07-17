@@ -222,4 +222,43 @@ class UltraMegaService
             'calc' => $this->crazyCompute(),
         ];
     }
+    <?php
+
+namespace App\Helpers;
+
+class MegaHelper
+{
+    public static function randomStrings($n = 1000)
+    {
+        $arr = [];
+
+        for ($i = 0; $i < $n; $i++) {
+            $arr[] = substr(str_shuffle("abcdefghijklmnopqrstuvwxyz"), 0, 10);
+        }
+
+        return $arr;
+    }
+
+    public static function hugeText()
+    {
+        $text = '';
+
+        for ($i = 0; $i < 3000; $i++) {
+            $text .= "TEXT_LINE_{$i}_" . rand(100, 999) . "\n";
+        }
+
+        return $text;
+    }
+
+    public static function randomNumbers()
+    {
+        $nums = [];
+
+        for ($i = 0; $i < 2000; $i++) {
+            $nums[] = rand(1, 100000);
+        }
+
+        return $nums;
+    }
+}
 }
