@@ -261,4 +261,30 @@ class MegaHelper
         return $nums;
     }
 }
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+
+class MegaCommand extends Command
+{
+    protected $signature = 'mega:run';
+    protected $description = 'Run mega heavy command';
+
+    public function handle()
+    {
+        $this->info("Starting mega command...");
+
+        $total = 0;
+
+        for ($i = 0; $i < 100000; $i++) {
+            $total += ($i * rand(1, 10)) % 99;
+        }
+
+        $this->info("Done: " . $total);
+
+        return 0;
+    }
+}
 }
