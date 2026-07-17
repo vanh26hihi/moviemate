@@ -287,4 +287,29 @@ class MegaCommand extends Command
         return 0;
     }
 }
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+
+class MegaSeeder extends Seeder
+{
+    public function run()
+    {
+        $data = [];
+
+        for ($i = 0; $i < 1000; $i++) {
+            $data[] = [
+                'name' => 'Seeder ' . $i,
+                'value' => rand(1, 99999),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::table('mega_table')->insert($data);
+    }
+}
 }
