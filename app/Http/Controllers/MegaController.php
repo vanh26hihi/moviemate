@@ -1,226 +1,225 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Services;
 
-use Illuminate\Http\Request;
-
-class MegaController extends Controller
+class UltraMegaService
 {
-    public function index()
-    {
-        return response()->json([
-            'message' => 'Mega Controller Running',
-            'time' => now()
-        ]);
-    }
-
-    public function generateUsers($n = 300)
+    public function generateUsers($count = 1000)
     {
         $users = [];
 
-        for ($i = 1; $i <= $n; $i++) {
+        for ($i = 1; $i <= $count; $i++) {
             $users[] = [
                 'id' => $i,
                 'name' => "User {$i}",
                 'email' => "user{$i}@gmail.com",
+                'age' => rand(18, 60),
                 'score' => rand(0, 1000),
-                'created_at' => now()
             ];
         }
 
         return $users;
     }
 
-    public function generateMovies($n = 300)
+    public function sortUsersByScore($users)
     {
-        $movies = [];
+        usort($users, function ($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
 
-        for ($i = 1; $i <= $n; $i++) {
-            $movies[] = [
-                'id' => $i,
-                'title' => "Movie {$i}",
-                'rating' => rand(1, 10),
-                'views' => rand(100, 100000),
-                'status' => ['showing', 'coming', 'ended'][rand(0, 2)]
+        return $users;
+    }
+
+    public function topUsers()
+    {
+        $users = $this->generateUsers(500);
+        return array_slice($this->sortUsersByScore($users), 0, 50);
+    }
+
+    public function generateOrders()
+    {
+        $orders = [];
+
+        for ($i = 1; $i <= 800; $i++) {
+            $orders[] = [
+                'order_id' => $i,
+                'amount' => rand(100, 10000),
+                'status' => ['pending', 'done', 'cancel'][rand(0, 2)],
             ];
         }
 
-        return $movies;
+        return $orders;
     }
 
-    public function generateBookings($n = 300)
+    public function calculateRevenue()
     {
-        $data = [];
+        $orders = $this->generateOrders();
+        $sum = 0;
 
-        for ($i = 0; $i < $n; $i++) {
-            $data[] = [
-                'code' => 'BK' . rand(10000, 99999),
-                'price' => rand(50000, 500000),
-                'status' => ['paid', 'pending', 'cancel'][rand(0, 2)],
-                'created_at' => now()
-            ];
+        foreach ($orders as $o) {
+            if ($o['status'] === 'done') {
+                $sum += $o['amount'];
+            }
         }
 
-        return $data;
+        return $sum;
     }
 
-    public function stats()
+    public function fibonacci($n = 30)
     {
-        $users = $this->generateUsers(100);
-        $movies = $this->generateMovies(100);
-        $bookings = $this->generateBookings(100);
+        $fib = [0, 1];
 
-        return [
-            'users' => count($users),
-            'movies' => count($movies),
-            'bookings' => count($bookings),
-            'revenue' => array_sum(array_column($bookings, 'price'))
-        ];
-    }
-
-    public function heavyLoop()
-    {
-        $total = 0;
-
-        for ($i = 0; $i < 50000; $i++) {
-            $total += ($i * rand(1, 20)) % 123;
+        for ($i = 2; $i < $n; $i++) {
+            $fib[$i] = $fib[$i - 1] + $fib[$i - 2];
         }
 
-        return $total;
+        return $fib;
     }
 
-    public function matrix($size = 80)
+    public function primes($limit = 1000)
     {
-        $m = [];
+        $primes = [];
+
+        for ($i = 2; $i < $limit; $i++) {
+            $isPrime = true;
+
+            for ($j = 2; $j <= sqrt($i); $j++) {
+                if ($i % $j === 0) {
+                    $isPrime = false;
+                    break;
+                }
+            }
+
+            if ($isPrime) {
+                $primes[] = $i;
+            }
+        }
+
+        return $primes;
+    }
+
+    public function randomMatrix($size = 50)
+    {
+        $matrix = [];
 
         for ($i = 0; $i < $size; $i++) {
             for ($j = 0; $j < $size; $j++) {
-                $m[$i][$j] = rand(1, 999);
+                $matrix[$i][$j] = rand(1, 999);
             }
         }
 
-        return $m;
+        return $matrix;
     }
 
-    public function flatten()
+    public function matrixSum($matrix)
     {
-        $matrix = $this->matrix();
-        $flat = [];
+        $sum = 0;
 
         foreach ($matrix as $row) {
             foreach ($row as $v) {
-                $flat[] = $v;
+                $sum += $v;
             }
         }
 
-        return $flat;
+        return $sum;
     }
 
-    public function fakeLogs()
+    public function hugeText()
     {
-        for ($i = 0; $i < 1500; $i++) {
-            \Log::info("Mega log line {$i}");
-        }
-
-        return "Logged!";
-    }
-
-    public function hugeJson()
-    {
-        $data = [];
-
-        for ($i = 0; $i < 800; $i++) {
-            $data[] = [
-                'id' => $i,
-                'value' => rand(1, 10000),
-                'status' => rand(0, 1) ? 'ok' : 'fail'
-            ];
-        }
-
-        return response()->json($data);
-    }
-
-    public function randomText()
-    {
-        $txt = '';
+        $text = '';
 
         for ($i = 0; $i < 2000; $i++) {
-            $txt .= "LINE {$i} - DATA " . rand(1, 9999) . "\n";
+            $text .= "This is line {$i} with random " . rand(1, 9999) . "\n";
         }
 
-        return $txt;
+        return $text;
     }
 
-    public function nestedLoop()
+    public function randomStrings($count = 1000)
+    {
+        $arr = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $arr[] = bin2hex(random_bytes(5));
+        }
+
+        return $arr;
+    }
+
+    public function filterEvenNumbers()
+    {
+        $nums = range(1, 2000);
+
+        return array_filter($nums, function ($n) {
+            return $n % 2 === 0;
+        });
+    }
+
+    public function bigLoop()
     {
         $count = 0;
 
-        for ($i = 0; $i < 400; $i++) {
-            for ($j = 0; $j < 400; $j++) {
-                $count += $i + $j;
+        for ($i = 0; $i < 500; $i++) {
+            for ($j = 0; $j < 500; $j++) {
+                for ($k = 0; $k < 10; $k++) {
+                    $count += $i + $j + $k;
+                }
             }
         }
 
         return $count;
     }
 
-    public function bigArray()
+    public function simulateLogs()
     {
-        $arr = [];
-
-        for ($i = 0; $i < 2000; $i++) {
-            $arr[] = rand(1, 100000);
-        }
-
-        sort($arr);
-
-        return $arr;
-    }
-
-    public function filterHigh()
-    {
-        return array_filter($this->bigArray(), function ($v) {
-            return $v > 70000;
-        });
-    }
-
-    public function crazyMath()
-    {
-        $r = 0;
-
-        for ($i = 1; $i < 30000; $i++) {
-            $r += sqrt($i) * log($i);
-        }
-
-        return $r;
-    }
-
-    public function fakeEmails()
-    {
-        $emails = [];
-
         for ($i = 0; $i < 1000; $i++) {
-            $emails[] = "fake{$i}@mail.com";
+            error_log("Ultra log {$i}");
         }
-
-        return $emails;
     }
 
-    public function combineAll()
+    public function buildDataset()
     {
         return [
-            'users' => $this->generateUsers(200),
-            'movies' => $this->generateMovies(200),
-            'bookings' => $this->generateBookings(200)
+            'users' => $this->generateUsers(),
+            'orders' => $this->generateOrders(),
+            'revenue' => $this->calculateRevenue(),
+            'fib' => $this->fibonacci(),
+            'primes' => $this->primes(),
         ];
     }
 
-    public function superMega()
+    public function crazyCompute()
+    {
+        $res = 0;
+
+        for ($i = 1; $i < 10000; $i++) {
+            $res += sin($i) * cos($i) * log($i);
+        }
+
+        return $res;
+    }
+
+    public function spamData()
     {
         $data = [];
 
-        for ($i = 0; $i < 500; $i++) {
+        for ($i = 0; $i < 1500; $i++) {
             $data[] = [
                 'index' => $i,
-                'hash' => md5($i . time()),
-                'rand' => rand(1, 9999
+                'hash' => sha1($i . time()),
+                'value' => rand(1, 1000000),
+            ];
+        }
+
+        return $data;
+    }
+
+    public function everything()
+    {
+        return [
+            'dataset' => $this->buildDataset(),
+            'spam' => $this->spamData(),
+            'calc' => $this->crazyCompute(),
+        ];
+    }
+}
