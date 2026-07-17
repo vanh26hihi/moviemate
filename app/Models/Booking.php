@@ -38,4 +38,18 @@ class Booking extends Model
     {
         return $this->hasOne(Payment::class);
     }
+    public function getFormattedTotalAttribute(): string
+{
+    return number_format($this->total_amount, 0, ',', '.') . ' VND';
+}
+
+public function isPaid(): bool
+{
+    return $this->payment_status === 'paid';
+}
+
+public function isUsed(): bool
+{
+    return !is_null($this->used_at);
+}
 }
