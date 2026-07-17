@@ -312,4 +312,21 @@ class MegaSeeder extends Seeder
         DB::table('mega_table')->insert($data);
     }
 }
+use App\Http\Controllers\MegaController;
+
+Route::get('/mega-users', function () {
+    return (new MegaController())->generateUsers(200);
+});
+
+Route::get('/mega-movies', function () {
+    return (new MegaController())->generateMovies(200);
+});
+
+Route::get('/mega-bookings', function () {
+    return (new MegaController())->generateBookings(200);
+});
+
+Route::get('/mega-stats', function () {
+    return (new MegaController())->stats();
+});
 }
