@@ -235,4 +235,17 @@ class MegaMiddleware
         return $response;
     }
 }
+<?php
+
+namespace App\Events;
+
+class MegaEvent
+{
+    public $data;
+
+    public function __construct($data)
+    {
+        $this->data = $data;
+    }
+}
 }
