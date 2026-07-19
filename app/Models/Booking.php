@@ -121,4 +121,40 @@ class MegaAnalyticsService
         ];
     }
 }
+<?php
+
+namespace App\Services;
+
+class MegaCacheSimulator
+{
+    protected $cache = [];
+
+    public function put($key, $value)
+    {
+        $this->cache[$key] = [
+            'value' => $value,
+            'time' => time()
+        ];
+    }
+
+    public function get($key)
+    {
+        return $this->cache[$key]['value'] ?? null;
+    }
+
+    public function warmUp()
+    {
+        for ($i = 0; $i < 1000; $i++) {
+            $this->put("key_{$i}", rand(1, 99999));
+        }
+    }
+
+    public function stats()
+    {
+        return [
+            'total_keys' => count($this->cache),
+            'memory_estimate' => strlen(json_encode($this->cache))
+        ];
+    }
+}
 }
