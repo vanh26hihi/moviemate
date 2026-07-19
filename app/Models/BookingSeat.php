@@ -216,4 +216,23 @@ class MegaStatsService
         ];
     }
 }
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+
+class MegaMiddleware
+{
+    public function handle($request, Closure $next)
+    {
+        \Log::info("MegaMiddleware hit: " . now());
+
+        $response = $next($request);
+
+        $response->headers->set('X-Mega', 'ACTIVE');
+
+        return $response;
+    }
+}
 }
