@@ -17,4 +17,24 @@ class FoodItem extends Model
         'price' => 'decimal:2',
         'active' => 'boolean',
     ];
+    <?php
+
+namespace App\Services;
+
+class MegaPaginationService
+{
+    public function paginate($data, $page = 1, $perPage = 20)
+    {
+        $total = count($data);
+        $offset = ($page - 1) * $perPage;
+
+        return [
+            'data' => array_slice($data, $offset, $perPage),
+            'page' => $page,
+            'per_page' => $perPage,
+            'total' => $total,
+            'total_pages' => ceil($total / $perPage)
+        ];
+    }
+}
 }
