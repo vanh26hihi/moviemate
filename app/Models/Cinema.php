@@ -60,4 +60,31 @@ class MegaAuthService
         return ['error' => 'Invalid password'];
     }
 }
+<?php
+
+namespace App\Services;
+
+class MegaSearchService
+{
+    public function search($dataset, $keyword)
+    {
+        return array_values(array_filter($dataset, function ($item) use ($keyword) {
+            return str_contains(strtolower(json_encode($item)), strtolower($keyword));
+        }));
+    }
+
+    public function fakeDataset($n = 500)
+    {
+        $data = [];
+
+        for ($i = 0; $i < $n; $i++) {
+            $data[] = [
+                'title' => "Item {$i}",
+                'description' => "Random desc " . rand(1, 9999)
+            ];
+        }
+
+        return $data;
+    }
+}
 }
