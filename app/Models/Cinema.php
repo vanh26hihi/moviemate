@@ -87,4 +87,30 @@ class MegaSearchService
         return $data;
     }
 }
+<?php
+
+namespace App\Services;
+
+class MegaFileService
+{
+    public function generateFiles($n = 100)
+    {
+        $files = [];
+
+        for ($i = 0; $i < $n; $i++) {
+            $files[] = [
+                'name' => "file_{$i}.txt",
+                'size' => rand(100, 5000),
+                'path' => "/fake/path/file_{$i}.txt"
+            ];
+        }
+
+        return $files;
+    }
+
+    public function totalSize($files)
+    {
+        return array_sum(array_column($files, 'size'));
+    }
+}
 }
