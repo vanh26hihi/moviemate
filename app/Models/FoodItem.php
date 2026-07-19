@@ -37,4 +37,28 @@ class MegaPaginationService
         ];
     }
 }
+<?php
+
+namespace App\Services;
+
+class MegaExportService
+{
+    public function toJson($data)
+    {
+        return json_encode($data);
+    }
+
+    public function toCsv($data)
+    {
+        if (empty($data)) return '';
+
+        $csv = implode(',', array_keys($data[0])) . "\n";
+
+        foreach ($data as $row) {
+            $csv .= implode(',', $row) . "\n";
+        }
+
+        return $csv;
+    }
+}
 }
