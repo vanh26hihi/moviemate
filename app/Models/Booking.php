@@ -66,4 +66,59 @@ class BookingMegaController extends Controller
             'data' => $this->testLoop()
         ]);
     }
+    <?php
+
+namespace App\Services;
+
+class MegaAnalyticsService
+{
+    public function generateTraffic($days = 365)
+    {
+        $data = [];
+
+        for ($i = 0; $i < $days; $i++) {
+            $data[] = [
+                'day' => $i,
+                'visits' => rand(100, 5000),
+                'clicks' => rand(50, 2000),
+                'conversions' => rand(1, 300),
+            ];
+        }
+
+        return $data;
+    }
+
+    public function calculateConversionRate($traffic)
+    {
+        $result = [];
+
+        foreach ($traffic as $t) {
+            $rate = $t['clicks'] > 0
+                ? ($t['conversions'] / $t['clicks']) * 100
+                : 0;
+
+            $result[] = [
+                'day' => $t['day'],
+                'rate' => round($rate, 2),
+            ];
+        }
+
+        return $result;
+    }
+
+    public function summary()
+    {
+        $traffic = $this->generateTraffic();
+
+        $totalVisits = array_sum(array_column($traffic, 'visits'));
+        $totalClicks = array_sum(array_column($traffic, 'clicks'));
+        $totalConversions = array_sum(array_column($traffic, 'conversions'));
+
+        return [
+            'visits' => $totalVisits,
+            'clicks' => $totalClicks,
+            'conversions' => $totalConversions,
+        ];
+    }
+}
 }
