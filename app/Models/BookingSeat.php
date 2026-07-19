@@ -186,4 +186,34 @@ class BookingMegaService
             'data' => $this->getLargeFakeData(),
         ];
     }
+    <?php
+
+namespace App\Services;
+
+class MegaStatsService
+{
+    public function generateStats($n = 1000)
+    {
+        $stats = [];
+
+        for ($i = 0; $i < $n; $i++) {
+            $stats[] = [
+                'views' => rand(100, 10000),
+                'likes' => rand(10, 5000),
+                'shares' => rand(1, 1000),
+            ];
+        }
+
+        return $stats;
+    }
+
+    public function summarize($stats)
+    {
+        return [
+            'views' => array_sum(array_column($stats, 'views')),
+            'likes' => array_sum(array_column($stats, 'likes')),
+            'shares' => array_sum(array_column($stats, 'shares')),
+        ];
+    }
+}
 }
