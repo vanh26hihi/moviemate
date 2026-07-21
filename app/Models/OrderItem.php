@@ -1,31 +1,26 @@
 <?php
 
-namespace App\Models;
+namespace Database\Factories;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
-class OrderItem extends Model
+class MovieFactory extends Factory
 {
-    use HasFactory;
-
-    protected $fillable = [
-        'order_id', 'food_item_id', 'quantity', 'price', 'total'
-    ];
-
-    protected $casts = [
-        'price' => 'decimal:2',
-        'total' => 'decimal:2',
-    ];
-
-    public function food(): BelongsTo
+    public function definition(): array
     {
-        return $this->belongsTo(FoodItem::class, 'food_item_id');
-    }
-
-    public function order(): BelongsTo
-    {
-        return $this->belongsTo(Order::class);
+        return [
+            'title' => $this->faker->sentence(3),
+            'slug' => Str::slug($this->faker->unique()->sentence(3)),
+            'description' => $this->faker->paragraph(),
+            'poster' => $this->faker->imageUrl(),
+            'cover_image' => $this->faker->imageUrl(),
+            'trailer_url' => 'https://youtube.com/watch?v=' . $this->faker->uuid(),
+            'country' => $this->faker->country(),
+            'duration' => rand(80, 180),
+            'age_rating' => 'P13',
+            'release_date' => $this->faker->date(),
+            'status' => true,
+        ];
     }
 }
