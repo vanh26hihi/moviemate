@@ -357,4 +357,29 @@ class Episode extends Model
         return $this->belongsTo(Movie::class);
     }
 }
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Episode extends Model
+{
+    protected $fillable = [
+        'movie_id',
+        'title',
+        'episode_number',
+        'video_url',
+        'duration'
+    ];
+
+    protected $casts = [
+        'duration' => 'integer'
+    ];
+
+    public function movie()
+    {
+        return $this->belongsTo(Movie::class);
+    }
+}
 }
