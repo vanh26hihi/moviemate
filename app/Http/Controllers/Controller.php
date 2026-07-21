@@ -2,35 +2,53 @@
 
 namespace App\Http\Controllers;
 
-abstract class Controller
+use App\Models\Movie;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+class MovieController extends Controller
 {
-    <?php
-
-namespace App\Http\Controllers;
-
-use App\Services\MegaPaymentService;
-use App\Services\MegaNotificationService;
-
-class MegaAdvancedController extends Controller
-{
-    public function payments()
+    public function index()
     {
-        $service = new MegaPaymentService();
-        $data = $service->bulkPayments(100);
+        return Movie::with(['genres', 'showtimes'])->get();
+    }
 
-        return response()->json([
-            'total_success' => $service->totalSuccess($data),
-            'data' => $data
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'poster' => 'nullable|string',
+            'country' => 'nullable|string',
+            'duration' => 'required|integer',
+            'release_date' => 'required|date',
         ]);
+
+        $data['slug'] = Str::slug($data['title']);
+
+        $movie = Movie::create($data);
+
+        return response()->json($movie, 201);
     }
 
-    public function notify()
+    public function show($id)
     {
-        $users = ['A', 'B', 'C', 'D'];
-
-        $noti = new MegaNotificationService();
-
-        return $noti->broadcast($users);
+        return Movie::with(['genres', 'reviews'])->findOrFail($id);
     }
-}
+
+    public function update(Request $request, $id)
+    {
+        $movie = Movie::findOrFail($id);
+
+        $movie->update($request->all());
+
+        return response()->json($movie);
+    }
+
+    public function destroy($id)
+    {
+        Movie::destroy($id);
+
+        return response()->json(['message' => 'Deleted']);
+    }
 }
