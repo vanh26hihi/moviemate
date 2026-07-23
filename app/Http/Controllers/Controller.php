@@ -2,53 +2,56 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Movie;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use App\Services\MegaPaymentService;
+use App\Services\MegaAnalyticsService;
 
-class MovieController extends Controller
+class MegaController extends Controller
 {
-    public function index()
-    {
-        return Movie::with(['genres', 'showtimes'])->get();
+    protected $payment;
+    protected $analytics;
+
+    public function __construct(
+        MegaPaymentService $payment,
+        MegaAnalyticsService $analytics
+    ) {
+        $this->payment = $payment;
+        $this->analytics = $analytics;
     }
 
-    public function store(Request $request)
+    public function payments()
     {
-        $data = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'poster' => 'nullable|string',
-            'country' => 'nullable|string',
-            'duration' => 'required|integer',
-            'release_date' => 'required|date',
-        ]);
-
-        $data['slug'] = Str::slug($data['title']);
-
-        $movie = Movie::create($data);
-
-        return response()->json($movie, 201);
+        return $this->payment->bulkPayments(300);
     }
 
-    public function show($id)
+    public function traffic()
     {
-        return Movie::with(['genres', 'reviews'])->findOrFail($id);
+        $data = $this->analytics->generateTraffic(100);
+        return response()->json($data);
     }
 
-    public function update(Request $request, $id)
+    public function conversion()
     {
-        $movie = Movie::findOrFail($id);
-
-        $movie->update($request->all());
-
-        return response()->json($movie);
+        $traffic = $this->analytics->generateTraffic(50);
+        return $this->analytics->calculateConversionRate($traffic);
     }
 
-    public function destroy($id)
+    public function summary()
     {
-        Movie::destroy($id);
+        return $this->analytics->summary();
+    }
 
-        return response()->json(['message' => 'Deleted']);
+    public function stressTest()
+    {
+        $result = [];
+
+        for ($i = 0; $i < 1000; $i++) {
+            $result[] = [
+                'id' => $i,
+                'value' => md5($i . time())
+            ];
+        }
+
+        return $result;
     }
 }
