@@ -399,4 +399,51 @@ class TicketType extends Model
         'price_multiplier' => 'float'
     ];
 }
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class MegaMovie extends Model
+{
+    protected $fillable = [
+        'title',
+        'slug',
+        'description',
+        'duration',
+        'views',
+        'rating',
+        'status'
+    ];
+
+    protected $casts = [
+        'duration' => 'integer',
+        'views' => 'integer',
+        'rating' => 'float'
+    ];
+
+    public function episodes(): HasMany
+    {
+        return $this->hasMany(Episode::class, 'movie_id');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 1);
+    }
+
+    public function increaseViews()
+    {
+        $this->increment('views');
+    }
+
+    public function getRatingLabelAttribute()
+    {
+        if ($this->rating >= 8) return 'Hot';
+        if ($this->rating >= 5) return 'Normal';
+        return 'Bad';
+    }
+}
 }
