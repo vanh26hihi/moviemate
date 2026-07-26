@@ -31,9 +31,9 @@ class MovieController extends Controller
     /**
      * Show the form for creating a new movie.
      */
-    public function create()
+     public function create()
     {
-        $genres = Genre::orderBy('name')->get();
+        $genres = Genre::all();
         return view('admin.movies.create', compact('genres'));
     }
 
@@ -72,17 +72,20 @@ class MovieController extends Controller
         // Handle file uploads
         if ($request->hasFile('poster')) {
             $validated['poster'] = $request->file('poster')
-                ->store('posters', 'public');
+                ->store('movies/posters', 'public');
         }
 
         if ($request->hasFile('cover_image')) {
             $validated['cover_image'] = $request->file('cover_image')
-                ->store('covers', 'public');
+                ->store('movies/covers', 'public');
         }
 
         $movie = Movie::create($validated);
 
-        $movie->genres()->sync($validated['genres'] ?? []);
+        // Sync genres
+        if (!empty($validated['genres'])) {
+            $movie->genres()->sync($validated['genres']);
+        }
 
         return redirect()
             ->route('admin.movies.index')
