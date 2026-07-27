@@ -3,124 +3,93 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Genre;
+use App\Models\Cinema;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
-class GenreController extends Controller
+class CinemaController extends Controller
 {
-    /**
-     * Display a listing of the genres.
-     */
     public function index(Request $request)
     {
-        $query = Genre::query();
+        $query = Cinema::query();
 
         if ($search = $request->query('search')) {
             $query->where('name', 'like', "%{$search}%");
         }
 
-        $genres = $query->orderBy('name')->paginate(20)->withQueryString();
+        $cinemas = $query->orderBy('name')->paginate(15)->withQueryString();
 
-        return view('admin.genres.index', compact('genres', 'search'));
+        return view('admin.cinemas.index', compact('cinemas', 'search'));
     }
 
-    /**
-     * Show the form for creating a new genre.
-     */
     public function create()
     {
-        return view('admin.genres.create');
+        return view('admin.cinemas.create');
     }
 
-    /**
-     * Store a newly created genre in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'slug'        => 'nullable|string|max:255|unique:genres,slug',
+            'name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'city' => 'required|string|max:100',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'phone' => 'nullable|string|max:30',
+            'image' => 'nullable|image|max:4096',
             'description' => 'nullable|string',
+            'status' => 'required|in:active,inactive',
         ]);
 
-        // Generate slug if not provided
-        if (empty($validated['slug'])) {
-            $validated['slug'] = Str::slug($validated['name']);
-            $original = $validated['slug'];
-            $counter = 1;
-            while (Genre::where('slug', $validated['slug'])->exists()) {
-                $validated['slug'] = $original . '-' . $counter++;
-            }
+        if ($request->hasFile('image')) {
+            $validated['image'] = $request->file('image')->store('cinema_images', 'public');
         }
 
-        Genre::create($validated);
+        Cinema::create($validated);
 
-        return redirect()
-            ->route('admin.genres.index')
-            ->with('success', 'Genre created successfully.');
+        return redirect()->route('admin.cinemas.index')->with('success', 'Cinema created successfully.');
     }
 
-    /**
-     * Display the specified genre.
-     */
-    public function show(Genre $genre)
+    public function edit(Cinema $cinema)
     {
-        $genre->load('movies');
-        return view('admin.genres.show', compact('genre'));
+        return view('admin.cinemas.edit', compact('cinema'));
     }
 
-    /**
-     * Show the form for editing the specified genre.
-     */
-    public function edit(Genre $genre)
-    {
-        return view('admin.genres.edit', compact('genre'));
-    }
-
-    /**
-     * Update the specified genre in storage.
-     */
-    public function update(Request $request, Genre $genre)
+    public function update(Request $request, Cinema $cinema)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'slug'        => 'nullable|string|max:255|unique:genres,slug,' . $genre->id,
+            'name' => 'required|string|max:255',
+            'address' => 'required|string|max:255',
+            'city' => 'required|string|max:100',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'phone' => 'nullable|string|max:30',
+            'image' => 'nullable|image|max:4096',
             'description' => 'nullable|string',
+            'status' => 'required|in:active,inactive',
         ]);
 
-        // Generate slug if not provided
-        if (empty($validated['slug'])) {
-            $validated['slug'] = Str::slug($validated['name']);
-            $original = $validated['slug'];
-            $counter = 1;
-            while (Genre::where('slug', $validated['slug'])->where('id', '!=', $genre->id)->exists()) {
-                $validated['slug'] = $original . '-' . $counter++;
+        if ($request->hasFile('image')) {
+            if ($cinema->image && Storage::disk('public')->exists($cinema->image)) {
+                Storage::disk('public')->delete($cinema->image);
             }
+
+            $validated['image'] = $request->file('image')->store('cinema_images', 'public');
         }
 
-        $genre->update($validated);
+        $cinema->update($validated);
 
-        return redirect()
-            ->route('admin.genres.index')
-            ->with('success', 'Genre updated successfully.');
+        return redirect()->route('admin.cinemas.index')->with('success', 'Cinema updated successfully.');
     }
 
-    /**
-     * Remove the specified genre from storage.
-     */
-    public function destroy(Genre $genre)
+    public function destroy(Cinema $cinema)
     {
-        if ($genre->movies()->exists()) {
-            return redirect()
-                ->route('admin.genres.index')
-                ->with('error', 'Không thể xóa thể loại đang được gắn với phim.');
+        if ($cinema->image && Storage::disk('public')->exists($cinema->image)) {
+            Storage::disk('public')->delete($cinema->image);
         }
 
-        $genre->delete();
+        $cinema->delete();
 
-        return redirect()
-            ->route('admin.genres.index')
-            ->with('success', 'Genre deleted successfully.');
+        return redirect()->route('admin.cinemas.index')->with('success', 'Cinema deleted successfully.');
     }
 }
