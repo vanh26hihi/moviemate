@@ -23,8 +23,13 @@ return new class extends Migration
             $table->integer('duration')->default(90);
             $table->string('age_rating')->default('P');
             $table->date('release_date')->nullable();
-            $table->enum('status', ['now_showing', 'coming_soon', 'stopped'])->default('now_showing');
+            $table->enum('status', [
+                'now_showing',
+                'coming_soon',
+                'stopped'
+            ])->default('now_showing');
             $table->timestamps();
+            
         });
     }
 
