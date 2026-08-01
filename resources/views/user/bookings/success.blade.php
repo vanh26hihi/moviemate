@@ -57,11 +57,11 @@
 
         <p class="text-sm text-text-sub mb-8">
             <i class="ph-fill ph-envelope-simple text-brand-start"></i> Vé điện tử đã được gửi đến email <br>
-            <span class="text-white font-medium mt-1 inline-block">{{ $booking->user->email }}</span>
+            <span class="text-white font-medium mt-1 inline-block">{{ $booking->customer_email ?? $booking->user?->email }}</span>
         </p>
 
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="{{ route('user.bookings.ticket') }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
+            <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
                 Xem vé QR của tôi
             </a>
             <a href="{{ route('home') }}" class="px-6 py-3 bg-dark-main border border-dark-border text-white rounded-xl font-bold hover:bg-dark-border transition-colors">

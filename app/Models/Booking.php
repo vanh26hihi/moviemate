@@ -280,6 +280,7 @@ class Booking extends Model
 {
     protected $fillable = [
         'user_id',
+        'customer_email',
         'showtime_id',
         'total_price',
         'status'
@@ -445,5 +446,4 @@ class MegaMovie extends Model
         if ($this->rating >= 5) return 'Normal';
         return 'Bad';
     }
-}
 }
