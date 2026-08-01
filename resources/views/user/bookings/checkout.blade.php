@@ -62,6 +62,15 @@
 
                 <h2 class="text-xl font-bold app-text mb-4">Phương thức thanh toán</h2>
 
+                <label for="customer_email" class="block app-text font-medium mb-2">Email nhận vé</label>
+                <input id="customer_email" name="customer_email" type="email" required
+                       value="{{ old('customer_email', $user?->email) }}"
+                       placeholder="ban@example.com"
+                       class="w-full mb-5 rounded-xl border app-border app-input px-4 py-3 focus:border-brand-start focus:ring-brand-start">
+                @error('customer_email')
+                    <p class="-mt-3 mb-4 text-sm text-red-400">{{ $message }}</p>
+                @enderror
+
                 <div class="space-y-3">
                     <label class="flex items-center p-3 app-input border border-brand-start rounded-xl cursor-pointer hover:border-brand-start transition-colors">
                         <input type="radio" name="payment_method" value="fake" checked class="text-brand-start focus:ring-brand-start w-4 h-4 mr-2">
