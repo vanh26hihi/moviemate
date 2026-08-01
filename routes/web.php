@@ -37,9 +37,8 @@ Route::post('/booking/store', [BookingController::class, 'store'])
 Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
     ->name('user.bookings.success');
 
-Route::get('/my-ticket', function () {
-    return view('user.bookings.ticket');
-})->name('user.bookings.ticket');
+Route::get('/my-ticket/{booking}', [BookingController::class, 'ticket'])
+    ->name('user.bookings.ticket');
 
 Route::get('/booking-history', function () {
     return view('user.bookings.history');
