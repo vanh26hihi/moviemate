@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Mail\BookingTicketMail;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Seat;
@@ -11,6 +12,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
@@ -134,6 +137,7 @@ class BookingController extends Controller
             'seat_ids' => ['required', 'array', 'min:1'],
             'seat_ids.*' => ['integer', 'distinct'],
             'payment_method' => ['required', 'in:fake,counter,vnpay'],
+            'customer_email' => ['required', 'email:rfc', 'max:255'],
         ], [
             'seat_ids.required' => 'Vui lòng chọn ít nhất một ghế.',
             'seat_ids.array' => 'Dữ liệu ghế không hợp lệ.',
@@ -208,6 +212,7 @@ class BookingController extends Controller
 
             $booking = Booking::create([
                 'user_id' => Auth::id(),
+                'customer_email' => $validated['customer_email'],
                 'showtime_id' => $showtime->id,
                 'booking_code' => $this->generateBookingCode(),
                 'total_amount' => $totalAmount,
@@ -234,6 +239,20 @@ class BookingController extends Controller
             return $booking;
         });
 
+        try {
+            Mail::to($booking->customer_email)->send(new BookingTicketMail($booking));
+        } catch (\Throwable $exception) {
+            Log::warning('Không thể gửi email vé MovieMate.', [
+                'booking_id' => $booking->id,
+                'email' => $booking->customer_email,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('user.bookings.success', $booking)
+                ->with('warning', 'Đặt vé thành công nhưng hệ thống chưa gửi được email. Bạn vẫn có thể xem vé QR tại đây.');
+        }
+
         return redirect()->route('user.bookings.success', $booking);
     }
 
@@ -254,6 +273,22 @@ class BookingController extends Controller
         ]);
 
         return view('user.bookings.success', compact('booking'));
+    }
+
+    public function ticket(Booking $booking)
+    {
+        abort_unless($booking->user_id === null || $booking->user_id === Auth::id(), 403);
+
+        $booking->load([
+            'user',
+            'payment',
+            'showtime.movie',
+            'showtime.cinema',
+            'showtime.room',
+            'bookingSeats.seat',
+        ]);
+
+        return view('user.bookings.ticket', compact('booking'));
     }
 
     /**
