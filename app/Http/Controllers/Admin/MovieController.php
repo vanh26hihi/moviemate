@@ -3,88 +3,206 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\BookingSeat;
 use App\Models\Movie;
-use App\Models\Showtime;
-use App\Models\User;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use App\Models\Genre;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
-class DashboardController extends Controller
+class MovieController extends Controller
 {
-    public function index()
+    /**
+     * Display a listing of the movies.
+     */
+    public function index(Request $request)
     {
-        $today = now('Asia/Ho_Chi_Minh')->toDateString();
-        $startDate = now('Asia/Ho_Chi_Minh')->subDays(6)->startOfDay();
-        $endDate = now('Asia/Ho_Chi_Minh')->endOfDay();
+        $query = Movie::with('genres');
 
-        $paidBookings = Booking::query()->where('payment_status', 'paid');
-
-        $stats = [
-            'total_revenue' => (float) (clone $paidBookings)->sum('total_amount'),
-            'tickets_sold' => BookingSeat::whereHas('booking', fn ($query) => $query->where('payment_status', 'paid'))->count(),
-            'users' => User::count(),
-            'now_showing_movies' => Movie::where('status', 'now_showing')->count(),
-            'showtimes_today' => Showtime::whereDate('show_date', $today)->count(),
-        ];
-
-        $revenueByDay = $this->revenueByDay($startDate, $endDate);
-        $topMovies = $this->topMovies($startDate, $endDate, 5);
-
-        $recentBookings = Booking::with(['user', 'showtime.movie', 'bookingSeats.seat'])
-            ->latest()
-            ->limit(8)
-            ->get();
-
-        return view('admin.dashboard', compact('stats', 'revenueByDay', 'topMovies', 'recentBookings'));
-    }
-
-    private function revenueByDay(Carbon $startDate, Carbon $endDate): array
-    {
-        $rows = Booking::query()
-            ->selectRaw('DATE(created_at) as booking_date')
-            ->selectRaw('COALESCE(SUM(total_amount), 0) as revenue')
-            ->where('payment_status', 'paid')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy('booking_date')
-            ->pluck('revenue', 'booking_date');
-
-        $days = [];
-        $maxRevenue = max((float) $rows->max(), 1);
-
-        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            $key = $date->toDateString();
-            $revenue = (float) ($rows[$key] ?? 0);
-
-            $days[] = [
-                'label' => $date->format('d/m'),
-                'revenue' => $revenue,
-                'height' => max(6, round(($revenue / $maxRevenue) * 100)),
-            ];
+        // Simple search by title
+        if ($search = $request->query('search')) {
+            $query->where('title', 'like', "%{$search}%");
         }
 
-        return $days;
+        $movies = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
+
+        return view('admin.movies.index', compact('movies', 'search'));
     }
 
-    private function topMovies(Carbon $startDate, Carbon $endDate, int $limit)
+    /**
+     * Show the form for creating a new movie.
+     */
+    public function create()
     {
-        return DB::table('movies')
-            ->join('showtimes', 'showtimes.movie_id', '=', 'movies.id')
-            ->join('bookings', function ($join) use ($startDate, $endDate) {
-                $join->on('bookings.showtime_id', '=', 'showtimes.id')
-                    ->where('bookings.payment_status', '=', 'paid')
-                    ->whereBetween('bookings.created_at', [$startDate, $endDate]);
-            })
-            ->leftJoin('booking_seats', 'booking_seats.booking_id', '=', 'bookings.id')
-            ->select('movies.id', 'movies.title', 'movies.slug', 'movies.poster')
-            ->selectRaw('COUNT(booking_seats.id) as tickets_sold')
-            ->selectRaw('COUNT(DISTINCT bookings.id) as bookings_count')
-            ->selectRaw('COALESCE(SUM(booking_seats.price), 0) as revenue')
-            ->groupBy('movies.id', 'movies.title', 'movies.slug', 'movies.poster')
-            ->orderByDesc('tickets_sold')
-            ->orderByDesc('revenue')
-            ->limit($limit)
-            ->get();
+        $genres = Genre::all();
+        return view('admin.movies.create', compact('genres'));
+    }
+
+    /**
+     * Store a newly created movie in storage.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title'         => 'required|string|max:255',
+            'slug'          => 'nullable|string|max:255|unique:movies,slug',
+            'description'   => 'nullable|string',
+            'poster'        => 'nullable|image|max:2048',
+            'cover_image'   => 'nullable|image|max:4096',
+            'trailer_url'   => 'nullable|url',
+            'country'       => 'nullable|string|max:100',
+            'duration'      => 'nullable|integer|min:1',
+            'age_rating'    => 'nullable|string|max:10',
+            'release_date'  => 'nullable|date',
+            'status'        => 'required|in:now_showing,coming_soon,stopped',
+            'genres'        => 'nullable|array',
+            'genres.*'      => 'exists:genres,id',
+        ]);
+
+        // Generate slug if not provided
+        if (empty($validated['slug'])) {
+            $validated['slug'] = Str::slug($validated['title']);
+            // Ensure uniqueness
+            $original = $validated['slug'];
+            $counter = 1;
+            while (Movie::where('slug', $validated['slug'])->exists()) {
+                $validated['slug'] = $original . '-' . $counter++;
+            }
+        }
+
+        // Handle file uploads
+        if ($request->hasFile('poster')) {
+            $validated['poster'] = $request->file('poster')
+                ->store('movies/posters', 'public');
+        }
+
+        if ($request->hasFile('cover_image')) {
+            $validated['cover_image'] = $request->file('cover_image')
+                ->store('movies/covers', 'public');
+        }
+
+        $movie = Movie::create($validated);
+
+        // Sync genres
+        if (!empty($validated['genres'])) {
+            $movie->genres()->sync($validated['genres']);
+        }
+
+        return redirect()
+            ->route('admin.movies.index')
+            ->with('success', 'Movie created successfully.');
+    }
+
+    /**
+     * Display the specified movie.
+     */
+    public function show(Movie $movie)
+    {
+        $movie->load('genres');
+        return view('admin.movies.show', compact('movie'));
+    }
+
+    /**
+     * Show the form for editing the specified movie.
+     */
+    public function edit(Movie $movie)
+    {
+        $genres = Genre::all();
+        $movie->load('genres');
+        return view('admin.movies.edit', compact('movie', 'genres'));
+    }
+
+    /**
+     * Update the specified movie in storage.
+     */
+    public function update(Request $request, Movie $movie)
+    {
+        $validated = $request->validate([
+            'title'         => 'required|string|max:255',
+            'slug'          => 'nullable|string|max:255|unique:movies,slug,' . $movie->id,
+            'description'   => 'nullable|string',
+            'poster'        => 'nullable|image|max:2048',
+            'cover_image'   => 'nullable|image|max:4096',
+            'trailer_url'   => 'nullable|url',
+            'country'       => 'nullable|string|max:100',
+            'duration'      => 'nullable|integer|min:1',
+            'age_rating'    => 'nullable|string|max:10',
+            'release_date'  => 'nullable|date',
+            'status'        => 'required|in:now_showing,coming_soon,stopped',
+            'genres'        => 'nullable|array',
+            'genres.*'      => 'exists:genres,id',
+        ]);
+
+        // Generate slug if not provided
+        if (empty($validated['slug'])) {
+            $validated['slug'] = Str::slug($validated['title']);
+            $original = $validated['slug'];
+            $counter = 1;
+            while (Movie::where('slug', $validated['slug'])->where('id', '!=', $movie->id)->exists()) {
+                $validated['slug'] = $original . '-' . $counter++;
+            }
+        }
+
+        // Handle poster replacement
+        if ($request->hasFile('poster')) {
+            $oldPoster = Movie::storageDiskPath($movie->poster);
+
+            if ($oldPoster && Storage::disk('public')->exists($oldPoster)) {
+                Storage::disk('public')->delete($oldPoster);
+            }
+
+            $validated['poster'] = $request->file('poster')
+                ->store('movies/posters', 'public');
+        }
+
+        // Handle cover image replacement
+        if ($request->hasFile('cover_image')) {
+            $oldCover = Movie::storageDiskPath($movie->cover_image);
+
+            if ($oldCover && Storage::disk('public')->exists($oldCover)) {
+                Storage::disk('public')->delete($oldCover);
+            }
+
+            $validated['cover_image'] = $request->file('cover_image')
+                ->store('movies/covers', 'public');
+        }
+
+        $movie->update($validated);
+
+        // Sync genres
+        if (isset($validated['genres'])) {
+            $movie->genres()->sync($validated['genres']);
+        } else {
+            $movie->genres()->detach();
+        }
+
+        return redirect()
+            ->route('admin.movies.index')
+            ->with('success', 'Movie updated successfully.');
+    }
+
+    /**
+     * Remove the specified movie from storage.
+     */
+    public function destroy(Movie $movie)
+    {
+        // Detach genres first
+        $movie->genres()->detach();
+
+        // Delete associated files
+        $posterPath = Movie::storageDiskPath($movie->poster);
+        $coverPath = Movie::storageDiskPath($movie->cover_image);
+
+        if ($posterPath && Storage::disk('public')->exists($posterPath)) {
+            Storage::disk('public')->delete($posterPath);
+        }
+        if ($coverPath && Storage::disk('public')->exists($coverPath)) {
+            Storage::disk('public')->delete($coverPath);
+        }
+
+        $movie->delete();
+
+        return redirect()
+            ->route('admin.movies.index')
+            ->with('success', 'Movie deleted successfully.');
     }
 }
