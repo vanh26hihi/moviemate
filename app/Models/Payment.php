@@ -3,21 +3,23 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class Payment extends Model
+class Actor extends Model
 {
     protected $fillable = [
-        'booking_id',
-        'payment_method',
-        'amount',
-        'status',
-        'transaction_code',
-        'paid_at',
+        'name',
+        'avatar',
+        'birthday',
+        'bio'
     ];
 
-    public function booking(): BelongsTo
+    protected $casts = [
+        'birthday' => 'date',
+    ];
+
+    public function movies(): BelongsToMany
     {
-        return $this->belongsTo(Booking::class);
+        return $this->belongsToMany(Movie::class, 'movie_actor');
     }
 }

@@ -41,6 +41,14 @@
             <a href="/admin/users" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">NgÆ°á»i dÃ¹ng</a>
             <a href="/admin/reviews" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">ÄÃ¡nh giÃ¡</a>
             <a href="/admin/analytics/revenue" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Doanh thu</a>
+                <a href="{{ route('admin.foods.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.foods.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}">
+                <i class="{{ request()->routeIs('admin.foods.*') ? 'ph-fill' : 'ph' }} ph-burger text-lg"></i>
+                Món ăn
+            </a>
+            <a href="{{ route('admin.food-orders.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.food-orders.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}">
+                <i class="{{ request()->routeIs('admin.food-orders.*') ? 'ph-fill' : 'ph' }} ph-shopping-bag text-lg"></i>
+                Đơn đồ ăn
+            </a>
             <a href="/admin/analytics/top-movies" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Phim bÃ¡n cháº¡y</a>
             <a href="/admin/ai/movie-content" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">AI Tools</a>
             <a href="/" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Vá» website</a>
