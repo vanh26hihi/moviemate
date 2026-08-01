@@ -58,9 +58,22 @@
             </thead>
             <tbody>
                 @forelse($movies as $movie)
-                    @php
-                        $status = $statusMeta[$movie->status] ?? ['label' => $movie->status ?: 'Chưa rõ', 'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'];
-                    @endphp
+                 @php
+    $statusMeta = [
+        'now_showing' => [
+            'label' => 'Đang chiếu',
+            'class' => 'bg-success/10 text-success border border-success/20',
+        ],
+        'coming_soon' => [
+            'label' => 'Sắp chiếu',
+            'class' => 'bg-warning/10 text-warning border border-warning/20',
+        ],
+        'stopped' => [
+            'label' => 'Ngừng chiếu',
+            'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
+        ],
+    ];
+@endphp
                     <tr>
                         <td class="font-mono text-xs app-text-muted">#{{ $movie->id }}</td>
                         <td>
@@ -86,6 +99,9 @@
                             </div>
                         </td>
                         <td>
+                            @php
+                                $status = $statusMeta[$movie->status] ?? ['label' => $movie->status ?: 'Chưa rõ', 'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'];
+                            @endphp         
                             <span class="admin-badge {{ $status['class'] }}">{{ $status['label'] }}</span>
                         </td>
                         <td>
