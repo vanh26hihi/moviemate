@@ -9,7 +9,6 @@ class BookingSeat extends Model
 {
     protected $fillable = [
         'booking_id',
-        'showtime_id',
         'seat_id',
         'price',
     ];
@@ -21,11 +20,6 @@ class BookingSeat extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
-    }
-
-    public function showtime(): BelongsTo
-    {
-        return $this->belongsTo(Showtime::class);
     }
 
     public function seat(): BelongsTo

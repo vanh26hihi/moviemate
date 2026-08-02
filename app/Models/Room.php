@@ -12,19 +12,9 @@ class Room extends Model
         'cinema_id',
         'name',
         'room_type',
-        'layout_style',
         'total_seats',
         'status',
     ];
-
-    public function seatRowOffset(int $rowIndex, int $rowCount): int
-    {
-        return match ($this->layout_style) {
-            'staggered' => $rowIndex % 2 === 0 ? 0 : 18,
-            'curved' => (int) round(abs(($rowCount - 1) / 2 - $rowIndex) * 12),
-            default => 0,
-        };
-    }
 
     protected $casts = [
         'total_seats' => 'integer',

@@ -11,17 +11,10 @@ class Cinema extends Model
         'name',
         'address',
         'city',
-        'latitude',
-        'longitude',
         'phone',
         'image',
         'description',
         'status',
-    ];
-
-    protected $casts = [
-        'latitude' => 'decimal:7',
-        'longitude' => 'decimal:7',
     ];
 
     public function rooms(): HasMany
