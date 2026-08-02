@@ -13,9 +13,6 @@ class Payment extends Model
         'amount',
         'status',
         'transaction_code',
-        'provider_order_code',
-        'checkout_url',
-        'qr_code',
         'paid_at',
     ];
 
