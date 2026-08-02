@@ -13,7 +13,7 @@ class Order extends Model
     use HasFactory;
 
     protected $fillable = [
-        'user_id', 'customer_name', 'customer_phone', 'customer_email', 'pickup_cinema_id', 'total_amount', 'status'
+        'booking_id', 'user_id', 'customer_name', 'customer_phone', 'customer_email', 'pickup_cinema_id', 'total_amount', 'status'
     ];
 
     protected $casts = [
@@ -23,6 +23,11 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function booking(): BelongsTo
+    {
+        return $this->belongsTo(Booking::class);
     }
 
     public function pickupCinema(): BelongsTo

@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Models\FoodItem;
 
-class FoodController extends Controller
+class RoomController extends Controller
 {
     public function index(Request $request)
     {

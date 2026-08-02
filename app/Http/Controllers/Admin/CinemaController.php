@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\AiMovieContentService;
 use Illuminate\Http\Request;
 
-class AiContentController extends Controller
+class CinemaController extends Controller
 {
     public function __construct(
         protected AiMovieContentService $movieContentService

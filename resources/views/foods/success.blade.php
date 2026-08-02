@@ -22,7 +22,7 @@
 
         <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <a href="{{ route('foods.index') }}" class="inline-flex items-center justify-center rounded-2xl bg-brand-start px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:bg-brand-end transition">Quay lại thực đơn</a>
-            <a href="{{ route('user.showtimes.index') }}" class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-app-card px-6 py-3 text-sm font-semibold app-text hover:border-brand-start hover:text-brand-start transition">Xem lịch chiếu</a>
+            <a href="{{ route('home') }}#home-showtime-calendar" class="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-app-card px-6 py-3 text-sm font-semibold app-text hover:border-brand-start hover:text-brand-start transition">Xem lịch chiếu</a>
         </div>
     </div>
 </div>

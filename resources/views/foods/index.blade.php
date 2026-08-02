@@ -14,7 +14,7 @@
                 <i class="ph-fill ph-shopping-bag"></i>
                 Giỏ hàng ({{ array_sum(session('food_cart', [])) ?: 0 }})
             </a>
-            <a href="{{ route('user.showtimes.index') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-app-card px-5 py-3 text-sm font-semibold app-text hover:border-brand-start hover:text-brand-start transition">
+            <a href="{{ route('home') }}#home-showtime-calendar" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-app-card px-5 py-3 text-sm font-semibold app-text hover:border-brand-start hover:text-brand-start transition">
                 <i class="ph ph-film-strip"></i>
                 Xem lịch chiếu
             </a>

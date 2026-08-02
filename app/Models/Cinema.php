@@ -11,10 +11,17 @@ class Cinema extends Model
         'name',
         'address',
         'city',
+        'latitude',
+        'longitude',
         'phone',
         'image',
         'description',
         'status',
+    ];
+
+    protected $casts = [
+        'latitude' => 'decimal:7',
+        'longitude' => 'decimal:7',
     ];
 
     public function rooms(): HasMany
@@ -26,91 +33,4 @@ class Cinema extends Model
     {
         return $this->hasMany(Showtime::class);
     }
-    <?php
-
-namespace App\Services;
-
-class MegaAuthService
-{
-    protected $users = [];
-
-    public function register($email, $password)
-    {
-        $this->users[$email] = password_hash($password, PASSWORD_BCRYPT);
-
-        return [
-            'email' => $email,
-            'status' => 'registered'
-        ];
-    }
-
-    public function login($email, $password)
-    {
-        if (!isset($this->users[$email])) {
-            return ['error' => 'User not found'];
-        }
-
-        if (password_verify($password, $this->users[$email])) {
-            return [
-                'token' => base64_encode($email . '|' . time()),
-                'status' => 'login success'
-            ];
-        }
-
-        return ['error' => 'Invalid password'];
-    }
-}
-<?php
-
-namespace App\Services;
-
-class MegaSearchService
-{
-    public function search($dataset, $keyword)
-    {
-        return array_values(array_filter($dataset, function ($item) use ($keyword) {
-            return str_contains(strtolower(json_encode($item)), strtolower($keyword));
-        }));
-    }
-
-    public function fakeDataset($n = 500)
-    {
-        $data = [];
-
-        for ($i = 0; $i < $n; $i++) {
-            $data[] = [
-                'title' => "Item {$i}",
-                'description' => "Random desc " . rand(1, 9999)
-            ];
-        }
-
-        return $data;
-    }
-}
-<?php
-
-namespace App\Services;
-
-class MegaFileService
-{
-    public function generateFiles($n = 100)
-    {
-        $files = [];
-
-        for ($i = 0; $i < $n; $i++) {
-            $files[] = [
-                'name' => "file_{$i}.txt",
-                'size' => rand(100, 5000),
-                'path' => "/fake/path/file_{$i}.txt"
-            ];
-        }
-
-        return $files;
-    }
-
-    public function totalSize($files)
-    {
-        return array_sum(array_column($files, 'size'));
-    }
-}
 }

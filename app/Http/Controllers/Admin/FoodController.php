@@ -11,7 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class AnalyticsController extends Controller
+class FoodController extends Controller
 {
     public function revenue(Request $request)
     {

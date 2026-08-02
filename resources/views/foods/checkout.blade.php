@@ -17,6 +17,7 @@
     <div class="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <section class="rounded-[2rem] border border-white/10 bg-app-card p-6 shadow-sm">
             <h2 class="text-xl font-semibold app-text mb-4">Thông tin khách hàng</h2>
+            @if (\Illuminate\Support\Facades\Route::has('foods.store'))
             <form method="POST" action="{{ route('foods.store') }}" class="space-y-5">
                 @csrf
                 <div>
@@ -42,6 +43,7 @@
                 </div>
                 <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-brand-start px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:bg-brand-end transition">Đặt hàng và thanh toán</button>
             </form>
+            @endif
         </section>
 
         <aside class="rounded-[2rem] border border-white/10 bg-app-card p-6 shadow-sm">

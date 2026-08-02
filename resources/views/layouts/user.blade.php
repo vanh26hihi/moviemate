@@ -31,7 +31,7 @@
                 <nav class="hidden md:flex items-center gap-1 rounded-full app-card border app-border p-1">
                     <a href="{{ route('home') }}" class="px-4 py-2 rounded-full app-text hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Trang chủ</a>
                     <a href="{{ route('user.movies.index') }}" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Phim</a>
-                    <a href="{{ route('user.showtimes.index') }}" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Lịch chiếu</a>
+                    <a href="{{ route('home') }}#home-showtime-calendar" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Lịch chiếu</a>
                     <a href="{{ route('foods.index') }}" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Đồ ăn</a>
                     <a href="{{ route('user.ai.recommend') }}" class="px-4 py-2 rounded-full flex items-center gap-1.5 app-muted hover:text-ai-start hover:bg-ai-start/10 transition-colors font-medium text-sm">
                         <i class="ph-fill ph-sparkle text-ai-start"></i> AI Gợi ý
@@ -49,12 +49,14 @@
 
                     @auth
                         <a href="{{ route('user.bookings.history') }}" class="app-muted hover:app-text font-medium transition-colors text-sm">Tài khoản</a>
+                        @if (\Illuminate\Support\Facades\Route::has('logout'))
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="bg-gradient-to-r from-brand-start to-brand-end text-white px-5 py-2.5 rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-brand-start/25 transition-all">
                                 Đăng xuất
                             </button>
                         </form>
+                        @endif
                     @else
                         <a href="{{ route('login') }}" class="app-muted hover:app-text font-medium transition-colors text-sm">Đăng nhập</a>
                         <a href="{{ route('register') }}" class="bg-gradient-to-r from-brand-start to-brand-end text-white px-5 py-2.5 rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-brand-start/25 transition-all">
@@ -80,7 +82,7 @@
             <div class="px-4 pt-2 pb-4 space-y-1">
                 <a href="{{ route('home') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-text hover:bg-brand-start/10 hover:text-brand-start transition-colors">Trang chủ</a>
                 <a href="{{ route('user.movies.index') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Phim</a>
-                <a href="{{ route('user.showtimes.index') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Lịch chiếu</a>
+                <a href="{{ route('home') }}#home-showtime-calendar" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Lịch chiếu</a>
                 <a href="{{ route('foods.index') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Đồ ăn</a>
                 <a href="{{ route('user.ai.recommend') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-ai-start hover:bg-ai-start/10 transition-colors">
                     <i class="ph-fill ph-sparkle"></i> AI Gợi ý
@@ -88,10 +90,12 @@
                 <a href="{{ route('user.bookings.history') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Vé của tôi</a>
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
+                        @if (\Illuminate\Support\Facades\Route::has('logout'))
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="w-full block px-3 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-start to-brand-end text-center rounded-lg">Đăng xuất</button>
                         </form>
+                        @endif
                     @else
                         <a href="{{ route('login') }}" class="block px-3 py-2.5 text-sm font-medium app-muted hover:app-text text-center border app-border rounded-lg">Đăng nhập</a>
                         <a href="{{ route('register') }}" class="block px-3 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-start to-brand-end text-center rounded-lg">Đăng ký</a>
