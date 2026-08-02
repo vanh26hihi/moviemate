@@ -7,7 +7,7 @@ use App\Models\Cinema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
-class CinemaController extends Controller
+class GenreController extends Controller
 {
     public function index(Request $request)
     {

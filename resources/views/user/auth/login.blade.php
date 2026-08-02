@@ -29,6 +29,7 @@
                         {{ $errors->first() }}
                     </div>
                 @endif
+@if (\Illuminate\Support\Facades\Route::has('login.post'))
 <form action="{{ route('login.post') }}" method="POST" class="space-y-5">
                     @csrf
 
@@ -76,6 +77,7 @@
                         Đăng nhập
                     </button>
                 </form>
+                @endif
                 <div class="mt-6 relative">
                     <div class="absolute inset-0 flex items-center"><div class="w-full border-t app-border"></div></div>
                     <div class="relative flex justify-center text-sm">

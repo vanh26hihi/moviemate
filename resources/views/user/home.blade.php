@@ -3,7 +3,7 @@
 @section('title', 'Trang chủ - MovieMate')
 
 @php
-    $featuredMovie = $nowShowingMovies->first() ?? $comingSoonMovies->first();
+    $featuredMovie = $nowShowing->first() ?? $comingSoon->first();
     $featuredGenres = $featuredMovie?->genres?->pluck('name')->take(3)->join(', ') ?: 'Điện ảnh';
 @endphp
 
@@ -80,6 +80,7 @@
             </div>
         </div>
 
+        @if (\Illuminate\Support\Facades\Route::has('user.ai.recommend.submit'))
         <form action="{{ route('user.ai.recommend.submit') }}" method="POST" class="mt-10 cinema-card p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3">
             @csrf
             <input type="hidden" name="mood" value="chill">
@@ -95,6 +96,7 @@
                 Gợi ý bằng AI
             </button>
         </form>
+        @endif
     </div>
 </section>
 
@@ -111,7 +113,7 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-        @forelse(($latestShowtimes ?? collect())->take(6) as $showtime)
+        @forelse(($quickShowtimes ?? collect())->take(6) as $showtime)
             @php
                 $movie = $showtime->movie;
                 $showDate = $showtime->show_date ? \Carbon\Carbon::parse($showtime->show_date)->format('d/m') : '--/--';
@@ -209,7 +211,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        @forelse($nowShowingMovies as $movie)
+        @forelse($nowShowing as $movie)
             @include('user.movies._home-movie-card', ['movie' => $movie, 'type' => 'now_showing'])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
@@ -240,7 +242,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        @forelse($comingSoonMovies as $movie)
+        @forelse($comingSoon as $movie)
             @include('user.movies._home-movie-card', ['movie' => $movie, 'type' => 'coming_soon'])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">

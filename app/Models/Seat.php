@@ -3,22 +3,31 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Ticket extends Model
+class Seat extends Model
 {
     protected $fillable = [
-        'user_name',
-        'showtime_id',
-        'seat_number',
-        'price'
+        'room_id',
+        'row',
+        'number',
+        'seat_code',
+        'type',
+        'status',
     ];
 
     protected $casts = [
-        'price' => 'decimal:2'
+        'number' => 'integer',
     ];
 
-    public function showtime()
+    public function room(): BelongsTo
     {
-        return $this->belongsTo(Showtime::class);
+        return $this->belongsTo(Room::class);
+    }
+
+    public function bookingSeats(): HasMany
+    {
+        return $this->hasMany(BookingSeat::class);
     }
 }

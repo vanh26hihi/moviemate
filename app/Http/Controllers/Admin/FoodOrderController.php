@@ -7,7 +7,7 @@ use App\Models\Booking;
 use App\Models\Cinema;
 use Illuminate\Http\Request;
 
-class BookingController extends Controller
+class FoodOrderController extends Controller
 {
     public function index(Request $request)
     {

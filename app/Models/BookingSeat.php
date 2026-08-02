@@ -3,22 +3,33 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Payment extends Model
+class BookingSeat extends Model
 {
     protected $fillable = [
-        'ticket_id',
-        'method',
-        'amount',
-        'status'
+        'booking_id',
+        'showtime_id',
+        'seat_id',
+        'price',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2'
+        'price' => 'decimal:2',
     ];
 
-    public function ticket()
+    public function booking(): BelongsTo
     {
-        return $this->belongsTo(Ticket::class);
+        return $this->belongsTo(Booking::class);
+    }
+
+    public function showtime(): BelongsTo
+    {
+        return $this->belongsTo(Showtime::class);
+    }
+
+    public function seat(): BelongsTo
+    {
+        return $this->belongsTo(Seat::class);
     }
 }

@@ -28,6 +28,7 @@
                     </div>
                 @endif
 
+                @if (\Illuminate\Support\Facades\Route::has('register.post'))
                 <form action="{{ route('register.post') }}" method="POST" class="space-y-4">
                     @csrf
 <div>
@@ -115,6 +116,7 @@
                         Tạo tài khoản
                     </button>
                 </form>
+                @endif
                 <p class="mt-6 text-center text-sm app-text-muted">
                     Đã có tài khoản?
                     <a href="{{ route('login') }}" class="font-bold text-brand-start hover:text-brand-end ml-1">Đăng nhập</a>
