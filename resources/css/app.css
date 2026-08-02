@@ -438,3 +438,112 @@ html.light .bg-gradient-to-br.from-\[\#1E1B4B\].to-dark-main {
 html.light .bg-gradient-to-tr.from-dark-main.via-dark-main.to-dark-sub {
     background-image: linear-gradient(to top right, var(--bg-main), var(--bg-main), var(--bg-secondary));
 }
+
+/* Shared UI-source surface tokens used by the user, staff, and admin shells. */
+:root {
+    --app-bg: var(--bg-main);
+    --app-bg-soft: var(--bg-secondary);
+    --app-card: var(--card-bg);
+    --app-card-soft: var(--bg-secondary);
+    --app-border: var(--border-color);
+    --app-text: var(--text-primary);
+    --app-text-soft: #CBD5E1;
+    --app-text-muted: var(--text-muted);
+    --app-heading: var(--text-primary);
+    --app-input-bg: var(--input-bg);
+    --app-input-text: var(--text-primary);
+    --app-input-placeholder: #94A3B8;
+    --app-table-head: var(--bg-secondary);
+    --app-table-row: var(--card-bg);
+    --app-table-hover: #1E293B;
+}
+
+html.light {
+    --app-text-soft: #334155;
+    --app-input-placeholder: #64748B;
+    --app-table-head: #F1F5F9;
+    --app-table-row: #FFFFFF;
+    --app-table-hover: #F8FAFC;
+}
+
+.app-page { background: var(--app-bg); color: var(--app-text); }
+.app-bg { background: var(--app-bg); color: var(--app-text); }
+.app-bg-soft, .app-secondary { background: var(--app-bg-soft); color: var(--app-text); }
+.app-card { background: var(--app-card); color: var(--app-text); border-color: var(--app-border); }
+.app-card-soft { background: var(--app-card-soft); color: var(--app-text); border-color: var(--app-border); }
+.app-heading { color: var(--app-heading); }
+.app-text { color: var(--app-text); }
+.app-text-soft { color: var(--app-text-soft); }
+.app-text-muted, .app-muted { color: var(--app-text-muted); }
+.app-border { border-color: var(--app-border); }
+.app-input { background: var(--app-input-bg); border-color: var(--app-border); color: var(--app-input-text); }
+.app-input::placeholder { color: var(--app-input-placeholder); }
+.app-sidebar { background: var(--sidebar-bg); color: var(--app-text); border-color: var(--app-border); }
+.app-header { background: var(--header-bg); color: var(--app-text); border-color: var(--app-border); }
+.hover\:app-text:hover { color: var(--app-text); }
+
+.admin-shell, .staff-shell { min-width: 0; }
+.admin-shell h1, .admin-shell h2, .admin-shell h3,
+.staff-shell h1, .staff-shell h2, .staff-shell h3 { color: var(--app-heading); }
+.admin-shell label, .staff-shell label { color: var(--app-text-soft); }
+.admin-shell input:not([type="checkbox"]):not([type="radio"]), .admin-shell select, .admin-shell textarea,
+.staff-shell input:not([type="checkbox"]):not([type="radio"]), .staff-shell select, .staff-shell textarea {
+    background: var(--app-input-bg);
+    color: var(--app-input-text);
+    border-color: var(--app-border);
+}
+.admin-shell input::placeholder, .admin-shell textarea::placeholder,
+.staff-shell input::placeholder, .staff-shell textarea::placeholder { color: var(--app-input-placeholder); }
+.admin-shell table:not(.admin-table), .staff-shell table:not(.admin-table) {
+    background: var(--app-card);
+    color: var(--app-text);
+    border: 1px solid var(--app-border);
+    border-radius: 1rem;
+    overflow: hidden;
+}
+.admin-shell table:not(.admin-table) thead, .admin-shell table:not(.admin-table) thead tr, .admin-shell table:not(.admin-table) .bg-gray-200,
+.staff-shell table:not(.admin-table) thead, .staff-shell table:not(.admin-table) thead tr, .staff-shell table:not(.admin-table) .bg-gray-200 {
+    background: var(--app-table-head);
+    color: var(--app-text-soft);
+}
+.admin-shell table:not(.admin-table) tbody tr, .staff-shell table:not(.admin-table) tbody tr { background: var(--app-table-row); color: var(--app-text); }
+.admin-shell table:not(.admin-table) tbody tr:hover, .staff-shell table:not(.admin-table) tbody tr:hover { background: var(--app-table-hover); }
+.admin-shell table:not(.admin-table) th, .admin-shell table:not(.admin-table) td,
+.staff-shell table:not(.admin-table) th, .staff-shell table:not(.admin-table) td { border-color: var(--app-border); }
+
+.admin-page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.admin-page-title { color: var(--app-heading); font-size: clamp(1.5rem, 2vw, 1.875rem); line-height: 1.2; font-weight: 800; }
+.admin-page-subtitle { color: var(--app-text-muted); font-size: .875rem; margin-top: .375rem; }
+.admin-toolbar, .admin-form-card, .admin-table-card, .admin-detail-card {
+    background: var(--app-card);
+    color: var(--app-text);
+    border: 1px solid var(--app-border);
+    border-radius: 1rem;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .07), 0 12px 32px rgba(15, 23, 42, .04);
+}
+.admin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: 1rem; margin-bottom: 1.5rem; }
+.admin-form-card, .admin-detail-card { padding: 1.5rem; }
+.admin-table-card { overflow: hidden; }
+.admin-input { width: 100%; border-radius: .75rem; border: 1px solid var(--app-border); background: var(--app-input-bg); color: var(--app-input-text); padding: .75rem 1rem; outline: none; transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease; }
+.admin-input::placeholder { color: var(--app-input-placeholder); }
+.admin-input:focus { border-color: var(--color-brand-start); box-shadow: 0 0 0 4px rgba(255, 61, 87, .14); }
+.admin-label { display: block; color: var(--app-text-soft); font-size: .875rem; font-weight: 700; margin-bottom: .5rem; }
+.admin-help { color: var(--app-text-muted); font-size: .75rem; margin-top: .5rem; }
+.admin-btn-primary, .admin-btn-secondary, .admin-btn-danger, .admin-btn-warning, .admin-btn-info { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: .75rem; padding: .65rem 1rem; font-size: .875rem; font-weight: 800; transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, color .18s ease, border-color .18s ease; }
+.admin-btn-primary { background: linear-gradient(135deg, var(--color-brand-start), var(--color-brand-end)); color: #fff; box-shadow: 0 12px 24px rgba(255, 61, 87, .18); }
+.admin-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 30px rgba(255, 61, 87, .24); }
+.admin-btn-secondary { background: var(--app-card); color: var(--app-text); border: 1px solid var(--app-border); }
+.admin-btn-secondary:hover { border-color: var(--color-brand-start); color: var(--color-brand-start); }
+.admin-btn-info { background: rgba(14, 165, 233, .10); color: #0ea5e9; }
+.admin-btn-info:hover { background: #0ea5e9; color: #fff; }
+.admin-btn-warning { background: rgba(245, 158, 11, .12); color: #f59e0b; }
+.admin-btn-warning:hover { background: #f59e0b; color: #fff; }
+.admin-btn-danger { background: rgba(239, 68, 68, .12); color: #ef4444; }
+.admin-btn-danger:hover { background: #ef4444; color: #fff; }
+.admin-action-btn { width: 2.25rem; height: 2.25rem; padding: 0; }
+.admin-badge { display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; padding: .35rem .7rem; font-size: .75rem; font-weight: 800; white-space: nowrap; }
+.admin-empty { padding: 3rem 1.5rem; text-align: center; color: var(--app-text-muted); }
+
+@media (max-width: 640px) {
+    .admin-page-header, .admin-toolbar { flex-direction: column; align-items: stretch; }
+}
