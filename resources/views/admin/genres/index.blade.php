@@ -1,63 +1,91 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý Thể Loại')
+@section('title', 'Quản lý thể loại')
+@section('page-title', 'Quản lý thể loại')
 
 @section('content')
-<div class="container mx-auto py-6">
-    <h1 class="text-2xl font-bold mb-4">Quản lý Thể Loại</h1>
-
-    @if(session('success'))
-        <div class="bg-green-100 text-green-800 p-3 rounded mb-4">
-            {{ session('success') }}
-        </div>
-    @endif
-
-    <div class="flex justify-between mb-4">
-        <form method="GET" action="{{ route('admin.genres.index') }}" class="flex space-x-2">
-            <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Tìm kiếm tên..."
-                   class="border rounded px-3 py-1">
-            <button type="submit" class="bg-blue-600 text-white px-3 py-1 rounded">Tìm</button>
-        </form>
-        <a href="{{ route('admin.genres.create') }}" class="bg-green-600 text-white px-4 py-2 rounded">
-            Thêm mới
-        </a>
+<div class="admin-page-header">
+    <div>
+        <h1 class="admin-page-title">Quản lý thể loại</h1>
+        <p class="admin-page-subtitle">Quản lý nhóm thể loại dùng để phân loại phim trong MovieMate.</p>
     </div>
+    <a href="{{ route('admin.genres.create') }}" class="admin-btn-primary">
+        <i class="ph-bold ph-plus"></i>
+        Thêm mới
+    </a>
+</div>
 
-    <table class="w-full table-auto border-collapse">
-        <thead class="bg-gray-200">
-            <tr>
-                <th class="border px-4 py-2">#</th>
-                <th class="border px-4 py-2">Tên</th>
-                <th class="border px-4 py-2">Slug</th>
-                <th class="border px-4 py-2">Hành động</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($genres as $genre)
-                <tr>
-                    <td class="border px-4 py-2">{{ $genre->id }}</td>
-                    <td class="border px-4 py-2">{{ $genre->name }}</td>
-                    <td class="border px-4 py-2">{{ $genre->slug }}</td>
-                    <td class="border px-4 py-2 space-x-2">
-                        <a href="{{ route('admin.genres.edit', $genre) }}" class="text-yellow-600">Sửa</a>
-                        <form action="{{ route('admin.genres.destroy', $genre) }}" method="POST"
-                              class="inline"
-                              onsubmit="return confirm('Bạn có chắc muốn xóa thể loại này?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="text-red-600">Xóa</button>
-                        </form>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="4" class="border px-4 py-2 text-center">Không có thể loại nào.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
+@if(session('success'))
+    <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-semibold">
+        {{ session('success') }}
+    </div>
+@endif
 
-    <div class="mt-4">
+<div class="admin-toolbar">
+    <form method="GET" action="{{ route('admin.genres.index') }}" class="flex w-full flex-col sm:flex-row gap-3">
+        <label class="relative flex-1">
+            <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 app-text-muted"></i>
+            <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Tìm kiếm tên thể loại..."
+                   class="admin-input pl-11">
+        </label>
+        <button type="submit" class="admin-btn-primary">
+            <i class="ph-bold ph-funnel"></i>
+            Tìm
+        </button>
+    </form>
+</div>
+
+<div class="admin-table-card">
+    <div class="overflow-x-auto">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Tên</th>
+                    <th>Slug</th>
+                    <th class="text-right">Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($genres as $genre)
+                    <tr>
+                        <td class="font-mono text-xs app-text-muted">#{{ $genre->id }}</td>
+                        <td>
+                            <div class="font-extrabold app-heading">{{ $genre->name }}</div>
+                        </td>
+                        <td>
+                            <span class="font-mono text-xs app-text-muted">{{ $genre->slug }}</span>
+                        </td>
+                        <td>
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="{{ route('admin.genres.edit', $genre) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
+                                    <i class="ph ph-pencil-simple"></i>
+                                </a>
+                                <form action="{{ route('admin.genres.destroy', $genre) }}" method="POST"
+                                      onsubmit="return confirm('Bạn có chắc muốn xóa thể loại này?');" class="inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="admin-btn-danger admin-action-btn" title="Xóa" aria-label="Xóa" data-tooltip="Xóa">
+                                        <i class="ph ph-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4" class="admin-empty">
+                            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
+                                <i class="ph-fill ph-tag text-3xl"></i>
+                            </div>
+                            Chưa có thể loại nào.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+    <div class="border-t app-border px-5 py-4">
         {{ $genres->links() }}
     </div>
 </div>

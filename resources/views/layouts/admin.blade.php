@@ -18,7 +18,7 @@
 
     <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 app-sidebar border-r app-border transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col h-full">
         <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0">
-            <a href="/admin/dashboard" class="flex items-center gap-2">
+            <a href="{{ route('home') }}" class="flex items-center gap-2">
                 <i class="ph-fill ph-film-strip text-3xl text-brand-start"></i>
                 <div class="leading-tight">
                     <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end">MovieMate</span>
@@ -29,30 +29,28 @@
 
         <nav class="flex-grow py-4 px-4 space-y-0.5 overflow-y-auto hide-scrollbar">
             <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-4 first:mt-0">Tổng quan</p>
-            <a href="/admin/dashboard" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.dashboard') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}">
-                <i class="{{ request()->routeIs('admin.dashboard') ? 'ph-fill' : 'ph' }} ph-squares-four text-lg"></i> Dashboard
-            </a>
+            <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Dashboard" icon="ph-squares-four" />
 
             <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Quản lý rạp &amp; phim</p>
-            <a href="{{ route('admin.movies.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.movies.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.movies.*') ? 'ph-fill' : 'ph' }} ph-film-slate text-lg"></i> Phim</a>
-            <a href="{{ route('admin.genres.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.genres.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.genres.*') ? 'ph-fill' : 'ph' }} ph-tag text-lg"></i> Thể loại</a>
-            <a href="{{ route('admin.cinemas.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.cinemas.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.cinemas.*') ? 'ph-fill' : 'ph' }} ph-buildings text-lg"></i> Rạp chiếu</a>
-            <a href="{{ route('admin.rooms.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.rooms.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.rooms.*') ? 'ph-fill' : 'ph' }} ph-projector-screen text-lg"></i> Phòng chiếu</a>
-            <a href="{{ route('admin.seats.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.seats.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.seats.*') ? 'ph-fill' : 'ph' }} ph-armchair text-lg"></i> Ghế</a>
-            <a href="{{ route('admin.showtimes.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.showtimes.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.showtimes.*') ? 'ph-fill' : 'ph' }} ph-calendar-plus text-lg"></i> Suất chiếu</a>
+            <x-admin.nav-link route-name="admin.movies.index" active-pattern="admin.movies.*" label="Phim" icon="ph-film-slate" />
+            <x-admin.nav-link route-name="admin.genres.index" active-pattern="admin.genres.*" label="Thể loại" icon="ph-tag" />
+            <x-admin.nav-link route-name="admin.cinemas.index" active-pattern="admin.cinemas.*" label="Rạp chiếu" icon="ph-buildings" />
+            <x-admin.nav-link route-name="admin.rooms.index" active-pattern="admin.rooms.*" label="Phòng chiếu" icon="ph-projector-screen" />
+            <x-admin.nav-link route-name="admin.seats.index" active-pattern="admin.seats.*" label="Ghế" icon="ph-armchair" />
+            <x-admin.nav-link route-name="admin.showtimes.index" active-pattern="admin.showtimes.*" label="Suất chiếu" icon="ph-calendar-plus" />
 
             <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Kinh doanh</p>
-            <a href="{{ route('admin.foods.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.foods.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.foods.*') ? 'ph-fill' : 'ph' }} ph-burger text-lg"></i> Món ăn</a>
-            <a href="{{ route('admin.food-orders.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.food-orders.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.food-orders.*') ? 'ph-fill' : 'ph' }} ph-shopping-bag text-lg"></i> Đơn đồ ăn</a>
-            <a href="/admin/bookings" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.bookings.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.bookings.*') ? 'ph-fill' : 'ph' }} ph-ticket text-lg"></i> Vé đặt</a>
-            <a href="/admin/vouchers" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.vouchers.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.vouchers.*') ? 'ph-fill' : 'ph' }} ph-ticket text-lg"></i> Voucher</a>
-            <a href="/admin/users" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.users.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.users.*') ? 'ph-fill' : 'ph' }} ph-users text-lg"></i> Người dùng</a>
-            <a href="/admin/reviews" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.reviews.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.reviews.*') ? 'ph-fill' : 'ph' }} ph-star text-lg"></i> Đánh giá</a>
+            <x-admin.nav-link route-name="admin.foods.index" active-pattern="admin.foods.*" label="Món ăn" icon="ph-burger" />
+            <x-admin.nav-link route-name="admin.food-orders.index" active-pattern="admin.food-orders.*" label="Đơn đồ ăn" icon="ph-shopping-bag" />
+            <x-admin.nav-link route-name="admin.bookings.index" active-pattern="admin.bookings.*" label="Vé đặt" icon="ph-ticket" />
+            <x-admin.nav-link route-name="admin.vouchers.index" active-pattern="admin.vouchers.*" label="Voucher" icon="ph-ticket" />
+            <x-admin.nav-link route-name="admin.users.index" active-pattern="admin.users.*" label="Người dùng" icon="ph-users" />
+            <x-admin.nav-link route-name="admin.reviews.index" active-pattern="admin.reviews.*" label="Đánh giá" icon="ph-star" />
 
             <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Báo cáo &amp; AI</p>
-            <a href="/admin/analytics/revenue" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.analytics.revenue') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.analytics.revenue') ? 'ph-fill' : 'ph' }} ph-chart-line-up text-lg"></i> Doanh thu</a>
-            <a href="/admin/analytics/top-movies" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.analytics.topMovies') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.analytics.topMovies') ? 'ph-fill' : 'ph' }} ph-crown text-lg"></i> Phim bán chạy</a>
-            <a href="/admin/ai/movie-content" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.ai.*') ? 'bg-ai-start/10 text-ai-start font-bold border border-ai-start/20' : 'app-muted hover:bg-ai-start/5 hover:text-ai-start transition-colors text-sm font-medium' }}"><i class="{{ request()->routeIs('admin.ai.*') ? 'ph-fill' : 'ph' }} ph-magic-wand text-lg"></i> AI Tools</a>
+            <x-admin.nav-link route-name="admin.analytics.revenue" active-pattern="admin.analytics.revenue" label="Doanh thu" icon="ph-chart-line-up" />
+            <x-admin.nav-link route-name="admin.analytics.topMovies" active-pattern="admin.analytics.topMovies" label="Phim bán chạy" icon="ph-crown" />
+            <x-admin.nav-link route-name="admin.ai.movieContent" active-pattern="admin.ai.*" label="AI Tools" icon="ph-magic-wand" />
         </nav>
 
         <div class="p-4 border-t app-border shrink-0">

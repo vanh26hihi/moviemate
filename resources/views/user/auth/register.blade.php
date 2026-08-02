@@ -3,6 +3,10 @@
 @section('title', 'Đăng ký - MovieMate')
 
 @section('content')
+@php
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag();
+    $registrationEnabled = \Illuminate\Support\Facades\Route::has('register.post');
+@endphp
 <div class="min-h-[calc(100svh-4rem)] md:min-h-[calc(100svh-5rem)] flex">
         <div class="hidden lg:flex w-1/2 relative dark-surface border-r border-white/10 overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)]/40 to-transparent z-10"></div>
@@ -28,8 +32,7 @@
                     </div>
                 @endif
 
-                @if (\Illuminate\Support\Facades\Route::has('register.post'))
-                <form action="{{ route('register.post') }}" method="POST" class="space-y-4">
+                <form action="{{ $registrationEnabled ? route('register.post') : '#' }}" method="POST" class="space-y-4" @unless($registrationEnabled) onsubmit="return false" @endunless>
                     @csrf
 <div>
                         <label for="name" class="block text-sm font-semibold app-text-soft mb-1.5">Họ và tên</label>
@@ -39,7 +42,7 @@
                             </div>
                             <input type="text" id="name" name="name" value="{{ old('name') }}"
                                    class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="VD: Nguyễn Văn A" required>
+                                   placeholder="VD: Nguyễn Văn A" required @disabled(! $registrationEnabled)>
                         </div>
                         @error('name')
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
@@ -53,7 +56,7 @@
                             </div>
                             <input type="email" id="email" name="email" value="{{ old('email') }}"
                                    class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập email của bạn" required>
+                                   placeholder="Nhập email của bạn" required @disabled(! $registrationEnabled)>
                         </div>
                         @error('email')
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
@@ -67,7 +70,7 @@
                             </div>
                             <input type="tel" id="phone" name="phone" value="{{ old('phone') }}"
                                    class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="09xx xxx xxx">
+                                   placeholder="09xx xxx xxx" @disabled(! $registrationEnabled)>
                         </div>
                         @error('phone')
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
@@ -81,8 +84,8 @@
                             </div>
                             <input type="password" id="password" name="password"
                                    class="app-input w-full pl-11 pr-11 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Ít nhất 6 ký tự" required>
-                            <button type="button" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu">
+                                   placeholder="Ít nhất 6 ký tự" required @disabled(! $registrationEnabled)>
+                            <button type="button" data-password-toggle="password" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu" @disabled(! $registrationEnabled)>
                                 <i class="ph ph-eye text-lg"></i>
                             </button>
                         </div>
@@ -98,11 +101,11 @@
                             </div>
                             <input type="password" id="password_confirmation" name="password_confirmation"
                                    class="app-input w-full pl-11 pr-11 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập lại mật khẩu" required>
+                                   placeholder="Nhập lại mật khẩu" required @disabled(! $registrationEnabled)>
                         </div>
                     </div>
 <div class="flex items-start pt-1">
-                        <input id="terms" name="terms" type="checkbox" value="1" required
+                        <input id="terms" name="terms" type="checkbox" value="1" required @disabled(! $registrationEnabled)
                                class="h-4 w-4 rounded border-dark-border bg-dark-main text-brand-start focus:ring-brand-start mt-0.5 flex-shrink-0">
                         <label for="terms" class="ml-2 text-sm app-text-muted leading-relaxed cursor-pointer">
                             Tôi đồng ý với <a href="#" class="text-brand-start hover:text-brand-end">Điều khoản dịch vụ</a> và <a href="#" class="text-brand-start hover:text-brand-end">Chính sách bảo mật</a>
@@ -112,11 +115,13 @@
                         <p class="text-xs font-semibold text-error">{{ $message }}</p>
                     @enderror
 
-                    <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5 text-sm mt-2">
-                        Tạo tài khoản
-                    </button>
+                    @if($registrationEnabled)
+                        <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5 text-sm mt-2">Tạo tài khoản</button>
+                    @else
+                        <button type="button" disabled class="mt-2 w-full cursor-not-allowed rounded-xl border app-border app-card py-3.5 text-sm font-bold app-text-muted opacity-60">Đăng ký chưa khả dụng</button>
+                        <p class="text-center text-xs app-text-muted">Backend TEAM chưa cung cấp POST register.</p>
+                    @endif
                 </form>
-                @endif
                 <p class="mt-6 text-center text-sm app-text-muted">
                     Đã có tài khoản?
                     <a href="{{ route('login') }}" class="font-bold text-brand-start hover:text-brand-end ml-1">Đăng nhập</a>

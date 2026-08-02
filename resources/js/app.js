@@ -38,9 +38,31 @@ function applyTheme(theme) {
 applyTheme(readTheme());
 
 document.addEventListener('click', (event) => {
-    if (!event.target.closest('[data-theme-toggle]')) {
+    const themeToggle = event.target.closest('[data-theme-toggle]');
+
+    if (themeToggle) {
+        applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
         return;
     }
 
-    applyTheme(document.documentElement.classList.contains('light') ? 'dark' : 'light');
+    const passwordToggle = event.target.closest('[data-password-toggle]');
+
+    if (!passwordToggle) {
+        return;
+    }
+
+    const input = document.getElementById(passwordToggle.dataset.passwordToggle);
+
+    if (!(input instanceof HTMLInputElement)) {
+        return;
+    }
+
+    const showPassword = input.type === 'password';
+    input.type = showPassword ? 'text' : 'password';
+    passwordToggle.setAttribute('aria-label', showPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu');
+
+    const icon = passwordToggle.querySelector('i');
+    if (icon) {
+        icon.className = showPassword ? 'ph ph-eye-slash text-lg' : 'ph ph-eye text-lg';
+    }
 });

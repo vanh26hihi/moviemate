@@ -133,9 +133,8 @@
                         Nền tảng đặt vé xem phim tích hợp AI thông minh, mang đến trải nghiệm điện ảnh tiện lợi và cá nhân hóa.
                     </p>
                     <div class="flex gap-3">
-                        <a href="#" class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted hover:text-brand-start hover:border-brand-start transition-all"><i class="ph-fill ph-facebook-logo text-lg"></i></a>
-                        <a href="#" class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted hover:text-brand-start hover:border-brand-start transition-all"><i class="ph-fill ph-instagram-logo text-lg"></i></a>
-                        <a href="#" class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted hover:text-brand-start hover:border-brand-start transition-all"><i class="ph-fill ph-youtube-logo text-lg"></i></a>
+                        <span class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted" aria-label="Instagram"><i class="ph-fill ph-instagram-logo text-lg"></i></span>
+                        <span class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted" aria-label="YouTube"><i class="ph-fill ph-youtube-logo text-lg"></i></span>
                     </div>
                 </div>
 
