@@ -9,7 +9,7 @@
         <div class="cinema-card rounded-3xl p-8 text-center sm:p-12">
             <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start"><i class="ph-fill ph-ticket text-3xl"></i></div>
             <h2 class="mt-5 text-2xl font-extrabold app-text">Chưa có dữ liệu lịch sử</h2>
-            <p class="mx-auto mt-2 max-w-lg app-muted">TEAM chưa truyền danh sách lịch sử đặt vé cho trang này, vì vậy MovieMate không hiển thị dữ liệu mẫu.</p>
+            <p class="mx-auto mt-2 max-w-lg app-muted">TEAM chưa truyền danh sách lịch sử đặt vé cho trang này, vì vậy giao diện hiển thị empty state an toàn.</p>
             <a href="{{ route('user.movies.index') }}" class="btn-primary mt-6"><i class="ph-fill ph-film-strip"></i> Khám phá phim</a>
         </div>
     </div>

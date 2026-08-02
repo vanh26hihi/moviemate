@@ -1,61 +1,107 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Quáº£n lÃ½ ráº¡p - MovieMate')
-@section('page-title', 'Quáº£n lÃ½ ráº¡p')
+@section('title', 'Quản lý rạp')
+@section('page-title', 'Quản lý rạp')
 
 @section('content')
-
-<div class="rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-            <h1 class="text-3xl font-black">Quáº£n lÃ½ ráº¡p</h1>
-            <p class="mt-2 text-gray-400">Danh sÃ¡ch ráº¡p chiáº¿u</p>
-        </div>
-
-        <a href="/admin/cinemas/create" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-5 py-3 text-sm font-bold">
-            ThÃªm ráº¡p
-        </a>
+<div class="admin-page-header">
+    <div>
+        <h1 class="admin-page-title">Quản lý rạp</h1>
+        <p class="admin-page-subtitle">Quản lý thông tin rạp, địa chỉ và trạng thái vận hành.</p>
     </div>
+    <a href="{{ route('admin.cinemas.create') }}" class="admin-btn-primary">
+        <i class="ph-bold ph-plus"></i>
+        Thêm mới
+    </a>
+</div>
 
-    <div class="mb-6 grid gap-4 md:grid-cols-4">
-        <input placeholder="TÃ¬m kiáº¿m..." class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18] md:col-span-2">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18]">
-            <option>Tráº¡ng thÃ¡i</option>
-            <option>Äang hoáº¡t Ä‘á»™ng</option>
-            <option>Táº¡m khÃ³a</option>
-        </select>
-        <button class="rounded-2xl border border-white/10 px-5 py-3 font-bold hover:border-[#FF7A18]">Lá»c</button>
+@if(session('success'))
+    <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-semibold">
+        {{ session('success') }}
     </div>
+@endif
 
+<div class="admin-toolbar">
+    <form method="GET" action="{{ route('admin.cinemas.index') }}" class="flex w-full flex-col sm:flex-row gap-3">
+        <label class="relative flex-1">
+            <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 app-text-muted"></i>
+            <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Tìm tên rạp..."
+                   class="admin-input pl-11">
+        </label>
+        <button type="submit" class="admin-btn-primary">
+            <i class="ph-bold ph-funnel"></i>
+            Tìm
+        </button>
+    </form>
+</div>
+
+<div class="admin-table-card">
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
-            <thead class="text-gray-400">
-                <tr class="border-b border-white/10">
-                    <th class="py-4">#</th>
-                    <th>TÃªn</th>
-                    <th>ThÃ´ng tin</th>
-                    <th>NgÃ y táº¡o</th>
-                    <th>Tráº¡ng thÃ¡i</th>
-                    <th class="text-right">HÃ nh Ä‘á»™ng</th>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Tên rạp</th>
+                    <th>Địa chỉ</th>
+                    <th>Thành phố</th>
+                    <th>Điện thoại</th>
+                    <th>Trạng thái</th>
+                    <th class="text-right">Hành động</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (range(1,8) as $i)
-                    <tr class="border-b border-white/5">
-                        <td class="py-4 font-bold">{{ $i }}</td>
-                        <td class="font-bold">Dá»¯ liá»‡u máº«u {{ $i }}</td>
-                        <td class="text-gray-400">ThÃ´ng tin chi tiáº¿t cá»§a báº£n ghi {{ $i }}</td>
-                        <td>20/05/2026</td>
-                        <td><span class="rounded-full bg-green-500/20 px-3 py-1 text-xs font-bold text-green-400">Hoáº¡t Ä‘á»™ng</span></td>
-                        <td class="text-right">
-                            <a href="#" class="mr-3 text-[#FF7A18]">Sá»­a</a>
-                            <a href="#" class="text-red-400">XÃ³a</a>
+                @forelse($cinemas as $cinema)
+                    @php
+                        $isActive = $cinema->status === 'active';
+                    @endphp
+                    <tr>
+                        <td class="font-mono text-xs app-text-muted">#{{ $cinema->id }}</td>
+                        <td>
+                            <div class="font-extrabold app-heading">{{ $cinema->name }}</div>
+                        </td>
+                        <td>
+                            <div class="max-w-xs app-text-muted text-sm line-clamp-2">{{ $cinema->address }}</div>
+                        </td>
+                        <td>
+                            <span class="admin-badge bg-ai-start/10 text-ai-start border border-ai-start/20">{{ $cinema->city }}</span>
+                        </td>
+                        <td class="app-text-muted">{{ $cinema->phone ?? 'Chưa cập nhật' }}</td>
+                        <td>
+                            <span class="admin-badge {{ $isActive ? 'bg-success/10 text-success border border-success/20' : 'bg-error/10 text-error border border-error/20' }}">
+                                {{ $isActive ? 'Hoạt động' : 'Tạm ngừng' }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="{{ route('admin.cinemas.edit', $cinema) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
+                                    <i class="ph ph-pencil-simple"></i>
+                                </a>
+                                <form action="{{ route('admin.cinemas.destroy', $cinema) }}" method="POST" class="inline"
+                                      onsubmit="return confirm('Bạn có chắc muốn xóa rạp này?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="admin-btn-danger admin-action-btn" title="Xóa" aria-label="Xóa" data-tooltip="Xóa">
+                                        <i class="ph ph-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="7" class="admin-empty">
+                            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
+                                <i class="ph-fill ph-buildings text-3xl"></i>
+                            </div>
+                            Chưa có rạp nào.
+                        </td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
+    <div class="border-t app-border px-5 py-4">
+        {{ $cinemas->links() }}
+    </div>
 </div>
-
 @endsection

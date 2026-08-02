@@ -16,9 +16,9 @@
                         <h1 class="text-xl font-extrabold app-text">{{ $profileUser->name }}</h1>
                         <p class="mt-1 break-all text-sm app-muted">{{ $profileUser->email }}</p>
                         <div class="mt-5 w-full rounded-2xl border border-ai-start/25 bg-ai-start/10 px-4 py-3 text-left">
-                            <p class="text-xs app-muted">Hạng thành viên</p>
-                            <p class="mt-1 font-extrabold text-ai-start">{{ $profileUser->membership_tier }}</p>
-                            <p class="mt-2 text-xs app-muted">{{ number_format($profileUser->loyalty_points, 0, ',', '.') }} điểm khả dụng</p>
+                            <p class="text-xs app-muted">Tài khoản MovieMate</p>
+                            <p class="mt-1 font-extrabold text-ai-start">{{ $profileUser->email_verified_at ? 'Đã xác thực email' : 'Chưa xác thực email' }}</p>
+                            <p class="mt-2 text-xs app-muted">Tham gia {{ $profileUser->created_at?->format('d/m/Y') ?? '—' }}</p>
                         </div>
                         <div class="mt-5 w-full space-y-1 text-left">
                             <a href="{{ route('user.profile') }}" class="flex items-center gap-3 rounded-xl border border-brand-start/20 bg-brand-start/10 px-4 py-2.5 text-sm font-bold text-brand-start"><i class="ph-fill ph-user text-lg"></i> Thông tin cá nhân</a>
@@ -33,8 +33,8 @@
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Họ và tên</p><p class="mt-1 font-bold app-text">{{ $profileUser->name }}</p></div>
                             <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Email</p><p class="mt-1 break-all font-bold app-text">{{ $profileUser->email }}</p></div>
-                            <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Số điện thoại</p><p class="mt-1 font-bold app-text">{{ $profileUser->phone ?: 'Chưa cập nhật' }}</p></div>
-                            <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Điểm tích luỹ</p><p class="mt-1 font-bold text-ai-start">{{ number_format($profileUser->lifetime_loyalty_points, 0, ',', '.') }}</p></div>
+                            <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Ngày tham gia</p><p class="mt-1 font-bold app-text">{{ $profileUser->created_at?->format('d/m/Y') ?? '—' }}</p></div>
+                            <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Xác thực email</p><p class="mt-1 font-bold text-ai-start">{{ $profileUser->email_verified_at ? 'Đã xác thực' : 'Chưa xác thực' }}</p></div>
                         </div>
                         <div class="mt-6 rounded-2xl border border-brand-start/20 bg-brand-start/5 p-4 text-sm app-muted"><i class="ph-fill ph-info mr-2 text-brand-start"></i>Chức năng cập nhật hồ sơ sẽ hiển thị khi TEAM cung cấp route xử lý tương ứng.</div>
                     </div>
