@@ -74,7 +74,7 @@ Route::get('/foods/checkout', [UserOrderController::class, 'checkout'])->name('f
 Route::get('/foods/success/{order}', [UserOrderController::class, 'success'])->name('foods.success');
 
 Route::prefix('admin')->name('admin.')->group(function () {
-    Route::resource('foods', AdminFoodController::class);
+    Route::resource('foods', AdminFoodController::class)->except(['show']);
     Route::resource('movies', AdminMovieController::class);
     Route::resource('genres', AdminGenreController::class)->except(['show']);
     Route::resource('cinemas', AdminCinemaController::class)->except(['show']);
@@ -86,7 +86,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::patch('/seats/{seat}', [AdminSeatController::class, 'update'])->name('seats.update');
 
     Route::resource('showtimes', AdminShowtimeController::class)->except(['show']);
-     Route::resource('foods', AdminFoodController::class)->except(['show']);
     Route::get('/food-orders', [AdminFoodOrderController::class, 'index'])->name('food-orders.index');
     Route::get('/food-orders/{order}', [AdminFoodOrderController::class, 'show'])->name('food-orders.show');
 });

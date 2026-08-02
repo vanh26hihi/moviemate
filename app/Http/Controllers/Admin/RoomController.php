@@ -3,85 +3,146 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Room;
+use App\Models\Cinema;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use App\Models\FoodItem;
+use Illuminate\Validation\Rule;
 
 class RoomController extends Controller
 {
+    /**
+     * Display a listing of rooms.
+     */
     public function index(Request $request)
     {
+        $query = Room::with('cinema');
+
         $search = $request->query('search');
 
-        $foods = FoodItem::orderBy('name')
-            ->when($search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
-            })
-            ->paginate(20)
+        if ($search) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $rooms = $query->orderBy('name')
+            ->paginate(15)
             ->withQueryString();
 
-        return view('admin.foods.index', compact('foods', 'search'));
+        return view('admin.rooms.index', compact('rooms', 'search'));
     }
 
+    /**
+     * Show the form for creating a new room.
+     */
     public function create()
     {
-        return view('admin.foods.form', ['food' => new FoodItem()]);
+        $cinemas = Cinema::orderBy('name')->get();
+
+        return view('admin.rooms.create', compact('cinemas'));
     }
 
+    /**
+     * Store a newly created room.
+     */
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'image' => 'nullable|image|max:4096',
-            'active' => 'sometimes|boolean',
+        $request->merge([
+            'room_type' => $this->normalizeRoomType($request->input('room_type')),
         ]);
 
-        if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('food_images', 'public');
-        }
-
-        $data['active'] = $request->has('active');
-
-        FoodItem::create($data);
-
-        return redirect()->route('admin.foods.index')->with('success', 'Food created');
-    }
-
-    public function edit(FoodItem $food)
-    {
-        return view('admin.foods.form', compact('food'));
-    }
-
-    public function update(Request $request, FoodItem $food)
-    {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'image' => 'nullable|image|max:4096',
-            'active' => 'sometimes|boolean',
+        $validated = $request->validate([
+            'cinema_id'   => ['required', 'exists:cinemas,id'],
+            'name'        => ['required', 'string', 'max:255'],
+            'room_type'   => ['required', Rule::in(['2D', '3D', 'IMAX'])],
+            'total_seats' => ['required', 'integer', 'min:0'],
+            'status'      => ['required', 'in:active,inactive'],
         ]);
 
-        if ($request->hasFile('image')) {
-            if ($food->image && Storage::disk('public')->exists($food->image)) {
-                Storage::disk('public')->delete($food->image);
-            }
-            $data['image'] = $request->file('image')->store('food_images', 'public');
-        }
+        Room::create($validated);
 
-        $data['active'] = $request->has('active');
-
-        $food->update($data);
-
-        return redirect()->route('admin.foods.index')->with('success', 'Food updated');
+        return redirect()
+            ->route('admin.rooms.index')
+            ->with('success', 'Thêm phòng chiếu thành công.');
     }
 
-    public function destroy(FoodItem $food)
+    /**
+     * Display the specified room.
+     */
+    public function show(Room $room)
     {
-        $food->delete();
-        return redirect()->route('admin.foods.index')->with('success', 'Food deleted');
+        $room->load(['cinema', 'seats']);
+
+        return view('admin.rooms.show', compact('room'));
+    }
+
+    /**
+     * Show the form for editing the specified room.
+     */
+    public function edit(Room $room)
+    {
+        $cinemas = Cinema::orderBy('name')->get();
+
+        return view('admin.rooms.edit', compact('room', 'cinemas'));
+    }
+
+    /**
+     * Update the specified room.
+     */
+    public function update(Request $request, Room $room)
+    {
+        $request->merge([
+            'room_type' => $this->normalizeRoomType($request->input('room_type')),
+        ]);
+
+        $validated = $request->validate([
+            'cinema_id'   => ['required', 'exists:cinemas,id'],
+            'name'        => ['required', 'string', 'max:255'],
+            'room_type'   => ['required', Rule::in(['2D', '3D', 'IMAX'])],
+            'total_seats' => ['required', 'integer', 'min:0'],
+            'status'      => ['required', 'in:active,inactive'],
+        ]);
+
+        $room->update($validated);
+
+        return redirect()
+            ->route('admin.rooms.index')
+            ->with('success', 'Cập nhật phòng chiếu thành công.');
+    }
+
+    /**
+     * Remove the specified room.
+     */
+    public function destroy(Room $room)
+    {
+        $room->seats()->delete();
+
+        $room->delete();
+
+        return redirect()
+            ->route('admin.rooms.index')
+            ->with('success', 'Xóa phòng chiếu thành công.');
+    }
+
+    private function normalizeRoomType(?string $roomType): ?string
+    {
+        if ($roomType === null) {
+            return null;
+        }
+
+        $value = trim($roomType);
+        $upper = mb_strtoupper($value, 'UTF-8');
+
+        if (str_starts_with($upper, '2D')) {
+            return '2D';
+        }
+
+        if (str_starts_with($upper, '3D')) {
+            return '3D';
+        }
+
+        if (str_contains($upper, 'IMAX')) {
+            return 'IMAX';
+        }
+
+        return $value;
     }
 }
