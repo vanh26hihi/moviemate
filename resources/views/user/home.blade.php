@@ -212,7 +212,7 @@
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         @forelse($nowShowing as $movie)
-            @include('user.movies._home-movie-card', ['movie' => $movie, 'type' => 'now_showing'])
+            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'now_showing'])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                 <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
@@ -243,7 +243,7 @@
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         @forelse($comingSoon as $movie)
-            @include('user.movies._home-movie-card', ['movie' => $movie, 'type' => 'coming_soon'])
+            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'coming_soon'])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                 <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-pink-500/10 text-pink-400">
