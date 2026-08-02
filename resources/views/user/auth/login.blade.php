@@ -11,8 +11,8 @@
 <div class="min-h-[calc(100svh-4rem)] md:min-h-[calc(100svh-5rem)] flex">
         <div class="hidden lg:flex w-1/2 relative dark-surface border-r border-white/10 overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)]/40 to-transparent z-10"></div>
-            <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
-                 alt="Cinema" class="w-full h-full object-cover opacity-50">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_28%_24%,rgba(255,61,87,0.28),transparent_34%),radial-gradient(circle_at_72%_68%,rgba(124,58,237,0.22),transparent_38%),linear-gradient(145deg,#151A27,#080A12)]" aria-hidden="true"></div>
+            <div class="absolute inset-0 flex items-center justify-center text-white/10" aria-hidden="true"><i class="ph-fill ph-film-strip text-[15rem]"></i></div>
             <div class="absolute bottom-20 left-12 right-12 z-20">
                 <h2 class="text-3xl font-bold text-white mb-3 leading-tight">Mở ra thế giới điện ảnh<br>của riêng bạn.</h2>
                 <p class="surface-muted text-base">Hàng ngàn bộ phim bom tấn và tính năng AI đề xuất thông minh đang chờ đón bạn.</p>
