@@ -32,7 +32,6 @@
                             <span class="px-3 py-1.5 rounded-full app-secondary border app-border app-text">{{ $featuredGenres }}</span>
                             <span class="px-3 py-1.5 rounded-full app-secondary border app-border app-text">{{ $featuredMovie->duration ?? '--' }} phút</span>
                             <span class="px-3 py-1.5 rounded-full bg-brand-start/10 border border-brand-start/30 text-brand-start font-bold">{{ $featuredMovie->age_rating ?? 'P' }}</span>
-                            <span class="px-3 py-1.5 rounded-full app-secondary border app-border app-text"><i class="ph-fill ph-star text-brand-start"></i> 8.6</span>
                         </div>
                         <p class="mt-4 app-muted line-clamp-2">{{ $featuredMovie->description ?? 'Thông tin phim đang được cập nhật.' }}</p>
                     </div>
