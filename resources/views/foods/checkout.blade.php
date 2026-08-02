@@ -43,6 +43,15 @@
                 </div>
                 <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-brand-start px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:bg-brand-end transition">Đặt hàng và thanh toán</button>
             </form>
+            @else
+                <div class="rounded-3xl border border-brand-start/20 bg-brand-start/5 p-6 text-center">
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
+                        <i class="ph-fill ph-warning-circle text-3xl"></i>
+                    </div>
+                    <h3 class="mt-4 text-xl font-bold app-text">Thanh toán đồ ăn chưa sẵn sàng</h3>
+                    <p class="mt-2 text-sm leading-relaxed app-muted">TEAM chưa khai báo route xử lý đơn đồ ăn, vì vậy không thể gửi đơn từ giao diện này.</p>
+                    <a href="{{ route('foods.cart') }}" class="btn-secondary mt-5">Quay lại giỏ hàng</a>
+                </div>
             @endif
         </section>
 
