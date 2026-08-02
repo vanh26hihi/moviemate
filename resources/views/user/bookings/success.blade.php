@@ -26,7 +26,7 @@
                     <p class="text-xs text-text-sub mb-1">Mã đặt vé</p>
                     <p class="text-xl font-bold text-brand-start font-mono">{{ $booking->booking_code }}</p>
                 </div>
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data={{ $booking->booking_code }}&color=FF3D57&bgcolor=080A12" alt="QR Code" class="w-12 h-12 rounded bg-white p-1">
+                <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="w-12 h-12 rounded bg-white p-1">
             </div>
 
             <div class="space-y-3 text-sm">

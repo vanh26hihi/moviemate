@@ -28,7 +28,7 @@
                     </div>
                 </div>
                 <div class="flex flex-col items-center justify-center">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&amp;data={{ urlencode($booking->booking_code) }}" alt="QR Code {{ $booking->booking_code }}" class="h-52 w-52 rounded-3xl bg-white p-3">
+                    <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="h-52 w-52 rounded-3xl bg-white p-3">
                     <p class="mt-4 text-center text-sm text-gray-400">Mã QR soát vé</p>
                 </div>
             </div>
