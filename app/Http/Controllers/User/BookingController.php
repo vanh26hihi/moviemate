@@ -102,9 +102,7 @@ class BookingController extends Controller
         }
 
         $seatSummaries = $seats->map(function ($seat) use ($showtime) {
-            $price = $seat->type === 'vip'
-                ? ($showtime->vip_price ?? $showtime->price)
-                : $showtime->price;
+            $price = $showtime->priceForSeatType($seat->type);
 
             return [
                 'id' => $seat->id,
@@ -202,9 +200,7 @@ class BookingController extends Controller
             $totalAmount = 0;
 
             foreach ($seats as $seat) {
-                $price = $seat->type === 'vip'
-                    ? (float) ($showtime->vip_price ?? $showtime->price)
-                    : (float) $showtime->price;
+                $price = $showtime->priceForSeatType($seat->type);
 
                 $seatPrices[$seat->id] = $price;
                 $totalAmount += $price;

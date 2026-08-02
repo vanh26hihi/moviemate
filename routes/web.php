@@ -71,6 +71,7 @@ Route::get('/foods', [UserFoodController::class, 'index'])->name('foods.index');
 Route::post('/foods/add', [UserFoodController::class, 'addToCart'])->name('foods.add');
 Route::get('/foods/cart', [UserOrderController::class, 'cart'])->name('foods.cart');
 Route::get('/foods/checkout', [UserOrderController::class, 'checkout'])->name('foods.checkout');
+Route::post('/foods/store', [UserOrderController::class, 'store'])->name('foods.store');
 Route::get('/foods/success/{order}', [UserOrderController::class, 'success'])->name('foods.success');
 
 Route::prefix('admin')->name('admin.')->group(function () {

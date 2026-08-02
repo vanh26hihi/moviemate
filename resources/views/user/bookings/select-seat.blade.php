@@ -60,7 +60,7 @@
                                             $isBooked = in_array($seat->id, $bookedSeatIds);
                                             $isMaintenance = $seat->status !== 'active';
                                             $isVip = $seat->type === 'vip';
-                                            $price = $isVip ? ($showtime->vip_price ?? $showtime->price) : $showtime->price;
+                                            $price = $showtime->priceForSeatType($seat->type);
                                             $seatClass = $isBooked ? 'bg-dark-border border-dark-border text-dark-border/40 cursor-not-allowed opacity-40' :
                                                           $isMaintenance ? 'bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed opacity-50' :
                                                           $isVip ? 'bg-ai-start/10 border-ai-start/50 text-ai-start hover:bg-ai-start hover:text-white' :
