@@ -6,8 +6,6 @@
     <title>@yield('title', 'MovieMate - Đặt vé xem phim thông minh cùng AI')</title>
     <meta name="description" content="@yield('meta_description', 'MovieMate - Nền tảng đặt vé xem phim trực tuyến tích hợp AI thông minh.')">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
     <script>
         (function() {
             var theme = localStorage.getItem('theme') || localStorage.getItem('moviemate_theme') || 'dark';

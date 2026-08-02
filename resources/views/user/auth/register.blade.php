@@ -10,8 +10,8 @@
 <div class="min-h-[calc(100svh-4rem)] md:min-h-[calc(100svh-5rem)] flex">
         <div class="hidden lg:flex w-1/2 relative dark-surface border-r border-white/10 overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)]/40 to-transparent z-10"></div>
-            <img src="https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
-                 alt="Cinema" class="w-full h-full object-cover opacity-40">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_24%_32%,rgba(124,58,237,0.30),transparent_36%),radial-gradient(circle_at_76%_72%,rgba(255,122,24,0.22),transparent_40%),linear-gradient(145deg,#151A27,#080A12)]" aria-hidden="true"></div>
+            <div class="absolute inset-0 flex items-center justify-center text-white/10" aria-hidden="true"><i class="ph-fill ph-ticket text-[15rem]"></i></div>
             <div class="absolute bottom-16 left-12 right-12 z-20">
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-ai-start/20 border border-ai-start/50 text-ai-start text-sm font-medium mb-5 backdrop-blur-sm">
                     <i class="ph-fill ph-sparkle"></i> Trải nghiệm AI tích hợp

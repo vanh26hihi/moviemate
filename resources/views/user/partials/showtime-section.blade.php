@@ -129,7 +129,7 @@
                                 @endforeach
                             </div>
                         </details>
-                        <button type="button" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-brand-start/10 border border-brand-start/25 text-brand-start font-extrabold text-sm hover:bg-brand-start hover:text-white transition-colors">
+                        <button type="button" disabled aria-disabled="true" title="Backend TEAM chưa hỗ trợ lọc theo vị trí" class="inline-flex cursor-not-allowed items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-brand-start/10 border border-brand-start/25 text-brand-start font-extrabold text-sm opacity-60">
                             <i class="ph-fill ph-navigation-arrow"></i>
                             Gần bạn
                         </button>

@@ -3,7 +3,7 @@
 @section('title', 'Đặt vé thành công - MovieMate')
 
 @section('content')
-<div class="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center bg-no-repeat bg-fixed relative">
+<div class="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[radial-gradient(circle_at_20%_15%,rgba(255,61,87,0.2),transparent_35%),radial-gradient(circle_at_80%_85%,rgba(108,43,217,0.18),transparent_40%),linear-gradient(135deg,#080a12,#111526)] relative">
     <div class="absolute inset-0 bg-dark-main/90 backdrop-blur-sm"></div>
 
     <div class="relative max-w-lg w-full bg-dark-card/90 border border-dark-border rounded-3xl p-8 sm:p-12 text-center shadow-2xl shadow-brand-start/20 backdrop-blur-md animate-[fade-in-up_0.5s_ease-out]">
@@ -26,7 +26,10 @@
                     <p class="text-xs text-text-sub mb-1">Mã đặt vé</p>
                     <p class="text-xl font-bold text-brand-start font-mono">{{ $booking->booking_code }}</p>
                 </div>
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data={{ $booking->booking_code }}&color=FF3D57&bgcolor=080A12" alt="QR Code" class="w-12 h-12 rounded bg-white p-1">
+                <div class="w-14 h-14 rounded-lg bg-white p-1.5 flex items-center justify-center">
+                    <canvas data-qr-value="{{ $booking->booking_code }}" data-qr-size="48" class="w-12 h-12" aria-label="Mã QR vé {{ $booking->booking_code }}"></canvas>
+                    <span data-qr-fallback class="hidden text-dark-main text-[8px] font-bold text-center break-all">{{ $booking->booking_code }}</span>
+                </div>
             </div>
 
             <div class="space-y-3 text-sm">

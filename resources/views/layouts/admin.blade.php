@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'MovieMate Admin Panel')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script>
         (function () {
             var theme = localStorage.getItem('theme') || localStorage.getItem('moviemate_theme') || 'dark';
@@ -69,10 +68,13 @@
                     <i class="ph ph-magnifying-glass app-muted text-sm absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"></i>
                     <input type="text" class="app-input w-full pl-9 pr-3 py-2 rounded-lg border app-border focus:outline-none focus:border-brand-start transition-colors text-sm" placeholder="Tìm kiếm (Ctrl+K)">
                 </div>
-                <button type="button" class="relative app-muted hover:app-text transition-colors p-2" aria-label="Thông báo"><i class="ph ph-bell text-lg"></i><span class="absolute top-1 right-1 w-2 h-2 bg-brand-start rounded-full"></span></button>
+                <button type="button" class="relative app-muted hover:app-text transition-colors p-2" aria-label="Thông báo"><i class="ph ph-bell text-lg"></i></button>
                 <button data-theme-toggle type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border app-muted hover:border-brand-start transition-all text-sm" aria-label="Đổi giao diện sáng/tối" aria-pressed="false"><span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span><span class="theme-text hidden lg:inline text-xs font-medium">Tối</span></button>
                 <div class="flex items-center gap-3 pl-3 border-l app-border">
-                    <div class="hidden sm:block text-right"><p class="text-sm font-bold app-text leading-tight">Admin MovieMate</p><p class="text-[10px] uppercase tracking-wider text-brand-start font-bold">Quản trị viên</p></div>
+                    <div class="hidden sm:block text-right">
+                        <p class="text-sm font-bold app-text leading-tight">{{ auth()->user()?->name ?? 'Khu vực quản trị' }}</p>
+                        <p class="text-[10px] uppercase tracking-wider text-brand-start font-bold">MovieMate</p>
+                    </div>
                     <span class="w-9 h-9 rounded-full app-bg border app-border flex items-center justify-center text-brand-start"><i class="ph-fill ph-user text-lg"></i></span>
                 </div>
             </div>
