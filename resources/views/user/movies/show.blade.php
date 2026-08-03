@@ -72,7 +72,7 @@
         <section id="showtimes" class="mt-14">
             <div class="mb-6 flex items-center gap-3">
                 <span class="h-8 w-1 rounded-full bg-gradient-to-b from-brand-start to-brand-end"></span>
-                <div><h2 class="text-2xl font-extrabold app-text md:text-3xl">Lịch chiếu</h2><p class="mt-1 text-sm app-muted">Chọn rạp và giờ chiếu phù hợp để đặt vé.</p></div>
+                <div><h2 class="text-2xl font-extrabold app-text md:text-3xl">Lịch chiếu</h2><p class="mt-1 text-sm app-muted">Chọn giờ chiếu phù hợp tại MovieMate Cinema – FPT Polytechnic.</p></div>
             </div>
 
             @if($showtimes->isEmpty())
@@ -85,20 +85,17 @@
                                 <div><p class="text-sm font-extrabold uppercase tracking-wider text-brand-start">{{ \Carbon\Carbon::parse($date)->translatedFormat('l') }}</p><h3 class="text-xl font-extrabold app-text">{{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</h3></div>
                                 <span class="text-sm app-muted">{{ $items->count() }} suất chiếu</span>
                             </div>
-                            <div class="space-y-4">
-                                @foreach($items->groupBy('cinema_id') as $cinemaShowtimes)
-                                    @php($first = $cinemaShowtimes->first())
-                                    <div class="rounded-2xl border app-border app-secondary p-4">
-                                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                            <div><h4 class="font-extrabold app-text">{{ $first->cinema->name }}</h4><p class="text-sm app-muted">{{ $first->room->name }} · Giá thường {{ number_format($first->price, 0, ',', '.') }}đ · VIP {{ number_format($first->vip_price ?? $first->price, 0, ',', '.') }}đ</p></div>
-                                            <div class="flex flex-wrap gap-2">
-                                                @foreach($cinemaShowtimes as $show)
-                                                    <a href="{{ route('user.bookings.selectSeat', $show->id) }}" class="rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 font-extrabold text-brand-start transition-colors hover:bg-brand-start hover:text-white">{{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}</a>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
+                            @php($first = $items->first())
+                            <div class="rounded-2xl border app-border app-secondary p-4">
+                                <h4 class="font-extrabold app-text">{{ $first->cinema->name }}</h4>
+                                <p class="mt-1 text-sm app-muted">{{ $first->cinema->address }}</p>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    @foreach($items as $show)
+                                        <a href="{{ route('user.bookings.selectSeat', $show->id) }}" class="rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 font-extrabold text-brand-start transition-colors hover:bg-brand-start hover:text-white">
+                                            {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }} · {{ $show->room->name }}
+                                        </a>
+                                    @endforeach
+                                </div>
                             </div>
                         </div>
                     @endforeach

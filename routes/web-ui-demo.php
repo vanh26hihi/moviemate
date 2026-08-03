@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use Illuminate\Support\Facades\Route;
 
@@ -132,18 +132,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/genres/{id}/edit', function ($id) {
         return view('admin.genres.edit');
     })->name('genres.edit');
-
-    Route::get('/cinemas', function () {
-        return view('admin.cinemas.index');
-    })->name('cinemas.index');
-
-    Route::get('/cinemas/create', function () {
-        return view('admin.cinemas.create');
-    })->name('cinemas.create');
-
-    Route::get('/cinemas/{id}/edit', function ($id) {
-        return view('admin.cinemas.edit');
-    })->name('cinemas.edit');
 
     Route::get('/rooms', function () {
         return view('admin.rooms.index');

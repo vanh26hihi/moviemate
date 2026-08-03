@@ -36,6 +36,7 @@ class SchemaBaselineTest extends TestCase
             'cache',
             'jobs',
             'sessions',
+            'cinema_consolidation_mappings',
         ] as $table) {
             $this->assertTrue(Schema::hasTable($table), "Missing table [{$table}].");
         }
@@ -43,7 +44,10 @@ class SchemaBaselineTest extends TestCase
         $this->assertTrue(Schema::hasColumns('users', [
             'phone', 'role_id', 'avatar', 'status', 'email_verified_at',
         ]));
-        $this->assertTrue(Schema::hasColumns('cinemas', ['latitude', 'longitude']));
+        $this->assertTrue(Schema::hasColumns('cinemas', [
+            'canonical_key', 'school_name', 'country', 'latitude', 'longitude',
+            'is_primary', 'archived_at',
+        ]));
         $this->assertTrue(Schema::hasColumns('rooms', [
             'cinema_id', 'code', 'room_type_id', 'total_seats', 'status',
         ]));
@@ -115,6 +119,8 @@ class SchemaBaselineTest extends TestCase
         $this->assertForeignKey('order_items', 'food_item_id', 'food_items');
 
         $this->assertUniqueIndex('rooms', ['cinema_id', 'code']);
+        $this->assertUniqueIndex('cinemas', ['canonical_key']);
+        $this->assertUniqueIndex('cinema_consolidation_mappings', ['entity_type', 'entity_id']);
         $this->assertUniqueIndex('seats', ['room_id', 'seat_code']);
         $this->assertUniqueIndex('bookings', ['booking_code']);
         $this->assertUniqueIndex('booking_seats', [
@@ -128,8 +134,7 @@ class SchemaBaselineTest extends TestCase
         $foreignKeys = collect(Schema::getForeignKeys($table));
 
         $this->assertTrue(
-            $foreignKeys->contains(fn (array $foreignKey) =>
-                in_array($column, $foreignKey['columns'], true)
+            $foreignKeys->contains(fn (array $foreignKey) => in_array($column, $foreignKey['columns'], true)
                 && $foreignKey['foreign_table'] === $foreignTable
             ),
             "Missing foreign key [{$table}.{$column} -> {$foreignTable}]."
@@ -141,8 +146,7 @@ class SchemaBaselineTest extends TestCase
         $indexes = collect(Schema::getIndexes($table));
 
         $this->assertTrue(
-            $indexes->contains(fn (array $index) =>
-                $index['unique'] && $index['columns'] === $columns
+            $indexes->contains(fn (array $index) => $index['unique'] && $index['columns'] === $columns
             ),
             'Missing unique index ['.$table.'.'.implode(',', $columns).'].'
         );

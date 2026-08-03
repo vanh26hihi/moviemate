@@ -37,15 +37,10 @@
                     <input id="food-customer-email" type="email" name="customer_email" value="{{ old('customer_email') }}" class="user-form-control" autocomplete="email" />
                     @error('customer_email')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
                 </div>
-                <div>
-                    <label for="food-pickup-cinema" class="block text-sm font-medium app-text mb-2">Chọn rạp nhận</label>
-                    <select id="food-pickup-cinema" name="pickup_cinema_id" class="user-form-control">
-                        <option value="">Chọn rạp</option>
-                        @foreach(\App\Models\Cinema::orderBy('name')->get() as $c)
-                            <option value="{{ $c->id }}" @selected((string) old('pickup_cinema_id') === (string) $c->id)>{{ $c->name }}</option>
-                        @endforeach
-                    </select>
-                    @error('pickup_cinema_id')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
+                <div class="rounded-3xl border border-brand-start/20 bg-brand-start/5 p-5">
+                    <p class="text-xs font-semibold uppercase tracking-[0.25em] text-brand-start">Điểm nhận cố định</p>
+                    <p class="mt-2 font-bold app-text">{{ $cinema->name }}</p>
+                    <p class="mt-1 text-sm leading-relaxed app-muted">{{ $cinema->address }}</p>
                 </div>
                 <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-brand-start px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:bg-brand-end transition">Đặt hàng và thanh toán</button>
             </form>

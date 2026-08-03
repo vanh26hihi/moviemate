@@ -51,7 +51,7 @@ class AdminRouteAccessTest extends TestCase
         $manager = $this->userWithRole('manager');
         $allowedRoutes = [
             'admin.dashboard', 'admin.movies.index', 'admin.genres.index',
-            'admin.cinemas.index', 'admin.rooms.index', 'admin.seats.index',
+            'admin.cinema.show', 'admin.rooms.index', 'admin.seats.index',
             'admin.showtimes.index', 'admin.foods.index', 'admin.food-orders.index',
         ];
 
@@ -59,7 +59,8 @@ class AdminRouteAccessTest extends TestCase
             $this->actingAs($manager)->get(route($route))->assertOk();
         }
 
-        $this->actingAs($manager)->get(route('admin.cinemas.create'))->assertForbidden();
+        $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.create'));
+        $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.destroy'));
         $this->actingAs($manager)->get(route('admin.users.index'))->assertForbidden();
         $this->actingAs($manager)->get(route('admin.roles.index'))->assertForbidden();
     }

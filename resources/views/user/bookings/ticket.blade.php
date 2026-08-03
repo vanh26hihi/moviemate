@@ -75,6 +75,11 @@
                     </div>
                 </div>
 
+                <div class="mb-6 rounded-2xl bg-gray-50 p-4 text-center">
+                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Địa chỉ rạp</p>
+                    <p class="text-sm font-semibold text-gray-900">{{ $booking->showtime?->cinema?->address ?? 'Đang cập nhật' }}</p>
+                </div>
+
                 <div class="bg-gray-50 rounded-2xl p-4 flex justify-between items-center gap-4 mb-6">
                     <div>
                         <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Ghế ngồi</p>

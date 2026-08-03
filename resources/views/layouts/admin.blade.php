@@ -32,10 +32,10 @@
                 <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Dashboard" icon="ph-squares-four" />
             @endcan
 
-            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Quản lý rạp &amp; phim</p>
+            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Vận hành &amp; phim</p>
             @can('movies.view')<x-admin.nav-link route-name="admin.movies.index" active-pattern="admin.movies.*" label="Phim" icon="ph-film-slate" />@endcan
             @can('genres.view')<x-admin.nav-link route-name="admin.genres.index" active-pattern="admin.genres.*" label="Thể loại" icon="ph-tag" />@endcan
-            @can('cinema.view')<x-admin.nav-link route-name="admin.cinemas.index" active-pattern="admin.cinemas.*" label="Rạp chiếu" icon="ph-buildings" />@endcan
+            @can('cinema.view')<x-admin.nav-link route-name="admin.cinema.show" active-pattern="admin.cinema.*" label="Thông tin rạp" icon="ph-buildings" />@endcan
             @can('rooms.view')<x-admin.nav-link route-name="admin.rooms.index" active-pattern="admin.rooms.*" label="Phòng chiếu" icon="ph-projector-screen" />@endcan
             @can('seats.view')<x-admin.nav-link route-name="admin.seats.index" active-pattern="admin.seats.*" label="Ghế" icon="ph-armchair" />@endcan
             @can('showtimes.view')<x-admin.nav-link route-name="admin.showtimes.index" active-pattern="admin.showtimes.*" label="Suất chiếu" icon="ph-calendar-plus" />@endcan

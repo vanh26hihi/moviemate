@@ -4,11 +4,14 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Movie;
+use App\Services\CinemaContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class MovieController extends Controller
 {
+    public function __construct(private readonly CinemaContext $cinemaContext) {}
+
     /**
      * List movies (now showing & coming soon) with optional search and genre filter.
      */
@@ -65,18 +68,17 @@ class MovieController extends Controller
      */
     public function show($slug)
     {
-        $movie = Movie::where('slug', $slug)
-            ->with(['genres', 'showtimes' => function ($q) {
-                $q->where('status', 'active')
-                  ->whereDate('show_date', '>=', now()->timezone('Asia/Ho_Chi_Minh')->toDateString())
-                  ->orderBy('show_date')
-                  ->orderBy('show_time');
-            }])
-            ->firstOrFail();
+        $movie = Movie::query()->where('slug', $slug)->with('genres')->firstOrFail();
+        $showtimes = $movie->showtimes()->with(['cinema', 'room'])
+            ->where('cinema_id', $this->cinemaContext->id())
+            ->whereHas('room', fn ($query) => $query->where('status', 'active'))
+            ->where('status', 'active')
+            ->whereDate('show_date', '>=', now()->timezone('Asia/Ho_Chi_Minh')->toDateString())
+            ->orderBy('show_date')->orderBy('show_time')->get();
 
         // Filter out showtimes that have already passed (same day, earlier time)
         $now = now()->timezone('Asia/Ho_Chi_Minh');
-        $showtimes = $movie->showtimes->filter(function ($show) use ($now) {
+        $showtimes = $showtimes->filter(function ($show) use ($now) {
             if (! $show->show_date || ! $show->show_time) {
                 return false;
             }
