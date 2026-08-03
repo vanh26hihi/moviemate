@@ -6,8 +6,10 @@ use App\Domain\Payments\VerifiedPaymentData;
 use App\Domain\Payments\ZaloPayConfig;
 use App\Exceptions\ZaloPayAuthenticationException;
 use App\Exceptions\ZaloPayResponseException;
+use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\ZaloPay\ZaloPayGateway;
+use Illuminate\Support\Facades\DB;
 
 class PaymentReconciliationService
 {
@@ -19,22 +21,34 @@ class PaymentReconciliationService
 
     public function reconcile(Payment $payment): string
     {
-        $payment->forceFill(['last_queried_at' => now()])->save();
+        $queryStarted = DB::transaction(function () use ($payment): bool {
+            Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+
+            if ($lockedPayment->status !== Payment::STATUS_PENDING) {
+                return false;
+            }
+
+            $lockedPayment->forceFill(['last_queried_at' => now()])->save();
+
+            return true;
+        });
+
+        if (! $queryStarted) {
+            return $payment->fresh()->status;
+        }
 
         try {
             $response = $this->gateway->query($payment);
         } catch (ZaloPayAuthenticationException $exception) {
-            $payment->forceFill([
-                'status' => Payment::STATUS_REVIEW,
-                'failed_at' => now(),
-                'failure_reason' => 'query_authentication_error',
-            ])->save();
-
-            return Payment::STATUS_REVIEW;
+            return $this->applyOutcome(
+                $payment,
+                Payment::STATUS_REVIEW,
+                'query_authentication_error',
+            );
         }
 
         $payload = $response->payload;
-        $this->storeQueryAudit($payment, $payload, $response->hash);
 
         if ($payload['return_code'] === 1) {
             if (! is_int($payload['amount'] ?? null)) {
@@ -50,12 +64,13 @@ class PaymentReconciliationService
                 source: 'query',
                 payloadHash: $response->hash,
             ));
+            $status = $this->storeQueryAudit($payment, $payload, $response->hash);
 
-            return $result->accepted ? Payment::STATUS_SUCCESS : $payment->fresh()->status;
+            return $result->accepted ? Payment::STATUS_SUCCESS : $status;
         }
 
         if ($payload['return_code'] === 3) {
-            return Payment::STATUS_PENDING;
+            return $this->storeQueryAudit($payment, $payload, $response->hash);
         }
 
         if ($payload['return_code'] !== 2) {
@@ -64,35 +79,76 @@ class PaymentReconciliationService
 
         $subCode = $payload['sub_return_code'] ?? null;
         if ($subCode === -54) {
-            $payment->forceFill([
-                'status' => Payment::STATUS_EXPIRED,
-                'failed_at' => now(),
-                'failure_reason' => 'query_expired',
-            ])->save();
-
-            return Payment::STATUS_EXPIRED;
+            return $this->applyOutcome(
+                $payment,
+                Payment::STATUS_EXPIRED,
+                'query_expired',
+                $payload,
+                $response->hash,
+            );
         }
 
         if ($subCode === -101) {
-            $payment->forceFill([
-                'status' => Payment::STATUS_REVIEW,
-                'failed_at' => now(),
-                'failure_reason' => 'query_unresolved',
-            ])->save();
-
-            return Payment::STATUS_REVIEW;
+            return $this->applyOutcome(
+                $payment,
+                Payment::STATUS_REVIEW,
+                'query_unresolved',
+                $payload,
+                $response->hash,
+            );
         }
 
-        $payment->forceFill([
-            'status' => Payment::STATUS_FAILED,
-            'failed_at' => now(),
-            'failure_reason' => 'query_failed',
-        ])->save();
-
-        return Payment::STATUS_FAILED;
+        return $this->applyOutcome(
+            $payment,
+            Payment::STATUS_FAILED,
+            'query_failed',
+            $payload,
+            $response->hash,
+        );
     }
 
-    private function storeQueryAudit(Payment $payment, array $payload, string $hash): void
+    private function applyOutcome(
+        Payment $payment,
+        string $status,
+        string $reason,
+        ?array $payload = null,
+        ?string $hash = null,
+    ): string {
+        return DB::transaction(function () use ($payment, $status, $reason, $payload, $hash): string {
+            Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+
+            if ($payload !== null && $hash !== null) {
+                $this->fillQueryAudit($lockedPayment, $payload, $hash);
+            }
+
+            if ($lockedPayment->status === Payment::STATUS_PENDING) {
+                $lockedPayment->forceFill([
+                    'status' => $status,
+                    'failed_at' => now(),
+                    'failure_reason' => $reason,
+                ]);
+            }
+
+            $lockedPayment->save();
+
+            return $lockedPayment->status;
+        });
+    }
+
+    private function storeQueryAudit(Payment $payment, array $payload, string $hash): string
+    {
+        return DB::transaction(function () use ($payment, $payload, $hash): string {
+            Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $this->fillQueryAudit($lockedPayment, $payload, $hash);
+            $lockedPayment->save();
+
+            return $lockedPayment->status;
+        });
+    }
+
+    private function fillQueryAudit(Payment $payment, array $payload, string $hash): void
     {
         $payment->forceFill([
             'provider_return_code' => $payload['return_code'],
@@ -101,7 +157,7 @@ class PaymentReconciliationService
             'provider_return_message' => $this->message($payload['return_message'] ?? null),
             'provider_sub_return_message' => $this->message($payload['sub_return_message'] ?? null),
             'query_response_hash' => $hash,
-        ])->save();
+        ]);
     }
 
     private function message(mixed $message): ?string

@@ -6,6 +6,7 @@ use App\Domain\Payments\ZaloPaySigner;
 use App\Exceptions\PaymentInitiationException;
 use App\Exceptions\ZaloPayTransportException;
 use App\Models\Payment;
+use App\Services\BookingTokenService;
 use App\Services\Payments\PaymentInitiationService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -150,6 +151,70 @@ class PaymentInitiationTest extends PaymentTestCase
         $this->assertTrue($result->replayed);
         $this->assertSame($existing->id, $result->payment->id);
         $this->assertSame(1, $booking->payments()->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_guest_payment_initiation_requires_scoped_session_capability(): void
+    {
+        Http::fake(['*' => Http::response($this->successfulCreate(), 200)]);
+        $booking = $this->payableBooking();
+        $rawToken = app(BookingTokenService::class)->issueGuestAccessToken();
+        $booking->forceFill([
+            'guest_access_token_hash' => hash('sha256', $rawToken),
+            'guest_access_expires_at' => now()->addHour(),
+        ])->save();
+
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $rawToken,
+            'destination' => 'success',
+        ])->assertOk();
+
+        $this->post(route('payments.zalopay.initiate', $booking))
+            ->assertRedirect('https://zalopay.example.test/pay');
+        $this->assertSame(1, $booking->payments()->count());
+    }
+
+    public function test_guest_bearer_in_request_body_cannot_bypass_session_capability(): void
+    {
+        Http::fake();
+        $booking = $this->payableBooking();
+        $rawToken = app(BookingTokenService::class)->issueGuestAccessToken();
+        $booking->forceFill([
+            'guest_access_token_hash' => hash('sha256', $rawToken),
+            'guest_access_expires_at' => now()->addHour(),
+        ])->save();
+
+        $this->post(route('payments.zalopay.initiate', $booking), [
+            'guest_token' => $rawToken,
+        ])->assertNotFound();
+
+        $this->assertSame(0, $booking->payments()->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_checkout_replay_by_a_different_actor_cannot_start_payment(): void
+    {
+        $this->seedRbac();
+        Http::fake();
+        $scenario = $this->bookingScenario(false);
+        $checkoutToken = app(BookingTokenService::class)->issueCheckoutToken();
+        $booking = $this->reserve(
+            $scenario,
+            [$scenario['seats'][0]->id],
+            null,
+            $checkoutToken,
+        )->booking;
+        $attacker = $this->userWithRole('user');
+
+        $this->actingAs($attacker)->post(route('user.bookings.store'), [
+            'showtime_id' => $scenario['showtime']->id,
+            'seat_ids' => [$scenario['seats'][0]->id],
+            'customer_email' => 'guest@example.test',
+            'checkout_token' => $checkoutToken,
+        ])->assertConflict();
+
+        $this->post(route('payments.zalopay.initiate', $booking))->assertForbidden();
+        $this->assertSame(0, $booking->payments()->count());
         Http::assertNothingSent();
     }
 

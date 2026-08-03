@@ -4,11 +4,13 @@
 
 @php
     $seatCodes = $booking->seat_codes;
+    $isUsable = $booking->payment_status === 'paid' && $booking->booking_status === 'paid';
     $statusMap = [
         'paid' => ['label' => 'Chưa sử dụng', 'class' => 'bg-green-100 text-green-700 border-green-200', 'icon' => 'ph-check-circle'],
         'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700 border-blue-200', 'icon' => 'ph-checks'],
         'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-red-100 text-red-700 border-red-200', 'icon' => 'ph-x-circle'],
         'expired' => ['label' => 'Hết hạn', 'class' => 'bg-gray-100 text-gray-700 border-gray-200', 'icon' => 'ph-clock'],
+        'review' => ['label' => 'Cần đối soát', 'class' => 'bg-orange-100 text-orange-700 border-orange-200', 'icon' => 'ph-warning'],
         'pending_payment' => ['label' => 'Chờ thanh toán', 'class' => 'bg-amber-100 text-amber-700 border-amber-200', 'icon' => 'ph-hourglass'],
         'pending' => ['label' => 'Đang xử lý', 'class' => 'bg-amber-100 text-amber-700 border-amber-200', 'icon' => 'ph-hourglass'],
     ];
@@ -22,12 +24,14 @@
             <a href="{{ route('user.bookings.history') }}" class="app-muted hover:app-text transition-colors flex items-center gap-2">
                 <i class="ph-bold ph-arrow-left"></i> Lịch sử
             </a>
-            <button type="button"
+            @if($isUsable)
+                <button type="button"
                     data-ticket-download="ticket-image-card"
                     data-ticket-filename="moviemate-{{ $booking->booking_code }}.png"
                     class="app-muted hover:app-text transition-colors flex items-center gap-2 disabled:opacity-60">
-                <i class="ph-bold ph-download-simple"></i> Lưu vé
-            </button>
+                    <i class="ph-bold ph-download-simple"></i> Lưu vé
+                </button>
+            @endif
         </div>
 
         <div id="ticket-image-card" class="bg-white rounded-3xl overflow-hidden shadow-2xl relative">
@@ -43,11 +47,16 @@
                 <div class="absolute -bottom-4 -left-4 w-8 h-8 app-bg rounded-full"></div>
                 <div class="absolute -bottom-4 -right-4 w-8 h-8 app-bg rounded-full"></div>
 
-                <div class="inline-flex min-h-[216px] min-w-[216px] items-center justify-center rounded-2xl border-4 border-gray-100 bg-white p-2 mb-4">
-                    <canvas data-qr-value="{{ $booking->booking_code }}" data-qr-size="200" width="200" height="200" aria-label="QR Code {{ $booking->booking_code }}"></canvas>
-                    <span data-qr-fallback class="hidden font-mono text-sm font-bold text-gray-900">{{ $booking->booking_code }}</span>
-                </div>
-                <p class="text-gray-500 text-sm font-medium">Mã quét vé tại cổng rạp</p>
+                @if($isUsable)
+                    <div class="inline-flex min-h-[216px] min-w-[216px] items-center justify-center rounded-2xl border-4 border-gray-100 bg-white p-2 mb-4">
+                        <canvas data-qr-value="{{ $booking->booking_code }}" data-qr-size="200" width="200" height="200" aria-label="QR Code {{ $booking->booking_code }}"></canvas>
+                        <span data-qr-fallback class="hidden font-mono text-sm font-bold text-gray-900">{{ $booking->booking_code }}</span>
+                    </div>
+                    <p class="text-gray-500 text-sm font-medium">Mã quét vé tại cổng rạp</p>
+                @else
+                    <div class="mb-4 text-6xl text-gray-400"><i class="ph-bold {{ $status['icon'] }}"></i></div>
+                    <p class="text-gray-500 text-sm font-medium">Booking này không có vé QR khả dụng.</p>
+                @endif
                 <p class="text-2xl font-bold text-gray-900 font-mono mt-1 tracking-widest">{{ $booking->booking_code }}</p>
             </div>
 
@@ -79,7 +88,11 @@
         </div>
 
         <div class="mt-6 text-center text-xs app-muted space-y-2">
-            <p>Vui lòng xuất trình mã QR này cho nhân viên soát vé tại rạp.</p>
+            @if($isUsable)
+                <p>Vui lòng xuất trình mã QR này cho nhân viên soát vé tại rạp.</p>
+            @else
+                <p>Trạng thái: {{ $status['label'] }}. Không thể dùng booking này để vào rạp.</p>
+            @endif
             <p>Nên đến rạp trước 15 phút để đảm bảo trải nghiệm tốt nhất.</p>
         </div>
     </div>

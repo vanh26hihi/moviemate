@@ -25,6 +25,9 @@
             @endforeach
             <tr><td style="padding:10px 0;color:#9ca3af">Tổng thanh toán</td><td style="padding:10px 0;text-align:right;font-weight:bold;color:#ff3d57">{{ number_format($booking->total_amount, 0, ',', '.') }}đ</td></tr>
         </table>
+        <p style="margin:24px 0 0;text-align:center">
+            <a href="{{ $ticketAccessUrl }}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#ff3d57;color:#fff;text-decoration:none;font-weight:bold">Mở vé an toàn</a>
+        </p>
         <p style="margin:24px 0 0;color:#9ca3af;font-size:13px;line-height:1.6">Khi đến rạp, vui lòng đưa mã vé cho nhân viên soát vé.</p>
     </div>
 </div>

@@ -5,7 +5,11 @@ namespace Tests\Feature\Payments;
 use App\Jobs\Payments\SendBookingTicket;
 use App\Mail\BookingTicketMail;
 use App\Models\Payment;
+use App\Services\BookingCheckoutService;
+use App\Services\BookingExpirationService;
+use App\Services\BookingTokenService;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use RuntimeException;
 
 class ZaloPayCallbackTest extends PaymentTestCase
@@ -101,6 +105,8 @@ class ZaloPayCallbackTest extends PaymentTestCase
         $this->assertSame(1, Payment::query()->count());
         $this->assertSame($paidAt, $payment->fresh()->paid_at?->format('Y-m-d H:i:s.u'));
         $this->assertSame('paid', $payment->booking->fresh()->payment_status);
+        Queue::assertPushed(SendBookingTicket::class, 1);
+        $this->assertEmpty(session('guest_booking_capabilities', []));
     }
 
     public function test_ticket_email_job_claim_makes_duplicate_delivery_exactly_once(): void
@@ -114,6 +120,16 @@ class ZaloPayCallbackTest extends PaymentTestCase
         $job->handle();
 
         Mail::assertSent(BookingTicketMail::class, 1);
+        Mail::assertSent(BookingTicketMail::class, function (BookingTicketMail $mail) use ($payment): bool {
+            $cleanAccessUrl = route('user.bookings.access.show', $payment->booking);
+
+            $this->assertStringStartsWith($cleanAccessUrl.'#token=', $mail->ticketAccessUrl);
+            $this->assertStringContainsString('&destination=ticket', $mail->ticketAccessUrl);
+            $this->assertStringNotContainsString('guest_token=', $mail->ticketAccessUrl);
+            $this->assertStringNotContainsString('?', $mail->ticketAccessUrl);
+
+            return true;
+        });
         $this->assertNotNull($payment->booking->fresh()->ticket_emailed_at);
     }
 
@@ -193,6 +209,64 @@ class ZaloPayCallbackTest extends PaymentTestCase
 
         $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
         $this->assertSame('late_payment_after_expiration', $payment->fresh()->failure_reason);
+    }
+
+    public function test_expiration_wins_before_callback_and_never_fulfils_booking(): void
+    {
+        $booking = $this->payableBooking(['expires_at' => now()->subMinute()]);
+        $payment = $this->pendingPayment($booking);
+
+        $this->assertTrue(app(BookingExpirationService::class)->expire($booking->id));
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))
+            ->assertJsonPath('return_code', 2);
+
+        $this->assertSame('expired', $booking->fresh()->booking_status);
+        $this->assertSame('unpaid', $booking->fresh()->payment_status);
+        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame('late_payment_after_expiration', $payment->fresh()->failure_reason);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_callback_wins_before_expiration_and_expiration_skips_paid_booking(): void
+    {
+        $payment = $this->pendingPayment();
+        $booking = $payment->booking;
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))
+            ->assertJsonPath('return_code', 1);
+        $booking->forceFill(['expires_at' => now()->subMinute()])->save();
+
+        $this->assertFalse(app(BookingExpirationService::class)->expire($booking->id));
+        $this->assertSame('paid', $booking->fresh()->booking_status);
+        $this->assertSame('paid', $booking->fresh()->payment_status);
+        $this->assertSame(Payment::STATUS_SUCCESS, $payment->fresh()->status);
+        Queue::assertPushed(SendBookingTicket::class, 1);
+    }
+
+    public function test_late_callback_after_same_seat_is_rebooked_moves_old_payment_to_review(): void
+    {
+        $booking = $this->payableBooking(['expires_at' => now()->subMinute()]);
+        $seatId = $booking->bookingSeats()->value('seat_id');
+        $payment = $this->pendingPayment($booking);
+        $this->assertTrue(app(BookingExpirationService::class)->expire($booking->id));
+
+        $replacement = app(BookingCheckoutService::class)->createPendingBooking(
+            $booking->showtime_id,
+            [$seatId],
+            null,
+            'replacement@example.test',
+            app(BookingTokenService::class)->issueCheckoutToken(),
+        )->booking;
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))
+            ->assertJsonPath('return_code', 2);
+
+        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame('late_payment_after_expiration', $payment->fresh()->failure_reason);
+        $this->assertSame('expired', $booking->fresh()->booking_status);
+        $this->assertSame('pending_payment', $replacement->fresh()->booking_status);
+        $this->assertNotNull($replacement->bookingSeats()->value('active_lock_key'));
+        Queue::assertNothingPushed();
     }
 
     public function test_late_callback_does_not_fulfill_expired_booking(): void
