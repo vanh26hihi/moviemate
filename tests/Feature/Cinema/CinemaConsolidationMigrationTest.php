@@ -13,6 +13,8 @@ class CinemaConsolidationMigrationTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const MYSQL_ROOM_12_NAME = "Pho\u{0300}ng 1";
+
     public function test_consolidation_preserves_ids_counts_and_approved_room_mapping_and_rolls_back(): void
     {
         $migration = $this->migration();
@@ -35,6 +37,14 @@ class CinemaConsolidationMigrationTest extends TestCase
         $this->assertRoom(10, $canonical->id, 'P02', 'Phòng 2', 'active');
         $this->assertRoom(11, $canonical->id, 'P03', 'Phòng 3', 'active');
         $this->assertRoom(12, $canonical->id, 'ARCH-12', 'Phòng 1 (Ngừng hoạt động)', 'inactive');
+        $this->assertDatabaseHas('cinema_consolidation_mappings', [
+            'entity_type' => 'room',
+            'entity_id' => 12,
+            'original_cinema_id' => 6,
+            'original_code' => 'R0012',
+            'original_name' => self::MYSQL_ROOM_12_NAME,
+            'original_status' => 'inactive',
+        ]);
         $this->assertSame(1, DB::table('cinemas')->where('is_primary', true)->where('status', 'active')->count());
         $this->assertSame(0, DB::table('rooms')->where('cinema_id', '!=', $canonical->id)->count());
         $this->assertSame(0, DB::table('showtimes')->where('cinema_id', '!=', $canonical->id)->count());
@@ -56,7 +66,7 @@ class CinemaConsolidationMigrationTest extends TestCase
         $this->assertSame(10, DB::table('showtimes')->count());
         $this->assertSame(18, DB::table('bookings')->count());
         $this->assertSame(18, DB::table('payments')->count());
-        $this->assertSame(18, DB::table('booking_seats')->count());
+        $this->assertSame(35, DB::table('booking_seats')->count());
         foreach ([9 => [121, 5, 3], 10 => [121, 2, 2], 11 => [121, 3, 13], 12 => [0, 0, 0]] as $roomId => [$seatCount, $showtimeCount, $bookingCount]) {
             $this->assertSame($seatCount, DB::table('seats')->where('room_id', $roomId)->count());
             $this->assertSame($showtimeCount, DB::table('showtimes')->where('room_id', $roomId)->count());
@@ -74,7 +84,7 @@ class CinemaConsolidationMigrationTest extends TestCase
         $this->assertRoom(9, 6, 'P01', 'Phòng 1', 'active');
         $this->assertRoom(10, 6, 'P02', 'Phòng 2', 'active');
         $this->assertRoom(11, 11, 'P01', 'Phòng 1', 'active');
-        $this->assertRoom(12, 6, 'R0012', 'Phòng 1', 'inactive');
+        $this->assertRoom(12, 6, 'R0012', self::MYSQL_ROOM_12_NAME, 'inactive');
         $this->assertSame(0, DB::table('cinema_consolidation_mappings')->count());
         $this->assertFalse(DB::table('cinemas')->where('canonical_key', CinemaContext::CANONICAL_KEY)->exists());
         $this->assertSame($snapshots['seat_ids'], DB::table('seats')->orderBy('id')->pluck('id')->all());
@@ -155,9 +165,162 @@ class CinemaConsolidationMigrationTest extends TestCase
         $this->assertSame(0, DB::table('cinema_consolidation_mappings')->count());
     }
 
+    public function test_existing_canonical_is_reused_without_duplication_and_restored_on_down(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        $this->seedApprovedLegacyDataset(withHistory: false);
+        $canonicalId = $this->insertCanonical('Existing partial canonical');
+
+        $migration->up();
+
+        $this->assertSame(1, DB::table('cinemas')->where('canonical_key', CinemaContext::CANONICAL_KEY)->count());
+        $this->assertDatabaseHas('cinema_consolidation_mappings', [
+            'entity_type' => 'canonical',
+            'entity_id' => $canonicalId,
+            'canonical_cinema_id' => $canonicalId,
+            'original_code' => 'reused',
+        ]);
+
+        $migration->down();
+
+        $this->assertDatabaseHas('cinemas', [
+            'id' => $canonicalId,
+            'canonical_key' => CinemaContext::CANONICAL_KEY,
+            'name' => 'Existing partial canonical',
+            'is_primary' => false,
+            'status' => 'inactive',
+        ]);
+    }
+
+    public function test_safe_room_12_legacy_fields_are_captured_and_restored_from_mapping(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        $this->seedApprovedLegacyDataset(withHistory: false);
+        DB::table('rooms')->where('id', 12)->update([
+            'code' => 'LEGACY-12',
+            'name' => 'Tên lưu trữ thực tế',
+            'status' => 'active',
+        ]);
+
+        $migration->up();
+
+        $canonicalId = (int) DB::table('cinemas')->where('canonical_key', CinemaContext::CANONICAL_KEY)->value('id');
+        $this->assertRoom(12, $canonicalId, 'ARCH-12', 'Phòng 1 (Ngừng hoạt động)', 'inactive');
+        $this->assertDatabaseHas('cinema_consolidation_mappings', [
+            'entity_type' => 'room',
+            'entity_id' => 12,
+            'original_code' => 'LEGACY-12',
+            'original_name' => 'Tên lưu trữ thực tế',
+            'original_status' => 'active',
+        ]);
+
+        $migration->down();
+
+        $this->assertRoom(12, 6, 'LEGACY-12', 'Tên lưu trữ thực tế', 'active');
+    }
+
+    public function test_matching_partial_mapping_is_reused_without_duplicate_rows(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        $this->seedApprovedLegacyDataset(withHistory: false);
+        $canonicalId = $this->insertCanonical();
+        DB::table('cinema_consolidation_mappings')->insert([
+            'entity_type' => 'room', 'entity_id' => 9,
+            'original_cinema_id' => 6, 'canonical_cinema_id' => $canonicalId,
+            'original_code' => 'P01', 'original_name' => 'Phòng 1', 'original_status' => 'active',
+            'migrated_at' => now(),
+        ]);
+
+        $migration->up();
+
+        $this->assertSame(1, DB::table('cinema_consolidation_mappings')->where('entity_type', 'room')->where('entity_id', 9)->count());
+        $this->assertRoom(9, $canonicalId, 'P01', 'Phòng 1', 'active');
+        $this->assertSame(1, DB::table('cinemas')->where('canonical_key', CinemaContext::CANONICAL_KEY)->count());
+    }
+
+    public function test_inconsistent_partial_mapping_fails_without_silent_corruption(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        $this->seedApprovedLegacyDataset(withHistory: false);
+        $canonicalId = $this->insertCanonical();
+        DB::table('cinema_consolidation_mappings')->insert([
+            'entity_type' => 'room', 'entity_id' => 9,
+            'original_cinema_id' => 6, 'canonical_cinema_id' => $canonicalId,
+            'original_code' => 'WRONG', 'original_name' => 'Phòng 1', 'original_status' => 'active',
+            'migrated_at' => now(),
+        ]);
+
+        try {
+            $migration->up();
+            $this->fail('Expected an inconsistent partial mapping to abort consolidation.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('inconsistent at original_code', $exception->getMessage());
+        }
+
+        $this->assertRoom(9, 6, 'P01', 'Phòng 1', 'active');
+        $this->assertSame(1, DB::table('cinema_consolidation_mappings')->count());
+    }
+
+    public function test_missing_room_12_aborts_and_rolls_back_canonical_creation(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        $this->seedApprovedLegacyDataset(withHistory: false);
+        DB::table('rooms')->where('id', 12)->delete();
+
+        try {
+            $migration->up();
+            $this->fail('Expected missing Room 12 to abort consolidation.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('Required Room 12 is missing', $exception->getMessage());
+        }
+
+        $this->assertFalse(DB::table('cinemas')->where('canonical_key', CinemaContext::CANONICAL_KEY)->exists());
+        $this->assertSame(0, DB::table('cinema_consolidation_mappings')->count());
+    }
+
+    public function test_pretend_path_does_not_query_fake_insert_results_or_change_data(): void
+    {
+        $migration = $this->migration();
+        $migration->down();
+        $this->seedApprovedLegacyDataset(withHistory: false);
+
+        $queries = DB::connection()->pretend(function () use ($migration): void {
+            $migration->up();
+        });
+
+        $this->assertSame([], $queries);
+        $this->assertFalse(DB::table('cinemas')->where('canonical_key', CinemaContext::CANONICAL_KEY)->exists());
+        $this->assertRoom(12, 6, 'R0012', self::MYSQL_ROOM_12_NAME, 'inactive');
+    }
+
     private function migration(): Migration
     {
         return require database_path('migrations/2026_08_03_100001_consolidate_cinemas_to_fpt_polytechnic.php');
+    }
+
+    private function insertCanonical(string $name = 'MovieMate Cinema – FPT Polytechnic'): int
+    {
+        return DB::table('cinemas')->insertGetId([
+            'canonical_key' => CinemaContext::CANONICAL_KEY,
+            'name' => $name,
+            'school_name' => null,
+            'address' => CinemaContext::ADDRESS,
+            'city' => CinemaContext::CITY,
+            'country' => CinemaContext::COUNTRY,
+            'phone' => null,
+            'latitude' => CinemaContext::LATITUDE,
+            'longitude' => CinemaContext::LONGITUDE,
+            'status' => 'inactive',
+            'is_primary' => false,
+            'archived_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function seedApprovedLegacyDataset(bool $withHistory): array
@@ -177,7 +340,7 @@ class CinemaConsolidationMigrationTest extends TestCase
             ['id' => 9, 'cinema_id' => 6, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
             ['id' => 10, 'cinema_id' => 6, 'code' => 'P02', 'name' => 'Phòng 2', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
             ['id' => 11, 'cinema_id' => 11, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => 12, 'cinema_id' => 6, 'code' => 'R0012', 'name' => 'Phòng 1', 'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 12, 'cinema_id' => 6, 'code' => 'R0012', 'name' => self::MYSQL_ROOM_12_NAME, 'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive', 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         if (! $withHistory) {
@@ -242,6 +405,22 @@ class CinemaConsolidationMigrationTest extends TestCase
             ];
             $bookingSeats[] = [
                 'id' => 4000 + $index, 'booking_id' => $bookingId, 'showtime_id' => $showtimeForBooking,
+                'seat_id' => $seatId, 'active_lock_key' => 'ACTIVE', 'price' => 80000,
+                'created_at' => $now, 'updated_at' => $now,
+            ];
+        }
+
+        $extraSeats = [
+            [2001, 901, 9020],
+            [2004, 906, 10020], [2005, 906, 10021],
+        ];
+        foreach (range(6, 18) as $index) {
+            $extraSeats[] = [2000 + $index, 908, 11024 + $index];
+        }
+        $extraSeats[] = [2006, 908, 11060];
+        foreach ($extraSeats as $offset => [$bookingId, $showtimeId, $seatId]) {
+            $bookingSeats[] = [
+                'id' => 4100 + $offset, 'booking_id' => $bookingId, 'showtime_id' => $showtimeId,
                 'seat_id' => $seatId, 'active_lock_key' => 'ACTIVE', 'price' => 80000,
                 'created_at' => $now, 'updated_at' => $now,
             ];
