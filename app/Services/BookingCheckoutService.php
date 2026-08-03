@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\BookingCheckoutConflictException;
 use App\Models\Booking;
 use App\Models\Seat;
 use App\Models\Showtime;
@@ -11,13 +12,18 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use LogicException;
 
 class BookingCheckoutService
 {
+    private const BOOKING_CODE_ATTEMPTS = 3;
+
     public function __construct(
         private readonly RoomLayoutService $layouts,
         private readonly BookingSeatLockService $seatLocks,
         private readonly BookingTokenService $tokens,
+        private readonly BookingCheckoutFingerprint $fingerprints,
+        private readonly BookingCodeGenerator $bookingCodes,
     ) {}
 
     public function createPendingBooking(
@@ -32,98 +38,146 @@ class BookingCheckoutService
         }
 
         $checkoutHash = $this->tokens->hash($checkoutToken);
-        $existing = Booking::query()->where('checkout_idempotency_key_hash', $checkoutHash)->first();
+        $requestFingerprint = $this->fingerprints->hash(
+            $showtimeId,
+            $seatIds,
+            $customerEmail,
+            $userId,
+        );
+        $existing = Booking::query()
+            ->where('checkout_idempotency_key_hash', $checkoutHash)
+            ->first();
 
         if ($existing) {
-            return $this->result($existing, $checkoutToken, true);
+            return $this->result($existing, $checkoutToken, $requestFingerprint, true);
         }
 
-        try {
-            $booking = DB::transaction(function () use (
-                $showtimeId,
-                $seatIds,
-                $userId,
-                $customerEmail,
-                $checkoutHash,
-                $checkoutToken,
-            ): Booking {
-                $existing = Booking::query()
+        for ($attempt = 1; $attempt <= self::BOOKING_CODE_ATTEMPTS; $attempt++) {
+            $bookingCode = $this->bookingCodes->generate();
+
+            try {
+                $booking = DB::transaction(function () use (
+                    $showtimeId,
+                    $seatIds,
+                    $userId,
+                    $customerEmail,
+                    $checkoutHash,
+                    $checkoutToken,
+                    $requestFingerprint,
+                    $bookingCode,
+                ): Booking {
+                    $existing = Booking::query()
+                        ->where('checkout_idempotency_key_hash', $checkoutHash)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($existing) {
+                        return $existing;
+                    }
+
+                    $showtime = Showtime::query()
+                        ->with(['room', 'roomLayout'])
+                        ->lockForUpdate()
+                        ->findOrFail($showtimeId);
+
+                    $this->assertShowtimeCanBeReserved($showtime);
+
+                    $normalizedSeatIds = collect($seatIds)
+                        ->map(fn ($id) => (int) $id)
+                        ->unique()
+                        ->values();
+                    $layout = $this->layouts->resolveForShowtime($showtime);
+                    $seats = Seat::query()
+                        ->where('room_id', $showtime->room_id)
+                        ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layout->id))
+                        ->whereIn('id', $normalizedSeatIds)
+                        ->lockForUpdate()
+                        ->orderBy('id')
+                        ->get();
+
+                    $this->assertSeatsCanBeReserved($seats, $normalizedSeatIds, $layout->id);
+
+                    $priceSnapshots = [];
+                    $totalAmount = 0;
+                    foreach ($seats as $seat) {
+                        $price = $showtime->priceForSeatType($seat->type);
+                        $priceSnapshots[$seat->id] = $price;
+                        $totalAmount += $price;
+                    }
+
+                    $guestToken = $userId === null
+                        ? $this->tokens->guestAccessTokenForCheckout($checkoutToken)
+                        : null;
+
+                    $booking = Booking::query()->create([
+                        'user_id' => $userId,
+                        'customer_email' => $customerEmail,
+                        'guest_access_token_hash' => $guestToken === null ? null : $this->tokens->hash($guestToken),
+                        'guest_access_expires_at' => $guestToken === null
+                            ? null
+                            : now()->addMinutes(max(1, (int) config('booking.guest_access_ttl_minutes', 1440))),
+                        'checkout_idempotency_key_hash' => $checkoutHash,
+                        'checkout_request_fingerprint_hash' => $requestFingerprint,
+                        'showtime_id' => $showtime->id,
+                        'booking_code' => $bookingCode,
+                        'total_amount' => $totalAmount,
+                        'payment_status' => 'unpaid',
+                        'booking_status' => 'pending_payment',
+                        'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
+                    ]);
+
+                    $this->seatLocks->acquire($booking, $seats, $priceSnapshots);
+
+                    return $booking;
+                });
+            } catch (UniqueConstraintViolationException) {
+                $booking = Booking::query()
                     ->where('checkout_idempotency_key_hash', $checkoutHash)
-                    ->lockForUpdate()
                     ->first();
 
-                if ($existing) {
-                    return $existing;
+                if ($booking) {
+                    return $this->result(
+                        $booking,
+                        $checkoutToken,
+                        $requestFingerprint,
+                        true,
+                    );
                 }
 
-                $showtime = Showtime::query()
-                    ->with(['room', 'roomLayout'])
-                    ->lockForUpdate()
-                    ->findOrFail($showtimeId);
-
-                $this->assertShowtimeCanBeReserved($showtime);
-
-                $normalizedSeatIds = collect($seatIds)
-                    ->map(fn ($id) => (int) $id)
-                    ->unique()
-                    ->values();
-                $layout = $this->layouts->resolveForShowtime($showtime);
-                $seats = Seat::query()
-                    ->where('room_id', $showtime->room_id)
-                    ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layout->id))
-                    ->whereIn('id', $normalizedSeatIds)
-                    ->lockForUpdate()
-                    ->orderBy('id')
-                    ->get();
-
-                $this->assertSeatsCanBeReserved($seats, $normalizedSeatIds, $layout->id);
-
-                $priceSnapshots = [];
-                $totalAmount = 0;
-                foreach ($seats as $seat) {
-                    $price = $showtime->priceForSeatType($seat->type);
-                    $priceSnapshots[$seat->id] = $price;
-                    $totalAmount += $price;
+                if ($attempt < self::BOOKING_CODE_ATTEMPTS
+                    && Booking::query()->where('booking_code', $bookingCode)->exists()) {
+                    continue;
                 }
 
-                $guestToken = $userId === null
-                    ? $this->tokens->guestAccessTokenForCheckout($checkoutToken)
-                    : null;
-
-                $booking = Booking::query()->create([
-                    'user_id' => $userId,
-                    'customer_email' => $customerEmail,
-                    'guest_access_token_hash' => $guestToken === null ? null : $this->tokens->hash($guestToken),
-                    'checkout_idempotency_key_hash' => $checkoutHash,
-                    'showtime_id' => $showtime->id,
-                    'booking_code' => $this->generateBookingCode(),
-                    'total_amount' => $totalAmount,
-                    'payment_status' => 'unpaid',
-                    'booking_status' => 'pending_payment',
-                    'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
-                ]);
-
-                $this->seatLocks->acquire($booking, $seats, $priceSnapshots);
-
-                return $booking;
-            });
-        } catch (UniqueConstraintViolationException $exception) {
-            $booking = Booking::query()->where('checkout_idempotency_key_hash', $checkoutHash)->first();
-
-            if (! $booking) {
                 throw ValidationException::withMessages([
                     'seat_ids' => 'Một hoặc nhiều ghế đã được giữ cho suất chiếu này.',
                 ]);
             }
 
-            return $this->result($booking, $checkoutToken, true);
+            return $this->result(
+                $booking,
+                $checkoutToken,
+                $requestFingerprint,
+                ! $booking->wasRecentlyCreated,
+            );
         }
 
-        return $this->result($booking, $checkoutToken, false);
+        throw new LogicException('Booking code generation attempts were exhausted.');
     }
 
-    private function result(Booking $booking, string $checkoutToken, bool $replayed): BookingCheckoutResult
-    {
+    private function result(
+        Booking $booking,
+        string $checkoutToken,
+        string $requestFingerprint,
+        bool $replayed,
+    ): BookingCheckoutResult {
+        if (! $this->fingerprints->matches(
+            $booking->checkout_request_fingerprint_hash,
+            $requestFingerprint,
+        )) {
+            throw new BookingCheckoutConflictException;
+        }
+
         return new BookingCheckoutResult(
             $booking,
             $booking->user_id === null ? $this->tokens->guestAccessTokenForCheckout($checkoutToken) : null,
@@ -178,20 +232,5 @@ class BookingCheckoutService
                 ]);
             }
         }
-    }
-
-    private function generateBookingCode(): string
-    {
-        $year = now()->format('Y');
-        $latestBooking = Booking::query()
-            ->whereYear('created_at', $year)
-            ->lockForUpdate()
-            ->latest('id')
-            ->first();
-        $nextNumber = $latestBooking
-            ? ((int) substr($latestBooking->booking_code, -4)) + 1
-            : 1;
-
-        return 'MMT-'.$year.'-'.str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
     }
 }
