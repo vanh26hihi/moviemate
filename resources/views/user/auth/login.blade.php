@@ -5,8 +5,6 @@
 @section('content')
 @php
     $errors = $errors ?? new \Illuminate\Support\ViewErrorBag();
-    $loginEnabled = \Illuminate\Support\Facades\Route::has('login.post');
-    $googleEnabled = \Illuminate\Support\Facades\Route::has('auth.google.redirect');
 @endphp
 <div class="min-h-[calc(100svh-4rem)] md:min-h-[calc(100svh-5rem)] flex">
         <div class="hidden lg:flex w-1/2 relative dark-surface border-r border-white/10 overflow-hidden">
@@ -34,8 +32,7 @@
                         {{ $errors->first() }}
                     </div>
                 @endif
-                <form action="{{ $loginEnabled ? route('login.post') : '#' }}" method="POST" class="space-y-5" @unless($loginEnabled) onsubmit="return false" @endunless>
-                    @csrf
+                <div class="space-y-5" aria-disabled="true">
 
                     <div>
                         <label for="email" class="block text-sm font-semibold app-text-soft mb-2">Email</label>
@@ -45,7 +42,7 @@
                             </div>
                             <input type="email" id="email" name="email" value="{{ old('email') }}"
                                    class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập email của bạn" required @disabled(! $loginEnabled)>
+                                   placeholder="Nhập email của bạn" required disabled>
                         </div>
                         @error('email')
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
@@ -59,8 +56,8 @@
                             </div>
                             <input type="password" id="password" name="password"
                                    class="app-input w-full pl-11 pr-11 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập mật khẩu" required @disabled(! $loginEnabled)>
-                            <button type="button" data-password-toggle="password" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu" @disabled(! $loginEnabled)>
+                                   placeholder="Nhập mật khẩu" required disabled>
+                            <button type="button" data-password-toggle="password" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu" disabled>
                                 <i class="ph ph-eye text-lg"></i>
                             </button>
                         </div>
@@ -72,18 +69,14 @@
                     <div class="flex items-center justify-between">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input id="remember-me" name="remember" type="checkbox" value="1" @checked(old('remember'))
-                                   class="h-4 w-4 rounded border-dark-border bg-dark-main text-brand-start focus:ring-brand-start" @disabled(! $loginEnabled)>
+                                   class="h-4 w-4 rounded border-dark-border bg-dark-main text-brand-start focus:ring-brand-start" disabled>
                             <span class="text-sm app-text-muted">Ghi nhớ đăng nhập</span>
                         </label>
                         <span class="text-sm app-text-muted">Quên mật khẩu?</span>
                     </div>
-                    @if($loginEnabled)
-                        <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5 text-sm">Đăng nhập</button>
-                    @else
-                        <button type="button" disabled class="w-full cursor-not-allowed rounded-xl border app-border app-card py-3.5 text-sm font-bold app-text-muted opacity-60">Đăng nhập chưa khả dụng</button>
-                        <p class="text-center text-xs app-text-muted">Backend TEAM chưa cung cấp POST login.</p>
-                    @endif
-                </form>
+                    <button type="button" disabled class="w-full cursor-not-allowed rounded-xl border app-border app-card py-3.5 text-sm font-bold app-text-muted opacity-60">Đăng nhập chưa khả dụng</button>
+                    <p class="text-center text-xs app-text-muted">Hệ thống đăng nhập đang được hoàn thiện.</p>
+                </div>
                 <div class="mt-6 relative">
                     <div class="absolute inset-0 flex items-center"><div class="w-full border-t app-border"></div></div>
                     <div class="relative flex justify-center text-sm">
@@ -92,15 +85,7 @@
                 </div>
 
                 <div class="mt-5">
-                    @if($googleEnabled)
-                        <a href="{{ route('auth.google.redirect') }}" class="flex items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted hover:app-text hover:border-brand-start transition-colors text-sm font-medium">
-                            <i class="ph-fill ph-google-logo text-lg"></i> Google
-                        </a>
-                    @else
-                        <button type="button" disabled class="flex cursor-not-allowed items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted opacity-60 text-sm font-medium">
-                            <i class="ph-fill ph-google-logo text-lg"></i> Google chưa khả dụng
-                        </button>
-                    @endif
+                    <button type="button" disabled class="flex cursor-not-allowed items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted opacity-60 text-sm font-medium"><i class="ph-fill ph-google-logo text-lg"></i> Google chưa khả dụng</button>
                 </div>
 
                 <p class="mt-6 text-center text-sm app-text-muted">

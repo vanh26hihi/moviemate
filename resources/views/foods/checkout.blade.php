@@ -1,7 +1,9 @@
-@extends('layouts.app')
+@extends('layouts.user')
+
+@section('title', 'Thanh toán đồ ăn - MovieMate')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="user-page-shell max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brand-start">Thanh toán đồ ăn</p>
@@ -15,31 +17,35 @@
     </div>
 
     <div class="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <section class="rounded-[2rem] border border-white/10 bg-app-card p-6 shadow-sm">
+        <section class="cinema-card rounded-[2rem] p-6 sm:p-8">
             <h2 class="text-xl font-semibold app-text mb-4">Thông tin khách hàng</h2>
             @if (\Illuminate\Support\Facades\Route::has('foods.store'))
             <form method="POST" action="{{ route('foods.store') }}" class="space-y-5">
                 @csrf
                 <div>
-                    <label class="block text-sm font-medium app-text mb-2">Họ và tên</label>
-                    <input type="text" name="customer_name" required class="admin-input w-full" placeholder="Nguyễn Văn A" />
+                    <label for="food-customer-name" class="block text-sm font-medium app-text mb-2">Họ và tên</label>
+                    <input id="food-customer-name" type="text" name="customer_name" required value="{{ old('customer_name') }}" class="user-form-control" autocomplete="name" />
+                    @error('customer_name')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium app-text mb-2">Số điện thoại</label>
-                    <input type="text" name="customer_phone" class="admin-input w-full" placeholder="0987 654 321" />
+                    <label for="food-customer-phone" class="block text-sm font-medium app-text mb-2">Số điện thoại</label>
+                    <input id="food-customer-phone" type="text" name="customer_phone" value="{{ old('customer_phone') }}" class="user-form-control" autocomplete="tel" />
+                    @error('customer_phone')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium app-text mb-2">Email</label>
-                    <input type="email" name="customer_email" class="admin-input w-full" placeholder="email@example.com" />
+                    <label for="food-customer-email" class="block text-sm font-medium app-text mb-2">Email</label>
+                    <input id="food-customer-email" type="email" name="customer_email" value="{{ old('customer_email') }}" class="user-form-control" autocomplete="email" />
+                    @error('customer_email')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
                 </div>
                 <div>
-                    <label class="block text-sm font-medium app-text mb-2">Chọn rạp nhận</label>
-                    <select name="pickup_cinema_id" class="admin-input w-full">
+                    <label for="food-pickup-cinema" class="block text-sm font-medium app-text mb-2">Chọn rạp nhận</label>
+                    <select id="food-pickup-cinema" name="pickup_cinema_id" class="user-form-control">
                         <option value="">Chọn rạp</option>
                         @foreach(\App\Models\Cinema::orderBy('name')->get() as $c)
-                            <option value="{{ $c->id }}">{{ $c->name }}</option>
+                            <option value="{{ $c->id }}" @selected((string) old('pickup_cinema_id') === (string) $c->id)>{{ $c->name }}</option>
                         @endforeach
                     </select>
+                    @error('pickup_cinema_id')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
                 </div>
                 <button type="submit" class="mt-2 inline-flex w-full items-center justify-center rounded-2xl bg-brand-start px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:bg-brand-end transition">Đặt hàng và thanh toán</button>
             </form>
@@ -55,7 +61,7 @@
             @endif
         </section>
 
-        <aside class="rounded-[2rem] border border-white/10 bg-app-card p-6 shadow-sm">
+        <aside class="cinema-card rounded-[2rem] p-6 lg:sticky lg:top-24 lg:self-start">
             <h2 class="text-xl font-semibold app-text mb-4">Tóm tắt đơn hàng</h2>
             <div class="space-y-4">
                 @php $total = 0; @endphp

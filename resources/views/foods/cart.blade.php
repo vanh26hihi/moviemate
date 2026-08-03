@@ -1,7 +1,9 @@
-@extends('layouts.app')
+@extends('layouts.user')
+
+@section('title', 'Giỏ đồ ăn - MovieMate')
 
 @section('content')
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="user-page-shell max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
     <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brand-start">Giỏ hàng của bạn</p>
@@ -14,7 +16,8 @@
     </div>
 
     @if(empty($cart))
-        <div class="rounded-[2rem] border border-white/10 bg-app-card p-10 text-center">
+        <div class="cinema-card rounded-[2rem] p-10 text-center">
+            <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start"><i class="ph-fill ph-shopping-cart text-3xl"></i></div>
             <p class="text-xl font-bold app-text">Giỏ hàng đang trống</p>
             <p class="mt-3 text-sm app-muted">Thêm món ăn vào giỏ để tiếp tục thanh toán.</p>
         </div>
@@ -24,7 +27,7 @@
                 @php $total = 0; @endphp
                 @foreach($cart as $id => $qty)
                     @php $fi = $items[$id]; $line = $fi->price * $qty; $total += $line; @endphp
-                    <div class="rounded-[2rem] border border-white/10 bg-app-card p-5 shadow-sm">
+                    <div class="cinema-card rounded-[2rem] p-5">
                         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div class="min-w-0">
                                 <h2 class="text-lg font-semibold app-text">{{ $fi->name }}</h2>
@@ -39,7 +42,7 @@
                 @endforeach
             </div>
 
-            <aside class="rounded-[2rem] border border-white/10 bg-app-card p-6 shadow-sm">
+            <aside class="cinema-card rounded-[2rem] p-6 lg:sticky lg:top-24 lg:self-start">
                 <div class="mb-6">
                     <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brand-start">Tóm tắt đơn</p>
                     <p class="mt-3 text-sm app-muted">Kiểm tra tổng và tiếp tục thanh toán.</p>
