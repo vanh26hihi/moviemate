@@ -17,10 +17,10 @@
         <h1 class="admin-page-title">Quản lý phim</h1>
         <p class="admin-page-subtitle">Quản lý danh sách phim, poster, trạng thái và thể loại.</p>
     </div>
-    <a href="{{ route('admin.movies.create') }}" class="admin-btn-primary">
+    @can('movies.create')<a href="{{ route('admin.movies.create') }}" class="admin-btn-primary">
         <i class="ph-bold ph-plus"></i>
         Thêm mới
-    </a>
+    </a>@endcan
 </div>
 
 @if(session('success'))
@@ -109,17 +109,17 @@
                                 <a href="{{ route('admin.movies.show', $movie) }}" class="admin-btn-info admin-action-btn" title="Xem" aria-label="Xem" data-tooltip="Xem">
                                     <i class="ph ph-eye"></i>
                                 </a>
-                                <a href="{{ route('admin.movies.edit', $movie) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
+                                @can('movies.update')<a href="{{ route('admin.movies.edit', $movie) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
                                     <i class="ph ph-pencil-simple"></i>
-                                </a>
-                                <form action="{{ route('admin.movies.destroy', $movie) }}" method="POST"
+                                </a>@endcan
+                                @can('movies.delete')<form action="{{ route('admin.movies.destroy', $movie) }}" method="POST"
                                       onsubmit="return confirm('Bạn có chắc muốn xóa phim này?');" class="inline">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="admin-btn-danger admin-action-btn" title="Xóa" aria-label="Xóa" data-tooltip="Xóa">
                                         <i class="ph ph-trash"></i>
                                     </button>
-                                </form>
+                                </form>@endcan
                             </div>
                         </td>
                     </tr>

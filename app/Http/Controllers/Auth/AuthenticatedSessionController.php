@@ -45,7 +45,13 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('home'));
+        $fallback = match (Auth::user()->role?->slug) {
+            'admin', 'manager' => route('admin.dashboard'),
+            'staff' => route('staff.dashboard'),
+            default => route('home'),
+        };
+
+        return redirect()->intended($fallback);
     }
 
     public function destroy(Request $request): RedirectResponse

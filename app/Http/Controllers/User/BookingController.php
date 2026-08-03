@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
@@ -257,7 +258,7 @@ class BookingController extends Controller
      */
     public function success(Booking $booking)
     {
-        abort_unless($booking->user_id === null || $booking->user_id === Auth::id(), 403);
+        $this->authorizeBookingView($booking);
 
         $booking->load([
             'user',
@@ -273,7 +274,7 @@ class BookingController extends Controller
 
     public function ticket(Booking $booking)
     {
-        abort_unless($booking->user_id === null || $booking->user_id === Auth::id(), 403);
+        $this->authorizeBookingView($booking);
 
         $booking->load([
             'user',
@@ -285,6 +286,17 @@ class BookingController extends Controller
         ]);
 
         return view('user.bookings.ticket', compact('booking'));
+    }
+
+    private function authorizeBookingView(Booking $booking): void
+    {
+        if (Auth::check()) {
+            Gate::authorize('view', $booking);
+
+            return;
+        }
+
+        abort_unless($booking->user_id === null, 403);
     }
 
     /**

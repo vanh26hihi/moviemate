@@ -27,33 +27,35 @@
         </div>
 
         <nav class="flex-grow py-4 px-4 space-y-0.5 overflow-y-auto hide-scrollbar">
-            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-4 first:mt-0">Tổng quan</p>
-            <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Dashboard" icon="ph-squares-four" />
+            @can('dashboard.view')
+                <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-4 first:mt-0">Tổng quan</p>
+                <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Dashboard" icon="ph-squares-four" />
+            @endcan
 
             <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Quản lý rạp &amp; phim</p>
-            <x-admin.nav-link route-name="admin.movies.index" active-pattern="admin.movies.*" label="Phim" icon="ph-film-slate" />
-            <x-admin.nav-link route-name="admin.genres.index" active-pattern="admin.genres.*" label="Thể loại" icon="ph-tag" />
-            <x-admin.nav-link route-name="admin.cinemas.index" active-pattern="admin.cinemas.*" label="Rạp chiếu" icon="ph-buildings" />
-            <x-admin.nav-link route-name="admin.rooms.index" active-pattern="admin.rooms.*" label="Phòng chiếu" icon="ph-projector-screen" />
-            <x-admin.nav-link route-name="admin.seats.index" active-pattern="admin.seats.*" label="Ghế" icon="ph-armchair" />
-            <x-admin.nav-link route-name="admin.showtimes.index" active-pattern="admin.showtimes.*" label="Suất chiếu" icon="ph-calendar-plus" />
+            @can('movies.view')<x-admin.nav-link route-name="admin.movies.index" active-pattern="admin.movies.*" label="Phim" icon="ph-film-slate" />@endcan
+            @can('genres.view')<x-admin.nav-link route-name="admin.genres.index" active-pattern="admin.genres.*" label="Thể loại" icon="ph-tag" />@endcan
+            @can('cinema.view')<x-admin.nav-link route-name="admin.cinemas.index" active-pattern="admin.cinemas.*" label="Rạp chiếu" icon="ph-buildings" />@endcan
+            @can('rooms.view')<x-admin.nav-link route-name="admin.rooms.index" active-pattern="admin.rooms.*" label="Phòng chiếu" icon="ph-projector-screen" />@endcan
+            @can('seats.view')<x-admin.nav-link route-name="admin.seats.index" active-pattern="admin.seats.*" label="Ghế" icon="ph-armchair" />@endcan
+            @can('showtimes.view')<x-admin.nav-link route-name="admin.showtimes.index" active-pattern="admin.showtimes.*" label="Suất chiếu" icon="ph-calendar-plus" />@endcan
 
             <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Kinh doanh</p>
-            <x-admin.nav-link route-name="admin.foods.index" active-pattern="admin.foods.*" label="Món ăn" icon="ph-burger" />
-            <x-admin.nav-link route-name="admin.food-orders.index" active-pattern="admin.food-orders.*" label="Đơn đồ ăn" icon="ph-shopping-bag" />
-            <x-admin.nav-link route-name="admin.bookings.index" active-pattern="admin.bookings.*" label="Vé đặt" icon="ph-ticket" />
-            <x-admin.nav-link route-name="admin.vouchers.index" active-pattern="admin.vouchers.*" label="Voucher" icon="ph-ticket" />
-            <x-admin.nav-link route-name="admin.users.index" active-pattern="admin.users.*" label="Người dùng" icon="ph-users" />
-            <x-admin.nav-link route-name="admin.reviews.index" active-pattern="admin.reviews.*" label="Đánh giá" icon="ph-star" />
+            @can('foods.view')<x-admin.nav-link route-name="admin.foods.index" active-pattern="admin.foods.*" label="Món ăn" icon="ph-burger" />@endcan
+            @can('food-orders.view')<x-admin.nav-link route-name="admin.food-orders.index" active-pattern="admin.food-orders.*" label="Đơn đồ ăn" icon="ph-shopping-bag" />@endcan
 
-            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Báo cáo &amp; AI</p>
-            <x-admin.nav-link route-name="admin.analytics.revenue" active-pattern="admin.analytics.revenue" label="Doanh thu" icon="ph-chart-line-up" />
-            <x-admin.nav-link route-name="admin.analytics.topMovies" active-pattern="admin.analytics.topMovies" label="Phim bán chạy" icon="ph-crown" />
-            <x-admin.nav-link route-name="admin.ai.movieContent" active-pattern="admin.ai.*" label="AI Tools" icon="ph-magic-wand" />
+            @canany(['users.view', 'roles.view'])
+                <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Bảo mật</p>
+                @can('users.view')<x-admin.nav-link route-name="admin.users.index" active-pattern="admin.users.*" label="Người dùng" icon="ph-users" />@endcan
+                @can('roles.view')<x-admin.nav-link route-name="admin.roles.index" active-pattern="admin.roles.*" label="Vai trò &amp; quyền" icon="ph-shield-check" />@endcan
+            @endcanany
         </nav>
 
         <div class="p-4 border-t app-border shrink-0">
             <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về website</a>
+            <form method="POST" action="{{ route('logout') }}" class="mt-2">@csrf
+                <button type="submit" class="flex items-center justify-center gap-2 w-full py-2.5 app-muted hover:text-error text-sm font-medium"><i class="ph ph-sign-out"></i> Đăng xuất</button>
+            </form>
         </div>
     </aside>
 
@@ -73,13 +75,18 @@
                 <div class="flex items-center gap-3 pl-3 border-l app-border">
                     <div class="hidden sm:block text-right">
                         <p class="text-sm font-bold app-text leading-tight">{{ auth()->user()?->name ?? 'Khu vực quản trị' }}</p>
-                        <p class="text-[10px] uppercase tracking-wider text-brand-start font-bold">MovieMate</p>
+                        <p class="text-[10px] uppercase tracking-wider text-brand-start font-bold">{{ auth()->user()?->role?->name ?? 'Chưa có vai trò' }}</p>
                     </div>
                     <span class="w-9 h-9 rounded-full app-bg border app-border flex items-center justify-center text-brand-start"><i class="ph-fill ph-user text-lg"></i></span>
                 </div>
             </div>
         </header>
-        <div class="flex-grow overflow-y-auto"><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12"><div class="sm:hidden mb-4"><h1 class="text-xl font-bold app-heading">@yield('page-title')</h1></div>@yield('content')</div></div>
+        <div class="flex-grow overflow-y-auto"><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12">
+            <div class="sm:hidden mb-4"><h1 class="text-xl font-bold app-heading">@yield('page-title')</h1></div>
+            @if(session('success'))<div class="mb-5 rounded-xl border border-success/30 bg-success/10 text-success px-4 py-3">{{ session('success') }}</div>@endif
+            @if(isset($errors) && $errors->any())<div class="mb-5 rounded-xl border border-error/30 bg-error/10 text-error px-4 py-3">{{ $errors->first() }}</div>@endif
+            @yield('content')
+        </div></div>
     </main>
 
     <script>
