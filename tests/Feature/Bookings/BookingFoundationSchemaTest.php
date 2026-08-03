@@ -5,7 +5,6 @@ namespace Tests\Feature\Bookings;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 use Tests\Support\CreatesBookingFixtures;
 use Tests\TestCase;
 
@@ -43,15 +42,18 @@ class BookingFoundationSchemaTest extends TestCase
         $this->assertSame(['booking_status', 'expires_at'], $index['columns']);
     }
 
-    public function test_migration_down_refuses_to_make_user_id_required_when_guests_exist(): void
+    public function test_migration_down_restores_original_nullable_user_relationship_with_guest_rows(): void
     {
         $scenario = $this->bookingScenario(false);
         $this->bookingForScenario($scenario);
         $migration = require database_path('migrations/2026_08_04_100000_harden_booking_foundations.php');
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('guest bookings exist');
         $migration->down();
+
+        $columns = collect(Schema::getColumns('bookings'))->keyBy('name');
+        $this->assertTrue($columns['user_id']['nullable']);
+        $this->assertFalse($columns->has('guest_access_token_hash'));
+        $this->assertDatabaseHas('bookings', ['user_id' => null]);
     }
 
     public function test_migration_can_safely_round_trip_without_guest_rows(): void
@@ -60,7 +62,7 @@ class BookingFoundationSchemaTest extends TestCase
 
         $migration->down();
         $columns = collect(Schema::getColumns('bookings'))->keyBy('name');
-        $this->assertFalse($columns['user_id']['nullable']);
+        $this->assertTrue($columns['user_id']['nullable']);
         $this->assertFalse($columns->has('guest_access_token_hash'));
 
         $migration->up();

@@ -17,9 +17,11 @@ use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
 use App\Http\Controllers\User\BookingController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
+use App\Http\Controllers\User\GuestBookingAccessController;
 use App\Http\Controllers\User\HomeController;
 use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
+use App\Http\Middleware\ProtectBookingResponses;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -63,16 +65,28 @@ Route::get('/booking/select-seat/{showtime}', [BookingController::class, 'select
     ->name('user.bookings.selectSeat');
 
 Route::get('/booking/checkout/{showtime}', [BookingController::class, 'checkout'])
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.checkout');
 
 Route::post('/booking/store', [BookingController::class, 'store'])
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.store');
 
 Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.success');
 
 Route::get('/my-ticket/{booking}', [BookingController::class, 'ticket'])
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.ticket');
+
+Route::get('/booking/access/{booking}', [GuestBookingAccessController::class, 'show'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.access.show');
+
+Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, 'exchange'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.access.exchange');
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/booking-history', function () {
