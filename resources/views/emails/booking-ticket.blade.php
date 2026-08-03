@@ -7,9 +7,9 @@
         <h1 style="margin:0 0 8px;color:#ff3d57">MovieMate</h1>
         <p style="margin:0 0 22px;color:#9ca3af">Vé điện tử của bạn đã được đặt thành công.</p>
         <div style="text-align:center;margin-bottom:22px">
-            <div style="display:inline-block;padding:16px 20px;border:2px dashed #ff3d57;border-radius:12px;background:#080a12;color:#fff;font-family:monospace;font-size:22px;font-weight:700;letter-spacing:2px">
-                {{ $booking->booking_code }}
-            </div>
+            <img src="{{ $booking->qr_code_url }}"
+                 width="180" height="180" alt="QR vé {{ $booking->booking_code }}"
+                 style="background:#fff;padding:10px;border-radius:12px">
             <p style="margin:12px 0 0;font-size:20px;font-weight:bold;color:#ffb703">{{ $booking->booking_code }}</p>
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:14px">
