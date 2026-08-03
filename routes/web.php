@@ -78,6 +78,10 @@ Route::get('/ai/chatbot', function () {
     return view('user.ai.chatbot');
 })->name('user.ai.chatbot');
 
+Route::get('/admin/rooms/{room}/layout/preview', [AdminSeatController::class, 'preview'])
+    ->middleware(['auth', 'active', 'permission:admin.access', 'permission:seats.view'])
+    ->name('admin.rooms.layout.preview');
+
 Route::get('/foods', [UserFoodController::class, 'index'])->name('foods.index');
 Route::post('/foods/add', [UserFoodController::class, 'addToCart'])->name('foods.add');
 Route::get('/foods/cart', [UserOrderController::class, 'cart'])->name('foods.cart');
@@ -121,6 +125,15 @@ Route::prefix('admin')->name('admin.')
             ->middlewareFor(['create', 'store'], 'permission:rooms.create')
             ->middlewareFor(['edit', 'update'], 'permission:rooms.update')
             ->middlewareFor('destroy', 'permission:rooms.delete');
+
+        Route::get('/rooms/{room}/layout', [AdminSeatController::class, 'layout'])
+            ->middleware('permission:seats.view')->name('rooms.layout.show');
+        Route::post('/rooms/{room}/layout/draft', [AdminSeatController::class, 'createDraft'])
+            ->middleware('permission:seats.manage')->name('rooms.layout.draft');
+        Route::patch('/rooms/{room}/layout/draft', [AdminSeatController::class, 'saveDraft'])
+            ->middleware('permission:seats.manage')->name('rooms.layout.update');
+        Route::post('/rooms/{room}/layout/publish', [AdminSeatController::class, 'publish'])
+            ->middleware('permission:seats.manage')->name('rooms.layout.publish');
 
         Route::get('/seats', [AdminSeatController::class, 'index'])
             ->middleware('permission:seats.view')->name('seats.index');
@@ -166,6 +179,8 @@ Route::get('/manager', fn () => redirect()->route('admin.dashboard'))
 Route::prefix('staff')->name('staff.')
     ->middleware(['auth', 'active', 'role:staff,manager,admin'])
     ->group(function () {
+        Route::get('/rooms/{room}/layout/preview', [AdminSeatController::class, 'preview'])
+            ->middleware('permission:seats.view')->name('rooms.layout.preview');
         Route::get('/', fn () => view('staff.dashboard'))
             ->middleware('permission:dashboard.view')->name('dashboard');
         Route::get('/tickets', fn () => view('staff.tickets.index'))

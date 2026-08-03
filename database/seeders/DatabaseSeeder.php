@@ -21,9 +21,7 @@ class DatabaseSeeder extends Seeder
             GenreSeeder::class,
             CinemaSeeder::class,
             RoomSeeder::class,
-            SeatSeeder::class,
             MovieSeeder::class,
-            ShowtimeSeeder::class,
             FoodItemSeeder::class,
         ]);
     }

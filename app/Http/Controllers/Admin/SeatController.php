@@ -3,14 +3,21 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\SaveRoomLayoutRequest;
 use App\Models\Room;
+use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Services\CinemaContext;
+use App\Services\RoomLayoutService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class SeatController extends Controller
 {
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
+    public function __construct(
+        private readonly CinemaContext $cinemaContext,
+        private readonly RoomLayoutService $layouts
+    ) {}
 
     public function index(Request $request)
     {
@@ -31,46 +38,82 @@ class SeatController extends Controller
     public function manage(Room $room)
     {
         $this->assertOperationalRoom($room);
-        $room->load('cinema');
-        $seats = $room->seats()->orderBy('row')->orderBy('number')->get();
 
-        return view('admin.seats.manage', compact('room', 'seats'));
+        return redirect()->route('admin.rooms.layout.show', $room);
+    }
+
+    public function layout(Room $room)
+    {
+        $this->assertOperationalRoom($room);
+        $room->load('cinema');
+        $layout = $room->draftLayout()->with('cells.seat')->first()
+            ?? $room->latestPublishedLayout()->with('cells.seat')->first();
+
+        return view('admin.rooms.layout', compact('room', 'layout'));
+    }
+
+    public function createDraft(Request $request, Room $room)
+    {
+        $this->assertOperationalRoom($room);
+        $validated = $request->validate([
+            'rows' => ['nullable', 'integer', 'min:1', 'max:30'],
+            'columns' => ['nullable', 'integer', 'min:1', 'max:40'],
+            'screen_position' => ['nullable', 'in:top,bottom'],
+        ]);
+
+        if ($this->layouts->latestPublishedFor($room)) {
+            $this->layouts->clonePublishedToDraft($room, Auth::id());
+        } else {
+            $this->layouts->createBlankDraft(
+                $room,
+                Auth::id(),
+                (int) ($validated['rows'] ?? 10),
+                (int) ($validated['columns'] ?? 12),
+                (string) ($validated['screen_position'] ?? 'top')
+            );
+        }
+
+        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã tạo layout nháp.');
+    }
+
+    public function saveDraft(SaveRoomLayoutRequest $request, Room $room)
+    {
+        $this->assertOperationalRoom($room);
+        $draft = $room->draftLayout()->firstOrFail();
+        $this->layouts->saveDraft($draft, $request->validated('layout'), Auth::id());
+
+        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã lưu layout nháp.');
+    }
+
+    public function publish(Room $room)
+    {
+        $this->assertOperationalRoom($room);
+        $draft = $room->draftLayout()->firstOrFail();
+        $published = $this->layouts->publish($draft, Auth::id());
+
+        return redirect()->route('admin.rooms.layout.show', $room)
+            ->with('success', "Đã publish layout v{$published->version}.");
+    }
+
+    public function preview(Request $request, Room $room)
+    {
+        $this->assertOperationalRoom($room);
+        $layout = RoomLayout::query()->with('cells.seat')
+            ->where('room_id', $room->id)
+            ->when($request->integer('version'), fn ($query, $version) => $query->where('version', $version))
+            ->orderByRaw("case when status = 'draft' then 0 else 1 end")
+            ->orderByDesc('version')
+            ->firstOrFail();
+
+        return view('admin.rooms.layout-preview', compact('room', 'layout'));
     }
 
     public function generate(Request $request, Room $room)
     {
         $this->assertOperationalRoom($room);
-        $validated = $request->validate([
-            'rows' => ['required', 'regex:/^[A-Z]-[A-Z]$/'],
-            'seats_per_row' => ['required', 'integer', 'min:1', 'max:50'],
-            'vip_rows' => ['nullable', 'string', 'max:100'],
-        ]);
-        [$startRow, $endRow] = explode('-', strtoupper($validated['rows']));
-        if (ord($startRow) > ord($endRow)) {
-            return back()->with('error', 'Khoảng hàng không hợp lệ. Ví dụ đúng: A-H.');
-        }
 
-        $vipRows = collect(explode(',', strtoupper($validated['vip_rows'] ?? '')))
-            ->map(fn ($row) => trim($row))->filter()->unique()->values()->all();
-        $created = 0;
-        for ($rowOrd = ord($startRow); $rowOrd <= ord($endRow); $rowOrd++) {
-            $row = chr($rowOrd);
-            for ($number = 1; $number <= $validated['seats_per_row']; $number++) {
-                $seatCode = $row.$number;
-                if (Seat::query()->where('room_id', $room->id)->where('seat_code', $seatCode)->exists()) {
-                    continue;
-                }
-                Seat::query()->create([
-                    'room_id' => $room->id, 'row' => $row, 'number' => $number,
-                    'seat_code' => $seatCode, 'type' => in_array($row, $vipRows, true) ? 'vip' : 'normal',
-                    'status' => 'active',
-                ]);
-                $created++;
-            }
-        }
-        $room->update(['total_seats' => $room->seats()->count()]);
-
-        return redirect()->route('admin.seats.manage', $room)->with('success', "Đã tạo thêm {$created} ghế cho phòng {$room->name}.");
+        return redirect()->route('admin.rooms.layout.show', $room)
+            ->with('warning', 'Trình tạo ma trận ghế cũ đã ngừng sử dụng. Hãy dùng Dynamic Layout Editor.');
     }
 
     public function update(Request $request, Seat $seat)
@@ -79,11 +122,11 @@ class SeatController extends Controller
         $this->assertOperationalRoom($seat->room);
         $validated = $request->validate([
             'type' => ['required', 'in:normal,vip,couple'],
-            'status' => ['required', 'in:active,maintenance'],
+            'status' => ['required', 'in:active,maintenance,inactive,retired'],
         ]);
         $seat->update($validated);
 
-        return back()->with('success', 'Cập nhật ghế thành công.');
+        return back()->with('success', 'Cập nhật trạng thái ghế thành công.');
     }
 
     private function operationalRooms()
