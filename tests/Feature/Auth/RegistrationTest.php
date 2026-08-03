@@ -3,11 +3,9 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
@@ -37,10 +35,6 @@ class RegistrationTest extends TestCase
 
     public function test_registration_normalizes_email_and_persists_supported_phone(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->string('phone')->nullable();
-        });
-
         $payload = $this->validPayload([
             'email' => '  NEW.USER@EXAMPLE.COM ',
             'phone' => ' 0901234567 ',
@@ -99,14 +93,6 @@ class RegistrationTest extends TestCase
 
     public function test_registration_ignores_role_escalation_and_creates_an_active_user_role(): void
     {
-        Schema::create('roles', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-        });
-        Schema::table('users', function (Blueprint $table) {
-            $table->unsignedBigInteger('role_id')->nullable();
-            $table->string('status')->default('active');
-        });
         DB::table('roles')->insert([
             ['id' => 1, 'name' => 'Admin'],
             ['id' => 2, 'name' => 'Staff'],

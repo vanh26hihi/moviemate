@@ -3,11 +3,9 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -135,10 +133,6 @@ class AuthenticationTest extends TestCase
 
     public function test_inactive_user_cannot_log_in_when_status_is_supported(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->string('status')->default('active');
-        });
-
         $user = User::factory()->create([
             'password' => Hash::make('correct-password'),
         ]);
