@@ -11,9 +11,10 @@ class BookingTicketMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public Booking $booking)
-    {
-    }
+    public function __construct(
+        public Booking $booking,
+        public string $ticketAccessUrl,
+    ) {}
 
     public function build(): self
     {
