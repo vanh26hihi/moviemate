@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Bookings;
 
+use App\Models\Booking;
 use App\Services\BookingTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\CreatesBookingFixtures;
@@ -18,37 +19,42 @@ class GuestBookingAccessTest extends TestCase
         $this->seedRbac();
     }
 
-    public function test_guest_cannot_view_a_guest_booking_by_sequential_id_alone(): void
+    public function test_guest_cannot_view_a_booking_by_sequential_id_or_query_token(): void
     {
-        [$booking] = $this->guestBooking();
+        [$booking, $rawToken] = $this->guestBooking();
 
         $this->get(route('user.bookings.ticket', $booking))->assertNotFound();
-    }
-
-    public function test_missing_guest_token_is_rejected_on_success_page(): void
-    {
-        [$booking] = $this->guestBooking();
-
-        $this->get(route('user.bookings.success', $booking))->assertNotFound();
-    }
-
-    public function test_wrong_guest_token_is_rejected(): void
-    {
-        [$booking] = $this->guestBooking();
-
         $this->get(route('user.bookings.ticket', [
             'booking' => $booking,
-            'guest_token' => 'wrong-token',
+            'guest_token' => $rawToken,
         ]))->assertNotFound();
     }
 
-    public function test_correct_guest_token_can_view_success_and_ticket_pages(): void
+    public function test_wrong_token_cannot_create_a_guest_session_capability(): void
+    {
+        [$booking] = $this->guestBooking();
+
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => 'wrong-token',
+            'destination' => 'ticket',
+        ])->assertNotFound();
+        $this->get(route('user.bookings.ticket', $booking))->assertNotFound();
+    }
+
+    public function test_correct_token_is_exchanged_for_a_scoped_session_capability(): void
     {
         [$booking, $rawToken] = $this->guestBooking();
-        $parameters = ['booking' => $booking, 'guest_token' => $rawToken];
 
-        $this->get(route('user.bookings.success', $parameters))->assertOk();
-        $this->get(route('user.bookings.ticket', $parameters))->assertOk();
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $rawToken,
+            'destination' => 'success',
+        ])->assertOk()->assertJsonPath(
+            'redirect_url',
+            route('user.bookings.success', $booking),
+        );
+
+        $this->get(route('user.bookings.success', $booking))->assertOk();
+        $this->get(route('user.bookings.ticket', $booking))->assertOk();
     }
 
     public function test_token_for_one_guest_booking_cannot_open_another_booking(): void
@@ -56,10 +62,79 @@ class GuestBookingAccessTest extends TestCase
         [, $firstToken] = $this->guestBooking();
         [$secondBooking] = $this->guestBooking();
 
-        $this->get(route('user.bookings.ticket', [
-            'booking' => $secondBooking,
-            'guest_token' => $firstToken,
-        ]))->assertNotFound();
+        $this->post(route('user.bookings.access.exchange', $secondBooking), [
+            'token' => $firstToken,
+            'destination' => 'ticket',
+        ])->assertNotFound();
+        $this->get(route('user.bookings.ticket', $secondBooking))->assertNotFound();
+    }
+
+    public function test_expired_guest_link_cannot_be_shown_or_exchanged(): void
+    {
+        [$booking, $rawToken] = $this->guestBooking();
+        $booking->update(['guest_access_expires_at' => now()->subSecond()]);
+
+        $this->get(route('user.bookings.access.show', $booking))->assertNotFound();
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $rawToken,
+            'destination' => 'ticket',
+        ])->assertNotFound();
+    }
+
+    public function test_expired_or_rotated_access_revokes_an_existing_session_capability(): void
+    {
+        [$booking, $rawToken] = $this->guestBooking();
+        $this->exchange($booking, $rawToken);
+
+        $booking->update(['guest_access_token_hash' => hash('sha256', 'rotated-token')]);
+        $this->get(route('user.bookings.ticket', $booking))->assertNotFound();
+
+        [$expiringBooking, $expiringToken] = $this->guestBooking();
+        $this->exchange($expiringBooking, $expiringToken);
+        $expiringBooking->update(['guest_access_expires_at' => now()->subSecond()]);
+        $this->get(route('user.bookings.ticket', $expiringBooking))->assertNotFound();
+    }
+
+    public function test_guest_checkout_uses_fragment_handoff_and_protected_response_headers(): void
+    {
+        $scenario = $this->bookingScenario();
+        $checkoutToken = app(BookingTokenService::class)->issueCheckoutToken();
+        $guestToken = app(BookingTokenService::class)->guestAccessTokenForCheckout($checkoutToken);
+
+        $response = $this->post(route('user.bookings.store'), [
+            'showtime_id' => $scenario['showtime']->id,
+            'seat_ids' => [$scenario['seats'][0]->id],
+            'customer_email' => 'guest@example.test',
+            'checkout_token' => $checkoutToken,
+        ]);
+
+        $response->assertOk()
+            ->assertViewIs('user.bookings.guest-handoff')
+            ->assertViewHas('guestAccessToken', $guestToken)
+            ->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertSee("'#token='", false)
+            ->assertDontSee('guest_token=', false);
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        $booking = Booking::query()->sole();
+        $this->assertSame(
+            route('user.bookings.access.show', $booking),
+            $response->viewData('accessUrl'),
+        );
+        $this->assertTrue($booking->guest_access_expires_at->isFuture());
+    }
+
+    public function test_access_page_removes_referrer_and_cache_leakage(): void
+    {
+        [$booking] = $this->guestBooking();
+
+        $response = $this->get(route('user.bookings.access.show', $booking));
+
+        $response->assertOk()
+            ->assertHeader('Referrer-Policy', 'no-referrer')
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
     }
 
     public function test_raw_guest_token_is_never_stored_in_the_database(): void
@@ -83,7 +158,7 @@ class GuestBookingAccessTest extends TestCase
         $this->assertFalse($tokens->verifyHash(null, $raw));
     }
 
-    public function test_logged_in_owner_can_still_view_their_booking_without_guest_token(): void
+    public function test_logged_in_owner_can_still_view_their_booking_without_guest_access(): void
     {
         $scenario = $this->bookingScenario(false);
         $owner = $this->userWithRole('user');
@@ -112,6 +187,14 @@ class GuestBookingAccessTest extends TestCase
         $this->actingAs($manager)->get(route('user.bookings.ticket', $booking))->assertOk();
     }
 
+    private function exchange(Booking $booking, string $rawToken): void
+    {
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $rawToken,
+            'destination' => 'ticket',
+        ])->assertOk();
+    }
+
     private function guestBooking(): array
     {
         $scenario = $this->bookingScenario(false);
@@ -120,6 +203,7 @@ class GuestBookingAccessTest extends TestCase
         );
         $booking = $this->bookingForScenario($scenario, [
             'guest_access_token_hash' => hash('sha256', $rawToken),
+            'guest_access_expires_at' => now()->addHour(),
         ]);
 
         return [$booking, $rawToken];

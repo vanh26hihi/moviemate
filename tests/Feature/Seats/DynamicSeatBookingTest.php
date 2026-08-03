@@ -152,7 +152,7 @@ class DynamicSeatBookingTest extends TestCase
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
             'checkout_token' => $this->checkoutToken,
             'total_amount' => 1, 'price' => 1, 'room_id' => $this->rooms['P02']->id, 'room_layout_id' => 999,
-        ])->assertRedirect();
+        ])->assertOk()->assertViewIs('user.bookings.guest-handoff');
 
         $this->assertDatabaseHas('bookings', ['showtime_id' => $this->showtime->id, 'total_amount' => 50000]);
         $this->assertDatabaseHas('bookings', [
