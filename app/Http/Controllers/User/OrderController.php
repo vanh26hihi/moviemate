@@ -35,6 +35,8 @@ class OrderController extends Controller
 
     public function store(Request $request)
     {
+        // Legacy standalone food checkout: it is separate from booking checkout and
+        // currently marks orders paid without payment-provider callback verification.
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],

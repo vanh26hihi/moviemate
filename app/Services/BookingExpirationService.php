@@ -7,7 +7,10 @@ use Illuminate\Support\Facades\DB;
 
 class BookingExpirationService
 {
-    public function __construct(private readonly BookingSeatLockService $seatLocks) {}
+    public function __construct(
+        private readonly BookingSeatLockService $seatLocks,
+        private readonly BookingFoodService $food,
+    ) {}
 
     public function expire(int $bookingId): bool
     {
@@ -23,6 +26,7 @@ class BookingExpirationService
 
             $booking->update(['booking_status' => 'expired']);
             $this->seatLocks->release($booking);
+            $this->food->transitionForBooking($booking, 'expired');
 
             return true;
         });

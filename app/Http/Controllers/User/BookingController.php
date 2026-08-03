@@ -8,8 +8,10 @@ use App\Models\BookingSeat;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutService;
+use App\Services\BookingPricingService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
+use App\Services\GuestBookingAccessService;
 use App\Services\RoomLayoutService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -23,7 +25,9 @@ class BookingController extends Controller
         private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
         private readonly BookingCheckoutService $checkoutService,
+        private readonly BookingPricingService $pricing,
         private readonly BookingTokenService $tokens,
+        private readonly GuestBookingAccessService $guestAccess,
     ) {}
 
     /**
@@ -117,18 +121,19 @@ class BookingController extends Controller
                 ->with('error', 'Một số ghế bạn chọn đã được người khác đặt trước.');
         }
 
-        $seatSummaries = $seats->map(function ($seat) use ($showtime) {
-            $price = $showtime->priceForSeatType($seat->type);
+        $priceBreakdown = $this->pricing->calculate($showtime, $seats);
+        $seatSummaries = $seats->map(function ($seat) use ($priceBreakdown) {
+            $price = $priceBreakdown->seatSnapshots[$seat->id];
 
             return [
                 'id' => $seat->id,
                 'seat_code' => $seat->seat_code,
                 'type' => $seat->type,
-                'price' => (float) $price,
+                'price' => $price,
             ];
         });
 
-        $totalAmount = $seatSummaries->sum('price');
+        $totalAmount = $priceBreakdown->seatSubtotal;
 
         return view('user.bookings.checkout', [
             'showtime' => $showtime,
@@ -153,6 +158,9 @@ class BookingController extends Controller
             'seat_ids.*' => ['integer', 'distinct'],
             'customer_email' => ['required', 'email:rfc', 'max:255'],
             'checkout_token' => ['required', 'string', 'max:200'],
+            'food_items' => ['sometimes', 'array'],
+            'food_items.*.food_id' => ['required', 'integer', 'distinct', 'min:1'],
+            'food_items.*.quantity' => ['required', 'integer', 'min:0', 'max:'.config('booking.max_food_quantity', 20)],
         ], [
             'seat_ids.required' => 'Vui lòng chọn ít nhất một ghế.',
             'seat_ids.array' => 'Dữ liệu ghế không hợp lệ.',
@@ -172,14 +180,18 @@ class BookingController extends Controller
             Auth::id(),
             $validated['customer_email'],
             $validated['checkout_token'],
+            $validated['food_items'] ?? [],
         );
 
-        $parameters = ['booking' => $result->booking];
         if ($result->guestAccessToken !== null) {
-            $parameters['guest_token'] = $result->guestAccessToken;
+            return response()->view('user.bookings.guest-handoff', [
+                'accessUrl' => route('user.bookings.access.show', $result->booking),
+                'guestAccessToken' => $result->guestAccessToken,
+                'destination' => 'success',
+            ]);
         }
 
-        return redirect()->route('user.bookings.success', $parameters);
+        return redirect()->route('user.bookings.success', $result->booking);
     }
 
     /**
@@ -187,8 +199,7 @@ class BookingController extends Controller
      */
     public function success(Request $request, Booking $booking)
     {
-        $guestAccessToken = $request->query('guest_token');
-        $this->authorizeBookingView($booking, $guestAccessToken);
+        $this->authorizeBookingView($request, $booking);
 
         $booking->load([
             'user',
@@ -199,13 +210,12 @@ class BookingController extends Controller
             'bookingSeats.seat',
         ]);
 
-        return view('user.bookings.success', compact('booking', 'guestAccessToken'));
+        return view('user.bookings.success', compact('booking'));
     }
 
     public function ticket(Request $request, Booking $booking)
     {
-        $guestAccessToken = $request->query('guest_token');
-        $this->authorizeBookingView($booking, $guestAccessToken);
+        $this->authorizeBookingView($request, $booking);
 
         $booking->load([
             'user',
@@ -216,10 +226,10 @@ class BookingController extends Controller
             'bookingSeats.seat',
         ]);
 
-        return view('user.bookings.ticket', compact('booking', 'guestAccessToken'));
+        return view('user.bookings.ticket', compact('booking'));
     }
 
-    private function authorizeBookingView(Booking $booking, mixed $guestAccessToken): void
+    private function authorizeBookingView(Request $request, Booking $booking): void
     {
         if (Auth::check()) {
             Gate::authorize('view', $booking);
@@ -228,11 +238,7 @@ class BookingController extends Controller
         }
 
         abort_unless(
-            $booking->user_id === null
-                && $this->tokens->verifyHash(
-                    $booking->guest_access_token_hash,
-                    is_string($guestAccessToken) ? $guestAccessToken : null,
-                ),
+            $this->guestAccess->allows($request, $booking),
             404,
         );
     }
