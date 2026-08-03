@@ -18,8 +18,8 @@
                 'Rạp' => $booking->showtime?->cinema?->name,
                 'Địa chỉ' => $booking->showtime?->cinema?->address,
                 'Phòng' => $booking->showtime?->room?->name,
-                'Suất chiếu' => $booking->showtime?->show_date?->format('d/m/Y').' '.\Carbon\Carbon::parse($booking->showtime?->show_time)->format('H:i'),
-                'Ghế' => $booking->bookingSeats->pluck('seat.seat_code')->join(', '),
+                'Suất chiếu' => $booking->showtime_label,
+                'Ghế' => $booking->seat_codes,
             ] as $label => $value)
                 <tr><td style="padding:10px 0;color:#9ca3af">{{ $label }}</td><td style="padding:10px 0;text-align:right;font-weight:bold">{{ $value }}</td></tr>
             @endforeach
