@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use RuntimeException;
+use App\Exceptions\BookingTokenConfigurationException;
 
 class BookingTokenService
 {
@@ -71,18 +71,29 @@ class BookingTokenService
 
     private function signingKey(): string
     {
-        $key = (string) config('app.key');
+        $configuredKey = config('app.key');
 
-        if ($key === '') {
-            throw new RuntimeException('APP_KEY is required to issue booking tokens.');
+        if (! is_string($configuredKey) || $configuredKey === '') {
+            throw new BookingTokenConfigurationException(
+                'APP_KEY must be configured before booking tokens can be used.'
+            );
         }
 
-        if (str_starts_with($key, 'base64:')) {
-            $decoded = base64_decode(substr($key, 7), true);
+        $key = $configuredKey;
+        if (str_starts_with($configuredKey, 'base64:')) {
+            $key = base64_decode(substr($configuredKey, 7), true);
 
-            if ($decoded !== false) {
-                return $decoded;
+            if ($key === false) {
+                throw new BookingTokenConfigurationException(
+                    'APP_KEY contains invalid base64 data.'
+                );
             }
+        }
+
+        if (strlen($key) < 32) {
+            throw new BookingTokenConfigurationException(
+                'APP_KEY must provide at least 256 bits of key material.'
+            );
         }
 
         return $key;
