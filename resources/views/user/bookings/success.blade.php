@@ -26,10 +26,7 @@
                     <p class="text-xs text-text-sub mb-1">Mã đặt vé</p>
                     <p class="text-xl font-bold text-brand-start font-mono">{{ $booking->booking_code }}</p>
                 </div>
-                <div class="w-14 h-14 rounded-lg bg-white p-1.5 flex items-center justify-center">
-                    <canvas data-qr-value="{{ $booking->booking_code }}" data-qr-size="48" class="w-12 h-12" aria-label="Mã QR vé {{ $booking->booking_code }}"></canvas>
-                    <span data-qr-fallback class="hidden text-dark-main text-[8px] font-bold text-center break-all">{{ $booking->booking_code }}</span>
-                </div>
+                <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="w-12 h-12 rounded bg-white p-1">
             </div>
 
             <div class="space-y-3 text-sm">
@@ -43,12 +40,12 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-text-sub">Thời gian</span>
-                    <span class="text-white font-medium text-right">{{ $booking->showtime->show_date->format('d/m/Y') }} {{ \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') }}</span>
+                    <span class="text-white font-medium text-right">{{ $booking->showtime_label }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-text-sub">Ghế</span>
                     <span class="text-white font-bold text-right">
-                        {{ $booking->bookingSeats->pluck('seat.seat_code')->join(', ') }}
+                        {{ $booking->seat_codes }}
                     </span>
                 </div>
                 <div class="flex justify-between">
@@ -60,7 +57,7 @@
 
         <p class="text-sm text-text-sub mb-8">
             <i class="ph-fill ph-envelope-simple text-brand-start"></i> Vé điện tử đã được gửi đến email <br>
-            <span class="text-white font-medium mt-1 inline-block">{{ $booking->customer_email ?? $booking->user?->email }}</span>
+            <span class="text-white font-medium mt-1 inline-block">{{ $booking->recipient_email }}</span>
         </p>
 
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
