@@ -40,12 +40,12 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-text-sub">Thời gian</span>
-                    <span class="text-white font-medium text-right">{{ $booking->showtime->show_date->format('d/m/Y') }} {{ \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') }}</span>
+                    <span class="text-white font-medium text-right">{{ $booking->showtime_label }}</span>
                 </div>
                 <div class="flex justify-between">
                     <span class="text-text-sub">Ghế</span>
                     <span class="text-white font-bold text-right">
-                        {{ $booking->bookingSeats->pluck('seat.seat_code')->join(', ') }}
+                        {{ $booking->seat_codes }}
                     </span>
                 </div>
                 <div class="flex justify-between">
@@ -57,7 +57,7 @@
 
         <p class="text-sm text-text-sub mb-8">
             <i class="ph-fill ph-envelope-simple text-brand-start"></i> Vé điện tử đã được gửi đến email <br>
-            <span class="text-white font-medium mt-1 inline-block">{{ $booking->customer_email ?? $booking->user?->email }}</span>
+            <span class="text-white font-medium mt-1 inline-block">{{ $booking->recipient_email }}</span>
         </p>
 
         <div class="flex flex-col sm:flex-row gap-4 justify-center">

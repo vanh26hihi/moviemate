@@ -3,7 +3,7 @@
 @section('title', 'Vé '.$booking->booking_code.' - MovieMate')
 
 @php
-    $seatCodes = $booking->bookingSeats->pluck('seat.seat_code')->filter()->join(', ');
+    $seatCodes = $booking->seat_codes;
     $statusMap = [
         'paid' => ['label' => 'Chưa sử dụng', 'class' => 'bg-green-100 text-green-700 border-green-200', 'icon' => 'ph-check-circle'],
         'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700 border-blue-200', 'icon' => 'ph-checks'],
@@ -73,10 +73,6 @@
                         <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Phòng chiếu</p>
                         <p class="font-bold text-gray-900">{{ $booking->showtime?->room?->name ?? 'Đang cập nhật' }}</p>
                     </div>
-                </div>
-                <div class="flex flex-col items-center justify-center">
-                    <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="h-52 w-52 rounded-3xl bg-white p-3">
-                    <p class="mt-4 text-center text-sm text-gray-400">Mã QR soát vé</p>
                 </div>
             </div>
         </div>
