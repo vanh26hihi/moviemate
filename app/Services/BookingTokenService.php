@@ -2,15 +2,17 @@
 
 namespace App\Services;
 
-use RuntimeException;
+use App\Exceptions\BookingTokenConfigurationException;
 
 class BookingTokenService
 {
-    private const CHECKOUT_VERSION = 'v1';
+    private const CHECKOUT_VERSION = 'v2';
 
     public function issueCheckoutToken(): string
     {
-        $payload = $this->base64UrlEncode(random_bytes(32));
+        $payload = $this->base64UrlEncode(
+            pack('N', now()->getTimestamp()).random_bytes(28)
+        );
         $signature = $this->signature($payload);
 
         return self::CHECKOUT_VERSION.'.'.$payload.'.'.$signature;
@@ -30,9 +32,18 @@ class BookingTokenService
         [, $payload, $signature] = $parts;
         $decoded = $this->base64UrlDecode($payload);
 
-        return $decoded !== false
-            && strlen($decoded) === 32
-            && hash_equals($this->signature($payload), $signature);
+        if ($decoded === false
+            || strlen($decoded) !== 32
+            || ! hash_equals($this->signature($payload), $signature)) {
+            return false;
+        }
+
+        $issuedAt = unpack('Nissued_at', substr($decoded, 0, 4))['issued_at'];
+        $now = now()->getTimestamp();
+        $ttlMinutes = max(1, (int) config('booking.checkout_token_ttl_minutes', 15));
+
+        return $issuedAt <= $now + 60
+            && $issuedAt >= $now - ($ttlMinutes * 60);
     }
 
     public function hash(string $token): string
@@ -71,18 +82,29 @@ class BookingTokenService
 
     private function signingKey(): string
     {
-        $key = (string) config('app.key');
+        $configuredKey = config('app.key');
 
-        if ($key === '') {
-            throw new RuntimeException('APP_KEY is required to issue booking tokens.');
+        if (! is_string($configuredKey) || $configuredKey === '') {
+            throw new BookingTokenConfigurationException(
+                'APP_KEY must be configured before booking tokens can be used.'
+            );
         }
 
-        if (str_starts_with($key, 'base64:')) {
-            $decoded = base64_decode(substr($key, 7), true);
+        $key = $configuredKey;
+        if (str_starts_with($configuredKey, 'base64:')) {
+            $key = base64_decode(substr($configuredKey, 7), true);
 
-            if ($decoded !== false) {
-                return $decoded;
+            if ($key === false) {
+                throw new BookingTokenConfigurationException(
+                    'APP_KEY contains invalid base64 data.'
+                );
             }
+        }
+
+        if (strlen($key) < 32) {
+            throw new BookingTokenConfigurationException(
+                'APP_KEY must provide at least 256 bits of key material.'
+            );
         }
 
         return $key;

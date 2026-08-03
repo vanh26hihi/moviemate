@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -29,12 +28,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (DB::table('bookings')->whereNull('user_id')->exists()) {
-            throw new RuntimeException(
-                'Cannot roll back booking foundation hardening while guest bookings exist.'
-            );
-        }
-
         Schema::table('bookings', function (Blueprint $table) {
             $table->dropUnique('bookings_guest_access_token_hash_unique');
             $table->dropUnique('bookings_checkout_idempotency_key_hash_unique');
@@ -47,11 +40,7 @@ return new class extends Migration
         });
 
         Schema::table('bookings', function (Blueprint $table) {
-            $table->foreignId('user_id')->nullable(false)->change();
-        });
-
-        Schema::table('bookings', function (Blueprint $table) {
-            $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
+            $table->foreign('user_id')->references('id')->on('users')->nullOnDelete();
         });
     }
 };
