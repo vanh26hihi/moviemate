@@ -8,6 +8,7 @@ use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -185,6 +186,7 @@ class SingleCinemaOperationsTest extends TestCase
             'seat_ids' => [$seat->id],
             'payment_method' => 'fake',
             'customer_email' => 'customer@example.com',
+            'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
         ])->assertSessionHasErrors('showtime');
         $this->assertDatabaseCount('bookings', 0);
     }

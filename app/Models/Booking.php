@@ -15,17 +15,28 @@ class Booking extends Model
     protected $fillable = [
         'user_id',
         'customer_email',
+        'guest_access_token_hash',
+        'checkout_idempotency_key_hash',
         'showtime_id',
         'booking_code',
         'total_amount',
         'payment_status',
         'booking_status',
+        'expires_at',
+        'paid_at',
         'used_at',
     ];
 
     protected $casts = [
         'used_at' => 'datetime',
+        'expires_at' => 'datetime',
+        'paid_at' => 'datetime',
         'total_amount' => 'decimal:2',
+    ];
+
+    protected $hidden = [
+        'guest_access_token_hash',
+        'checkout_idempotency_key_hash',
     ];
 
     public function user(): BelongsTo

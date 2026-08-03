@@ -9,6 +9,7 @@
         'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700 border-blue-200', 'icon' => 'ph-checks'],
         'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-red-100 text-red-700 border-red-200', 'icon' => 'ph-x-circle'],
         'expired' => ['label' => 'Hết hạn', 'class' => 'bg-gray-100 text-gray-700 border-gray-200', 'icon' => 'ph-clock'],
+        'pending_payment' => ['label' => 'Chờ thanh toán', 'class' => 'bg-amber-100 text-amber-700 border-amber-200', 'icon' => 'ph-hourglass'],
         'pending' => ['label' => 'Đang xử lý', 'class' => 'bg-amber-100 text-amber-700 border-amber-200', 'icon' => 'ph-hourglass'],
     ];
     $status = $statusMap[$booking->booking_status] ?? $statusMap['pending'];

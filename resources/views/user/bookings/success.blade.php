@@ -13,8 +13,8 @@
             <i class="ph-bold ph-check text-5xl text-success animate-[fade-in_0.5s_ease-out_0.2s_both]"></i>
         </div>
 
-        <h1 class="text-3xl font-bold text-white mb-2">Đặt vé thành công!</h1>
-        <p class="text-text-sub mb-8">Cảm ơn bạn đã sử dụng dịch vụ của MovieMate.</p>
+        <h1 class="text-3xl font-bold text-white mb-2">Đã giữ ghế!</h1>
+        <p class="text-text-sub mb-8">Booking đang chờ thanh toán và sẽ tự hết hạn nếu không được xác nhận.</p>
 
         <div class="bg-dark-main border border-dark-border rounded-2xl p-6 mb-8 text-left relative overflow-hidden">
             <!-- Ticket Notch Left/Right -->
@@ -56,12 +56,12 @@
         </div>
 
         <p class="text-sm text-text-sub mb-8">
-            <i class="ph-fill ph-envelope-simple text-brand-start"></i> Vé điện tử đã được gửi đến email <br>
+            <i class="ph-fill ph-envelope-simple text-brand-start"></i> Phase 4A chưa gửi email. Email liên hệ của booking: <br>
             <span class="text-white font-medium mt-1 inline-block">{{ $booking->recipient_email }}</span>
         </p>
 
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
+            <a href="{{ route('user.bookings.ticket', array_filter(['booking' => $booking, 'guest_token' => $guestAccessToken])) }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
                 Xem vé QR của tôi
             </a>
             <a href="{{ route('home') }}" class="px-6 py-3 bg-dark-main border border-dark-border text-white rounded-xl font-bold hover:bg-dark-border transition-colors">
