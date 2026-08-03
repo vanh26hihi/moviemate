@@ -257,11 +257,11 @@ class BookingController extends Controller
         });
 
         try {
-            Mail::to($booking->customer_email)->send(new BookingTicketMail($booking));
+            Mail::to($booking->recipient_email)->send(new BookingTicketMail($booking));
         } catch (\Throwable $exception) {
             Log::warning('Không thể gửi email vé MovieMate.', [
                 'booking_id' => $booking->id,
-                'email' => $booking->customer_email,
+                'email' => $booking->recipient_email,
                 'message' => $exception->getMessage(),
             ]);
 
