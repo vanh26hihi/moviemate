@@ -10,6 +10,7 @@ use App\Models\Showtime;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
+use App\Services\GuestBookingAccessService;
 use App\Services\RoomLayoutService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class BookingController extends Controller
         private readonly RoomLayoutService $layouts,
         private readonly BookingCheckoutService $checkoutService,
         private readonly BookingTokenService $tokens,
+        private readonly GuestBookingAccessService $guestAccess,
     ) {}
 
     /**
@@ -174,12 +176,15 @@ class BookingController extends Controller
             $validated['checkout_token'],
         );
 
-        $parameters = ['booking' => $result->booking];
         if ($result->guestAccessToken !== null) {
-            $parameters['guest_token'] = $result->guestAccessToken;
+            return response()->view('user.bookings.guest-handoff', [
+                'accessUrl' => route('user.bookings.access.show', $result->booking),
+                'guestAccessToken' => $result->guestAccessToken,
+                'destination' => 'success',
+            ]);
         }
 
-        return redirect()->route('user.bookings.success', $parameters);
+        return redirect()->route('user.bookings.success', $result->booking);
     }
 
     /**
@@ -187,8 +192,7 @@ class BookingController extends Controller
      */
     public function success(Request $request, Booking $booking)
     {
-        $guestAccessToken = $request->query('guest_token');
-        $this->authorizeBookingView($booking, $guestAccessToken);
+        $this->authorizeBookingView($request, $booking);
 
         $booking->load([
             'user',
@@ -199,13 +203,12 @@ class BookingController extends Controller
             'bookingSeats.seat',
         ]);
 
-        return view('user.bookings.success', compact('booking', 'guestAccessToken'));
+        return view('user.bookings.success', compact('booking'));
     }
 
     public function ticket(Request $request, Booking $booking)
     {
-        $guestAccessToken = $request->query('guest_token');
-        $this->authorizeBookingView($booking, $guestAccessToken);
+        $this->authorizeBookingView($request, $booking);
 
         $booking->load([
             'user',
@@ -216,10 +219,10 @@ class BookingController extends Controller
             'bookingSeats.seat',
         ]);
 
-        return view('user.bookings.ticket', compact('booking', 'guestAccessToken'));
+        return view('user.bookings.ticket', compact('booking'));
     }
 
-    private function authorizeBookingView(Booking $booking, mixed $guestAccessToken): void
+    private function authorizeBookingView(Request $request, Booking $booking): void
     {
         if (Auth::check()) {
             Gate::authorize('view', $booking);
@@ -228,11 +231,7 @@ class BookingController extends Controller
         }
 
         abort_unless(
-            $booking->user_id === null
-                && $this->tokens->verifyHash(
-                    $booking->guest_access_token_hash,
-                    is_string($guestAccessToken) ? $guestAccessToken : null,
-                ),
+            $this->guestAccess->allows($request, $booking),
             404,
         );
     }

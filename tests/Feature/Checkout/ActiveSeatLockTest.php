@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Checkout;
 
+use App\Exceptions\BookingCheckoutConflictException;
 use App\Models\BookingSeat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutService;
@@ -179,6 +180,85 @@ class ActiveSeatLockTest extends TestCase
         $this->assertDatabaseCount('booking_seats', 1);
     }
 
+    public function test_same_checkout_token_rejects_a_different_booking_request(): void
+    {
+        $scenario = $this->bookingScenario();
+        $token = app(BookingTokenService::class)->issueCheckoutToken();
+        $this->reserve($scenario, [$scenario['seats'][0]->id], null, $token);
+
+        $this->expectException(BookingCheckoutConflictException::class);
+        $this->reserve(
+            $scenario,
+            $scenario['seats']->where('type', 'couple')->pluck('id')->all(),
+            null,
+            $token,
+        );
+    }
+
+    public function test_checkout_fingerprint_normalizes_seat_order_and_email_case(): void
+    {
+        $scenario = $this->bookingScenario();
+        $token = app(BookingTokenService::class)->issueCheckoutToken();
+        $seatIds = $scenario['seats']->where('type', 'couple')->pluck('id')->all();
+
+        $first = app(BookingCheckoutService::class)->createPendingBooking(
+            $scenario['showtime']->id,
+            $seatIds,
+            null,
+            ' Guest@Example.Test ',
+            $token,
+        );
+        $second = app(BookingCheckoutService::class)->createPendingBooking(
+            $scenario['showtime']->id,
+            array_reverse($seatIds),
+            null,
+            'guest@example.test',
+            $token,
+        );
+
+        $this->assertSame($first->booking->id, $second->booking->id);
+        $this->assertTrue($second->replayed);
+    }
+
+    public function test_same_checkout_token_rejects_a_changed_customer_identity(): void
+    {
+        $scenario = $this->bookingScenario();
+        $token = app(BookingTokenService::class)->issueCheckoutToken();
+        $this->reserve($scenario, [$scenario['seats'][0]->id], null, $token);
+
+        $this->expectException(BookingCheckoutConflictException::class);
+        app(BookingCheckoutService::class)->createPendingBooking(
+            $scenario['showtime']->id,
+            [$scenario['seats'][0]->id],
+            null,
+            'attacker@example.test',
+            $token,
+        );
+    }
+
+    public function test_http_checkout_replay_with_changed_payload_returns_conflict(): void
+    {
+        $scenario = $this->bookingScenario();
+        $token = app(BookingTokenService::class)->issueCheckoutToken();
+        $payload = [
+            'showtime_id' => $scenario['showtime']->id,
+            'seat_ids' => [$scenario['seats'][0]->id],
+            'customer_email' => 'guest@example.test',
+            'checkout_token' => $token,
+        ];
+
+        $this->post(route('user.bookings.store'), $payload)->assertOk();
+        $this->postJson(route('user.bookings.store'), [
+            ...$payload,
+            'customer_email' => 'attacker@example.test',
+        ])->assertConflict()->assertExactJson([
+            'message' => 'Checkout token was already used for a different booking request.',
+        ]);
+
+        $this->assertDatabaseCount('bookings', 1);
+        $this->assertDatabaseCount('booking_seats', 1);
+    }
+
     public function test_predictable_client_supplied_checkout_key_is_rejected(): void
     {
         $scenario = $this->bookingScenario();
@@ -200,7 +280,12 @@ class ActiveSeatLockTest extends TestCase
         $booking = $this->reserve($scenario, [$scenario['seats'][0]->id], null, $token)->booking->refresh();
 
         $this->assertSame(hash('sha256', $token), $booking->getRawOriginal('checkout_idempotency_key_hash'));
+        $this->assertMatchesRegularExpression(
+            '/^[a-f0-9]{64}$/',
+            $booking->getRawOriginal('checkout_request_fingerprint_hash'),
+        );
         $this->assertStringNotContainsString($token, json_encode($booking->getAttributes()));
+        $this->assertArrayNotHasKey('checkout_request_fingerprint_hash', $booking->toArray());
     }
 
     public function test_http_checkout_creates_pending_booking_without_payment_or_email(): void
@@ -214,7 +299,7 @@ class ActiveSeatLockTest extends TestCase
             'seat_ids' => [$scenario['seats'][0]->id],
             'customer_email' => 'guest@example.test',
             'checkout_token' => $token,
-        ])->assertRedirect();
+        ])->assertOk()->assertViewIs('user.bookings.guest-handoff');
 
         $this->assertDatabaseHas('bookings', [
             'booking_status' => 'pending_payment',

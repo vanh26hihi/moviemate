@@ -16,7 +16,9 @@ class Booking extends Model
         'user_id',
         'customer_email',
         'guest_access_token_hash',
+        'guest_access_expires_at',
         'checkout_idempotency_key_hash',
+        'checkout_request_fingerprint_hash',
         'showtime_id',
         'booking_code',
         'total_amount',
@@ -30,6 +32,7 @@ class Booking extends Model
     protected $casts = [
         'used_at' => 'datetime',
         'expires_at' => 'datetime',
+        'guest_access_expires_at' => 'datetime',
         'paid_at' => 'datetime',
         'ticket_emailed_at' => 'datetime',
         'total_amount' => 'decimal:2',
@@ -38,6 +41,7 @@ class Booking extends Model
     protected $hidden = [
         'guest_access_token_hash',
         'checkout_idempotency_key_hash',
+        'checkout_request_fingerprint_hash',
     ];
 
     public function user(): BelongsTo
