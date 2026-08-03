@@ -31,6 +31,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (DB::connection()->pretending()) {
+            return;
+        }
+
         DB::transaction(function (): void {
             $before = $this->historyCounts();
             [$canonicalId] = $this->resolveOrCreateCanonical();
@@ -65,6 +69,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->pretending()) {
+            return;
+        }
+
         if (! Schema::hasTable('cinema_consolidation_mappings')) {
             return;
         }
@@ -155,19 +163,49 @@ return new class extends Migration
             throw new RuntimeException('Multiple cinemas match the canonical FPT profile.');
         }
 
-        $created = $matches->isEmpty();
-        $canonicalId = $created
-            ? DB::table('cinemas')->insertGetId([
+        $canonicalMappings = DB::table('cinema_consolidation_mappings')
+            ->where('entity_type', 'canonical')->lockForUpdate()->get();
+
+        if ($matches->isEmpty()) {
+            if ($canonicalMappings->isNotEmpty()) {
+                throw new RuntimeException('A canonical mapping exists but its cinema record is missing.');
+            }
+
+            $created = true;
+            $canonicalId = DB::table('cinemas')->insertGetId([
                 'name' => self::NAME, 'school_name' => self::SCHOOL, 'address' => self::ADDRESS,
                 'city' => self::CITY, 'country' => self::COUNTRY, 'phone' => null,
                 'latitude' => self::LATITUDE, 'longitude' => self::LONGITUDE,
                 'status' => 'active', 'canonical_key' => self::KEY, 'is_primary' => true,
                 'archived_at' => null, 'created_at' => now(), 'updated_at' => now(),
-            ])
-            : (int) $matches->sole();
+            ]);
+            $original = DB::table('cinemas')->where('id', $canonicalId)->lockForUpdate()->first();
+            if (! $original) {
+                throw new RuntimeException('Canonical cinema creation did not return a persistent record.');
+            }
+            $this->insertMapping('canonical', $canonicalId, $canonicalId, $canonicalId, 'created', $original->name, $original->status);
+        } else {
+            $canonicalId = (int) $matches->sole();
+            if ($canonicalMappings->contains(fn ($mapping) => (int) $mapping->entity_id !== $canonicalId)) {
+                throw new RuntimeException('Canonical mappings reference conflicting cinema records.');
+            }
 
-        $original = DB::table('cinemas')->where('id', $canonicalId)->lockForUpdate()->first();
-        $this->insertMapping('canonical', $canonicalId, $canonicalId, $canonicalId, $created ? 'created' : 'reused', $original->name, $original->status, $created ? null : $this->cinemaPayload($original));
+            $existingMapping = $canonicalMappings->firstWhere('entity_id', $canonicalId);
+            if ($existingMapping) {
+                if (! in_array($existingMapping->original_code, ['created', 'reused'], true)
+                    || (int) $existingMapping->canonical_cinema_id !== $canonicalId) {
+                    throw new RuntimeException('Existing canonical mapping is inconsistent.');
+                }
+                $created = $existingMapping->original_code === 'created';
+            } else {
+                $created = false;
+                $original = DB::table('cinemas')->where('id', $canonicalId)->lockForUpdate()->first();
+                if (! $original) {
+                    throw new RuntimeException('Matched canonical cinema no longer exists.');
+                }
+                $this->insertMapping('canonical', $canonicalId, $canonicalId, $canonicalId, 'reused', $original->name, $original->status, $this->cinemaPayload($original));
+            }
+        }
 
         DB::table('cinemas')->where('id', $canonicalId)->update([
             'canonical_key' => self::KEY, 'name' => self::NAME, 'school_name' => self::SCHOOL,
@@ -183,10 +221,75 @@ return new class extends Migration
     {
         foreach (self::APPROVED_ROOMS as $id => $approved) {
             $room = $rooms->firstWhere('id', $id);
-            if (! $room || $room->code !== $approved['old_code'] || $room->name !== $approved['old_name'] || $room->status !== $approved['old_status']) {
-                throw new RuntimeException("Room {$id} no longer matches the approved preflight mapping.");
+            if (! $room) {
+                throw new RuntimeException("Required Room {$id} is missing; consolidation is blocked.");
+            }
+            if (! DB::table('cinemas')->where('id', $room->cinema_id)->exists()) {
+                throw new RuntimeException("Room {$id} references a missing cinema; consolidation is blocked.");
+            }
+
+            if ($id === 12) {
+                $this->assertRoom12MatchesAuditedEntity($room, $rooms);
+
+                continue;
+            }
+
+            $matchesLegacy = $this->roomMatchesProfile($room, $approved['old_code'], $approved['old_name'], $approved['old_status']);
+            $matchesTarget = $this->roomMatchesProfile($room, $approved['code'], $approved['name'], $approved['status']);
+            if (! $matchesLegacy && ! $matchesTarget) {
+                throw new RuntimeException("Room {$id} does not match either its audited legacy profile or approved target profile.");
             }
         }
+
+        if (DB::table('showtimes')->join('rooms', 'rooms.id', '=', 'showtimes.room_id')
+            ->whereIn('rooms.id', array_keys(self::APPROVED_ROOMS))
+            ->whereColumn('showtimes.cinema_id', '!=', 'rooms.cinema_id')->exists()) {
+            throw new RuntimeException('A required room has showtimes assigned to a different cinema.');
+        }
+    }
+
+    private function assertRoom12MatchesAuditedEntity(object $room, $rooms): void
+    {
+        $room9 = $rooms->firstWhere('id', 9);
+        $room10 = $rooms->firstWhere('id', 10);
+        if (! $room9 || ! $room10
+            || (int) $room->cinema_id !== (int) $room9->cinema_id
+            || (int) $room->cinema_id !== (int) $room10->cinema_id) {
+            throw new RuntimeException('Room 12 no longer belongs to the audited legacy cinema.');
+        }
+        if (trim((string) $room->code) === '' || trim((string) $room->name) === ''
+            || ! in_array((string) $room->status, ['active', 'inactive'], true)) {
+            throw new RuntimeException('Room 12 has unsafe legacy identity fields.');
+        }
+
+        $hasHistory = DB::table('seats')->where('room_id', 12)->exists()
+            || DB::table('showtimes')->where('room_id', 12)->exists()
+            || DB::table('bookings')->join('showtimes', 'showtimes.id', '=', 'bookings.showtime_id')->where('showtimes.room_id', 12)->exists()
+            || DB::table('payments')->join('bookings', 'bookings.id', '=', 'payments.booking_id')->join('showtimes', 'showtimes.id', '=', 'bookings.showtime_id')->where('showtimes.room_id', 12)->exists()
+            || DB::table('booking_seats')->join('bookings', 'bookings.id', '=', 'booking_seats.booking_id')->join('showtimes', 'showtimes.id', '=', 'bookings.showtime_id')->where('showtimes.room_id', 12)->exists();
+        if ($hasHistory) {
+            throw new RuntimeException('Room 12 history no longer matches the audited empty archive room.');
+        }
+    }
+
+    private function roomMatchesProfile(object $room, string $code, string $name, string $status): bool
+    {
+        return trim((string) $room->code) === $code
+            && $this->normalizeText((string) $room->name) === $this->normalizeText($name)
+            && (string) $room->status === $status;
+    }
+
+    private function normalizeText(string $value): string
+    {
+        $value = trim($value);
+        if (class_exists(Normalizer::class)) {
+            $normalized = Normalizer::normalize($value, Normalizer::FORM_C);
+            if (is_string($normalized)) {
+                $value = $normalized;
+            }
+        }
+
+        return mb_strtolower($value, 'UTF-8');
     }
 
     private function assertNoRoomCollisions($rooms): void
@@ -269,22 +372,52 @@ return new class extends Migration
 
     private function historyCounts(): array
     {
-        return [
+        $counts = [
             'rooms' => DB::table('rooms')->count(), 'seats' => DB::table('seats')->count(),
             'showtimes' => DB::table('showtimes')->count(), 'bookings' => DB::table('bookings')->count(),
             'payments' => DB::table('payments')->count(), 'booking_seats' => DB::table('booking_seats')->count(),
         ];
+
+        foreach (array_keys(self::APPROVED_ROOMS) as $roomId) {
+            $counts["room_{$roomId}"] = [
+                'seats' => DB::table('seats')->where('room_id', $roomId)->count(),
+                'showtimes' => DB::table('showtimes')->where('room_id', $roomId)->count(),
+                'bookings' => DB::table('bookings')->join('showtimes', 'showtimes.id', '=', 'bookings.showtime_id')->where('showtimes.room_id', $roomId)->count(),
+                'payments' => DB::table('payments')->join('bookings', 'bookings.id', '=', 'payments.booking_id')->join('showtimes', 'showtimes.id', '=', 'bookings.showtime_id')->where('showtimes.room_id', $roomId)->count(),
+                'booking_seats' => DB::table('booking_seats')->join('bookings', 'bookings.id', '=', 'booking_seats.booking_id')->join('showtimes', 'showtimes.id', '=', 'bookings.showtime_id')->where('showtimes.room_id', $roomId)->count(),
+            ];
+        }
+
+        return $counts;
     }
 
     private function insertMapping(string $type, int $entityId, ?int $originalCinemaId, int $canonicalId, ?string $code, ?string $name, ?string $status, ?array $payload = null): void
     {
-        DB::table('cinema_consolidation_mappings')->insert([
+        $attributes = [
             'entity_type' => $type, 'entity_id' => $entityId,
             'original_cinema_id' => $originalCinemaId, 'canonical_cinema_id' => $canonicalId,
             'original_code' => $code, 'original_name' => $name, 'original_status' => $status,
             'original_payload' => $payload ? json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE) : null,
-            'migrated_at' => now(),
-        ]);
+        ];
+        $existing = DB::table('cinema_consolidation_mappings')
+            ->where('entity_type', $type)->where('entity_id', $entityId)->lockForUpdate()->first();
+
+        if ($existing) {
+            foreach ($attributes as $field => $expected) {
+                $actual = $existing->{$field};
+                if ($field === 'original_payload') {
+                    $actual = $actual === null ? null : json_decode((string) $actual, true, flags: JSON_THROW_ON_ERROR);
+                    $expected = $expected === null ? null : json_decode((string) $expected, true, flags: JSON_THROW_ON_ERROR);
+                }
+                if ($actual != $expected) {
+                    throw new RuntimeException("Existing {$type} mapping for entity {$entityId} is inconsistent at {$field}.");
+                }
+            }
+
+            return;
+        }
+
+        DB::table('cinema_consolidation_mappings')->insert([...$attributes, 'migrated_at' => now()]);
     }
 
     private function cinemaPayload(object $cinema): array
