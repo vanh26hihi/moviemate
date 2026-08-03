@@ -6,6 +6,7 @@ use App\Domain\Payments\ZaloPaySigner;
 use App\Models\Payment;
 use App\Services\Payments\PaymentReturnTokenService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Testing\TestResponse;
 
 class ZaloPayReturnTest extends PaymentTestCase
 {
@@ -14,7 +15,7 @@ class ZaloPayReturnTest extends PaymentTestCase
         $payment = $this->pendingPayment();
         $params = $this->returnParams($payment, ['status' => '1'], false);
 
-        $this->get(route('payments.zalopay.return', $params))->assertOk();
+        $this->visitReturn($payment, $params)->assertOk();
 
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
         $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
@@ -26,7 +27,7 @@ class ZaloPayReturnTest extends PaymentTestCase
         $payment = $this->pendingPayment();
         $params = $this->returnParams($payment, ['status' => '1', 'amount' => '999999'], true);
 
-        $response = $this->get(route('payments.zalopay.return', $params));
+        $response = $this->visitReturn($payment, $params);
 
         $response->assertOk()->assertSee('có checksum hợp lệ');
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
@@ -39,7 +40,7 @@ class ZaloPayReturnTest extends PaymentTestCase
         $payment = $this->pendingPayment();
         $params = $this->returnParams($payment, [], false);
 
-        $this->get(route('payments.zalopay.return', $params))
+        $this->visitReturn($payment, $params)
             ->assertOk()
             ->assertSee('không được xác thực');
 
@@ -55,7 +56,7 @@ class ZaloPayReturnTest extends PaymentTestCase
         ]);
         $params = $this->returnParams($payment, ['status' => '1'], true);
 
-        $this->get(route('payments.zalopay.return', $params))
+        $this->visitReturn($payment, $params)
             ->assertOk()
             ->assertSee('data-payment-state="review"', false)
             ->assertSee('Cần đối soát');
@@ -70,6 +71,65 @@ class ZaloPayReturnTest extends PaymentTestCase
         unset($params['return_token']);
 
         $this->get(route('payments.zalopay.return', $params))->assertNotFound();
+    }
+
+    public function test_guest_return_exchanges_internal_token_for_clean_session_url(): void
+    {
+        $payment = $this->pendingPayment();
+        $guestToken = 'guest-bearer-must-never-enter-a-url';
+        $payment->booking->forceFill([
+            'guest_access_token_hash' => hash('sha256', $guestToken),
+            'guest_access_expires_at' => now()->addHour(),
+        ])->save();
+        $params = $this->returnParams($payment);
+
+        $response = $this->get(route('payments.zalopay.return', $params));
+        $cleanUrl = route('payments.zalopay.return', ['apptransid' => $payment->app_trans_id]);
+
+        $response->assertRedirect($cleanUrl)
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringNotContainsString($guestToken, route('payments.zalopay.return', $params));
+        $this->assertStringNotContainsString('return_token', $cleanUrl);
+        $this->assertStringNotContainsString($guestToken, $cleanUrl);
+
+        $this->get($cleanUrl)->assertOk();
+    }
+
+    public function test_pending_return_has_no_ticket_qr_or_download(): void
+    {
+        $payment = $this->pendingPayment();
+
+        $this->visitReturn($payment, $this->returnParams($payment))
+            ->assertOk()
+            ->assertDontSee('data-paid-ticket-link', false)
+            ->assertDontSee('data-qr-value', false)
+            ->assertDontSee('data-ticket-download', false);
+    }
+
+    public function test_paid_callback_return_links_to_clean_guest_ticket_url(): void
+    {
+        $payment = $this->pendingPayment();
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))
+            ->assertJsonPath('return_code', 1);
+
+        $this->visitReturn($payment, $this->returnParams($payment))
+            ->assertOk()
+            ->assertSee('data-paid-ticket-link', false)
+            ->assertSee(route('user.bookings.ticket', $payment->booking), false)
+            ->assertDontSee('guest_token=', false)
+            ->assertDontSee('return_token=', false);
+    }
+
+    private function visitReturn(Payment $payment, array $params): TestResponse
+    {
+        $cleanUrl = route('payments.zalopay.return', ['apptransid' => $payment->app_trans_id]);
+        $response = $this->get(route('payments.zalopay.return', $params));
+        $response->assertRedirect($cleanUrl)
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        return $this->get($cleanUrl);
     }
 
     private function returnParams(Payment $payment, array $overrides = [], bool $validChecksum = false): array

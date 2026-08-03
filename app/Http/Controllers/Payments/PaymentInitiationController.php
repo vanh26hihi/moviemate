@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Payments;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
-use App\Services\BookingTokenService;
+use App\Services\GuestBookingAccessService;
 use App\Services\Payments\PaymentInitiationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,10 +16,10 @@ class PaymentInitiationController extends Controller
     public function __invoke(
         Request $request,
         Booking $booking,
-        BookingTokenService $bookingTokens,
+        GuestBookingAccessService $guestAccess,
         PaymentInitiationService $payments,
     ): RedirectResponse {
-        $this->authorizeBooking($request, $booking, $bookingTokens);
+        $this->authorizeBooking($request, $booking, $guestAccess);
         $result = $payments->initiate($booking);
 
         abort_unless(is_string($result->orderUrl) && $result->orderUrl !== '', 409);
@@ -30,7 +30,7 @@ class PaymentInitiationController extends Controller
     private function authorizeBooking(
         Request $request,
         Booking $booking,
-        BookingTokenService $tokens,
+        GuestBookingAccessService $guestAccess,
     ): void {
         if (Auth::check()) {
             Gate::authorize('view', $booking);
@@ -38,14 +38,6 @@ class PaymentInitiationController extends Controller
             return;
         }
 
-        $guestToken = $request->input('guest_token');
-        abort_unless(
-            $booking->user_id === null
-                && $tokens->verifyHash(
-                    $booking->guest_access_token_hash,
-                    is_string($guestToken) ? $guestToken : null,
-                ),
-            404,
-        );
+        abort_unless($guestAccess->allows($request, $booking), 404);
     }
 }

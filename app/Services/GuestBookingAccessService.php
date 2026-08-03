@@ -23,13 +23,36 @@ class GuestBookingAccessService
             return false;
         }
 
+        $this->grant($request, $booking, true);
+
+        return true;
+    }
+
+    public function grantPaymentReturn(Request $request, Booking $booking): bool
+    {
+        if ($booking->user_id !== null
+            || ! $booking->guest_access_expires_at
+            || ! $booking->guest_access_expires_at->isFuture()
+            || ! is_string($booking->guest_access_token_hash)) {
+            return false;
+        }
+
+        $this->grant($request, $booking, true);
+
+        return true;
+    }
+
+    private function grant(Request $request, Booking $booking, bool $rotateSession): void
+    {
         $sessionExpiry = now()->addMinutes(
             max(1, (int) config('booking.guest_session_ttl_minutes', 60)),
         );
         $expiresAt = $booking->guest_access_expires_at->lt($sessionExpiry)
             ? $booking->guest_access_expires_at
             : $sessionExpiry;
-        $request->session()->migrate(true);
+        if ($rotateSession) {
+            $request->session()->migrate(true);
+        }
         $capabilities = $request->session()->get(self::SESSION_KEY, []);
         if (! is_array($capabilities)) {
             $capabilities = [];
@@ -39,8 +62,6 @@ class GuestBookingAccessService
             'token_hash' => $booking->guest_access_token_hash,
         ];
         $request->session()->put(self::SESSION_KEY, $capabilities);
-
-        return true;
     }
 
     public function allows(Request $request, Booking $booking): bool

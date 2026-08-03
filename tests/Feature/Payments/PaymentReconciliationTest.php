@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Jobs\Payments\SendBookingTicket;
 use App\Models\Payment;
 use App\Services\Payments\PaymentReconciliationService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 
 class PaymentReconciliationTest extends PaymentTestCase
 {
@@ -97,6 +99,50 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->assertSame(Payment::STATUS_SUCCESS, $status);
         $this->assertSame($paidAt, $payment->fresh()->paid_at?->format('Y-m-d H:i:s.u'));
         $this->assertSame(1, Payment::query()->where('status', Payment::STATUS_SUCCESS)->count());
+        Queue::assertPushed(SendBookingTicket::class, 1);
+    }
+
+    public function test_query_then_callback_success_is_idempotent_under_opposite_interleaving(): void
+    {
+        $payment = $this->pendingPayment();
+        $zpTransId = 876543210;
+        Http::fake(['*' => Http::response($this->querySuccess($payment, [
+            'zp_trans_id' => $zpTransId,
+        ]), 200)]);
+
+        $this->assertSame(
+            Payment::STATUS_SUCCESS,
+            app(PaymentReconciliationService::class)->reconcile($payment),
+        );
+        $paidAt = $payment->fresh()->paid_at?->format('Y-m-d H:i:s.u');
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'zp_trans_id' => $zpTransId,
+        ]))->assertJsonPath('return_code', 1);
+
+        $this->assertSame($paidAt, $payment->fresh()->paid_at?->format('Y-m-d H:i:s.u'));
+        $this->assertSame('paid', $payment->booking->fresh()->booking_status);
+        $this->assertSame(1, Payment::query()->where('status', Payment::STATUS_SUCCESS)->count());
+        Queue::assertPushed(SendBookingTicket::class, 1);
+    }
+
+    public function test_successful_query_after_expiration_moves_payment_to_review(): void
+    {
+        $booking = $this->payableBooking([
+            'booking_status' => 'expired',
+            'expires_at' => now()->subMinute(),
+        ]);
+        $booking->bookingSeats()->update(['active_lock_key' => null]);
+        $payment = $this->pendingPayment($booking);
+        Http::fake(['*' => Http::response($this->querySuccess($payment), 200)]);
+
+        $status = app(PaymentReconciliationService::class)->reconcile($payment);
+
+        $this->assertSame(Payment::STATUS_REVIEW, $status);
+        $this->assertSame('late_payment_after_expiration', $payment->fresh()->failure_reason);
+        $this->assertSame('expired', $booking->fresh()->booking_status);
+        $this->assertSame('unpaid', $booking->fresh()->payment_status);
+        Queue::assertNothingPushed();
     }
 
     public function test_authentication_error_fails_closed_to_review(): void

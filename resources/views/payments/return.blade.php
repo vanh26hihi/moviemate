@@ -22,6 +22,13 @@
             {{ $integrityVerified ? 'có checksum hợp lệ' : 'không được xác thực' }} và không tự xác nhận thanh toán.
         </p>
         <p class="mt-4 text-sm">Mã đặt vé: <strong>{{ $booking->booking_code }}</strong></p>
+        @if($payment->status === \App\Models\Payment::STATUS_SUCCESS
+            && $booking->payment_status === 'paid'
+            && $booking->booking_status === 'paid')
+            <a href="{{ route('user.bookings.ticket', $booking) }}" data-paid-ticket-link class="mt-6 inline-flex rounded-xl bg-green-600 px-5 py-3 font-semibold text-white">
+                Mở vé điện tử
+            </a>
+        @endif
     </section>
 </main>
 @endsection

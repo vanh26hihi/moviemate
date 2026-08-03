@@ -4,6 +4,7 @@ namespace App\Jobs\Payments;
 
 use App\Mail\BookingTicketMail;
 use App\Models\Booking;
+use App\Services\BookingTokenService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,7 +35,7 @@ class SendBookingTicket implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         $claimedAt = now()->startOfSecond();
-        $booking = DB::transaction(function () use ($claimedAt): ?Booking {
+        $claim = DB::transaction(function () use ($claimedAt): ?array {
             $booking = Booking::query()->lockForUpdate()->find($this->bookingId);
 
             if (! $booking
@@ -44,14 +45,26 @@ class SendBookingTicket implements ShouldBeUnique, ShouldQueue
                 return null;
             }
 
-            $booking->forceFill(['ticket_emailed_at' => $claimedAt])->save();
+            $guestAccessToken = null;
+            $fields = ['ticket_emailed_at' => $claimedAt];
+            if ($booking->user_id === null) {
+                $guestAccessToken = app(BookingTokenService::class)->issueGuestAccessToken();
+                $fields['guest_access_token_hash'] = hash('sha256', $guestAccessToken);
+                $fields['guest_access_expires_at'] = now()->addMinutes(
+                    max(1, (int) config('booking.guest_access_ttl_minutes', 1440)),
+                );
+            }
 
-            return $booking;
+            $booking->forceFill($fields)->save();
+
+            return [$booking, $guestAccessToken];
         });
 
-        if (! $booking) {
+        if (! $claim) {
             return;
         }
+
+        [$booking, $guestAccessToken] = $claim;
 
         $recipient = $booking->recipient_email;
 
@@ -61,7 +74,11 @@ class SendBookingTicket implements ShouldBeUnique, ShouldQueue
         }
 
         try {
-            Mail::to($recipient)->send(new BookingTicketMail($booking));
+            $ticketAccessUrl = $guestAccessToken === null
+                ? route('user.bookings.ticket', $booking)
+                : route('user.bookings.access.show', $booking)
+                    .'#token='.rawurlencode($guestAccessToken).'&destination=ticket';
+            Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl));
         } catch (Throwable $exception) {
             $this->releaseClaim($claimedAt);
             throw $exception;

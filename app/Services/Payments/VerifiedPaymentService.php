@@ -16,8 +16,8 @@ class VerifiedPaymentService
     public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
     {
         return DB::transaction(function () use ($payment, $data): PaymentVerificationResult {
+            $booking = Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
-            $booking = Booking::query()->lockForUpdate()->findOrFail($lockedPayment->booking_id);
 
             if ($lockedPayment->provider !== 'zalopay'
                 || $lockedPayment->app_id !== $data->appId
