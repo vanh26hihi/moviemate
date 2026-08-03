@@ -22,6 +22,9 @@ class Booking extends Model
         'showtime_id',
         'booking_code',
         'total_amount',
+        'seat_subtotal',
+        'food_subtotal',
+        'currency',
         'payment_status',
         'booking_status',
         'expires_at',
@@ -35,6 +38,8 @@ class Booking extends Model
         'guest_access_expires_at' => 'datetime',
         'paid_at' => 'datetime',
         'total_amount' => 'decimal:2',
+        'seat_subtotal' => 'integer',
+        'food_subtotal' => 'integer',
     ];
 
     protected $hidden = [
@@ -61,6 +66,11 @@ class Booking extends Model
     public function payment(): HasOne
     {
         return $this->hasOne(Payment::class);
+    }
+
+    public function foodOrder(): HasOne
+    {
+        return $this->hasOne(Order::class);
     }
 
     public function getQrCodeUrlAttribute(): string

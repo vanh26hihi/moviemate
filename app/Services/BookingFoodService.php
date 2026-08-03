@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Domain\Bookings\FoodLine;
 use App\Domain\Bookings\FoodPriceBreakdown;
 use App\Domain\Money\VndAmount;
+use App\Models\Booking;
 use App\Models\FoodItem;
 use App\Models\Order;
 use Illuminate\Support\Collection;
@@ -12,20 +13,23 @@ use InvalidArgumentException;
 
 class BookingFoodService
 {
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
+    public function __construct(
+        private readonly CinemaContext $cinemaContext,
+        private readonly FoodSelectionCanonicalizer $foodSelections,
+    ) {}
 
     public function calculate(array|Collection|null $payload): FoodPriceBreakdown
     {
-        $quantities = $this->normalize($payload instanceof Collection ? $payload->all() : ($payload ?? []));
-        if ($quantities === []) {
+        $selection = $this->foodSelections->canonicalize($payload);
+        if ($selection === []) {
             return FoodPriceBreakdown::empty();
         }
 
-        $foods = FoodItem::query()->whereIn('id', array_keys($quantities))->get()->keyBy('id');
+        $foods = FoodItem::query()->whereIn('id', array_column($selection, 'food_id'))->get()->keyBy('id');
         $lines = [];
         $subtotal = VndAmount::zero();
 
-        foreach ($quantities as $foodId => $quantity) {
+        foreach ($selection as ['food_id' => $foodId, 'quantity' => $quantity]) {
             /** @var FoodItem|null $food */
             $food = $foods->get($foodId);
             if (! $food) {
@@ -62,14 +66,26 @@ class BookingFoodService
         if ($food->pickupCinemaId === null) {
             throw new InvalidArgumentException('A food order requires the canonical pickup cinema.');
         }
+        $canonicalCinemaId = $this->cinemaContext->id();
+        if ($food->pickupCinemaId !== $canonicalCinemaId) {
+            throw new InvalidArgumentException('Food pickup must use the canonical cinema.');
+        }
+
+        $booking = null;
+        if (isset($attributes['booking_id'])) {
+            $booking = Booking::query()->lockForUpdate()->findOrFail((int) $attributes['booking_id']);
+            if ($booking->booking_status !== 'pending_payment' || $booking->payment_status !== 'unpaid') {
+                throw new InvalidArgumentException('Unified food can only be attached to an unpaid pending booking.');
+            }
+        }
 
         $order = Order::query()->create([
-            'booking_id' => $attributes['booking_id'] ?? null,
-            'user_id' => $attributes['user_id'] ?? null,
+            'booking_id' => $booking?->id,
+            'user_id' => $booking?->user_id ?? ($attributes['user_id'] ?? null),
             'customer_name' => $attributes['customer_name'] ?? '',
             'customer_phone' => $attributes['customer_phone'] ?? null,
-            'customer_email' => $attributes['customer_email'] ?? null,
-            'pickup_cinema_id' => $food->pickupCinemaId,
+            'customer_email' => $booking?->customer_email ?? ($attributes['customer_email'] ?? null),
+            'pickup_cinema_id' => $canonicalCinemaId,
             'subtotal' => $food->foodSubtotal,
             'total_amount' => $food->foodSubtotal,
             'status' => 'pending',
@@ -90,69 +106,22 @@ class BookingFoodService
         return $order->load('items');
     }
 
-    /** @return array<int, int> */
-    private function normalize(array $payload): array
+    public function transitionForBooking(Booking|int $booking, string $status): int
     {
-        if ($payload === []) {
-            return [];
+        if (! in_array($status, ['expired', 'cancelled'], true)) {
+            throw new InvalidArgumentException('Unified food orders may only transition to expired or cancelled here.');
         }
 
-        $normalized = [];
-        if (array_is_list($payload)) {
-            foreach ($payload as $line) {
-                if (! is_array($line) || ! array_key_exists('food_id', $line) || ! array_key_exists('quantity', $line)) {
-                    throw new InvalidArgumentException('Each food line requires food_id and quantity.');
-                }
-                $foodId = $this->positiveInteger($line['food_id'], 'food_id');
-                if (array_key_exists($foodId, $normalized)) {
-                    throw new InvalidArgumentException("Duplicate food item {$foodId}.");
-                }
-                $normalized[$foodId] = $this->quantity($line['quantity']);
-            }
-        } else {
-            foreach ($payload as $foodId => $quantity) {
-                $normalized[$this->positiveInteger($foodId, 'food_id')] = $this->quantity($quantity);
-            }
+        $booking = $booking instanceof Booking
+            ? $booking->fresh()
+            : Booking::query()->find($booking);
+        if (! $booking || $booking->booking_status !== $status) {
+            throw new InvalidArgumentException("Booking must be {$status} before its food order can transition.");
         }
 
-        return array_filter($normalized, fn (int $quantity) => $quantity !== 0);
-    }
-
-    private function positiveInteger(mixed $value, string $field): int
-    {
-        if (is_int($value)) {
-            $integer = $value;
-        } elseif (is_string($value) && preg_match('/^\d+$/', $value)) {
-            $integer = (int) $value;
-        } else {
-            throw new InvalidArgumentException("{$field} must be an integer.");
-        }
-
-        if ($integer < 1) {
-            throw new InvalidArgumentException("{$field} must be positive.");
-        }
-
-        return $integer;
-    }
-
-    private function quantity(mixed $value): int
-    {
-        if (is_int($value)) {
-            $quantity = $value;
-        } elseif (is_string($value) && preg_match('/^-?\d+$/', $value)) {
-            $quantity = (int) $value;
-        } else {
-            throw new InvalidArgumentException('Food quantity must be an integer.');
-        }
-
-        if ($quantity < 0) {
-            throw new InvalidArgumentException('Food quantity cannot be negative.');
-        }
-        $maximum = (int) config('booking.max_food_quantity', 20);
-        if ($quantity > $maximum) {
-            throw new InvalidArgumentException("Food quantity cannot exceed {$maximum}.");
-        }
-
-        return $quantity;
+        return Order::query()
+            ->where('booking_id', $booking->id)
+            ->where('status', 'pending')
+            ->update(['status' => $status]);
     }
 }
