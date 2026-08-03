@@ -11,9 +11,9 @@
             <h1 class="text-3xl font-extrabold app-text">Suất chiếu</h1>
             <p class="app-muted mt-2">Lên lịch chiếu theo phim, rạp, phòng và trạng thái vận hành.</p>
         </div>
-        <a href="{{ route('admin.showtimes.create') }}" class="btn-primary">
+        @can('showtimes.create')<a href="{{ route('admin.showtimes.create') }}" class="btn-primary">
             <i class="ph-bold ph-plus"></i> Thêm suất chiếu
-        </a>
+        </a>@endcan
     </div>
 
     <div class="cinema-card overflow-hidden">
@@ -92,16 +92,16 @@
                             </td>
                             <td>
                                 <div class="flex items-center justify-end gap-2">
-                                    <a href="{{ route('admin.showtimes.edit', $showtime) }}" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa">
+                                    @can('showtimes.update')<a href="{{ route('admin.showtimes.edit', $showtime) }}" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa">
                                         <i class="ph-bold ph-pencil-simple text-xs"></i>
-                                    </a>
-                                    <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn xóa suất chiếu này?');">
+                                    </a>@endcan
+                                    @can('showtimes.delete')<form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn xóa suất chiếu này?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-white hover:bg-error hover:border-error transition-colors" title="Xóa">
                                             <i class="ph-bold ph-trash text-xs"></i>
                                         </button>
-                                    </form>
+                                    </form>@endcan
                                 </div>
                             </td>
                         </tr>

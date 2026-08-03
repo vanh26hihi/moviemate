@@ -9,10 +9,10 @@
         <h1 class="admin-page-title">Quản lý thể loại</h1>
         <p class="admin-page-subtitle">Quản lý nhóm thể loại dùng để phân loại phim trong MovieMate.</p>
     </div>
-    <a href="{{ route('admin.genres.create') }}" class="admin-btn-primary">
+    @can('genres.create')<a href="{{ route('admin.genres.create') }}" class="admin-btn-primary">
         <i class="ph-bold ph-plus"></i>
         Thêm mới
-    </a>
+    </a>@endcan
 </div>
 
 @if(session('success'))
@@ -58,17 +58,17 @@
                         </td>
                         <td>
                             <div class="flex items-center justify-end gap-2">
-                                <a href="{{ route('admin.genres.edit', $genre) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
+                                @can('genres.update')<a href="{{ route('admin.genres.edit', $genre) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
                                     <i class="ph ph-pencil-simple"></i>
-                                </a>
-                                <form action="{{ route('admin.genres.destroy', $genre) }}" method="POST"
+                                </a>@endcan
+                                @can('genres.delete')<form action="{{ route('admin.genres.destroy', $genre) }}" method="POST"
                                       onsubmit="return confirm('Bạn có chắc muốn xóa thể loại này?');" class="inline">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="admin-btn-danger admin-action-btn" title="Xóa" aria-label="Xóa" data-tooltip="Xóa">
                                         <i class="ph ph-trash"></i>
                                     </button>
-                                </form>
+                                </form>@endcan
                             </div>
                         </td>
                     </tr>
