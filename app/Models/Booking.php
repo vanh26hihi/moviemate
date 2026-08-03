@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -67,5 +68,15 @@ class Booking extends Model
             ->pluck('seat.seat_code')
             ->filter()
             ->join(', ');
+    }
+
+    public function getShowtimeLabelAttribute(): string
+    {
+        if (! $this->showtime?->show_date || ! $this->showtime?->show_time) {
+            return 'Đang cập nhật';
+        }
+
+        return $this->showtime->show_date->format('d/m/Y').' '
+            .Carbon::parse($this->showtime->show_time)->format('H:i');
     }
 }
