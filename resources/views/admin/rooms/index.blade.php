@@ -43,7 +43,7 @@
                         <th>Rạp</th>
                         <th>Tên phòng</th>
                         <th>Loại</th>
-                        <th>Số ghế</th>
+                        <th>Layout published</th>
                         <th>Trạng thái</th>
                         <th class="text-right">Thao tác</th>
                     </tr>
@@ -58,7 +58,19 @@
                             </td>
                             <td class="font-extrabold">{{ $room->name }}</td>
                             <td>{{ $room->room_type }}</td>
-                            <td>{{ $room->total_seats }}</td>
+                            <td>
+                                @php
+                                    $published = $room->latestPublishedLayout;
+                                    $publishedSeats = $published?->cells->where('cell_type', 'seat')->pluck('seat')->filter() ?? collect();
+                                @endphp
+                                @if($published)
+                                    <p class="font-bold app-text">v{{ $published->version }} · {{ $published->rows }} × {{ $published->columns }}</p>
+                                    <p class="text-xs app-muted">{{ $publishedSeats->count() }} ghế · {{ $publishedSeats->where('type', 'vip')->count() }} VIP · {{ $publishedSeats->where('type', 'couple')->count() }} couple</p>
+                                @else
+                                    <span class="text-xs text-warning">Chưa publish</span>
+                                @endif
+                                @if($room->draftLayout)<span class="mt-1 inline-block status-badge bg-warning/10 text-warning">Có draft v{{ $room->draftLayout->version }}</span>@endif
+                            </td>
                             <td>
                                 @if($room->status === 'active')
                                     <span class="status-badge text-success bg-success/10">Hoạt động</span>
@@ -68,9 +80,10 @@
                             </td>
                             <td>
                                 <div class="flex items-center justify-end gap-2">
-                                    @can('seats.manage')<a href="{{ route('admin.seats.manage', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
-                                        <i class="ph ph-armchair"></i> Ghế
+                                    @can('seats.manage')<a href="{{ route('admin.rooms.layout.show', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
+                                        <i class="ph ph-grid-four"></i> Layout
                                     </a>@endcan
+                                    @can('seats.view') @if($published)<a href="{{ route('admin.rooms.layout.preview', ['room' => $room, 'version' => $published->version]) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">Preview</a>@endif @endcan
                                     @can('rooms.update')<a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
                                         <i class="ph ph-pencil-simple"></i> Sửa
                                     </a>@endcan

@@ -41,10 +41,6 @@
                     </select>
                 </div>
                 <div>
-                    <label class="cinema-label">Số ghế *</label>
-                    <input type="number" name="total_seats" value="{{ old('total_seats', 0) }}" required class="cinema-input" min="0">
-                </div>
-                <div>
                     <label class="cinema-label">Trạng thái *</label>
                     <select name="status" required class="cinema-input">
                         <option value="active" {{ old('status') == 'active' ? 'selected' : '' }}>Hoạt động</option>

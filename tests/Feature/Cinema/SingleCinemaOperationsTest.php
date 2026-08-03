@@ -94,17 +94,19 @@ class SingleCinemaOperationsTest extends TestCase
         $canonical = app(CinemaContext::class)->current();
         $legacy = Cinema::factory()->legacy()->create();
 
-        $this->actingAs($manager)->post(route('admin.rooms.store'), [
+        $response = $this->actingAs($manager)->post(route('admin.rooms.store'), [
             'cinema_id' => $legacy->id,
             'code' => 'P99',
             'name' => 'Phòng 99',
             'room_type' => '2D',
             'total_seats' => 20,
             'status' => 'active',
-        ])->assertRedirect(route('admin.rooms.index'));
+        ]);
 
         $room = Room::query()->where('code', 'P99')->sole();
+        $response->assertRedirect(route('admin.rooms.layout.show', $room));
         $this->assertSame($canonical->id, $room->cinema_id);
+        $this->assertSame(0, $room->total_seats);
 
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), [
             'cinema_id' => $legacy->id,

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Room extends Model
 {
@@ -38,6 +39,26 @@ class Room extends Model
     public function showtimes(): HasMany
     {
         return $this->hasMany(Showtime::class);
+    }
+
+    public function layouts(): HasMany
+    {
+        return $this->hasMany(RoomLayout::class);
+    }
+
+    public function publishedLayouts(): HasMany
+    {
+        return $this->layouts()->published()->orderByDesc('version');
+    }
+
+    public function draftLayout(): HasOne
+    {
+        return $this->hasOne(RoomLayout::class)->where('status', 'draft')->latestOfMany('version');
+    }
+
+    public function latestPublishedLayout(): HasOne
+    {
+        return $this->hasOne(RoomLayout::class)->where('status', 'published')->latestOfMany('version');
     }
 
     public function scopeOperational(Builder $query): Builder

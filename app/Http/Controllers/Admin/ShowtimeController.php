@@ -7,12 +7,16 @@ use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\CinemaContext;
+use App\Services\RoomLayoutService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ShowtimeController extends Controller
 {
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
+    public function __construct(
+        private readonly CinemaContext $cinemaContext,
+        private readonly RoomLayoutService $layouts
+    ) {}
 
     public function index(Request $request)
     {
@@ -48,6 +52,12 @@ class ShowtimeController extends Controller
         $validated = $this->validatedData($request);
         $validated['show_time'] .= ':00';
         $validated['cinema_id'] = $this->cinemaContext->id();
+        $room = Room::query()->findOrFail($validated['room_id']);
+        $layout = $this->layouts->latestPublishedFor($room);
+        if (! $layout) {
+            return back()->withErrors(['room_id' => 'Phòng phải có layout published trước khi tạo suất chiếu.'])->withInput();
+        }
+        $validated['room_layout_id'] = $layout->id;
 
         if (Movie::query()->findOrFail($validated['movie_id'])->status === 'stopped') {
             return back()->withErrors(['movie_id' => 'Phim đã ngừng chiếu không thể tạo suất chiếu.'])->withInput();
@@ -79,6 +89,16 @@ class ShowtimeController extends Controller
         $validated = $this->validatedData($request);
         $validated['show_time'] .= ':00';
         $validated['cinema_id'] = $this->cinemaContext->id();
+        if ((int) $validated['room_id'] !== (int) $showtime->room_id || ! $showtime->room_layout_id) {
+            $room = Room::query()->findOrFail($validated['room_id']);
+            $layout = $this->layouts->latestPublishedFor($room);
+            if (! $layout) {
+                return back()->withErrors(['room_id' => 'Phòng phải có layout published trước khi cập nhật suất chiếu.'])->withInput();
+            }
+            $validated['room_layout_id'] = $layout->id;
+        } else {
+            $validated['room_layout_id'] = $showtime->room_layout_id;
+        }
 
         if (Movie::query()->findOrFail($validated['movie_id'])->status === 'stopped') {
             return back()->withErrors(['movie_id' => 'Phim đã ngừng chiếu không thể cập nhật suất chiếu.'])->withInput();
@@ -116,7 +136,7 @@ class ShowtimeController extends Controller
     private function operationalRooms()
     {
         return Room::query()->where('cinema_id', $this->cinemaContext->id())
-            ->operational()->orderBy('code')->get();
+            ->operational()->whereHas('latestPublishedLayout')->orderBy('code')->get();
     }
 
     private function hasConflict(array $data, ?int $exceptId = null): bool

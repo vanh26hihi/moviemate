@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Services\CinemaContext;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -16,7 +17,7 @@ class RoomController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
-        $rooms = Room::query()->with('cinema')
+        $rooms = Room::query()->with(['cinema', 'latestPublishedLayout.cells.seat', 'draftLayout'])
             ->where('cinema_id', $this->cinemaContext->id())
             ->operational()
             ->when($search, fn ($query, $search) => $query->where('name', 'like', "%{$search}%"))
@@ -39,14 +40,14 @@ class RoomController extends Controller
             'code' => ['required', 'string', 'max:32', Rule::unique('rooms', 'code')->where('cinema_id', $this->cinemaContext->id())],
             'name' => ['required', 'string', 'max:255'],
             'room_type' => ['required', Rule::in(['2D', '3D', 'IMAX'])],
-            'total_seats' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'in:active,inactive'],
         ]);
         $this->ensureOperationalNameIsUnique($validated);
 
-        Room::query()->create([...$validated, 'cinema_id' => $this->cinemaContext->id()]);
+        $room = Room::query()->create([...$validated, 'total_seats' => 0, 'cinema_id' => $this->cinemaContext->id()]);
 
-        return redirect()->route('admin.rooms.index')->with('success', 'Thêm phòng chiếu thành công.');
+        return redirect()->route('admin.rooms.layout.show', $room)
+            ->with('success', 'Đã tạo phòng. Hãy thiết kế và publish layout trước khi tạo suất chiếu.');
     }
 
     public function edit(Room $room)
@@ -65,7 +66,6 @@ class RoomController extends Controller
             'code' => ['required', 'string', 'max:32', Rule::unique('rooms', 'code')->where('cinema_id', $this->cinemaContext->id())->ignore($room->id)],
             'name' => ['required', 'string', 'max:255'],
             'room_type' => ['required', Rule::in(['2D', '3D', 'IMAX'])],
-            'total_seats' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'in:active,inactive'],
         ]);
         $this->ensureOperationalNameIsUnique($validated, $room->id);
@@ -79,8 +79,15 @@ class RoomController extends Controller
     {
         $this->assertOperationalRoom($room);
         abort_if($room->showtimes()->exists(), 409, 'Không thể xóa phòng đã có lịch sử suất chiếu.');
-        $room->seats()->delete();
-        $room->delete();
+        DB::transaction(function () use ($room): void {
+            DB::table('room_layout_cells')->whereIn(
+                'room_layout_id',
+                DB::table('room_layouts')->where('room_id', $room->id)->select('id')
+            )->delete();
+            DB::table('room_layouts')->where('room_id', $room->id)->delete();
+            $room->seats()->delete();
+            $room->delete();
+        });
 
         return redirect()->route('admin.rooms.index')->with('success', 'Xóa phòng chiếu thành công.');
     }
