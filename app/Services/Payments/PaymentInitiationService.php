@@ -44,7 +44,6 @@ class PaymentInitiationService
                 ->where('booking_id', $lockedBooking->id)
                 ->where('provider', 'zalopay')
                 ->where('status', Payment::STATUS_PENDING)
-                ->where('expires_at', '>', now())
                 ->latest('id')
                 ->lockForUpdate()
                 ->first();
@@ -85,7 +84,10 @@ class PaymentInitiationService
             return [$payment, false];
         });
 
-        if ($replayed && is_string($payment->order_url) && $payment->order_url !== '') {
+        if ($replayed
+            && $payment->expires_at?->isFuture()
+            && is_string($payment->order_url)
+            && $payment->order_url !== '') {
             return new PaymentInitiationResult($payment, $payment->order_url, true);
         }
 

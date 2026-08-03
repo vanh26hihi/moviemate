@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers\Payments;
 
+use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\ZaloPayResponseException;
+use App\Exceptions\ZaloPayTransportException;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Payment;
 use App\Services\GuestBookingAccessService;
 use App\Services\Payments\PaymentInitiationService;
 use Illuminate\Http\RedirectResponse;
@@ -20,7 +24,22 @@ class PaymentInitiationController extends Controller
         PaymentInitiationService $payments,
     ): RedirectResponse {
         $this->authorizeBooking($request, $booking, $guestAccess);
-        $result = $payments->initiate($booking);
+        try {
+            $result = $payments->initiate($booking);
+        } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException) {
+            $paymentStatus = $booking->payments()->latest('id')->value('status');
+            $statusRoute = match ($paymentStatus) {
+                Payment::STATUS_SUCCESS => 'user.bookings.success',
+                Payment::STATUS_FAILED => 'user.bookings.failed',
+                Payment::STATUS_REVIEW => 'user.bookings.payment-review',
+                Payment::STATUS_EXPIRED => 'user.bookings.expired',
+                default => 'user.bookings.pending',
+            };
+
+            return redirect()
+                ->route($statusRoute, $booking)
+                ->with('warning', 'MovieMate đang đối soát lần thanh toán ZaloPay hiện tại.');
+        }
 
         abort_unless(is_string($result->orderUrl) && $result->orderUrl !== '', 409);
 

@@ -15,7 +15,10 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Payments\PaymentInitiationController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
+use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
+use App\Http\Controllers\User\BookingFoodSelectionController;
+use App\Http\Controllers\User\BookingReviewController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\GuestBookingAccessController;
 use App\Http\Controllers\User\HomeController;
@@ -69,6 +72,22 @@ Route::get('/booking/checkout/{showtime}', [BookingController::class, 'checkout'
     ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
     ->name('user.bookings.checkout');
 
+Route::get('/booking/food', [BookingFoodSelectionController::class, 'show'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
+    ->name('user.bookings.food');
+
+Route::post('/booking/food', [BookingFoodSelectionController::class, 'store'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->name('user.bookings.food.store');
+
+Route::get('/booking/review', BookingReviewController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
+    ->name('user.bookings.review');
+
+Route::post('/booking/confirm', BookingCheckoutConfirmController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
+    ->name('user.bookings.confirm');
+
 Route::post('/booking/store', [BookingController::class, 'store'])
     ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
     ->name('user.bookings.store');
@@ -76,6 +95,22 @@ Route::post('/booking/store', [BookingController::class, 'store'])
 Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
     ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.success');
+
+Route::get('/booking/payment/pending/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.pending');
+
+Route::get('/booking/payment/failed/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.failed');
+
+Route::get('/booking/payment/review/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.payment-review');
+
+Route::get('/booking/payment/expired/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.expired');
 
 Route::get('/my-ticket/{booking}', [BookingController::class, 'ticket'])
     ->middleware(ProtectBookingResponses::class)

@@ -6,6 +6,7 @@ use App\Domain\Payments\PaymentVerificationResult;
 use App\Domain\Payments\VerifiedPaymentData;
 use App\Jobs\Payments\SendBookingTicket;
 use App\Models\Booking;
+use App\Models\Order;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -29,6 +30,12 @@ class VerifiedPaymentService
                 $this->markReview($lockedPayment, $data, 'amount_mismatch');
 
                 return PaymentVerificationResult::rejected('Payment amount mismatch.');
+            }
+
+            if ($data->zpTransId === null) {
+                $this->markReview($lockedPayment, $data, 'missing_zp_trans_id');
+
+                return PaymentVerificationResult::rejected('Missing verified ZaloPay transaction identity.');
             }
 
             if ($data->zpTransId !== null) {
@@ -95,6 +102,13 @@ class VerifiedPaymentService
                 'booking_status' => 'paid',
                 'paid_at' => $now,
             ])->save();
+
+            $foodOrder = Order::query()
+                ->where('booking_id', $booking->id)
+                ->where('status', 'pending')
+                ->lockForUpdate()
+                ->first();
+            $foodOrder?->forceFill(['status' => 'paid'])->save();
 
             DB::afterCommit(function () use ($booking): void {
                 try {
