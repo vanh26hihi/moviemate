@@ -4,32 +4,32 @@ namespace Database\Seeders;
 
 use App\Models\Movie;
 use App\Models\Room;
-use App\Models\Showtime;
 use App\Services\CinemaContext;
-use Carbon\Carbon;
+use App\Services\ShowtimeScheduleService;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 
 class ShowtimeSeeder extends Seeder
 {
     public function run(): void
     {
-        $movies = Movie::all();
+        $movies = Movie::query()->where('status', '!=', 'stopped')->orderBy('id')->get();
         $cinema = app(CinemaContext::class)->current();
-        $room = Room::query()->where('cinema_id', $cinema->id)->operational()->where('code', 'P01')->firstOrFail();
+        $room = Room::query()->where('cinema_id', $cinema->id)->operational()
+            ->whereHas('latestPublishedLayout')->where('code', 'P01')->firstOrFail();
+        $schedule = app(ShowtimeScheduleService::class);
+        $date = CarbonImmutable::now($schedule->timezone())->addDay()->startOfDay();
+        $sequence = 0;
 
         foreach ($movies as $movie) {
-            // Create three showtimes for each movie
             for ($i = 0; $i < 3; $i++) {
-                $date = Carbon::now()->addDays($i + 1)->toDateString();
-                $time = '14:00:00';
-
-                Showtime::create([
+                $start = $date->addDays($sequence++)->setTime(14, 0);
+                $schedule->schedule([
                     'movie_id' => $movie->id,
-                    'cinema_id' => $cinema->id,
                     'room_id' => $room->id,
-                    'show_date' => $date,
-                    'show_time' => $time,
-                    'price' => 100000, // VND
+                    'show_date' => $start->toDateString(),
+                    'show_time' => $start->format('H:i'),
+                    'price' => 100000,
                     'vip_price' => 150000,
                     'status' => 'active',
                 ]);
