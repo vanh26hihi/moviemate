@@ -55,6 +55,10 @@
                             <div class="user-account-dropdown absolute right-0 top-full mt-2 w-56 rounded-2xl border app-border app-card p-2 shadow-2xl">
                                 <a href="{{ route('user.profile') }}" class="user-dropdown-link"><i class="ph ph-user"></i> Hồ sơ</a>
                                 <a href="{{ route('user.bookings.history') }}" class="user-dropdown-link"><i class="ph ph-ticket"></i> Lịch sử đặt vé</a>
+                                <form action="{{ route('logout') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="user-dropdown-link w-full text-left"><i class="ph ph-sign-out"></i> Đăng xuất</button>
+                                </form>
                             </div>
                         </details>
                     @else
@@ -91,6 +95,10 @@
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
                         <a href="{{ route('user.profile') }}" class="user-mobile-link"><i class="ph ph-user mr-2"></i>Hồ sơ</a>
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+                            <button type="submit" class="user-mobile-link w-full text-left"><i class="ph ph-sign-out mr-2"></i>Đăng xuất</button>
+                        </form>
                     @else
                         <a href="{{ route('login') }}" class="block px-3 py-2.5 text-sm font-medium app-muted hover:app-text text-center border app-border rounded-lg">Đăng nhập</a>
                         <a href="{{ route('register') }}" class="block px-3 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-start to-brand-end text-center rounded-lg">Đăng ký</a>

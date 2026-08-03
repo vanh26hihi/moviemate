@@ -32,7 +32,8 @@
                         {{ $errors->first() }}
                     </div>
                 @endif
-                <div class="space-y-5" aria-disabled="true">
+                <form action="{{ route('login.store') }}" method="POST" class="space-y-5">
+                    @csrf
 
                     <div>
                         <label for="email" class="block text-sm font-semibold app-text-soft mb-2">Email</label>
@@ -40,9 +41,9 @@
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i class="ph ph-envelope app-text-muted text-lg"></i>
                             </div>
-                            <input type="email" id="email" name="email" value="{{ old('email') }}"
+                            <input type="email" id="email" name="email" value="{{ old('email') }}" autocomplete="email"
                                    class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập email của bạn" required disabled>
+                                   placeholder="Nhập email của bạn" required autofocus @error('email') aria-invalid="true" @enderror>
                         </div>
                         @error('email')
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
@@ -54,10 +55,10 @@
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i class="ph ph-lock-key app-text-muted text-lg"></i>
                             </div>
-                            <input type="password" id="password" name="password"
+                            <input type="password" id="password" name="password" autocomplete="current-password"
                                    class="app-input w-full pl-11 pr-11 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập mật khẩu" required disabled>
-                            <button type="button" data-password-toggle="password" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu" disabled>
+                                   placeholder="Nhập mật khẩu" required @error('password') aria-invalid="true" @enderror>
+                            <button type="button" data-password-toggle="password" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu">
                                 <i class="ph ph-eye text-lg"></i>
                             </button>
                         </div>
@@ -69,14 +70,16 @@
                     <div class="flex items-center justify-between">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input id="remember-me" name="remember" type="checkbox" value="1" @checked(old('remember'))
-                                   class="h-4 w-4 rounded border-dark-border bg-dark-main text-brand-start focus:ring-brand-start" disabled>
+                                   class="h-4 w-4 rounded border-dark-border bg-dark-main text-brand-start focus:ring-brand-start">
                             <span class="text-sm app-text-muted">Ghi nhớ đăng nhập</span>
                         </label>
                         <span class="text-sm app-text-muted">Quên mật khẩu?</span>
                     </div>
-                    <button type="button" disabled class="w-full cursor-not-allowed rounded-xl border app-border app-card py-3.5 text-sm font-bold app-text-muted opacity-60">Đăng nhập chưa khả dụng</button>
-                    <p class="text-center text-xs app-text-muted">Hệ thống đăng nhập đang được hoàn thiện.</p>
-                </div>
+                    @error('remember')
+                        <p class="text-xs font-semibold text-error">{{ $message }}</p>
+                    @enderror
+                    <button type="submit" class="w-full rounded-xl bg-gradient-to-r from-brand-start to-brand-end py-3.5 text-sm font-bold text-white transition-all hover:shadow-lg hover:shadow-brand-start/25">Đăng nhập</button>
+                </form>
                 <div class="mt-6 relative">
                     <div class="absolute inset-0 flex items-center"><div class="w-full border-t app-border"></div></div>
                     <div class="relative flex justify-center text-sm">
