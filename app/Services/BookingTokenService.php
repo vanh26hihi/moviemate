@@ -61,6 +61,11 @@ class BookingTokenService
         ));
     }
 
+    public function issueGuestAccessToken(): string
+    {
+        return $this->base64UrlEncode(random_bytes(32));
+    }
+
     public function verifyHash(?string $storedHash, ?string $rawToken): bool
     {
         if (! is_string($storedHash) || strlen($storedHash) !== 64 || ! is_string($rawToken)) {

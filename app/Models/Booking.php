@@ -37,6 +37,7 @@ class Booking extends Model
         'expires_at' => 'datetime',
         'guest_access_expires_at' => 'datetime',
         'paid_at' => 'datetime',
+        'ticket_emailed_at' => 'datetime',
         'total_amount' => 'decimal:2',
         'seat_subtotal' => 'integer',
         'food_subtotal' => 'integer',
@@ -65,7 +66,13 @@ class Booking extends Model
 
     public function payment(): HasOne
     {
-        return $this->hasOne(Payment::class);
+        // Backward-compatible singular access now resolves the newest attempt.
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     public function foodOrder(): HasOne

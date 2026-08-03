@@ -12,6 +12,9 @@ use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Payments\PaymentInitiationController;
+use App\Http\Controllers\Payments\ZaloPayCallbackController;
+use App\Http\Controllers\Payments\ZaloPayReturnController;
 use App\Http\Controllers\User\BookingController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\GuestBookingAccessController;
@@ -22,6 +25,18 @@ use App\Http\Middleware\ProtectBookingResponses;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
+    ->middleware('throttle:120,1')
+    ->name('payments.zalopay.callback');
+
+Route::get('/payments/zalopay/return', ZaloPayReturnController::class)
+    ->middleware(ProtectBookingResponses::class)
+    ->name('payments.zalopay.return');
+
+Route::post('/payments/zalopay/bookings/{booking}', PaymentInitiationController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->name('payments.zalopay.initiate');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', function () {
@@ -51,11 +66,11 @@ Route::get('/booking/select-seat/{showtime}', [BookingController::class, 'select
     ->name('user.bookings.selectSeat');
 
 Route::get('/booking/checkout/{showtime}', [BookingController::class, 'checkout'])
-    ->middleware(ProtectBookingResponses::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
     ->name('user.bookings.checkout');
 
 Route::post('/booking/store', [BookingController::class, 'store'])
-    ->middleware(ProtectBookingResponses::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
     ->name('user.bookings.store');
 
 Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
@@ -71,7 +86,7 @@ Route::get('/booking/access/{booking}', [GuestBookingAccessController::class, 's
     ->name('user.bookings.access.show');
 
 Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, 'exchange'])
-    ->middleware(ProtectBookingResponses::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
     ->name('user.bookings.access.exchange');
 
 Route::middleware(['auth', 'active'])->group(function () {

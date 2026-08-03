@@ -3,6 +3,10 @@
 @section('title', 'Đặt vé thành công - MovieMate')
 
 @section('content')
+@php
+    $isPaid = $booking->payment_status === 'paid' && $booking->booking_status === 'paid';
+    $isPending = $booking->payment_status !== 'paid' && $booking->booking_status === 'pending_payment';
+@endphp
 <div class="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[radial-gradient(circle_at_20%_15%,rgba(255,61,87,0.2),transparent_35%),radial-gradient(circle_at_80%_85%,rgba(108,43,217,0.18),transparent_40%),linear-gradient(135deg,#080a12,#111526)] relative">
     <div class="absolute inset-0 bg-dark-main/90 backdrop-blur-sm"></div>
 
@@ -26,7 +30,9 @@
                     <p class="text-xs text-text-sub mb-1">Mã đặt vé</p>
                     <p class="text-xl font-bold text-brand-start font-mono">{{ $booking->booking_code }}</p>
                 </div>
-                <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="w-12 h-12 rounded bg-white p-1">
+                @if($isPaid)
+                    <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="w-12 h-12 rounded bg-white p-1">
+                @endif
             </div>
 
             <div class="space-y-3 text-sm">
@@ -56,14 +62,25 @@
         </div>
 
         <p class="text-sm text-text-sub mb-8">
-            <i class="ph-fill ph-envelope-simple text-brand-start"></i> Phase 4A chưa gửi email. Email liên hệ của booking: <br>
+            <i class="ph-fill ph-envelope-simple text-brand-start"></i>
+            {{ $isPaid ? 'Vé điện tử được gửi sau khi thanh toán được xác minh.' : 'Vé điện tử chỉ được gửi sau khi thanh toán được xác minh.' }}
+            Email liên hệ của booking: <br>
             <span class="text-white font-medium mt-1 inline-block">{{ $booking->recipient_email }}</span>
         </p>
 
         <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
-                Xem vé QR của tôi
-            </a>
+            @if($isPaid)
+                <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
+                    Xem vé QR của tôi
+                </a>
+            @elseif($isPending)
+                <form method="POST" action="{{ route('payments.zalopay.initiate', $booking) }}">
+                    @csrf
+                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
+                        Thanh toán bằng ZaloPay
+                    </button>
+                </form>
+            @endif
             <a href="{{ route('home') }}" class="px-6 py-3 bg-dark-main border border-dark-border text-white rounded-xl font-bold hover:bg-dark-border transition-colors">
                 Về trang chủ
             </a>

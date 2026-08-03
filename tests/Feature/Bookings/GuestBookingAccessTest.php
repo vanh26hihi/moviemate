@@ -57,6 +57,41 @@ class GuestBookingAccessTest extends TestCase
         $this->get(route('user.bookings.ticket', $booking))->assertOk();
     }
 
+    public function test_pending_booking_pages_never_render_a_usable_ticket(): void
+    {
+        [$booking, $rawToken] = $this->guestBooking();
+        $this->exchange($booking, $rawToken);
+
+        $this->get(route('user.bookings.success', $booking))
+            ->assertOk()
+            ->assertDontSee($booking->qr_code_url, false)
+            ->assertDontSee('Xem vé QR của tôi');
+
+        $this->get(route('user.bookings.ticket', $booking))
+            ->assertOk()
+            ->assertDontSee('data-qr-value', false)
+            ->assertDontSee('data-ticket-download', false)
+            ->assertSee('không có vé QR khả dụng');
+    }
+
+    public function test_used_booking_is_history_without_a_usable_qr_or_download(): void
+    {
+        [$booking, $rawToken] = $this->guestBooking();
+        $booking->forceFill([
+            'payment_status' => 'paid',
+            'booking_status' => 'used',
+            'paid_at' => now()->subHour(),
+            'used_at' => now(),
+        ])->save();
+        $this->exchange($booking, $rawToken);
+
+        $this->get(route('user.bookings.ticket', $booking))
+            ->assertOk()
+            ->assertDontSee('data-qr-value', false)
+            ->assertDontSee('data-ticket-download', false)
+            ->assertSee('Đã sử dụng');
+    }
+
     public function test_token_for_one_guest_booking_cannot_open_another_booking(): void
     {
         [, $firstToken] = $this->guestBooking();
