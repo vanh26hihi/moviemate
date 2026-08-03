@@ -74,27 +74,9 @@
                         <p class="font-bold text-gray-900">{{ $booking->showtime?->room?->name ?? 'Đang cập nhật' }}</p>
                     </div>
                 </div>
-
-                <div class="mb-6 rounded-2xl bg-gray-50 p-4 text-center">
-                    <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Địa chỉ rạp</p>
-                    <p class="text-sm font-semibold text-gray-900">{{ $booking->showtime?->cinema?->address ?? 'Đang cập nhật' }}</p>
-                </div>
-
-                <div class="bg-gray-50 rounded-2xl p-4 flex justify-between items-center gap-4 mb-6">
-                    <div>
-                        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Ghế ngồi</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $seatCodes ?: '—' }}</p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Tổng tiền</p>
-                        <p class="text-lg font-bold text-gray-900">{{ number_format((float) $booking->total_amount, 0, ',', '.') }}đ</p>
-                    </div>
-                </div>
-
-                <div class="text-center flex justify-center">
-                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full {{ $status['class'] }} text-sm font-bold border">
-                        <i class="ph-fill {{ $status['icon'] }}"></i> {{ $status['label'] }}
-                    </span>
+                <div class="flex flex-col items-center justify-center">
+                    <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="h-52 w-52 rounded-3xl bg-white p-3">
+                    <p class="mt-4 text-center text-sm text-gray-400">Mã QR soát vé</p>
                 </div>
             </div>
         </div>
