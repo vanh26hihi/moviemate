@@ -49,11 +49,12 @@
             <form action="{{ route('user.bookings.store') }}" method="POST" class="cinema-card self-start rounded-3xl p-6 sm:p-8 lg:sticky lg:top-24">
                 @csrf
                 <input type="hidden" name="showtime_id" value="{{ $showtime->id }}">
+                <input type="hidden" name="checkout_token" value="{{ $checkoutToken }}">
                 @foreach($seatSummaries as $seat)
                     <input type="hidden" name="seat_ids[]" value="{{ $seat['id'] }}">
                 @endforeach
 
-                <div class="mb-6"><p class="text-xs font-extrabold uppercase tracking-[0.24em] text-ai-start">Thanh toán an toàn</p><h2 class="mt-2 text-2xl font-extrabold app-text">Hoàn tất đặt vé</h2><p class="mt-2 text-sm app-muted">Vé điện tử sẽ được gửi tới email sau khi đặt thành công.</p></div>
+                <div class="mb-6"><p class="text-xs font-extrabold uppercase tracking-[0.24em] text-ai-start">Giữ ghế an toàn</p><h2 class="mt-2 text-2xl font-extrabold app-text">Xác nhận giữ ghế</h2><p class="mt-2 text-sm app-muted">Booking sẽ ở trạng thái chờ thanh toán trong thời hạn hiển thị. Phase 4A chưa kết nối cổng thanh toán và chưa gửi email.</p></div>
 
                 <div>
                     <label for="customer_email" class="mb-2 block text-sm font-semibold app-text">Email nhận vé</label>
@@ -61,23 +62,7 @@
                     @error('customer_email')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
                 </div>
 
-                <fieldset class="mt-6 space-y-3">
-                    <legend class="mb-3 text-sm font-semibold app-text">Phương thức thanh toán</legend>
-                    @foreach([
-                        'fake' => ['Mô phỏng thanh toán', 'ph-check-circle', 'Xác nhận thanh toán ngay trong hệ thống'],
-                        'counter' => ['Thanh toán tại quầy', 'ph-storefront', 'Thanh toán khi đến rạp'],
-                        'vnpay' => ['VNPay mô phỏng', 'ph-qr-code', 'Luồng VNPay trong môi trường hiện tại'],
-                    ] as $value => [$label, $icon, $description])
-                        <label class="group flex cursor-pointer items-center gap-3 rounded-2xl border app-border app-secondary p-4 transition hover:border-brand-start/50">
-                            <input type="radio" name="payment_method" value="{{ $value }}" @checked(old('payment_method', 'fake') === $value) class="peer h-4 w-4 text-brand-start focus:ring-brand-start">
-                            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-start/10 text-brand-start"><i class="ph-fill {{ $icon }} text-xl"></i></span>
-                            <span class="min-w-0"><strong class="block text-sm app-text">{{ $label }}</strong><span class="block text-xs app-muted">{{ $description }}</span></span>
-                        </label>
-                    @endforeach
-                    @error('payment_method')<p class="text-xs font-semibold text-error">{{ $message }}</p>@enderror
-                </fieldset>
-
-                <button type="submit" class="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-start to-brand-end px-5 py-3.5 font-extrabold text-white shadow-lg shadow-brand-start/20 transition hover:-translate-y-0.5 hover:shadow-brand-start/35"><i class="ph-fill ph-lock-key"></i>Xác nhận và thanh toán</button>
+                <button type="submit" class="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-start to-brand-end px-5 py-3.5 font-extrabold text-white shadow-lg shadow-brand-start/20 transition hover:-translate-y-0.5 hover:shadow-brand-start/35"><i class="ph-fill ph-lock-key"></i>Xác nhận giữ ghế</button>
                 <p class="mt-4 text-center text-xs app-muted"><i class="ph-fill ph-shield-check mr-1 text-success"></i>Số tiền do backend MovieMate xác nhận.</p>
             </form>
         </div>

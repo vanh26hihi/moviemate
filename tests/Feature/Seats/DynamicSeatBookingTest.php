@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Seats;
 
-use App\Mail\BookingTicketMail;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Cinema;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +24,8 @@ class DynamicSeatBookingTest extends TestCase
     private $rooms;
 
     private Showtime $showtime;
+
+    private string $checkoutToken;
 
     protected function setUp(): void
     {
@@ -48,6 +50,7 @@ class DynamicSeatBookingTest extends TestCase
             'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);
+        $this->checkoutToken = app(BookingTokenService::class)->issueCheckoutToken();
     }
 
     public function test_user_map_renders_dynamic_coordinates_aisle_screen_and_pair_metadata(): void
@@ -71,6 +74,7 @@ class DynamicSeatBookingTest extends TestCase
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$half->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
+            'checkout_token' => $this->checkoutToken,
         ])->assertSessionHasErrors('seat_ids');
         $this->assertDatabaseCount('bookings', 0);
     }
@@ -94,6 +98,7 @@ class DynamicSeatBookingTest extends TestCase
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$foreign->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
+            'checkout_token' => $this->checkoutToken,
         ])->assertSessionHasErrors('seat_ids');
     }
 
@@ -113,6 +118,7 @@ class DynamicSeatBookingTest extends TestCase
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $showtime->id, 'seat_ids' => [$maintenance->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
+            'checkout_token' => $this->checkoutToken,
         ])->assertSessionHasErrors('seat_ids');
     }
 
@@ -124,7 +130,13 @@ class DynamicSeatBookingTest extends TestCase
             'booking_code' => 'MMT-2026-9999', 'total_amount' => 50000,
             'payment_status' => 'paid', 'booking_status' => 'paid',
         ]);
-        BookingSeat::query()->create(['booking_id' => $booking->id, 'seat_id' => $seat->id, 'price' => 50000]);
+        BookingSeat::query()->create([
+            'booking_id' => $booking->id,
+            'showtime_id' => $this->showtime->id,
+            'seat_id' => $seat->id,
+            'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
+            'price' => 50000,
+        ]);
 
         $this->get(route('user.bookings.selectSeat', $this->showtime))
             ->assertOk()->assertSee('aria-label="Ghế A1', false)->assertSee('cursor-not-allowed', false);
@@ -138,12 +150,19 @@ class DynamicSeatBookingTest extends TestCase
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$seat->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
+            'checkout_token' => $this->checkoutToken,
             'total_amount' => 1, 'price' => 1, 'room_id' => $this->rooms['P02']->id, 'room_layout_id' => 999,
         ])->assertRedirect();
 
         $this->assertDatabaseHas('bookings', ['showtime_id' => $this->showtime->id, 'total_amount' => 50000]);
-        $this->assertDatabaseHas('payments', ['amount' => 50000, 'status' => 'success']);
-        Mail::assertSent(BookingTicketMail::class);
+        $this->assertDatabaseHas('bookings', [
+            'showtime_id' => $this->showtime->id,
+            'total_amount' => 50000,
+            'booking_status' => 'pending_payment',
+            'payment_status' => 'unpaid',
+        ]);
+        $this->assertDatabaseCount('payments', 0);
+        Mail::assertNothingSent();
     }
 
     public function test_showtime_without_published_layout_cannot_open_seat_map(): void
