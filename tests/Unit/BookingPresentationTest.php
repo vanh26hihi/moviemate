@@ -1,0 +1,59 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Models\Booking;
+use App\Models\BookingSeat;
+use App\Models\Seat;
+use App\Models\Showtime;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
+use PHPUnit\Framework\TestCase;
+
+class BookingPresentationTest extends TestCase
+{
+    public function test_it_builds_an_encoded_qr_url(): void
+    {
+        $booking = new Booking(['booking_code' => 'MMT 2026/0001']);
+
+        $this->assertStringContainsString('size=200x200', $booking->qr_code_url);
+        $this->assertStringEndsWith('data=MMT%202026%2F0001', $booking->qr_code_url);
+    }
+
+    public function test_it_prefers_checkout_email_and_falls_back_to_user_email(): void
+    {
+        $booking = new Booking(['customer_email' => 'checkout@example.com']);
+        $booking->setRelation('user', new User(['email' => 'account@example.com']));
+
+        $this->assertSame('checkout@example.com', $booking->recipient_email);
+
+        $booking->customer_email = null;
+
+        $this->assertSame('account@example.com', $booking->recipient_email);
+    }
+
+    public function test_it_formats_showtime_and_seat_codes_for_ticket_views(): void
+    {
+        $booking = new Booking();
+        $booking->setRelation('showtime', new Showtime([
+            'show_date' => '2026-08-03',
+            'show_time' => '19:30:00',
+        ]));
+
+        $booking->setRelation('bookingSeats', new Collection([
+            $this->bookingSeatWithCode('A1'),
+            $this->bookingSeatWithCode('A2'),
+        ]));
+
+        $this->assertSame('03/08/2026 19:30', $booking->showtime_label);
+        $this->assertSame('A1, A2', $booking->seat_codes);
+    }
+
+    private function bookingSeatWithCode(string $code): BookingSeat
+    {
+        $bookingSeat = new BookingSeat();
+        $bookingSeat->setRelation('seat', new Seat(['seat_code' => $code]));
+
+        return $bookingSeat;
+    }
+}
