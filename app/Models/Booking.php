@@ -60,4 +60,12 @@ class Booking extends Model
     {
         return $this->customer_email ?: $this->user?->email;
     }
+
+    public function getSeatCodesAttribute(): string
+    {
+        return $this->bookingSeats
+            ->pluck('seat.seat_code')
+            ->filter()
+            ->join(', ');
+    }
 }
