@@ -8,6 +8,7 @@ use App\Models\BookingSeat;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutService;
+use App\Services\BookingPricingService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use App\Services\GuestBookingAccessService;
@@ -24,6 +25,7 @@ class BookingController extends Controller
         private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
         private readonly BookingCheckoutService $checkoutService,
+        private readonly BookingPricingService $pricing,
         private readonly BookingTokenService $tokens,
         private readonly GuestBookingAccessService $guestAccess,
     ) {}
@@ -119,18 +121,19 @@ class BookingController extends Controller
                 ->with('error', 'Một số ghế bạn chọn đã được người khác đặt trước.');
         }
 
-        $seatSummaries = $seats->map(function ($seat) use ($showtime) {
-            $price = $showtime->priceForSeatType($seat->type);
+        $priceBreakdown = $this->pricing->calculate($showtime, $seats);
+        $seatSummaries = $seats->map(function ($seat) use ($priceBreakdown) {
+            $price = $priceBreakdown->seatSnapshots[$seat->id];
 
             return [
                 'id' => $seat->id,
                 'seat_code' => $seat->seat_code,
                 'type' => $seat->type,
-                'price' => (float) $price,
+                'price' => $price,
             ];
         });
 
-        $totalAmount = $seatSummaries->sum('price');
+        $totalAmount = $priceBreakdown->seatSubtotal;
 
         return view('user.bookings.checkout', [
             'showtime' => $showtime,
@@ -155,6 +158,9 @@ class BookingController extends Controller
             'seat_ids.*' => ['integer', 'distinct'],
             'customer_email' => ['required', 'email:rfc', 'max:255'],
             'checkout_token' => ['required', 'string', 'max:200'],
+            'food_items' => ['sometimes', 'array'],
+            'food_items.*.food_id' => ['required', 'integer', 'distinct', 'min:1'],
+            'food_items.*.quantity' => ['required', 'integer', 'min:0', 'max:'.config('booking.max_food_quantity', 20)],
         ], [
             'seat_ids.required' => 'Vui lòng chọn ít nhất một ghế.',
             'seat_ids.array' => 'Dữ liệu ghế không hợp lệ.',
@@ -174,6 +180,7 @@ class BookingController extends Controller
             Auth::id(),
             $validated['customer_email'],
             $validated['checkout_token'],
+            $validated['food_items'] ?? [],
         );
 
         if ($result->guestAccessToken !== null) {

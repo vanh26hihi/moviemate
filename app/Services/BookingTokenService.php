@@ -6,11 +6,13 @@ use App\Exceptions\BookingTokenConfigurationException;
 
 class BookingTokenService
 {
-    private const CHECKOUT_VERSION = 'v1';
+    private const CHECKOUT_VERSION = 'v2';
 
     public function issueCheckoutToken(): string
     {
-        $payload = $this->base64UrlEncode(random_bytes(32));
+        $payload = $this->base64UrlEncode(
+            pack('N', now()->getTimestamp()).random_bytes(28)
+        );
         $signature = $this->signature($payload);
 
         return self::CHECKOUT_VERSION.'.'.$payload.'.'.$signature;
@@ -30,9 +32,18 @@ class BookingTokenService
         [, $payload, $signature] = $parts;
         $decoded = $this->base64UrlDecode($payload);
 
-        return $decoded !== false
-            && strlen($decoded) === 32
-            && hash_equals($this->signature($payload), $signature);
+        if ($decoded === false
+            || strlen($decoded) !== 32
+            || ! hash_equals($this->signature($payload), $signature)) {
+            return false;
+        }
+
+        $issuedAt = unpack('Nissued_at', substr($decoded, 0, 4))['issued_at'];
+        $now = now()->getTimestamp();
+        $ttlMinutes = max(1, (int) config('booking.checkout_token_ttl_minutes', 15));
+
+        return $issuedAt <= $now + 60
+            && $issuedAt >= $now - ($ttlMinutes * 60);
     }
 
     public function hash(string $token): string

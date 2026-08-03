@@ -2,9 +2,12 @@
 
 namespace Tests\Unit\Services;
 
+use App\Domain\Bookings\FoodLine;
+use App\Domain\Bookings\FoodPriceBreakdown;
 use App\Models\FoodItem;
 use App\Services\BookingFoodService;
 use App\Services\CinemaContext;
+use App\Services\FoodSelectionCanonicalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use Tests\TestCase;
@@ -18,7 +21,7 @@ class BookingFoodServiceTest extends TestCase
         $cinema = $this->createMock(CinemaContext::class);
         $cinema->expects($this->never())->method('id');
 
-        $result = (new BookingFoodService($cinema))->calculate([]);
+        $result = (new BookingFoodService($cinema, app(FoodSelectionCanonicalizer::class)))->calculate([]);
 
         $this->assertSame(0, $result->foodSubtotal);
         $this->assertSame([], $result->lines);
@@ -105,6 +108,17 @@ class BookingFoodServiceTest extends TestCase
         $this->assertCount(2, $result->lines);
         $this->assertSame(app(CinemaContext::class)->id(), $result->pickupCinemaId);
         $this->assertSame('VND', $result->currency);
+    }
+
+    public function test_persist_rejects_a_non_canonical_pickup_even_for_a_forged_breakdown(): void
+    {
+        $food = $this->food('Forged pickup', 20_000);
+        $breakdown = new FoodPriceBreakdown(20_000, [
+            new FoodLine($food->id, $food->name, 20_000, 1, 20_000),
+        ], 999999);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->service()->persist($breakdown);
     }
 
     private function service(): BookingFoodService

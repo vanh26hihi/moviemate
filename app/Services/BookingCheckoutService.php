@@ -24,6 +24,8 @@ class BookingCheckoutService
         private readonly BookingTokenService $tokens,
         private readonly BookingCheckoutFingerprint $fingerprints,
         private readonly BookingCodeGenerator $bookingCodes,
+        private readonly BookingPricingService $pricing,
+        private readonly BookingFoodService $food,
     ) {}
 
     public function createPendingBooking(
@@ -32,6 +34,7 @@ class BookingCheckoutService
         ?int $userId,
         string $customerEmail,
         string $checkoutToken,
+        array|Collection|null $foodSelection = null,
     ): BookingCheckoutResult {
         if (! $this->tokens->isValidCheckoutToken($checkoutToken)) {
             throw new InvalidArgumentException('The checkout idempotency token was not issued by MovieMate.');
@@ -43,6 +46,7 @@ class BookingCheckoutService
             $seatIds,
             $customerEmail,
             $userId,
+            $foodSelection,
         );
         $existing = Booking::query()
             ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -65,6 +69,7 @@ class BookingCheckoutService
                     $checkoutToken,
                     $requestFingerprint,
                     $bookingCode,
+                    $foodSelection,
                 ): Booking {
                     $existing = Booking::query()
                         ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -97,13 +102,10 @@ class BookingCheckoutService
 
                     $this->assertSeatsCanBeReserved($seats, $normalizedSeatIds, $layout->id);
 
-                    $priceSnapshots = [];
-                    $totalAmount = 0;
-                    foreach ($seats as $seat) {
-                        $price = $showtime->priceForSeatType($seat->type);
-                        $priceSnapshots[$seat->id] = $price;
-                        $totalAmount += $price;
-                    }
+                    $foodBreakdown = $this->food->calculate($foodSelection);
+                    $priceBreakdown = $this->pricing
+                        ->calculate($showtime, $seats)
+                        ->withFood($foodBreakdown);
 
                     $guestToken = $userId === null
                         ? $this->tokens->guestAccessTokenForCheckout($checkoutToken)
@@ -120,13 +122,19 @@ class BookingCheckoutService
                         'checkout_request_fingerprint_hash' => $requestFingerprint,
                         'showtime_id' => $showtime->id,
                         'booking_code' => $bookingCode,
-                        'total_amount' => $totalAmount,
+                        'total_amount' => $priceBreakdown->grandTotal,
+                        'seat_subtotal' => $priceBreakdown->seatSubtotal,
+                        'food_subtotal' => $priceBreakdown->foodSubtotal,
+                        'currency' => $priceBreakdown->currency,
                         'payment_status' => 'unpaid',
                         'booking_status' => 'pending_payment',
                         'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
                     ]);
 
-                    $this->seatLocks->acquire($booking, $seats, $priceSnapshots);
+                    $this->seatLocks->acquire($booking, $seats, $priceBreakdown->seatSnapshots);
+                    $this->food->persist($foodBreakdown, [
+                        'booking_id' => $booking->id,
+                    ]);
 
                     return $booking;
                 });

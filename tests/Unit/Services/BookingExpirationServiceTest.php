@@ -5,6 +5,7 @@ namespace Tests\Unit\Services;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Services\BookingExpirationService;
+use App\Services\BookingFoodService;
 use App\Services\BookingSeatLockService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -138,7 +139,7 @@ class BookingExpirationServiceTest extends TestCase
         [$booking] = $this->overdueBooking();
         $seatLocks = Mockery::mock(BookingSeatLockService::class);
         $seatLocks->shouldReceive('release')->once()->andThrow(new RuntimeException('release failed'));
-        $service = new BookingExpirationService($seatLocks);
+        $service = new BookingExpirationService($seatLocks, app(BookingFoodService::class));
 
         try {
             $service->expire($booking->id);

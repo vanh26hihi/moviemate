@@ -24,6 +24,49 @@ class BookingSecurityPrimitivesTest extends TestCase
         $this->assertFalse($fingerprints->matches(null, $canonical));
     }
 
+    public function test_food_fingerprint_is_stable_across_line_order_and_ignores_client_prices(): void
+    {
+        $fingerprints = app(BookingCheckoutFingerprint::class);
+
+        $canonical = $fingerprints->hash(10, [1], 'guest@example.test', null, [
+            ['food_id' => 9, 'quantity' => '2', 'price' => 1],
+            ['food_id' => 3, 'quantity' => 1, 'line_total' => 1],
+        ]);
+        $reordered = $fingerprints->hash(10, [1], 'guest@example.test', null, [
+            ['food_id' => 3, 'quantity' => '1', 'price' => 999999],
+            ['food_id' => 9, 'quantity' => 2, 'unit_price' => 999999],
+        ]);
+
+        $this->assertSame($canonical, $reordered);
+    }
+
+    public function test_food_fingerprint_changes_with_quantity_or_food_identity(): void
+    {
+        $fingerprints = app(BookingCheckoutFingerprint::class);
+        $canonical = $fingerprints->hash(10, [1], 'guest@example.test', null, [
+            ['food_id' => 3, 'quantity' => 1],
+        ]);
+
+        $this->assertNotSame($canonical, $fingerprints->hash(10, [1], 'guest@example.test', null, [
+            ['food_id' => 3, 'quantity' => 2],
+        ]));
+        $this->assertNotSame($canonical, $fingerprints->hash(10, [1], 'guest@example.test', null, [
+            ['food_id' => 4, 'quantity' => 1],
+        ]));
+    }
+
+    public function test_empty_food_and_zero_quantities_have_the_same_fingerprint(): void
+    {
+        $fingerprints = app(BookingCheckoutFingerprint::class);
+
+        $this->assertSame(
+            $fingerprints->hash(10, [1], 'guest@example.test', null, []),
+            $fingerprints->hash(10, [1], 'guest@example.test', null, [
+                ['food_id' => 999, 'quantity' => 0, 'price' => 999999],
+            ]),
+        );
+    }
+
     public function test_booking_codes_use_high_entropy_random_identifiers(): void
     {
         $generator = app(BookingCodeGenerator::class);
@@ -59,5 +102,19 @@ class BookingSecurityPrimitivesTest extends TestCase
         $token = $tokens->issueCheckoutToken();
 
         $this->assertTrue($tokens->isValidCheckoutToken($token));
+    }
+
+    public function test_booking_tokens_expire_after_the_configured_checkout_ttl(): void
+    {
+        config([
+            'app.key' => 'base64:'.base64_encode(str_repeat('k', 32)),
+            'booking.checkout_token_ttl_minutes' => 15,
+        ]);
+        $tokens = app(BookingTokenService::class);
+        $token = $tokens->issueCheckoutToken();
+
+        $this->travel(16)->minutes();
+
+        $this->assertFalse($tokens->isValidCheckoutToken($token));
     }
 }

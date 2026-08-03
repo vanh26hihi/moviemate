@@ -2,11 +2,14 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Collection;
 use JsonException;
 
 class BookingCheckoutFingerprint
 {
-    private const SCHEMA_VERSION = 'booking-checkout-v1';
+    private const SCHEMA_VERSION = 'booking-checkout-v2';
+
+    public function __construct(private readonly FoodSelectionCanonicalizer $foodSelections) {}
 
     /**
      * @throws JsonException
@@ -16,6 +19,7 @@ class BookingCheckoutFingerprint
         array $seatIds,
         string $customerEmail,
         ?int $userId,
+        array|Collection|null $foodSelection = null,
     ): string {
         $normalizedSeats = collect($seatIds)
             ->map(fn ($id): int => (int) $id)
@@ -34,6 +38,7 @@ class BookingCheckoutFingerprint
             'customer_email' => $normalizedEmail,
             'actor_type' => $actorType,
             'actor_identity' => $actorIdentity,
+            'food' => $this->foodSelections->canonicalize($foodSelection),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
         return hash('sha256', $canonical);
