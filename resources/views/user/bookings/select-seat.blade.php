@@ -2,7 +2,10 @@
 
 @section('title', 'Chọn ghế - MovieMate')
 @section('content')
-<div class="container mx-auto py-8">
+<div class="user-page-shell mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+    <div class="mb-5">
+        <a href="{{ $showtime->movie?->slug ? route('user.movies.show', $showtime->movie->slug).'#showtimes' : route('user.movies.index') }}" class="btn-secondary !px-4 !py-2 text-sm"><i class="ph ph-arrow-left"></i>Quay lại lịch chiếu</a>
+    </div>
     <!-- Progress Steps -->
     <div class="mb-8">
         <div class="flex items-center justify-center sm:justify-start gap-2 sm:gap-4 text-xs sm:text-sm">
@@ -25,12 +28,13 @@
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <!-- Left: Seat Map -->
-        <div class="lg:col-span-2 app-card border app-border rounded-2xl p-6 overflow-hidden">
+        <div class="lg:col-span-2 cinema-card rounded-3xl p-5 sm:p-6 overflow-hidden">
             <!-- Show info -->
             <div class="text-center mb-6">
-                <h2 class="text-lg md:text-xl font-bold app-text mb-1">
+                <p class="mb-2 text-xs font-extrabold uppercase tracking-[0.22em] text-brand-start">{{ $showtime->movie->title }}</p>
+                <h1 class="text-lg md:text-xl font-bold app-text mb-1">
                     {{ $showtime->cinema->name }} - {{ $showtime->room->name }}
-                </h2>
+                </h1>
                 <p class="app-muted text-sm">
                     {{ $showtime->show_date->format('d/m/Y') }} — {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}
                 </p>
@@ -60,18 +64,24 @@
                                             $isBooked = in_array($seat->id, $bookedSeatIds);
                                             $isMaintenance = $seat->status !== 'active';
                                             $isVip = $seat->type === 'vip';
-                                            $price = $isVip ? ($showtime->vip_price ?? $showtime->price) : $showtime->price;
-                                            $seatClass = $isBooked ? 'bg-dark-border border-dark-border text-dark-border/40 cursor-not-allowed opacity-40' :
-                                                          $isMaintenance ? 'bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed opacity-50' :
-                                                          $isVip ? 'bg-ai-start/10 border-ai-start/50 text-ai-start hover:bg-ai-start hover:text-white' :
-                                                          'app-input border-[var(--border-color)] app-muted hover:border-brand-start hover:text-brand-start';
+                                            $isCouple = $seat->type === 'couple';
+                                            $price = $showtime->priceForSeatType($seat->type);
+                                            $seatClass = match (true) {
+                                                $isBooked => 'bg-dark-border border-dark-border text-dark-border/40 cursor-not-allowed opacity-40',
+                                                $isMaintenance => 'bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed opacity-50',
+                                                $isVip => 'bg-ai-start/10 border-ai-start/50 text-ai-start hover:bg-ai-start hover:text-white',
+                                                $isCouple => 'bg-warning/10 border-warning/50 text-warning hover:bg-warning hover:text-white',
+                                                default => 'app-input border-[var(--border-color)] app-muted hover:border-brand-start hover:text-brand-start',
+                                            };
                                         @endphp
                                         <button type="button"
-                                            class="w-8 h-8 rounded-t-lg border transition-all text-[10px] font-bold {{ $seatClass }} {{ $seat->number == 6 ? 'mr-4' : '' }}"
+                                            class="{{ $isCouple ? 'w-16' : 'w-8' }} h-8 rounded-t-lg border transition-all text-[10px] font-bold {{ $seatClass }} {{ $seat->number == 6 ? 'mr-4' : '' }}"
                                             data-seat-id="{{ $seat->id }}"
                                             data-seat-code="{{ $seat->seat_code }}"
                                             data-seat-type="{{ $seat->type }}"
                                             data-price="{{ $price }}"
+                                            aria-label="Ghế {{ $seat->seat_code }}, {{ $seat->type }}, {{ number_format($price, 0, ',', '.') }} đồng"
+                                            aria-pressed="false"
                                             {{ $isBooked || $isMaintenance ? 'disabled' : '' }}>
                                             {{ $seat->number }}
                                         </button>
@@ -92,10 +102,16 @@
                         <div class="w-6 h-6 rounded-t-lg bg-ai-start/10 border border-ai-start/50"></div> Ghế VIP ({{ number_format($showtime->vip_price ?? $showtime->price,0,',','.') }}đ)
                     </div>
                     <div class="flex items-center gap-2 app-muted">
+                        <div class="w-10 h-6 rounded-t-lg bg-warning/10 border border-warning/50"></div> Ghế đôi ({{ number_format($showtime->priceForSeatType('couple'),0,',','.') }}đ)
+                    </div>
+                    <div class="flex items-center gap-2 app-muted">
                         <div class="w-6 h-6 rounded-t-lg bg-brand-start border border-brand-start"></div> Đang chọn
                     </div>
                     <div class="flex items-center gap-2 app-muted">
                         <div class="w-6 h-6 rounded-t-lg bg-dark-border border border-dark-border opacity-40"></div> Đã đặt
+                    </div>
+                    <div class="flex items-center gap-2 app-muted">
+                        <div class="w-6 h-6 rounded-t-lg bg-gray-300 border border-gray-400 opacity-50"></div> Bảo trì
                     </div>
                 </div>
             </form>
@@ -103,7 +119,7 @@
 
         <!-- Right: Summary Sticky -->
         <div class="lg:col-span-1">
-            <div class="app-card border app-border rounded-2xl overflow-hidden sticky top-24 shadow-2xl shadow-black/20">
+            <div class="cinema-card rounded-3xl overflow-hidden sticky top-24">
                 <div class="p-5">
                     <h3 class="text-lg font-bold mb-3">Thông tin đặt vé</h3>
                     <ul class="space-y-2 text-sm">
@@ -119,7 +135,7 @@
                         <span id="totalAmountDisplay" class="text-3xl font-bold text-brand-start">0đ</span>
                     </div>
 
-                    <button type="submit" form="seatForm" class="w-full py-3.5 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/30 transition-all">
+                    <button id="continueBookingButton" type="submit" form="seatForm" disabled class="w-full py-3.5 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/30 transition-all disabled:cursor-not-allowed disabled:opacity-50">
                         Tiếp tục thanh toán
                     </button>
                 </div>
@@ -136,12 +152,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const totalAmountInput = document.getElementById('totalAmountInput');
     const selectedSeatsDisplay = document.getElementById('selectedSeatsDisplay');
     const totalAmountDisplay = document.getElementById('totalAmountDisplay');
+    const continueButton = document.getElementById('continueBookingButton');
 
     function restoreSeatStyle(button) {
         button.classList.remove('bg-brand-start', 'border-brand-start', 'text-white', 'shadow-lg', 'shadow-brand-start/30');
 
         if (button.dataset.seatType === 'vip') {
             button.classList.add('bg-ai-start/10', 'border-ai-start/50', 'text-ai-start');
+        } else if (button.dataset.seatType === 'couple') {
+            button.classList.add('bg-warning/10', 'border-warning/50', 'text-warning');
         } else {
             button.classList.add('app-input', 'border-[var(--border-color)]', 'app-muted');
         }
@@ -154,7 +173,10 @@ document.addEventListener('DOMContentLoaded', function () {
             'app-muted',
             'bg-ai-start/10',
             'border-ai-start/50',
-            'text-ai-start'
+            'text-ai-start',
+            'bg-warning/10',
+            'border-warning/50',
+            'text-warning'
         );
         button.classList.add('bg-brand-start', 'border-brand-start', 'text-white', 'shadow-lg', 'shadow-brand-start/30');
     }
@@ -167,6 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
         totalAmountInput.value = total.toFixed(2);
         selectedSeatsDisplay.textContent = selected.length ? selected.map(seat => seat.code).join(', ') : '-';
         totalAmountDisplay.textContent = total.toLocaleString('vi-VN') + 'đ';
+        continueButton.disabled = selected.length === 0;
     }
 
     seatButtons.forEach(button => {
@@ -176,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (selectedSeats.has(seatId)) {
                 selectedSeats.delete(seatId);
                 restoreSeatStyle(this);
+                this.setAttribute('aria-pressed', 'false');
             } else {
                 selectedSeats.set(seatId, {
                     id: seatId,
@@ -184,6 +208,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     price: parseFloat(this.dataset.price)
                 });
                 applySelectedStyle(this);
+                this.setAttribute('aria-pressed', 'true');
             }
 
             refreshSummary();

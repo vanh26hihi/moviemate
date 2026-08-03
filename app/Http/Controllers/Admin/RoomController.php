@@ -4,122 +4,90 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
-use App\Models\Cinema;
+use App\Services\CinemaContext;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class RoomController extends Controller
 {
-    /**
-     * Display a listing of rooms.
-     */
+    public function __construct(private readonly CinemaContext $cinemaContext) {}
+
     public function index(Request $request)
     {
-        $query = Room::with('cinema');
-
         $search = $request->query('search');
-
-        if ($search) {
-            $query->where('name', 'like', "%{$search}%");
-        }
-
-        $rooms = $query->orderBy('name')
-            ->paginate(15)
-            ->withQueryString();
+        $rooms = Room::query()->with('cinema')
+            ->where('cinema_id', $this->cinemaContext->id())
+            ->operational()
+            ->when($search, fn ($query, $search) => $query->where('name', 'like', "%{$search}%"))
+            ->orderBy('code')->paginate(15)->withQueryString();
 
         return view('admin.rooms.index', compact('rooms', 'search'));
     }
 
-    /**
-     * Show the form for creating a new room.
-     */
     public function create()
     {
-        $cinemas = Cinema::orderBy('name')->get();
+        $cinema = $this->cinemaContext->current();
 
-        return view('admin.rooms.create', compact('cinemas'));
+        return view('admin.rooms.create', compact('cinema'));
     }
 
-    /**
-     * Store a newly created room.
-     */
     public function store(Request $request)
     {
-        $request->merge([
-            'room_type' => $this->normalizeRoomType($request->input('room_type')),
-        ]);
-
+        $this->normalizeRoomInput($request);
         $validated = $request->validate([
-            'cinema_id'   => ['required', 'exists:cinemas,id'],
-            'name'        => ['required', 'string', 'max:255'],
-            'room_type'   => ['required', Rule::in(['2D', '3D', 'IMAX'])],
+            'code' => ['required', 'string', 'max:32', Rule::unique('rooms', 'code')->where('cinema_id', $this->cinemaContext->id())],
+            'name' => ['required', 'string', 'max:255'],
+            'room_type' => ['required', Rule::in(['2D', '3D', 'IMAX'])],
             'total_seats' => ['required', 'integer', 'min:0'],
-            'status'      => ['required', 'in:active,inactive'],
+            'status' => ['required', 'in:active,inactive'],
         ]);
+        $this->ensureOperationalNameIsUnique($validated);
 
-        Room::create($validated);
+        Room::query()->create([...$validated, 'cinema_id' => $this->cinemaContext->id()]);
 
-        return redirect()
-            ->route('admin.rooms.index')
-            ->with('success', 'Thêm phòng chiếu thành công.');
+        return redirect()->route('admin.rooms.index')->with('success', 'Thêm phòng chiếu thành công.');
     }
 
-    /**
-     * Display the specified room.
-     */
-    public function show(Room $room)
-    {
-        $room->load(['cinema', 'seats']);
-
-        return view('admin.rooms.show', compact('room'));
-    }
-
-    /**
-     * Show the form for editing the specified room.
-     */
     public function edit(Room $room)
     {
-        $cinemas = Cinema::orderBy('name')->get();
+        $this->assertOperationalRoom($room);
+        $cinema = $this->cinemaContext->current();
 
-        return view('admin.rooms.edit', compact('room', 'cinemas'));
+        return view('admin.rooms.edit', compact('room', 'cinema'));
     }
 
-    /**
-     * Update the specified room.
-     */
     public function update(Request $request, Room $room)
     {
-        $request->merge([
-            'room_type' => $this->normalizeRoomType($request->input('room_type')),
-        ]);
-
+        $this->assertOperationalRoom($room);
+        $this->normalizeRoomInput($request);
         $validated = $request->validate([
-            'cinema_id'   => ['required', 'exists:cinemas,id'],
-            'name'        => ['required', 'string', 'max:255'],
-            'room_type'   => ['required', Rule::in(['2D', '3D', 'IMAX'])],
+            'code' => ['required', 'string', 'max:32', Rule::unique('rooms', 'code')->where('cinema_id', $this->cinemaContext->id())->ignore($room->id)],
+            'name' => ['required', 'string', 'max:255'],
+            'room_type' => ['required', Rule::in(['2D', '3D', 'IMAX'])],
             'total_seats' => ['required', 'integer', 'min:0'],
-            'status'      => ['required', 'in:active,inactive'],
+            'status' => ['required', 'in:active,inactive'],
         ]);
+        $this->ensureOperationalNameIsUnique($validated, $room->id);
 
-        $room->update($validated);
+        $room->update([...$validated, 'cinema_id' => $this->cinemaContext->id()]);
 
-        return redirect()
-            ->route('admin.rooms.index')
-            ->with('success', 'Cập nhật phòng chiếu thành công.');
+        return redirect()->route('admin.rooms.index')->with('success', 'Cập nhật phòng chiếu thành công.');
     }
 
-    /**
-     * Remove the specified room.
-     */
     public function destroy(Room $room)
     {
+        $this->assertOperationalRoom($room);
+        abort_if($room->showtimes()->exists(), 409, 'Không thể xóa phòng đã có lịch sử suất chiếu.');
         $room->seats()->delete();
-
         $room->delete();
 
-        return redirect()
-            ->route('admin.rooms.index')
-            ->with('success', 'Xóa phòng chiếu thành công.');
+        return redirect()->route('admin.rooms.index')->with('success', 'Xóa phòng chiếu thành công.');
+    }
+
+    private function assertOperationalRoom(Room $room): void
+    {
+        abort_unless($room->cinema_id === $this->cinemaContext->id() && $room->status === 'active', 404);
     }
 
     private function normalizeRoomType(?string $roomType): ?string
@@ -127,22 +95,41 @@ class RoomController extends Controller
         if ($roomType === null) {
             return null;
         }
+        $upper = mb_strtoupper(trim($roomType), 'UTF-8');
 
-        $value = trim($roomType);
-        $upper = mb_strtoupper($value, 'UTF-8');
+        return match (true) {
+            str_starts_with($upper, '2D') => '2D',
+            str_starts_with($upper, '3D') => '3D',
+            str_contains($upper, 'IMAX') => 'IMAX',
+            default => trim($roomType),
+        };
+    }
 
-        if (str_starts_with($upper, '2D')) {
-            return '2D';
+    private function normalizeRoomInput(Request $request): void
+    {
+        $request->merge([
+            'code' => is_string($request->input('code')) ? mb_strtoupper(trim($request->input('code'))) : $request->input('code'),
+            'name' => is_string($request->input('name')) ? trim($request->input('name')) : $request->input('name'),
+            'room_type' => $this->normalizeRoomType($request->input('room_type')),
+        ]);
+    }
+
+    private function ensureOperationalNameIsUnique(array $data, ?int $exceptId = null): void
+    {
+        if ($data['status'] !== 'active') {
+            return;
         }
 
-        if (str_starts_with($upper, '3D')) {
-            return '3D';
-        }
+        $normalizedName = mb_strtolower(trim($data['name']));
+        $exists = Room::query()->where('cinema_id', $this->cinemaContext->id())
+            ->where('status', 'active')
+            ->when($exceptId, fn ($query) => $query->whereKeyNot($exceptId))
+            ->pluck('name')->contains(fn ($name) => mb_strtolower(trim($name)) === $normalizedName);
 
-        if (str_contains($upper, 'IMAX')) {
-            return 'IMAX';
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'name' => 'Tên phòng đang hoạt động không được trùng trong cùng cơ sở.',
+            ]);
         }
-
-        return $value;
     }
 }

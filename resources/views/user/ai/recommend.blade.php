@@ -3,104 +3,37 @@
 @section('title', 'AI gợi ý phim - MovieMate')
 
 @section('content')
-
-<section class="min-h-screen bg-[#080A12] px-6 py-12 lg:px-10">
-
-    <div class="mx-auto max-w-[1200px]">
-
-        <div class="mb-10 text-center">
-            <div class="mx-auto mb-5 inline-flex rounded-full border border-[#7C3AED]/40 bg-[#7C3AED]/10 px-5 py-2 text-sm font-bold text-purple-200">
-                ✨ MovieMate AI
-            </div>
-
-            <h1 class="text-5xl font-black">AI gợi ý phim dành riêng cho bạn</h1>
-            <p class="mx-auto mt-4 max-w-2xl text-gray-400">
-                Nhập sở thích, tâm trạng và thời gian rảnh, MovieMate AI sẽ gợi ý phim phù hợp nhất.
-            </p>
+<section class="relative min-h-screen overflow-hidden py-14 md:py-20">
+    <div class="absolute inset-0 bg-gradient-to-br from-dark-main via-dark-main to-[#111827]"></div>
+    <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(124,58,237,0.28),transparent_32%),radial-gradient(circle_at_82%_8%,rgba(37,99,235,0.22),transparent_30%),radial-gradient(circle_at_52%_100%,rgba(255,61,87,0.14),transparent_34%)] opacity-40"></div>
+    <div class="relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-3xl text-center">
+            <div class="mb-6 inline-flex items-center gap-2 rounded-full border border-ai-start/30 bg-ai-start/10 px-4 py-2"><i class="ph-fill ph-magic-wand text-ai-start"></i><span class="text-sm font-medium text-ai-start">Trí tuệ nhân tạo MovieMate</span></div>
+            <h1 class="hero-title text-4xl font-extrabold app-text md:text-6xl">AI gợi ý phim <span class="bg-gradient-to-r from-ai-start to-ai-end bg-clip-text text-transparent">dành riêng cho bạn</span></h1>
+            <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed app-muted">Chức năng này sẽ sử dụng sở thích của bạn và lịch chiếu hiện có để đưa ra gợi ý phù hợp.</p>
         </div>
 
-        <div class="grid gap-8 lg:grid-cols-[420px_1fr]">
-
-            <div class="rounded-[32px] border border-white/10 bg-[#151A27] p-6">
-                <h2 class="mb-5 text-2xl font-black">Thông tin sở thích</h2>
-
-                <form class="space-y-4">
-                    <select class="w-full rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#7C3AED]">
-                        <option>Thể loại yêu thích</option>
-                        <option>Hành động</option>
-                        <option>Kinh dị</option>
-                        <option>Hài</option>
-                        <option>Tình cảm</option>
-                    </select>
-
-                    <select class="w-full rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#7C3AED]">
-                        <option>Tâm trạng hiện tại</option>
-                        <option>Muốn vui vẻ</option>
-                        <option>Muốn hồi hộp</option>
-                        <option>Muốn thư giãn</option>
-                    </select>
-
-                    <input placeholder="Thời gian muốn xem, ví dụ: tối nay" class="w-full rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#7C3AED]">
-
-                    <input placeholder="Khu vực/rạp mong muốn" class="w-full rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#7C3AED]">
-
-                    <select class="w-full rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#7C3AED]">
-                        <option>Bạn đi xem với ai?</option>
-                        <option>Một mình</option>
-                        <option>Bạn bè</option>
-                        <option>Người yêu</option>
-                        <option>Gia đình</option>
-                    </select>
-
-                    <button type="button" class="w-full rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] py-4 font-bold shadow-xl shadow-purple-500/30 transition hover:scale-105">
-                        Gợi ý phim bằng AI
-                    </button>
-                </form>
-            </div>
-
-            <div class="space-y-5">
-                <div class="rounded-[32px] border border-[#7C3AED]/30 bg-[#151A27] p-6 shadow-2xl shadow-purple-500/10">
-                    <div class="mb-4 flex items-center gap-3">
-                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7C3AED] to-[#2563EB]">
-                            ✨
-                        </div>
-                        <div>
-                            <h2 class="text-2xl font-black">Kết quả AI đề xuất</h2>
-                            <p class="text-sm text-gray-400">Dựa trên sở thích của bạn</p>
-                        </div>
+        <div class="mx-auto mt-10 grid max-w-4xl gap-6 lg:grid-cols-2">
+            <div class="cinema-card rounded-3xl p-6 sm:p-8">
+                <div class="mb-6 flex items-center gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-ai-start/10 text-ai-start"><i class="ph-fill ph-sparkle text-xl"></i></span><div><h2 class="font-extrabold app-text">Prompt của bạn</h2><p class="text-sm app-muted">Chọn sở thích để bắt đầu.</p></div></div>
+                @if(\Illuminate\Support\Facades\Route::has('user.ai.recommend.submit'))
+                    @include('components.home-ai-search')
+                @else
+                    <div class="space-y-4">
+                        <label class="block text-sm font-bold app-text" for="ai-prompt">Bạn muốn xem gì hôm nay?</label>
+                        <textarea id="ai-prompt" rows="4" disabled class="w-full resize-none rounded-2xl border app-border app-input px-4 py-3 opacity-70" placeholder="Tính năng gửi yêu cầu AI chưa được kết nối."></textarea>
+                        <button type="button" disabled class="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl bg-ai-start/30 px-5 py-3 font-bold text-white/70"><i class="ph-fill ph-magic-wand"></i> Tạo gợi ý</button>
                     </div>
-
-                    @foreach (range(1, 3) as $i)
-                        <div class="mb-5 rounded-[24px] border border-white/10 bg-[#080A12] p-5 last:mb-0">
-                            <div class="grid gap-5 md:grid-cols-[120px_1fr_auto] md:items-center">
-                                <img
-                                    src="https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=400&auto=format&fit=crop"
-                                    class="h-40 w-full rounded-2xl object-cover md:w-28"
-                                    alt="Poster"
-                                >
-
-                                <div>
-                                    <h3 class="text-xl font-black">Thanh Gươm Diệt Quỷ</h3>
-                                    <p class="mt-2 text-sm text-gray-400">Hành động, Hoạt hình • 115 phút</p>
-                                    <p class="mt-3 text-sm leading-6 text-purple-200">
-                                        AI gợi ý phim này vì bạn thích hành động, muốn xem buổi tối và phim có suất chiếu phù hợp tại Hà Nội.
-                                    </p>
-                                </div>
-
-                                <a href="/movies/{{ $i }}" class="rounded-xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-5 py-3 text-center text-sm font-bold">
-                                    Đặt vé
-                                </a>
-                            </div>
-                        </div>
-                    @endforeach
-
-                </div>
+                @endif
             </div>
 
+            <div class="cinema-card rounded-3xl p-6 text-center sm:p-8">
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-ai-start/10 text-ai-start"><i class="ph-fill ph-robot text-3xl"></i></div>
+                <h2 class="mt-5 text-2xl font-extrabold app-text">Chưa có gợi ý</h2>
+                <p class="mx-auto mt-3 max-w-sm leading-relaxed app-muted">Gợi ý cá nhân hóa sẽ xuất hiện tại đây khi dịch vụ AI sẵn sàng.</p>
+                <a href="{{ route('user.movies.index') }}" class="btn-secondary mt-6"><i class="ph-fill ph-film-strip"></i> Xem danh sách phim</a>
+            </div>
         </div>
-
     </div>
-
 </section>
-
 @endsection

@@ -19,22 +19,20 @@
             @csrf
             @method('PUT')
 
-            <div>
-                <label class="cinema-label">Rạp *</label>
-                <select name="cinema_id" required class="cinema-input">
-                    @foreach($cinemas as $cinema)
-                        <option value="{{ $cinema->id }}" {{ old('cinema_id', $room->cinema_id) == $cinema->id ? 'selected' : '' }}>
-                            {{ $cinema->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+            <div class="rounded-2xl app-card-soft border app-border p-4"><span class="app-muted text-sm">Cơ sở</span><strong class="block app-text">{{ $cinema->name }}</strong></div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label class="cinema-label">Mã phòng *</label>
+                    <input type="text" name="code" value="{{ old('code', $room->code) }}" required class="cinema-input">
+                </div>
                 <div>
                     <label class="cinema-label">Tên phòng *</label>
                     <input type="text" name="name" value="{{ old('name', $room->name) }}" required class="cinema-input">
                 </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                     <label class="cinema-label">Loại phòng *</label>
                     <select name="room_type" required class="cinema-input">
@@ -43,9 +41,6 @@
                         <option value="IMAX" {{ old('room_type', $room->room_type) === 'IMAX' ? 'selected' : '' }}>IMAX</option>
                     </select>
                 </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                     <label class="cinema-label">Số ghế *</label>
                     <input type="number" name="total_seats" value="{{ old('total_seats', $room->total_seats) }}" required class="cinema-input" min="0">

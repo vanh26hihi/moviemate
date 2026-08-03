@@ -11,9 +11,9 @@
             <h1 class="text-3xl font-extrabold app-text">Phòng chiếu</h1>
             <p class="app-muted mt-2">Quản lý phòng, loại phòng và sơ đồ ghế theo từng rạp.</p>
         </div>
-        <a href="{{ route('admin.rooms.create') }}" class="btn-primary">
+        @can('rooms.create')<a href="{{ route('admin.rooms.create') }}" class="btn-primary">
             <i class="ph-bold ph-plus"></i> Thêm phòng
-        </a>
+        </a>@endcan
     </div>
 
     @if(session('success'))
@@ -68,19 +68,19 @@
                             </td>
                             <td>
                                 <div class="flex items-center justify-end gap-2">
-                                    <a href="{{ route('admin.seats.manage', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
+                                    @can('seats.manage')<a href="{{ route('admin.seats.manage', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
                                         <i class="ph ph-armchair"></i> Ghế
-                                    </a>
-                                    <a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
+                                    </a>@endcan
+                                    @can('rooms.update')<a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
                                         <i class="ph ph-pencil-simple"></i> Sửa
-                                    </a>
-                                    <form action="{{ route('admin.rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phòng này?');">
+                                    </a>@endcan
+                                    @can('rooms.delete')<form action="{{ route('admin.rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phòng này?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:bg-error hover:border-error hover:text-white transition-colors">
                                             <i class="ph ph-trash"></i>
                                         </button>
-                                    </form>
+                                    </form>@endcan
                                 </div>
                             </td>
                         </tr>

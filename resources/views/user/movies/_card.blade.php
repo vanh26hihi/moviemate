@@ -29,11 +29,8 @@
             </div>
 
             <div class="absolute inset-x-0 bottom-0 z-10 p-3 bg-gradient-to-t from-black/90 via-black/45 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                <div class="grid grid-cols-2 gap-2">
-                    <span class="inline-flex items-center justify-center gap-1 rounded-xl bg-white text-slate-950 px-3 py-2 text-xs font-extrabold">
-                        <i class="ph-fill ph-star text-brand-start"></i> 8.6
-                    </span>
-                    <span class="inline-flex items-center justify-center gap-1 rounded-xl bg-brand-start text-white px-3 py-2 text-xs font-extrabold">
+                <div class="flex justify-end">
+                    <span class="inline-flex items-center justify-center gap-1 rounded-xl bg-brand-start text-white px-4 py-2 text-xs font-extrabold">
                         <i class="ph-fill ph-ticket"></i> Đặt vé
                     </span>
                 </div>

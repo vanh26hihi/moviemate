@@ -16,6 +16,7 @@
             @foreach([
                 'Phim' => $booking->showtime?->movie?->title,
                 'Rạp' => $booking->showtime?->cinema?->name,
+                'Địa chỉ' => $booking->showtime?->cinema?->address,
                 'Phòng' => $booking->showtime?->room?->name,
                 'Suất chiếu' => $booking->showtime?->show_date?->format('d/m/Y').' '.\Carbon\Carbon::parse($booking->showtime?->show_time)->format('H:i'),
                 'Ghế' => $booking->bookingSeats->pluck('seat.seat_code')->join(', '),
@@ -24,7 +25,7 @@
             @endforeach
             <tr><td style="padding:10px 0;color:#9ca3af">Tổng thanh toán</td><td style="padding:10px 0;text-align:right;font-weight:bold;color:#ff3d57">{{ number_format($booking->total_amount, 0, ',', '.') }}đ</td></tr>
         </table>
-        <p style="margin:24px 0 0;color:#9ca3af;font-size:13px;line-height:1.6">Khi đến rạp, vui lòng đưa mã QR hoặc mã vé cho nhân viên soát vé.</p>
+        <p style="margin:24px 0 0;color:#9ca3af;font-size:13px;line-height:1.6">Khi đến rạp, vui lòng đưa mã vé cho nhân viên soát vé.</p>
     </div>
 </div>
 </body>
