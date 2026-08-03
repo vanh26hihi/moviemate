@@ -1,90 +1,87 @@
 @extends('layouts.user')
 
-@section('title', 'Đặt vé thành công - MovieMate')
+@php
+    $paymentState = $booking->payment?->status;
+    $isPaid = $booking->payment_status === 'paid' && $booking->booking_status === 'paid';
+    $isExpired = $booking->booking_status === 'expired' || $paymentState === \App\Models\Payment::STATUS_EXPIRED;
+    $isReview = $paymentState === \App\Models\Payment::STATUS_REVIEW;
+    $isFailed = $paymentState === \App\Models\Payment::STATUS_FAILED;
+    $isPending = !$isPaid && !$isExpired && !$isReview && !$isFailed && $booking->booking_status === 'pending_payment';
+    $state = $isPaid ? [
+        'title' => 'Thanh toán đã xác minh',
+        'message' => 'Vé điện tử đã sẵn sàng và đơn đồ ăn (nếu có) đã được xác nhận.',
+        'icon' => 'ph-check',
+        'colour' => 'text-success',
+    ] : ($isReview ? [
+        'title' => 'Thanh toán cần đối soát',
+        'message' => 'MovieMate chưa phát vé. Nhân viên sẽ kiểm tra giao dịch ZaloPay đã xác minh nhưng không khớp trạng thái đơn.',
+        'icon' => 'ph-warning',
+        'colour' => 'text-orange-400',
+    ] : ($isExpired ? [
+        'title' => 'Booking đã hết hạn',
+        'message' => 'Ghế đã được giải phóng. Thanh toán đến muộn sẽ được chuyển đối soát và không tự phát vé.',
+        'icon' => 'ph-clock-countdown',
+        'colour' => 'text-gray-400',
+    ] : ($isFailed ? [
+        'title' => 'Thanh toán thất bại',
+        'message' => 'ZaloPay chưa xác nhận giao dịch. Booking vẫn không phải là vé điện tử.',
+        'icon' => 'ph-x',
+        'colour' => 'text-error',
+    ] : [
+        'title' => 'Đang chờ thanh toán',
+        'message' => 'Booking và ghế đang được giữ tạm. Chỉ callback/query ZaloPay hợp lệ mới có thể phát vé.',
+        'icon' => 'ph-hourglass',
+        'colour' => 'text-amber-400',
+    ])));
+@endphp
+
+@section('title', $state['title'].' - MovieMate')
 
 @section('content')
-@php
-    $isPaid = $booking->payment_status === 'paid' && $booking->booking_status === 'paid';
-    $isPending = $booking->payment_status !== 'paid' && $booking->booking_status === 'pending_payment';
-@endphp
-<div class="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[radial-gradient(circle_at_20%_15%,rgba(255,61,87,0.2),transparent_35%),radial-gradient(circle_at_80%_85%,rgba(108,43,217,0.18),transparent_40%),linear-gradient(135deg,#080a12,#111526)] relative">
-    <div class="absolute inset-0 bg-dark-main/90 backdrop-blur-sm"></div>
+<main class="user-page-shell mx-auto flex min-h-[80vh] max-w-3xl items-center px-4 py-12 sm:px-6 lg:px-8">
+    <section class="cinema-card w-full rounded-3xl p-7 sm:p-10" data-booking-state="{{ $isPaid ? 'paid' : ($paymentState ?: $booking->booking_status) }}">
+        <nav class="mb-8 flex flex-wrap items-center gap-3 text-sm" aria-label="Tiến trình checkout">
+            <span class="font-bold text-success">Ghế ✓</span><span class="app-muted">→</span>
+            <span class="font-bold text-success">Đồ ăn ✓</span><span class="app-muted">→</span>
+            <span class="font-bold text-success">Xác nhận ✓</span><span class="app-muted">→</span>
+            <span class="font-bold {{ $state['colour'] }}" aria-current="step">Thanh toán</span>
+        </nav>
 
-    <div class="relative max-w-lg w-full bg-dark-card/90 border border-dark-border rounded-3xl p-8 sm:p-12 text-center shadow-2xl shadow-brand-start/20 backdrop-blur-md animate-[fade-in-up_0.5s_ease-out]">
-
-        <div class="w-24 h-24 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-            <div class="absolute inset-0 rounded-full border-4 border-success animate-ping opacity-20"></div>
-            <i class="ph-bold ph-check text-5xl text-success animate-[fade-in_0.5s_ease-out_0.2s_both]"></i>
+        <div class="text-center">
+            <i class="ph-bold {{ $state['icon'] }} text-6xl {{ $state['colour'] }}"></i>
+            <h1 class="mt-4 text-3xl font-extrabold app-text">{{ $state['title'] }}</h1>
+            <p class="mx-auto mt-3 max-w-xl app-muted">{{ $state['message'] }}</p>
         </div>
 
-        <h1 class="text-3xl font-bold text-white mb-2">Đã giữ ghế!</h1>
-        <p class="text-text-sub mb-8">Booking đang chờ thanh toán và sẽ tự hết hạn nếu không được xác nhận.</p>
-
-        <div class="bg-dark-main border border-dark-border rounded-2xl p-6 mb-8 text-left relative overflow-hidden">
-            <!-- Ticket Notch Left/Right -->
-            <div class="absolute top-1/2 -left-3 -translate-y-1/2 w-6 h-6 bg-dark-card rounded-full border-r border-dark-border"></div>
-            <div class="absolute top-1/2 -right-3 -translate-y-1/2 w-6 h-6 bg-dark-card rounded-full border-l border-dark-border"></div>
-
-            <div class="border-b border-dashed border-dark-border pb-4 mb-4 flex justify-between items-center">
-                <div>
-                    <p class="text-xs text-text-sub mb-1">Mã đặt vé</p>
-                    <p class="text-xl font-bold text-brand-start font-mono">{{ $booking->booking_code }}</p>
-                </div>
+        <div class="mt-8 rounded-2xl app-secondary p-5 sm:p-6">
+            <div class="flex items-center justify-between gap-4 border-b pb-4 app-border">
+                <div><p class="text-xs app-muted">Mã booking</p><p class="font-mono text-xl font-bold text-brand-start">{{ $booking->booking_code }}</p></div>
                 @if($isPaid)
-                    <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="w-12 h-12 rounded bg-white p-1">
+                    <img src="{{ $booking->qr_code_url }}" alt="QR Code {{ $booking->booking_code }}" class="h-16 w-16 rounded bg-white p-1">
                 @endif
             </div>
-
-            <div class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Phim</span>
-                    <span class="text-white font-medium text-right max-w-[60%]">{{ $booking->showtime->movie->title }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Rạp</span>
-                    <span class="text-white font-medium text-right">{{ $booking->showtime->cinema->name }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Thời gian</span>
-                    <span class="text-white font-medium text-right">{{ $booking->showtime_label }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Ghế</span>
-                    <span class="text-white font-bold text-right">
-                        {{ $booking->seat_codes }}
-                    </span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Tổng tiền</span>
-                    <span class="text-white font-bold text-right">{{ number_format($booking->total_amount,0,',','.') }}đ</span>
-                </div>
-            </div>
+            <dl class="mt-4 space-y-3 text-sm">
+                <div class="flex justify-between gap-4"><dt class="app-muted">Phim</dt><dd class="text-right font-semibold app-text">{{ $booking->showtime->movie->title }}</dd></div>
+                <div class="flex justify-between gap-4"><dt class="app-muted">Ghế</dt><dd class="text-right font-semibold app-text">{{ $booking->seat_codes }}</dd></div>
+                <div class="flex justify-between gap-4"><dt class="app-muted">Tiền ghế</dt><dd class="font-semibold app-text">{{ number_format($booking->seat_subtotal, 0, ',', '.') }}đ</dd></div>
+                <div class="flex justify-between gap-4"><dt class="app-muted">Đồ ăn</dt><dd class="font-semibold app-text">{{ number_format($booking->food_subtotal, 0, ',', '.') }}đ</dd></div>
+                <div class="flex justify-between gap-4 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng cộng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VND</dd></div>
+            </dl>
         </div>
 
-        <p class="text-sm text-text-sub mb-8">
-            <i class="ph-fill ph-envelope-simple text-brand-start"></i>
-            {{ $isPaid ? 'Vé điện tử được gửi sau khi thanh toán được xác minh.' : 'Vé điện tử chỉ được gửi sau khi thanh toán được xác minh.' }}
-            Email liên hệ của booking: <br>
-            <span class="text-white font-medium mt-1 inline-block">{{ $booking->recipient_email }}</span>
-        </p>
+        <p class="mt-5 text-center text-sm app-muted">Email nhận vé: <strong class="app-text">{{ $booking->recipient_email }}</strong></p>
 
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
             @if($isPaid)
-                <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
-                    Xem vé QR của tôi
-                </a>
+                <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary">Xem vé QR của tôi</a>
             @elseif($isPending)
                 <form method="POST" action="{{ route('payments.zalopay.initiate', $booking) }}">
                     @csrf
-                    <button type="submit" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
-                        Thanh toán bằng ZaloPay
-                    </button>
+                    <button type="submit" class="btn-primary">Tiếp tục / đối soát ZaloPay</button>
                 </form>
             @endif
-            <a href="{{ route('home') }}" class="px-6 py-3 bg-dark-main border border-dark-border text-white rounded-xl font-bold hover:bg-dark-border transition-colors">
-                Về trang chủ
-            </a>
+            <a href="{{ route('home') }}" class="btn-secondary">Về trang chủ</a>
         </div>
-    </div>
-</div>
+    </section>
+</main>
 @endsection

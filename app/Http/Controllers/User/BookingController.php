@@ -5,10 +5,12 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\BookingSeat;
+use App\Models\FoodItem;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Services\BookingCheckoutDraftService;
+use App\Services\BookingCheckoutPreviewService;
 use App\Services\BookingCheckoutService;
-use App\Services\BookingPricingService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use App\Services\GuestBookingAccessService;
@@ -25,9 +27,10 @@ class BookingController extends Controller
         private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
         private readonly BookingCheckoutService $checkoutService,
-        private readonly BookingPricingService $pricing,
         private readonly BookingTokenService $tokens,
         private readonly GuestBookingAccessService $guestAccess,
+        private readonly BookingCheckoutDraftService $drafts,
+        private readonly BookingCheckoutPreviewService $previews,
     ) {}
 
     /**
@@ -121,28 +124,11 @@ class BookingController extends Controller
                 ->with('error', 'Một số ghế bạn chọn đã được người khác đặt trước.');
         }
 
-        $priceBreakdown = $this->pricing->calculate($showtime, $seats);
-        $seatSummaries = $seats->map(function ($seat) use ($priceBreakdown) {
-            $price = $priceBreakdown->seatSnapshots[$seat->id];
+        $draft = $this->drafts->start($request, $showtime->id, $seatIds);
+        $preview = $this->previews->preview($draft);
+        $foods = FoodItem::query()->where('active', true)->orderBy('name')->get();
 
-            return [
-                'id' => $seat->id,
-                'seat_code' => $seat->seat_code,
-                'type' => $seat->type,
-                'price' => $price,
-            ];
-        });
-
-        $totalAmount = $priceBreakdown->seatSubtotal;
-
-        return view('user.bookings.checkout', [
-            'showtime' => $showtime,
-            'seats' => $seats,
-            'seatSummaries' => $seatSummaries,
-            'totalAmount' => $totalAmount,
-            'user' => Auth::user(),
-            'checkoutToken' => $this->tokens->issueCheckoutToken(),
-        ]);
+        return view('user.bookings.food', compact('draft', 'preview', 'foods'));
     }
 
     /**

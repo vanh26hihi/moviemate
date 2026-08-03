@@ -26,6 +26,7 @@ class BookingCheckoutService
         private readonly BookingCodeGenerator $bookingCodes,
         private readonly BookingPricingService $pricing,
         private readonly BookingFoodService $food,
+        private readonly CinemaContext $cinemaContext,
     ) {}
 
     public function createPendingBooking(
@@ -196,9 +197,12 @@ class BookingCheckoutService
     private function assertShowtimeCanBeReserved(Showtime $showtime): void
     {
         $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time);
+        $canonicalCinemaId = $this->cinemaContext->id();
 
         if ($showtime->status !== 'active'
+            || $showtime->cinema_id !== $canonicalCinemaId
             || $showtime->room?->status !== 'active'
+            || $showtime->room?->cinema_id !== $canonicalCinemaId
             || ! $showtime->roomLayout
             || $showtime->roomLayout->status !== 'published'
             || $showtime->roomLayout->room_id !== $showtime->room_id

@@ -9,6 +9,9 @@
             <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brand-start">Thanh toán đồ ăn</p>
             <h1 class="mt-3 text-3xl font-bold app-text">Hoàn tất đơn hàng</h1>
             <p class="mt-2 text-sm app-muted">Nhập thông tin nhận hàng để chúng tôi chuẩn bị sẵn khi bạn tới rạp.</p>
+            <p class="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                Đây là flow đặt đồ ăn riêng (standalone), chưa sử dụng thanh toán online đã xác minh. Đồ ăn kèm vé phải được chọn trong checkout vé.
+            </p>
         </div>
         <a href="{{ route('foods.cart') }}" class="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-app-card px-5 py-3 text-sm font-semibold app-text hover:border-brand-start hover:text-brand-start transition">
             <i class="ph ph-arrow-left"></i>
