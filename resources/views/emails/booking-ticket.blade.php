@@ -16,6 +16,7 @@
             @foreach([
                 'Phim' => $booking->showtime?->movie?->title,
                 'Rạp' => $booking->showtime?->cinema?->name,
+                'Địa chỉ' => $booking->showtime?->cinema?->address,
                 'Phòng' => $booking->showtime?->room?->name,
                 'Suất chiếu' => $booking->showtime?->show_date?->format('d/m/Y').' '.\Carbon\Carbon::parse($booking->showtime?->show_time)->format('H:i'),
                 'Ghế' => $booking->bookingSeats->pluck('seat.seat_code')->join(', '),

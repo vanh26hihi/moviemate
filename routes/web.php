@@ -17,7 +17,6 @@ use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\HomeController;
 use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
-use App\Models\Cinema;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -79,13 +78,6 @@ Route::get('/ai/chatbot', function () {
     return view('user.ai.chatbot');
 })->name('user.ai.chatbot');
 
-Route::get('/api/cinemas/{cinema}/rooms', function (Cinema $cinema) {
-    return $cinema->rooms()
-        ->select('id', 'name', 'room_type')
-        ->orderBy('name')
-        ->get();
-})->name('api.cinemas.rooms');
-
 Route::get('/foods', [UserFoodController::class, 'index'])->name('foods.index');
 Route::post('/foods/add', [UserFoodController::class, 'addToCart'])->name('foods.add');
 Route::get('/foods/cart', [UserOrderController::class, 'cart'])->name('foods.cart');
@@ -117,11 +109,12 @@ Route::prefix('admin')->name('admin.')
             ->middlewareFor(['edit', 'update'], 'permission:genres.update')
             ->middlewareFor('destroy', 'permission:genres.delete');
 
-        Route::resource('cinemas', AdminCinemaController::class)->except(['show'])
-            ->middlewareFor('index', 'permission:cinema.view')
-            ->middlewareFor(['create', 'store'], 'permission:cinema.create')
-            ->middlewareFor(['edit', 'update'], 'permission:cinema.update')
-            ->middlewareFor('destroy', 'permission:cinema.delete');
+        Route::get('/cinema', [AdminCinemaController::class, 'show'])
+            ->middleware('permission:cinema.view')->name('cinema.show');
+        Route::patch('/cinema', [AdminCinemaController::class, 'update'])
+            ->middleware('permission:cinema.update')->name('cinema.update');
+        Route::get('/cinemas', fn () => redirect()->route('admin.cinema.show'))
+            ->middleware('permission:cinema.view')->name('cinemas.index');
 
         Route::resource('rooms', AdminRoomController::class)->except(['show'])
             ->middlewareFor('index', 'permission:rooms.view')

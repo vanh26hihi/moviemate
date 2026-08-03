@@ -3,189 +3,137 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Showtime;
 use App\Models\Movie;
-use App\Models\Cinema;
 use App\Models\Room;
+use App\Models\Showtime;
+use App\Services\CinemaContext;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ShowtimeController extends Controller
 {
-    /**
-     * Display a listing of the showtimes with filters.
-     */
+    public function __construct(private readonly CinemaContext $cinemaContext) {}
+
     public function index(Request $request)
     {
-        $query = Showtime::with(['movie', 'cinema', 'room']);
+        $query = Showtime::query()->with(['movie', 'cinema', 'room'])
+            ->where('cinema_id', $this->cinemaContext->id());
 
-        // Filters
-        if ($movieId = $request->query('movie_id')) {
-            $query->where('movie_id', $movieId);
+        foreach (['movie_id', 'status'] as $filter) {
+            if ($value = $request->query($filter)) {
+                $query->where($filter, $value);
+            }
         }
-
-        if ($cinemaId = $request->query('cinema_id')) {
-            $query->where('cinema_id', $cinemaId);
-        }
-
         if ($date = $request->query('show_date')) {
             $query->whereDate('show_date', $date);
         }
 
-        if ($status = $request->query('status')) {
-            $query->where('status', $status);
-        }
+        $showtimes = $query->orderByDesc('show_date')->orderBy('show_time')->paginate(15)->withQueryString();
+        $movies = Movie::all();
 
-        $showtimes = $query->orderByDesc('show_date')
-                           ->orderBy('show_time')
-                           ->paginate(15)
-                           ->withQueryString();
-
-        $movies   = Movie::all();
-        $cinemas  = Cinema::all();
-
-        return view('admin.showtimes.index', compact('showtimes', 'movies', 'cinemas'));
+        return view('admin.showtimes.index', compact('showtimes', 'movies'));
     }
 
-    /**
-     * Show the form for creating a new showtime.
-     */
     public function create()
     {
-        $movies  = Movie::where('status', '!=', 'stopped')->get();
-        $cinemas = Cinema::all();
-
-        return view('admin.showtimes.create', compact('movies', 'cinemas'));
+        return view('admin.showtimes.create', [
+            'movies' => Movie::query()->where('status', '!=', 'stopped')->get(),
+            'rooms' => $this->operationalRooms(),
+            'cinema' => $this->cinemaContext->current(),
+        ]);
     }
 
-    /**
-     * Store a newly created showtime in storage.
-     */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'movie_id'   => ['required', 'exists:movies,id'],
-            'cinema_id'  => ['required', 'exists:cinemas,id'],
-            'room_id'    => ['required', 'exists:rooms,id'],
-            'show_date'  => ['required', 'date'],
-            'show_time'  => ['required', 'date_format:H:i'],
-            'price'      => ['required', 'numeric', 'min:0'],
-            'vip_price'  => ['nullable', 'numeric', 'min:0'],
-            'status'     => ['required', Rule::in(['active', 'cancelled', 'finished'])],
-        ]);
+        $validated = $this->validatedData($request);
+        $validated['show_time'] .= ':00';
+        $validated['cinema_id'] = $this->cinemaContext->id();
 
-        // Normalize show_time to HH:MM:SS for DB consistency
-        $validated['show_time'] = $validated['show_time'] . ':00';
-
-        // Ensure the selected movie is not stopped
-        $movie = Movie::findOrFail($validated['movie_id']);
-        if ($movie->status === 'stopped') {
-            return back()->withErrors(['movie_id' => 'Phim đã ngừng chiếu không thể tạo suất chiếu.'])
-                         ->withInput();
+        if (Movie::query()->findOrFail($validated['movie_id'])->status === 'stopped') {
+            return back()->withErrors(['movie_id' => 'Phim đã ngừng chiếu không thể tạo suất chiếu.'])->withInput();
+        }
+        if ($this->hasConflict($validated)) {
+            return back()->withErrors(['show_time' => 'Đã có suất chiếu ở cùng phòng, ngày và giờ.'])->withInput();
         }
 
-        // Ensure room belongs to selected cinema
-        $room = Room::findOrFail($validated['room_id']);
-        if ((int) $room->cinema_id !== (int) $validated['cinema_id']) {
-            return back()->withErrors(['room_id' => 'Phòng không thuộc rạp đã chọn.'])
-                         ->withInput();
-        }
+        Showtime::query()->create($validated);
 
-        // Conflict check: same cinema, room, date & time
-        $conflict = Showtime::where('cinema_id', $validated['cinema_id'])
-            ->where('room_id', $validated['room_id'])
-            ->whereDate('show_date', $validated['show_date'])
-            ->where('show_time', $validated['show_time'])
-            ->exists();
-
-        if ($conflict) {
-            return back()->withErrors(['show_time' => 'Đã có suất chiếu ở cùng phòng, ngày và giờ.'])
-                         ->withInput();
-        }
-
-        Showtime::create($validated);
-
-        return redirect()
-            ->route('admin.showtimes.index')
-            ->with('success', 'Suất chiếu đã được tạo thành công.');
+        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được tạo thành công.');
     }
 
-    /**
-     * Show the form for editing the specified showtime.
-     */
     public function edit(Showtime $showtime)
     {
-        $movies  = Movie::where('status', '!=', 'stopped')->get();
-        $cinemas = Cinema::all();
+        $this->assertOperationalShowtime($showtime);
 
-        // Load rooms for the cinema of this showtime (for the edit form)
-        $rooms = Room::where('cinema_id', $showtime->cinema_id)->get();
-
-        return view('admin.showtimes.edit', compact('showtime', 'movies', 'cinemas', 'rooms'));
+        return view('admin.showtimes.edit', [
+            'showtime' => $showtime,
+            'movies' => Movie::query()->where('status', '!=', 'stopped')->get(),
+            'rooms' => $this->operationalRooms(),
+            'cinema' => $this->cinemaContext->current(),
+        ]);
     }
 
-    /**
-     * Update the specified showtime in storage.
-     */
     public function update(Request $request, Showtime $showtime)
     {
-        $validated = $request->validate([
-            'movie_id'   => ['required', 'exists:movies,id'],
-            'cinema_id'  => ['required', 'exists:cinemas,id'],
-            'room_id'    => ['required', 'exists:rooms,id'],
-            'show_date'  => ['required', 'date'],
-            'show_time'  => ['required', 'date_format:H:i'],
-            'price'      => ['required', 'numeric', 'min:0'],
-            'vip_price'  => ['nullable', 'numeric', 'min:0'],
-            'status'     => ['required', Rule::in(['active', 'cancelled', 'finished'])],
-        ]);
+        $this->assertOperationalShowtime($showtime);
+        $validated = $this->validatedData($request);
+        $validated['show_time'] .= ':00';
+        $validated['cinema_id'] = $this->cinemaContext->id();
 
-        // Normalize show_time to HH:MM:SS for DB consistency
-        $validated['show_time'] = $validated['show_time'] . ':00';
-
-        // Ensure the selected movie is not stopped
-        $movie = Movie::findOrFail($validated['movie_id']);
-        if ($movie->status === 'stopped') {
-            return back()->withErrors(['movie_id' => 'Phim đã ngừng chiếu không thể cập nhật suất chiếu.'])
-                         ->withInput();
+        if (Movie::query()->findOrFail($validated['movie_id'])->status === 'stopped') {
+            return back()->withErrors(['movie_id' => 'Phim đã ngừng chiếu không thể cập nhật suất chiếu.'])->withInput();
         }
-
-        // Ensure room belongs to selected cinema
-        $room = Room::findOrFail($validated['room_id']);
-        if ((int) $room->cinema_id !== (int) $validated['cinema_id']) {
-            return back()->withErrors(['room_id' => 'Phòng không thuộc rạp đã chọn.'])
-                         ->withInput();
-        }
-
-        // Conflict check, exclude current record
-        $conflict = Showtime::where('cinema_id', $validated['cinema_id'])
-            ->where('room_id', $validated['room_id'])
-            ->whereDate('show_date', $validated['show_date'])
-            ->where('show_time', $validated['show_time'])
-            ->where('id', '!=', $showtime->id)
-            ->exists();
-
-        if ($conflict) {
-            return back()->withErrors(['show_time' => 'Đã có suất chiếu ở cùng phòng, ngày và giờ.'])
-                         ->withInput();
+        if ($this->hasConflict($validated, $showtime->id)) {
+            return back()->withErrors(['show_time' => 'Đã có suất chiếu ở cùng phòng, ngày và giờ.'])->withInput();
         }
 
         $showtime->update($validated);
 
-        return redirect()
-            ->route('admin.showtimes.index')
-            ->with('success', 'Suất chiếu đã được cập nhật.');
+        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được cập nhật.');
     }
 
-    /**
-     * Remove the specified showtime from storage.
-     */
     public function destroy(Showtime $showtime)
     {
+        $this->assertOperationalShowtime($showtime);
         $showtime->delete();
 
-        return redirect()
-            ->route('admin.showtimes.index')
-            ->with('success', 'Suất chiếu đã được xóa.');
+        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được xóa.');
+    }
+
+    private function validatedData(Request $request): array
+    {
+        return $request->validate([
+            'movie_id' => ['required', 'exists:movies,id'],
+            'room_id' => ['required', Rule::exists('rooms', 'id')->where(fn ($query) => $query->where('cinema_id', $this->cinemaContext->id())->where('status', 'active'))],
+            'show_date' => ['required', 'date'],
+            'show_time' => ['required', 'date_format:H:i'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'vip_price' => ['nullable', 'numeric', 'min:0'],
+            'status' => ['required', Rule::in(['active', 'cancelled', 'finished'])],
+        ]);
+    }
+
+    private function operationalRooms()
+    {
+        return Room::query()->where('cinema_id', $this->cinemaContext->id())
+            ->operational()->orderBy('code')->get();
+    }
+
+    private function hasConflict(array $data, ?int $exceptId = null): bool
+    {
+        return Showtime::query()->where('cinema_id', $this->cinemaContext->id())
+            ->where('room_id', $data['room_id'])->whereDate('show_date', $data['show_date'])
+            ->where('show_time', $data['show_time'])->when($exceptId, fn ($query) => $query->whereKeyNot($exceptId))->exists();
+    }
+
+    private function assertOperationalShowtime(Showtime $showtime): void
+    {
+        $showtime->loadMissing('room');
+        abort_unless(
+            $showtime->cinema_id === $this->cinemaContext->id()
+            && $showtime->room?->cinema_id === $this->cinemaContext->id()
+            && $showtime->room?->status === 'active',
+            404
+        );
     }
 }

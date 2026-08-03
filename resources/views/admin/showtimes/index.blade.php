@@ -9,7 +9,7 @@
         <div>
             <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Showtimes</p>
             <h1 class="text-3xl font-extrabold app-text">Suất chiếu</h1>
-            <p class="app-muted mt-2">Lên lịch chiếu theo phim, rạp, phòng và trạng thái vận hành.</p>
+            <p class="app-muted mt-2">Lên lịch chiếu theo phim, phòng và trạng thái tại cơ sở FPT Polytechnic.</p>
         </div>
         @can('showtimes.create')<a href="{{ route('admin.showtimes.create') }}" class="btn-primary">
             <i class="ph-bold ph-plus"></i> Thêm suất chiếu
@@ -18,14 +18,7 @@
 
     <div class="cinema-card overflow-hidden">
         <div class="p-5 border-b app-border">
-            <form method="GET" action="{{ route('admin.showtimes.index') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[180px_1fr_160px_160px_auto] gap-3">
-                <select name="cinema_id" class="cinema-input">
-                    <option value="">Tất cả rạp</option>
-                    @foreach($cinemas as $cinema)
-                        <option value="{{ $cinema->id }}" {{ request('cinema_id') == $cinema->id ? 'selected' : '' }}>{{ $cinema->name }}</option>
-                    @endforeach
-                </select>
-
+            <form method="GET" action="{{ route('admin.showtimes.index') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_160px_160px_auto] gap-3">
                 <select name="movie_id" class="cinema-input">
                     <option value="">Tất cả phim</option>
                     @foreach($movies as $movie)

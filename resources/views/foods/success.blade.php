@@ -11,6 +11,12 @@
         <h1 class="text-3xl font-bold app-text">Đặt đồ ăn thành công!</h1>
         <p class="mt-4 text-sm app-muted">Đơn hàng #{{ $order->id }} đã được ghi nhận. Chúng tôi sẽ chuẩn bị đồ ăn và giao khi bạn đến rạp.</p>
 
+        <div class="mt-6 rounded-3xl border border-brand-start/20 bg-brand-start/5 p-5 text-left">
+            <p class="text-xs font-semibold uppercase tracking-[0.25em] text-brand-start">Điểm nhận</p>
+            <p class="mt-2 font-bold app-text">{{ $order->pickupCinema?->name }}</p>
+            <p class="mt-1 text-sm leading-relaxed app-muted">{{ $order->pickupCinema?->address }}</p>
+        </div>
+
         <div class="mt-8 grid gap-4 sm:grid-cols-2">
             <div class="rounded-3xl border border-white/10 bg-app-secondary p-5">
                 <p class="text-xs uppercase tracking-[0.3em] text-brand-start font-semibold">Tổng đơn</p>
