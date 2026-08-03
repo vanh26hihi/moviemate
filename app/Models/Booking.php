@@ -55,4 +55,9 @@ class Booking extends Model
             rawurlencode($this->booking_code)
         );
     }
+
+    public function getRecipientEmailAttribute(): ?string
+    {
+        return $this->customer_email ?: $this->user?->email;
+    }
 }
