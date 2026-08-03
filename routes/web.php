@@ -12,6 +12,9 @@ use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Payments\PaymentInitiationController;
+use App\Http\Controllers\Payments\ZaloPayCallbackController;
+use App\Http\Controllers\Payments\ZaloPayReturnController;
 use App\Http\Controllers\User\BookingController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\HomeController;
@@ -20,6 +23,17 @@ use App\Http\Controllers\User\OrderController as UserOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
+    ->middleware('throttle:120,1')
+    ->name('payments.zalopay.callback');
+
+Route::get('/payments/zalopay/return', ZaloPayReturnController::class)
+    ->name('payments.zalopay.return');
+
+Route::post('/payments/zalopay/bookings/{booking}', PaymentInitiationController::class)
+    ->middleware('throttle:20,1')
+    ->name('payments.zalopay.initiate');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', function () {

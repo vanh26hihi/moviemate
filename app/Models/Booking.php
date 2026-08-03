@@ -31,6 +31,7 @@ class Booking extends Model
         'used_at' => 'datetime',
         'expires_at' => 'datetime',
         'paid_at' => 'datetime',
+        'ticket_emailed_at' => 'datetime',
         'total_amount' => 'decimal:2',
     ];
 
@@ -56,7 +57,13 @@ class Booking extends Model
 
     public function payment(): HasOne
     {
-        return $this->hasOne(Payment::class);
+        // Backward-compatible singular access now resolves the newest attempt.
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     public function getQrCodeUrlAttribute(): string
