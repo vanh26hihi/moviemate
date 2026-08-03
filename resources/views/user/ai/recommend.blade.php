@@ -30,7 +30,7 @@
             <div class="cinema-card rounded-3xl p-6 text-center sm:p-8">
                 <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-ai-start/10 text-ai-start"><i class="ph-fill ph-robot text-3xl"></i></div>
                 <h2 class="mt-5 text-2xl font-extrabold app-text">Chưa có gợi ý</h2>
-                <p class="mx-auto mt-3 max-w-sm leading-relaxed app-muted">TEAM chưa có endpoint xử lý AI recommendation, nên trang không tạo hay hiển thị dữ liệu gợi ý mẫu.</p>
+                <p class="mx-auto mt-3 max-w-sm leading-relaxed app-muted">Gợi ý cá nhân hóa sẽ xuất hiện tại đây khi dịch vụ AI sẵn sàng.</p>
                 <a href="{{ route('user.movies.index') }}" class="btn-secondary mt-6"><i class="ph-fill ph-film-strip"></i> Xem danh sách phim</a>
             </div>
         </div>

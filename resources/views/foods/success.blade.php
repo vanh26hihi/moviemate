@@ -1,8 +1,10 @@
-@extends('layouts.app')
+@extends('layouts.user')
+
+@section('title', 'Đặt đồ ăn thành công - MovieMate')
 
 @section('content')
-<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-    <div class="rounded-[2rem] border border-white/10 bg-app-card p-10 text-center shadow-lg shadow-black/10">
+<div class="user-page-shell max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div class="cinema-card rounded-[2rem] p-10 text-center">
         <div class="mx-auto mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-success/10 text-success text-4xl">
             <i class="ph-fill ph-check-circle"></i>
         </div>

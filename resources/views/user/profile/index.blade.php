@@ -36,7 +36,7 @@
                             <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Ngày tham gia</p><p class="mt-1 font-bold app-text">{{ $profileUser->created_at?->format('d/m/Y') ?? '—' }}</p></div>
                             <div class="rounded-2xl border app-border app-secondary p-4"><p class="text-xs app-muted">Xác thực email</p><p class="mt-1 font-bold text-ai-start">{{ $profileUser->email_verified_at ? 'Đã xác thực' : 'Chưa xác thực' }}</p></div>
                         </div>
-                        <div class="mt-6 rounded-2xl border border-brand-start/20 bg-brand-start/5 p-4 text-sm app-muted"><i class="ph-fill ph-info mr-2 text-brand-start"></i>Chức năng cập nhật hồ sơ sẽ hiển thị khi TEAM cung cấp route xử lý tương ứng.</div>
+                        <div class="mt-6 rounded-2xl border border-brand-start/20 bg-brand-start/5 p-4 text-sm app-muted"><i class="ph-fill ph-info mr-2 text-brand-start"></i>Thông tin cập nhật hồ sơ đang được hoàn thiện.</div>
                     </div>
                 </div>
             </div>

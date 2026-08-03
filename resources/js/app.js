@@ -41,6 +41,19 @@ function applyTheme(theme) {
 applyTheme(readTheme());
 
 document.addEventListener('click', (event) => {
+    const mobileMenuButton = event.target.closest('#mobile-menu-btn');
+
+    if (mobileMenuButton) {
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (!mobileMenu) return;
+
+        const willOpen = mobileMenu.classList.contains('hidden');
+        mobileMenu.classList.toggle('hidden', !willOpen);
+        mobileMenuButton.setAttribute('aria-expanded', String(willOpen));
+        mobileMenuButton.setAttribute('aria-label', willOpen ? 'Đóng menu' : 'Mở menu');
+        return;
+    }
+
     const modalTrigger = event.target.closest('[data-modal-open]');
     const modalClose = event.target.closest('[data-modal-close]');
 
@@ -85,6 +98,35 @@ document.addEventListener('click', (event) => {
     const icon = passwordToggle.querySelector('i');
     if (icon) {
         icon.className = showPassword ? 'ph ph-eye-slash text-lg' : 'ph ph-eye text-lg';
+    }
+});
+
+document.addEventListener('click', (event) => {
+    document.querySelectorAll('.user-account-menu[open]').forEach((menu) => {
+        if (!menu.contains(event.target)) menu.removeAttribute('open');
+    });
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileMenuButton = document.getElementById('mobile-menu-btn');
+    if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
+        mobileMenu.classList.add('hidden');
+        mobileMenuButton?.setAttribute('aria-expanded', 'false');
+        mobileMenuButton?.setAttribute('aria-label', 'Mở menu');
+        mobileMenuButton?.focus();
+    }
+
+    document.querySelectorAll('.user-account-menu[open]').forEach((menu) => menu.removeAttribute('open'));
+
+    const openModal = document.querySelector('[data-modal]:not([hidden])');
+    if (openModal) {
+        openModal.hidden = true;
+        openModal.classList.add('hidden');
+        openModal.classList.remove('flex');
+        document.body.classList.remove('overflow-hidden');
     }
 });
 

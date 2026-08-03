@@ -1,0 +1,99 @@
+.user-app {
+    --mm-bg: #080a12;
+    --mm-surface: #151a27;
+    --mm-surface-2: #0b0f1a;
+    --mm-text: #ffffff;
+    --mm-muted: #94a3b8;
+    --mm-primary: #ff3d57;
+    --mm-accent: #ff7a18;
+    --mm-ai: #7c3aed;
+    --mm-border: rgba(255, 255, 255, 0.1);
+    --mm-radius-sm: 0.75rem;
+    --mm-radius-md: 1.25rem;
+    --mm-radius-lg: 1.75rem;
+    --mm-shadow: 0 18px 50px rgba(0, 0, 0, 0.2);
+}
+
+html.light .user-app {
+    --mm-bg: #f8fafc;
+    --mm-surface: #ffffff;
+    --mm-surface-2: #eef2f7;
+    --mm-text: #0f172a;
+    --mm-muted: #64748b;
+    --mm-border: rgba(15, 23, 42, 0.12);
+    --mm-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+.user-app .user-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 999px;
+    padding: 0.5rem 0.875rem;
+    color: var(--mm-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    transition: color 160ms ease, background-color 160ms ease;
+}
+
+.user-app .user-nav-link:hover,
+.user-app .user-nav-link.is-active {
+    background: rgba(255, 61, 87, 0.1);
+    color: var(--mm-primary);
+}
+
+.user-app .user-mobile-link,
+.user-app .user-dropdown-link {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    border-radius: var(--mm-radius-sm);
+    padding: 0.7rem 0.8rem;
+    color: var(--mm-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: color 160ms ease, background-color 160ms ease;
+}
+
+.user-app .user-mobile-link:hover,
+.user-app .user-mobile-link.is-active,
+.user-app .user-dropdown-link:hover {
+    background: rgba(255, 61, 87, 0.1);
+    color: var(--mm-primary);
+}
+
+.user-app .user-account-menu summary::-webkit-details-marker { display: none; }
+.user-app .user-account-menu[open] summary { border-color: rgba(255, 61, 87, 0.45); }
+.user-app .user-account-dropdown { z-index: 70; }
+
+.user-app :focus-visible {
+    outline: 3px solid rgba(255, 61, 87, 0.38);
+    outline-offset: 3px;
+}
+
+.user-app .user-page-shell {
+    min-height: calc(100svh - 5rem);
+    background:
+        radial-gradient(circle at 12% 0%, rgba(255, 61, 87, 0.1), transparent 26rem),
+        radial-gradient(circle at 88% 5%, rgba(124, 58, 237, 0.08), transparent 24rem);
+}
+
+.user-app .user-form-control {
+    width: 100%;
+    border: 1px solid var(--mm-border);
+    border-radius: var(--mm-radius-sm);
+    background: var(--app-input-bg);
+    color: var(--app-input-text);
+    padding: 0.75rem 1rem;
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.user-app .user-form-control:focus {
+    border-color: var(--mm-primary);
+    box-shadow: 0 0 0 3px rgba(255, 61, 87, 0.12);
+    outline: none;
+}
+
+@media (max-width: 767px) {
+    .user-app .user-account-dropdown { max-width: calc(100vw - 2rem); }
+}
