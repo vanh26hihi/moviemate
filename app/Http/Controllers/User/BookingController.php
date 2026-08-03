@@ -8,16 +8,20 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Services\CinemaContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
+    public function __construct(private readonly CinemaContext $cinemaContext) {}
+
     /**
      * Show seat selection page for a given showtime.
      */
@@ -102,9 +106,7 @@ class BookingController extends Controller
         }
 
         $seatSummaries = $seats->map(function ($seat) use ($showtime) {
-            $price = $seat->type === 'vip'
-                ? ($showtime->vip_price ?? $showtime->price)
-                : $showtime->price;
+            $price = $showtime->priceForSeatType($seat->type);
 
             return [
                 'id' => $seat->id,
@@ -202,9 +204,7 @@ class BookingController extends Controller
             $totalAmount = 0;
 
             foreach ($seats as $seat) {
-                $price = $seat->type === 'vip'
-                    ? (float) ($showtime->vip_price ?? $showtime->price)
-                    : (float) $showtime->price;
+                $price = $showtime->priceForSeatType($seat->type);
 
                 $seatPrices[$seat->id] = $price;
                 $totalAmount += $price;
@@ -232,7 +232,7 @@ class BookingController extends Controller
                 'payment_method' => $validated['payment_method'],
                 'amount' => $totalAmount,
                 'status' => 'success',
-                'transaction_code' => 'FAKE-' . now()->format('YmdHis') . '-' . $booking->id,
+                'transaction_code' => 'FAKE-'.now()->format('YmdHis').'-'.$booking->id,
                 'paid_at' => now(),
             ]);
 
@@ -261,7 +261,7 @@ class BookingController extends Controller
      */
     public function success(Booking $booking)
     {
-        abort_unless($booking->user_id === null || $booking->user_id === Auth::id(), 403);
+        $this->authorizeBookingView($booking);
 
         $booking->load([
             'user',
@@ -277,7 +277,7 @@ class BookingController extends Controller
 
     public function ticket(Booking $booking)
     {
-        abort_unless($booking->user_id === null || $booking->user_id === Auth::id(), 403);
+        $this->authorizeBookingView($booking);
 
         $booking->load([
             'user',
@@ -289,6 +289,17 @@ class BookingController extends Controller
         ]);
 
         return view('user.bookings.ticket', compact('booking'));
+    }
+
+    private function authorizeBookingView(Booking $booking): void
+    {
+        if (Auth::check()) {
+            Gate::authorize('view', $booking);
+
+            return;
+        }
+
+        abort_unless($booking->user_id === null, 403);
     }
 
     /**
@@ -310,12 +321,15 @@ class BookingController extends Controller
      */
     protected function isShowtimeAvailable(Showtime $showtime): bool
     {
-        if ($showtime->status !== 'active') {
+        if ($showtime->status !== 'active'
+            || $showtime->cinema_id !== $this->cinemaContext->id()
+            || $showtime->room?->status !== 'active'
+            || $showtime->room?->cinema_id !== $this->cinemaContext->id()) {
             return false;
         }
 
         $showDateTime = Carbon::parse(
-            $showtime->show_date->format('Y-m-d') . ' ' . $showtime->show_time
+            $showtime->show_date->format('Y-m-d').' '.$showtime->show_time
         );
 
         return $showDateTime->isFuture();
@@ -338,7 +352,7 @@ class BookingController extends Controller
                 ? ((int) substr($latestBooking->booking_code, -4)) + 1
                 : 1;
 
-            $bookingCode = 'MMT-' . $year . '-' . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+            $bookingCode = 'MMT-'.$year.'-'.str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
         } while (Booking::where('booking_code', $bookingCode)->exists());
 
         return $bookingCode;

@@ -8,6 +8,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Showtime extends Model
 {
+    public function priceForSeatType(string $seatType): float
+    {
+        return match ($seatType) {
+            'vip' => (float) ($this->vip_price ?? $this->price),
+            'couple' => (float) $this->price * 2,
+            default => (float) $this->price,
+        };
+    }
+
     protected $fillable = [
         'movie_id',
         'cinema_id',

@@ -13,6 +13,10 @@ class BookingSeat extends Model
         'price',
     ];
 
+    protected $casts = [
+        'price' => 'decimal:2',
+    ];
+
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);

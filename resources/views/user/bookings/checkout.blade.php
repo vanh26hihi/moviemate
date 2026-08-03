@@ -3,96 +3,84 @@
 @section('title', 'Thanh toán - MovieMate')
 
 @section('content')
-<div class="min-h-screen py-8 app-bg">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+<section class="user-page-shell py-8 lg:py-10">
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <a href="{{ route('user.bookings.selectSeat', $showtime) }}" class="btn-secondary mb-6 !px-4 !py-2 text-sm"><i class="ph ph-arrow-left"></i>Quay lại chọn ghế</a>
 
-        <!-- Progress Steps -->
-        <div class="mb-8">
-            <div class="flex items-center justify-center sm:justify-start gap-2 sm:gap-4 text-xs sm:text-sm">
-                <div class="flex items-center gap-2 text-brand-start font-medium">
-                    <div class="w-7 h-7 rounded-full bg-brand-start text-white flex items-center justify-center font-bold text-xs"><i class="ph-bold ph-check"></i></div>
-                    <span class="hidden sm:inline">Chọn phim & Suất</span>
-                </div>
-                <div class="h-px w-8 sm:w-12 bg-brand-start"></div>
-                <div class="flex items-center gap-2 text-brand-start font-medium">
-                    <div class="w-7 h-7 rounded-full bg-brand-start text-white flex items-center justify-center font-bold text-xs"><i class="ph-bold ph-check"></i></div>
-                    <span class="hidden sm:inline">Chọn ghế</span>
-                </div>
-                <div class="h-px w-8 sm:w-12 bg-brand-start"></div>
-                <div class="flex items-center gap-2 text-brand-start font-medium">
-                    <div class="w-7 h-7 rounded-full bg-brand-start text-white flex items-center justify-center font-bold text-xs">3</div>
-                    <span>Thanh toán</span>
-                </div>
-            </div>
+        <div class="mb-8 flex items-center justify-center gap-2 text-xs sm:justify-start sm:gap-4 sm:text-sm" aria-label="Tiến trình đặt vé">
+            <div class="flex items-center gap-2 font-semibold text-brand-start"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-start text-white"><i class="ph-bold ph-check"></i></span><span class="hidden sm:inline">Chọn phim & suất</span></div>
+            <div class="h-px w-8 bg-brand-start sm:w-12"></div>
+            <div class="flex items-center gap-2 font-semibold text-brand-start"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-start text-white"><i class="ph-bold ph-check"></i></span><span class="hidden sm:inline">Chọn ghế</span></div>
+            <div class="h-px w-8 bg-brand-start sm:w-12"></div>
+            <div class="flex items-center gap-2 font-semibold text-brand-start" aria-current="step"><span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand-start text-xs font-black text-white">3</span><span>Thanh toán</span></div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-
-            <!-- Left: Summary -->
-            <div class="app-card border app-border rounded-2xl p-6">
-                <h2 class="text-xl font-bold app-text mb-4">Thông tin đặt vé</h2>
-
-                <ul class="space-y-3 text-sm">
-                    <li class="flex justify-between"><span class="app-muted">Phim</span><span class="app-text font-medium">{{ $showtime->movie->title }}</span></li>
-                    <li class="flex justify-between"><span class="app-muted">Rạp</span><span class="app-text font-medium">{{ $showtime->cinema->name }}</span></li>
-                    <li class="flex justify-between"><span class="app-muted">Phòng</span><span class="app-text font-medium">{{ $showtime->room->name }}</span></li>
-                    <li class="flex justify-between"><span class="app-muted">Ngày & Giờ</span><span class="app-text font-medium">{{ $showtime->show_date->format('d/m/Y') }} {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}</span></li>
-                </ul>
-
-                <h3 class="text-lg font-bold app-text mt-6 mb-2">Ghế đã chọn</h3>
-                <ul class="list-disc list-inside text-sm app-muted">
-                    @foreach($seatSummaries as $seat)
-                        <li>{{ $seat['seat_code'] }} ({{ ucfirst($seat['type']) }}) - {{ number_format($seat['price'],0,',','.') }}đ</li>
-                    @endforeach
-                </ul>
-
-                <div class="flex justify-between items-center mt-4 pt-4 border-t app-border">
-                    <span class="app-muted text-sm font-medium">Tổng tiền:</span>
-                    <span class="text-2xl font-bold text-brand-start">{{ number_format($totalAmount,0,',','.') }}đ</span>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
+            <article class="cinema-card overflow-hidden rounded-3xl">
+                <div class="relative min-h-48 overflow-hidden border-b app-border p-6 sm:p-8">
+                    @if($showtime->movie->cover_url)
+                        <img src="{{ $showtime->movie->cover_url }}" alt="" class="absolute inset-0 h-full w-full object-cover opacity-20" loading="lazy">
+                    @endif
+                    <div class="absolute inset-0 bg-gradient-to-r from-[var(--app-card)] via-[var(--app-card)]/95 to-transparent"></div>
+                    <div class="relative max-w-xl">
+                        <p class="mb-2 text-xs font-extrabold uppercase tracking-[0.24em] text-brand-start">Thông tin đặt vé</p>
+                        <h1 class="text-2xl font-extrabold app-text sm:text-3xl">{{ $showtime->movie->title }}</h1>
+                        <div class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                            <p class="flex items-start gap-2 app-muted"><i class="ph-fill ph-buildings mt-0.5 text-brand-start"></i><span><strong class="block app-text">{{ $showtime->cinema->name }}</strong>{{ $showtime->room->name }}</span></p>
+                            <p class="flex items-start gap-2 app-muted"><i class="ph-fill ph-calendar-blank mt-0.5 text-brand-start"></i><span><strong class="block app-text">{{ $showtime->show_date->format('d/m/Y') }}</strong>{{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}</span></p>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Right: Payment Form -->
-            <form action="{{ route('user.bookings.store') }}" method="POST" class="app-card border app-border rounded-2xl p-6">
+                <div class="p-6 sm:p-8">
+                    <div class="mb-4 flex items-center justify-between gap-4"><h2 class="text-lg font-extrabold app-text">Ghế đã chọn</h2><span class="rounded-full bg-brand-start/10 px-3 py-1 text-xs font-bold text-brand-start">{{ $seatSummaries->count() }} ghế</span></div>
+                    <div class="space-y-3">
+                        @foreach($seatSummaries as $seat)
+                            <div class="flex items-center justify-between gap-4 rounded-2xl border app-border app-secondary px-4 py-3">
+                                <div class="flex items-center gap-3"><span class="flex h-10 min-w-10 items-center justify-center rounded-xl bg-brand-start/10 px-2 font-black text-brand-start">{{ $seat['seat_code'] }}</span><div><p class="text-sm font-bold app-text">Ghế {{ $seat['type'] === 'vip' ? 'VIP' : ($seat['type'] === 'couple' ? 'đôi' : 'thường') }}</p><p class="text-xs app-muted">{{ $showtime->room->name }}</p></div></div>
+                                <strong class="whitespace-nowrap app-text">{{ number_format($seat['price'], 0, ',', '.') }}đ</strong>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="mt-6 flex items-end justify-between gap-4 border-t pt-5 app-border"><div><p class="text-sm app-muted">Tổng thanh toán</p><p class="mt-1 text-xs app-muted">Giá được xác nhận lại khi đặt vé</p></div><strong class="text-3xl font-extrabold text-brand-start">{{ number_format($totalAmount, 0, ',', '.') }}đ</strong></div>
+                </div>
+            </article>
+
+            <form action="{{ route('user.bookings.store') }}" method="POST" class="cinema-card self-start rounded-3xl p-6 sm:p-8 lg:sticky lg:top-24">
                 @csrf
                 <input type="hidden" name="showtime_id" value="{{ $showtime->id }}">
                 @foreach($seatSummaries as $seat)
                     <input type="hidden" name="seat_ids[]" value="{{ $seat['id'] }}">
                 @endforeach
 
-                <h2 class="text-xl font-bold app-text mb-4">Phương thức thanh toán</h2>
+                <div class="mb-6"><p class="text-xs font-extrabold uppercase tracking-[0.24em] text-ai-start">Thanh toán an toàn</p><h2 class="mt-2 text-2xl font-extrabold app-text">Hoàn tất đặt vé</h2><p class="mt-2 text-sm app-muted">Vé điện tử sẽ được gửi tới email sau khi đặt thành công.</p></div>
 
-                <label for="customer_email" class="block app-text font-medium mb-2">Email nhận vé</label>
-                <input id="customer_email" name="customer_email" type="email" required
-                       value="{{ old('customer_email', $user?->email) }}"
-                       placeholder="ban@example.com"
-                       class="w-full mb-5 rounded-xl border app-border app-input px-4 py-3 focus:border-brand-start focus:ring-brand-start">
-                @error('customer_email')
-                    <p class="-mt-3 mb-4 text-sm text-red-400">{{ $message }}</p>
-                @enderror
-
-                <div class="space-y-3">
-                    <label class="flex items-center p-3 app-input border border-brand-start rounded-xl cursor-pointer hover:border-brand-start transition-colors">
-                        <input type="radio" name="payment_method" value="fake" checked class="text-brand-start focus:ring-brand-start w-4 h-4 mr-2">
-                        <span class="app-text font-medium">Thanh toán giả lập (đã thanh toán)</span>
-                    </label>
-
-                    <label class="flex items-center p-3 app-input border app-border rounded-xl cursor-pointer hover:border-brand-start transition-colors">
-                        <input type="radio" name="payment_method" value="counter" class="text-brand-start focus:ring-brand-start w-4 h-4 mr-2">
-                        <span class="app-text font-medium">Thanh toán tại quầy</span>
-                    </label>
-
-                    <label class="flex items-center p-3 app-input border app-border rounded-xl cursor-pointer hover:border-brand-start transition-colors">
-                        <input type="radio" name="payment_method" value="vnpay" class="text-brand-start focus:ring-brand-start w-4 h-4 mr-2">
-                        <span class="app-text font-medium">Thanh toán VNPay (giả lập)</span>
-                    </label>
+                <div>
+                    <label for="customer_email" class="mb-2 block text-sm font-semibold app-text">Email nhận vé</label>
+                    <div class="relative"><i class="ph ph-envelope-simple absolute left-4 top-1/2 -translate-y-1/2 app-muted"></i><input id="customer_email" name="customer_email" type="email" required autocomplete="email" value="{{ old('customer_email', $user?->email) }}" class="user-form-control !pl-11" placeholder="ban@example.com"></div>
+                    @error('customer_email')<p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>@enderror
                 </div>
 
-                <button type="submit" class="w-full mt-6 py-3.5 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/30 transition-all">
-                    Xác nhận và thanh toán
-                </button>
+                <fieldset class="mt-6 space-y-3">
+                    <legend class="mb-3 text-sm font-semibold app-text">Phương thức thanh toán</legend>
+                    @foreach([
+                        'fake' => ['Mô phỏng thanh toán', 'ph-check-circle', 'Xác nhận thanh toán ngay trong hệ thống'],
+                        'counter' => ['Thanh toán tại quầy', 'ph-storefront', 'Thanh toán khi đến rạp'],
+                        'vnpay' => ['VNPay mô phỏng', 'ph-qr-code', 'Luồng VNPay trong môi trường hiện tại'],
+                    ] as $value => [$label, $icon, $description])
+                        <label class="group flex cursor-pointer items-center gap-3 rounded-2xl border app-border app-secondary p-4 transition hover:border-brand-start/50">
+                            <input type="radio" name="payment_method" value="{{ $value }}" @checked(old('payment_method', 'fake') === $value) class="peer h-4 w-4 text-brand-start focus:ring-brand-start">
+                            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-start/10 text-brand-start"><i class="ph-fill {{ $icon }} text-xl"></i></span>
+                            <span class="min-w-0"><strong class="block text-sm app-text">{{ $label }}</strong><span class="block text-xs app-muted">{{ $description }}</span></span>
+                        </label>
+                    @endforeach
+                    @error('payment_method')<p class="text-xs font-semibold text-error">{{ $message }}</p>@enderror
+                </fieldset>
+
+                <button type="submit" class="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-start to-brand-end px-5 py-3.5 font-extrabold text-white shadow-lg shadow-brand-start/20 transition hover:-translate-y-0.5 hover:shadow-brand-start/35"><i class="ph-fill ph-lock-key"></i>Xác nhận và thanh toán</button>
+                <p class="mt-4 text-center text-xs app-muted"><i class="ph-fill ph-shield-check mr-1 text-success"></i>Số tiền do backend MovieMate xác nhận.</p>
             </form>
         </div>
     </div>
-</div>
+</section>
 @endsection

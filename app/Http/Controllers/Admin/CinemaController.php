@@ -3,89 +3,44 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Cinema;
+use App\Services\CinemaContext;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\View\View;
 
 class CinemaController extends Controller
 {
-    public function index(Request $request)
+    public function __construct(private readonly CinemaContext $cinemaContext) {}
+
+    public function show(): View
     {
-        $query = Cinema::query();
-
-        if ($search = $request->query('search')) {
-            $query->where('name', 'like', "%{$search}%");
-        }
-
-        $cinemas = $query->orderBy('name')->paginate(15)->withQueryString();
-
-        return view('admin.cinemas.index', compact('cinemas', 'search'));
-    }
-
-    public function create()
-    {
-        return view('admin.cinemas.create');
-    }
-
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'required|string|max:255',
-            'city' => 'required|string|max:100',
-            'phone' => 'nullable|string|max:30',
-            'image' => 'nullable|image|max:4096',
-            'description' => 'nullable|string',
-            'status' => 'required|in:active,inactive',
+        $cinema = $this->cinemaContext->current()->loadCount([
+            'rooms',
+            'rooms as active_rooms_count' => fn ($query) => $query->where('status', 'active'),
         ]);
 
-        if ($request->hasFile('image')) {
-            $validated['image'] = $request->file('image')->store('cinema_images', 'public');
-        }
-
-        Cinema::create($validated);
-
-        return redirect()->route('admin.cinemas.index')->with('success', 'Cinema created successfully.');
+        return view('admin.cinemas.show', compact('cinema'));
     }
 
-    public function edit(Cinema $cinema)
+    public function update(Request $request): RedirectResponse
     {
-        return view('admin.cinemas.edit', compact('cinema'));
-    }
-
-    public function update(Request $request, Cinema $cinema)
-    {
+        $cinema = $this->cinemaContext->current();
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'required|string|max:255',
-            'city' => 'required|string|max:100',
-            'phone' => 'nullable|string|max:30',
-            'image' => 'nullable|image|max:4096',
-            'description' => 'nullable|string',
-            'status' => 'required|in:active,inactive',
+            'phone' => ['nullable', 'string', 'max:30'],
+            'image' => ['nullable', 'image', 'max:4096'],
+            'description' => ['nullable', 'string'],
         ]);
 
         if ($request->hasFile('image')) {
             if ($cinema->image && Storage::disk('public')->exists($cinema->image)) {
                 Storage::disk('public')->delete($cinema->image);
             }
-
             $validated['image'] = $request->file('image')->store('cinema_images', 'public');
         }
 
         $cinema->update($validated);
 
-        return redirect()->route('admin.cinemas.index')->with('success', 'Cinema updated successfully.');
-    }
-
-    public function destroy(Cinema $cinema)
-    {
-        if ($cinema->image && Storage::disk('public')->exists($cinema->image)) {
-            Storage::disk('public')->delete($cinema->image);
-        }
-
-        $cinema->delete();
-
-        return redirect()->route('admin.cinemas.index')->with('success', 'Cinema deleted successfully.');
+        return redirect()->route('admin.cinema.show')->with('success', 'Đã cập nhật thông tin rạp.');
     }
 }
