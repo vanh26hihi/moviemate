@@ -23,7 +23,20 @@ class QueryPendingPayments extends Command
         Payment::query()
             ->where('provider', 'zalopay')
             ->where('status', Payment::STATUS_PENDING)
-            ->where('expires_at', '>', now())
+            ->where(function ($query): void {
+                $query->whereNull('reconcile_until')->orWhere('reconcile_until', '<=', now());
+            })
+            ->update([
+                'status' => Payment::STATUS_REVIEW,
+                'failed_at' => now(),
+                'failure_reason' => 'reconciliation_window_elapsed',
+                'updated_at' => now(),
+            ]);
+
+        Payment::query()
+            ->where('provider', 'zalopay')
+            ->where('status', Payment::STATUS_PENDING)
+            ->where('reconcile_until', '>', now())
             ->where(function ($query) use ($cutoff) {
                 $query->whereNull('last_queried_at')->orWhere('last_queried_at', '<=', $cutoff);
             })

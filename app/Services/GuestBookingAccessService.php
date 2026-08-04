@@ -28,20 +28,6 @@ class GuestBookingAccessService
         return true;
     }
 
-    public function grantPaymentReturn(Request $request, Booking $booking): bool
-    {
-        if ($booking->user_id !== null
-            || ! $booking->guest_access_expires_at
-            || ! $booking->guest_access_expires_at->isFuture()
-            || ! is_string($booking->guest_access_token_hash)) {
-            return false;
-        }
-
-        $this->grant($request, $booking, true);
-
-        return true;
-    }
-
     private function grant(Request $request, Booking $booking, bool $rotateSession): void
     {
         $sessionExpiry = now()->addMinutes(

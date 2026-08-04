@@ -83,8 +83,7 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
 
         $this->get(route('user.bookings.pending', $booking))
             ->assertOk()
-            ->assertSee('Đang chờ xác minh thanh toán')
-            ->assertDontSee($booking->qr_code_url, false);
+            ->assertSee('Đang chờ xác minh thanh toán');
     }
 
     public function test_seat_only_skip_creates_no_empty_order_and_one_payment_attempt(): void

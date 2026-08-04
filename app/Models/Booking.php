@@ -10,8 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Booking extends Model
 {
-    public const QR_CODE_SIZE = 200;
-
     protected $fillable = [
         'user_id',
         'customer_email',
@@ -78,15 +76,6 @@ class Booking extends Model
     public function foodOrder(): HasOne
     {
         return $this->hasOne(Order::class);
-    }
-
-    public function getQrCodeUrlAttribute(): string
-    {
-        return sprintf(
-            'https://api.qrserver.com/v1/create-qr-code/?size=%1$dx%1$d&data=%2$s',
-            self::QR_CODE_SIZE,
-            rawurlencode($this->booking_code)
-        );
     }
 
     public function getRecipientEmailAttribute(): ?string

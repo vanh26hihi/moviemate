@@ -64,6 +64,23 @@ final readonly class ZaloPayConfig
             }
         }
 
+        if (app()->environment('production') && $environment !== 'production') {
+            throw new PaymentConfigurationException('Production must use the ZaloPay production environment.');
+        }
+
+        if (app()->environment('production') || $environment === 'production') {
+            $this->validatePublicUrl(
+                $callbackUrl,
+                (string) config('payment.zalopay.callback_path'),
+                'callback',
+            );
+            $this->validatePublicUrl(
+                $redirectUrl,
+                (string) config('payment.zalopay.redirect_path'),
+                'redirect',
+            );
+        }
+
         foreach (['expiration' => $expireDuration, 'HTTP timeout' => $timeout, 'query interval' => $queryInterval] as $name => $seconds) {
             if (! is_int($seconds) || $seconds <= 0) {
                 throw new PaymentConfigurationException("ZaloPay {$name} must be a positive integer.");
@@ -88,5 +105,47 @@ final readonly class ZaloPayConfig
         $this->queryIntervalSeconds = $queryInterval;
         $this->createEndpoint = $createEndpoint;
         $this->queryEndpoint = $queryEndpoint;
+    }
+
+    private function validatePublicUrl(string $url, string $expectedPath, string $name): void
+    {
+        $parts = parse_url($url);
+        $hosts = config('payment.public_hosts');
+        if (! is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || ! is_string($parts['host'] ?? null)
+            || ($parts['path'] ?? '/') !== $expectedPath
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || isset($parts['query'])
+            || isset($parts['fragment'])
+            || ! is_array($hosts)
+            || $hosts === []) {
+            throw new PaymentConfigurationException("Production ZaloPay {$name} URL is not securely configured.");
+        }
+
+        $host = strtolower(rtrim($parts['host'], '.'));
+        $allowedHosts = array_values(array_filter(array_map(
+            static fn (mixed $configured): ?string => is_string($configured)
+                ? strtolower(rtrim(trim($configured), '.'))
+                : null,
+            $hosts,
+        )));
+        if ($host === 'localhost'
+            || str_ends_with($host, '.localhost')
+            || $this->isLoopbackIp($host)
+            || ! in_array($host, $allowedHosts, true)) {
+            throw new PaymentConfigurationException("Production ZaloPay {$name} host is not allowed.");
+        }
+    }
+
+    private function isLoopbackIp(string $host): bool
+    {
+        $ip = trim($host, '[]');
+        if (filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
+
+        return $ip === '::1' || str_starts_with($ip, '127.');
     }
 }

@@ -67,7 +67,11 @@
             @endif
 
             <dl class="mx-auto mt-7 max-w-xl rounded-2xl app-secondary p-5 text-left text-sm">
-                <div class="flex justify-between gap-4"><dt class="app-muted">Mã booking</dt><dd class="break-all text-right font-mono font-bold text-brand-start">{{ $booking->booking_code }}</dd></div>
+                @if($canViewBooking)
+                    <div class="flex justify-between gap-4"><dt class="app-muted">Mã booking</dt><dd class="break-all text-right font-mono font-bold text-brand-start">{{ $booking->booking_code }}</dd></div>
+                @else
+                    <div class="flex justify-between gap-4"><dt class="app-muted">Lần thanh toán</dt><dd class="text-right font-mono font-bold text-brand-start">#{{ $payment->id }}</dd></div>
+                @endif
                 <div class="mt-3 flex justify-between gap-4"><dt class="app-muted">Kênh thanh toán</dt><dd class="font-bold app-text">ZaloPay</dd></div>
                 <div class="mt-3 flex justify-between gap-4 border-t pt-3 app-border"><dt class="font-bold app-text">Số tiền</dt><dd class="font-extrabold text-brand-start">{{ number_format((int) $payment->amount, 0, ',', '.') }} {{ $payment->currency ?: 'VND' }}</dd></div>
             </dl>
@@ -85,13 +89,17 @@
             @endif
 
             <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
-                @if($isVerifiedPaid)
+                @if($isVerifiedPaid && $canViewTicket)
                     <a href="{{ route('user.bookings.ticket', $booking) }}" data-paid-ticket-link class="btn-primary">
                         <i class="ph-fill ph-ticket" aria-hidden="true"></i>
                         Mở vé điện tử
                     </a>
+                @elseif($isVerifiedPaid)
+                    <p class="app-muted">Liên kết mở vé an toàn được gửi riêng qua email và không được cấp bởi trang quay lại thanh toán.</p>
                 @endif
-                <a href="{{ route('user.bookings.success', $booking) }}" class="btn-secondary">Xem chi tiết booking</a>
+                @if($canViewBooking)
+                    <a href="{{ route('user.bookings.success', $booking) }}" class="btn-secondary">Xem chi tiết booking</a>
+                @endif
             </div>
         </section>
     </div>
