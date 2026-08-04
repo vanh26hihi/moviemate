@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\FoodController as AdminFoodController;
 use App\Http\Controllers\Admin\FoodOrderController as AdminFoodOrderController;
 use App\Http\Controllers\Admin\GenreController as AdminGenreController;
 use App\Http\Controllers\Admin\MovieController as AdminMovieController;
+use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
@@ -12,14 +13,35 @@ use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Payments\PaymentInitiationController;
+use App\Http\Controllers\Payments\ZaloPayCallbackController;
+use App\Http\Controllers\Payments\ZaloPayReturnController;
+use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
+use App\Http\Controllers\User\BookingFoodSelectionController;
+use App\Http\Controllers\User\BookingReviewController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
+use App\Http\Controllers\User\GuestBookingAccessController;
 use App\Http\Controllers\User\HomeController;
 use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
+use App\Http\Controllers\User\RetiredBookingStoreController;
+use App\Http\Middleware\ProtectBookingResponses;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
+    ->middleware('throttle:120,1')
+    ->name('payments.zalopay.callback');
+
+Route::get('/payments/zalopay/return', ZaloPayReturnController::class)
+    ->middleware(ProtectBookingResponses::class)
+    ->name('payments.zalopay.return');
+
+Route::post('/payments/zalopay/bookings/{booking}', PaymentInitiationController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->name('payments.zalopay.initiate');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', function () {
@@ -49,16 +71,60 @@ Route::get('/booking/select-seat/{showtime}', [BookingController::class, 'select
     ->name('user.bookings.selectSeat');
 
 Route::get('/booking/checkout/{showtime}', [BookingController::class, 'checkout'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
     ->name('user.bookings.checkout');
 
-Route::post('/booking/store', [BookingController::class, 'store'])
+Route::get('/booking/food', [BookingFoodSelectionController::class, 'show'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
+    ->name('user.bookings.food');
+
+Route::post('/booking/food', [BookingFoodSelectionController::class, 'store'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->name('user.bookings.food.store');
+
+Route::get('/booking/review', BookingReviewController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
+    ->name('user.bookings.review');
+
+Route::post('/booking/confirm', BookingCheckoutConfirmController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
+    ->name('user.bookings.confirm');
+
+Route::post('/booking/store', RetiredBookingStoreController::class)
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.store');
 
 Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.success');
 
+Route::get('/booking/payment/pending/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.pending');
+
+Route::get('/booking/payment/failed/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.failed');
+
+Route::get('/booking/payment/review/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.payment-review');
+
+Route::get('/booking/payment/expired/{booking}', [BookingController::class, 'success'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.expired');
+
 Route::get('/my-ticket/{booking}', [BookingController::class, 'ticket'])
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.ticket');
+
+Route::get('/booking/access/{booking}', [GuestBookingAccessController::class, 'show'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.access.show');
+
+Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, 'exchange'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
+    ->name('user.bookings.access.exchange');
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/booking-history', function () {
@@ -83,11 +149,13 @@ Route::get('/admin/rooms/{room}/layout/preview', [AdminSeatController::class, 'p
     ->name('admin.rooms.layout.preview');
 
 Route::get('/foods', [UserFoodController::class, 'index'])->name('foods.index');
-Route::post('/foods/add', [UserFoodController::class, 'addToCart'])->name('foods.add');
-Route::get('/foods/cart', [UserOrderController::class, 'cart'])->name('foods.cart');
-Route::get('/foods/checkout', [UserOrderController::class, 'checkout'])->name('foods.checkout');
-Route::post('/foods/store', [UserOrderController::class, 'store'])->name('foods.store');
-Route::get('/foods/success/{order}', [UserOrderController::class, 'success'])->name('foods.success');
+Route::post('/foods/add', [UserOrderController::class, 'retired'])->name('foods.add');
+Route::get('/foods/cart', [UserOrderController::class, 'retired'])->name('foods.cart');
+Route::get('/foods/checkout', [UserOrderController::class, 'retired'])->name('foods.checkout');
+Route::post('/foods/store', [UserOrderController::class, 'retired'])->name('foods.store');
+Route::get('/foods/success/{order}', [UserOrderController::class, 'retired'])
+    ->whereNumber('order')
+    ->name('foods.success');
 
 Route::prefix('admin')->name('admin.')
     ->middleware(['auth', 'active', 'permission:admin.access'])
@@ -154,6 +222,13 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:food-orders.view')->name('food-orders.index');
         Route::get('/food-orders/{order}', [AdminFoodOrderController::class, 'show'])
             ->middleware('permission:food-orders.view')->name('food-orders.show');
+
+        Route::get('/payment-reviews', [AdminPaymentReviewController::class, 'index'])
+            ->middleware('permission:bookings.operate')->name('payment-reviews.index');
+        Route::post('/payment-reviews/{paymentId}/reconcile', [AdminPaymentReviewController::class, 'resolve'])
+            ->whereNumber('paymentId')
+            ->middleware(['permission:bookings.operate', 'throttle:6,1'])
+            ->name('payment-reviews.resolve');
 
         Route::get('/users', [AdminUserController::class, 'index'])
             ->middleware('permission:users.view')->name('users.index');

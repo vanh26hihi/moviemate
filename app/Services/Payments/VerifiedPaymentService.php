@@ -1,0 +1,209 @@
+<?php
+
+namespace App\Services\Payments;
+
+use App\Domain\Payments\PaymentVerificationResult;
+use App\Domain\Payments\VerifiedPaymentData;
+use App\Models\Booking;
+use App\Models\BookingSeat;
+use App\Models\BookingTicketDelivery;
+use App\Models\Order;
+use App\Models\Payment;
+use Illuminate\Support\Facades\DB;
+
+class VerifiedPaymentService
+{
+    public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
+    {
+        return $this->verifyEligiblePayment($payment, $data, false);
+    }
+
+    public function verifyReview(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
+    {
+        return $this->verifyEligiblePayment($payment, $data, true);
+    }
+
+    private function verifyEligiblePayment(
+        Payment $payment,
+        VerifiedPaymentData $data,
+        bool $allowReview,
+    ): PaymentVerificationResult {
+        return DB::transaction(function () use ($payment, $data, $allowReview): PaymentVerificationResult {
+            $booking = Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
+
+            if ($lockedPayment->status === Payment::STATUS_SUCCESS) {
+                return PaymentVerificationResult::duplicate();
+            }
+
+            $eligible = $allowReview
+                ? $lockedPayment->status === Payment::STATUS_REVIEW
+                : in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true);
+
+            if (! $eligible) {
+                return PaymentVerificationResult::rejected(
+                    'Payment attempt is not eligible for automatic fulfillment.',
+                );
+            }
+
+            if ($lockedPayment->provider !== 'zalopay'
+                || $lockedPayment->app_id !== $data->appId
+                || $lockedPayment->app_trans_id !== $data->appTransId) {
+                return PaymentVerificationResult::rejected('Invalid payment identity.');
+            }
+
+            if ($lockedPayment->amount !== $data->amount) {
+                $this->markReview($lockedPayment, $data, 'amount_mismatch');
+
+                return PaymentVerificationResult::rejected('Payment amount mismatch.');
+            }
+
+            if ($data->zpTransId === null) {
+                $this->markReview($lockedPayment, $data, 'missing_zp_trans_id');
+
+                return PaymentVerificationResult::rejected('Missing verified ZaloPay transaction identity.');
+            }
+
+            if ($lockedPayment->zp_trans_id !== null
+                && $lockedPayment->zp_trans_id !== $data->zpTransId) {
+                $this->markReview($lockedPayment, $data, 'zp_trans_id_mismatch', false);
+
+                return PaymentVerificationResult::rejected('ZaloPay transaction identity mismatch.');
+            }
+
+            if ($data->zpTransId !== null) {
+                $duplicateTransaction = Payment::query()
+                    ->where('provider', 'zalopay')
+                    ->where('zp_trans_id', $data->zpTransId)
+                    ->whereKeyNot($lockedPayment->getKey())
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($duplicateTransaction) {
+                    $this->markReview($lockedPayment, $data, 'duplicate_zp_trans_id', false);
+
+                    return PaymentVerificationResult::rejected('ZaloPay transaction belongs to another attempt.');
+                }
+            }
+
+            $laterAttemptExists = Payment::query()
+                ->where('booking_id', $booking->getKey())
+                ->where('provider', $lockedPayment->provider)
+                ->where('id', '>', $lockedPayment->getKey())
+                ->lockForUpdate()
+                ->exists();
+
+            if ($laterAttemptExists) {
+                $this->markReview($lockedPayment, $data, 'incompatible_later_attempt');
+
+                return PaymentVerificationResult::rejected(
+                    'A later payment attempt exists for this booking.',
+                );
+            }
+
+            $seatLocks = $booking->bookingSeats()->lockForUpdate()->get();
+            $seatsAreOwned = $seatLocks->isNotEmpty()
+                && $seatLocks->every(
+                    fn (BookingSeat $seat): bool => $seat->showtime_id === $booking->showtime_id
+                        && $seat->active_lock_key === BookingSeat::ACTIVE_LOCK_KEY,
+                );
+
+            if ($booking->booking_status === 'expired'
+                || ! $booking->expires_at
+                || $booking->expires_at->isPast()) {
+                $this->markReview($lockedPayment, $data, 'late_payment_after_expiration');
+
+                return PaymentVerificationResult::rejected('Payment arrived after booking expiration.');
+            }
+
+            if (! $seatsAreOwned) {
+                $this->markReview($lockedPayment, $data, 'seat_ownership_lost');
+
+                return PaymentVerificationResult::rejected('Booking no longer owns its reserved seats.');
+            }
+
+            if ($booking->payment_status === 'paid'
+                || $booking->booking_status !== 'pending_payment') {
+                $this->markReview($lockedPayment, $data, 'booking_not_payable');
+
+                return PaymentVerificationResult::rejected('Booking is no longer payable.');
+            }
+
+            $now = now();
+            $this->applyAuditFields($lockedPayment, $data);
+            $lockedPayment->forceFill([
+                'status' => Payment::STATUS_SUCCESS,
+                'verified_at' => $now,
+                'paid_at' => $now,
+                'failed_at' => null,
+                'failure_reason' => null,
+            ])->save();
+
+            $booking->forceFill([
+                'payment_method' => 'zalopay',
+                'payment_status' => 'paid',
+                'booking_status' => 'paid',
+                'paid_at' => $now,
+            ])->save();
+
+            $foodOrder = Order::query()
+                ->where('booking_id', $booking->id)
+                ->where('status', 'pending')
+                ->lockForUpdate()
+                ->first();
+            $foodOrder?->forceFill(['status' => 'paid'])->save();
+            $this->ensureTicketDelivery($booking);
+
+            return PaymentVerificationResult::transitioned();
+        });
+    }
+
+    private function ensureTicketDelivery(Booking $booking): void
+    {
+        BookingTicketDelivery::query()->firstOrCreate(
+            ['booking_id' => $booking->getKey()],
+            [
+                'status' => BookingTicketDelivery::STATUS_PENDING,
+                'attempts' => 0,
+                'available_at' => now(),
+            ],
+        );
+    }
+
+    private function markReview(
+        Payment $payment,
+        VerifiedPaymentData $data,
+        string $reason,
+        bool $storeTransactionId = true,
+    ): void {
+        $this->applyAuditFields($payment, $data, $storeTransactionId);
+        $payment->forceFill([
+            'status' => Payment::STATUS_REVIEW,
+            'failure_reason' => $reason,
+            'failed_at' => now(),
+        ])->save();
+    }
+
+    private function applyAuditFields(
+        Payment $payment,
+        VerifiedPaymentData $data,
+        bool $storeTransactionId = true,
+    ): void {
+        $fields = [
+            'server_time_ms' => $data->serverTimeMs,
+        ];
+
+        if ($storeTransactionId && $data->zpTransId !== null) {
+            $fields['zp_trans_id'] = $data->zpTransId;
+        }
+
+        if ($data->source === 'callback') {
+            $fields['callback_received_at'] = now();
+            $fields['callback_payload_hash'] = $data->payloadHash;
+        } elseif ($data->source === 'query') {
+            $fields['query_response_hash'] = $data->payloadHash;
+        }
+
+        $payment->forceFill($fields);
+    }
+}

@@ -10,22 +10,44 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Booking extends Model
 {
-    public const QR_CODE_SIZE = 200;
-
     protected $fillable = [
         'user_id',
         'customer_email',
+        'guest_access_token_hash',
+        'guest_access_expires_at',
+        'checkout_idempotency_key_hash',
+        'checkout_request_fingerprint_hash',
         'showtime_id',
         'booking_code',
         'total_amount',
+        'seat_subtotal',
+        'food_subtotal',
+        'currency',
         'payment_status',
         'booking_status',
+        'expires_at',
+        'paid_at',
         'used_at',
     ];
 
     protected $casts = [
         'used_at' => 'datetime',
+        'expires_at' => 'datetime',
+        'guest_access_expires_at' => 'datetime',
+        'ticket_email_token_expires_at' => 'datetime',
+        'paid_at' => 'datetime',
+        'ticket_emailed_at' => 'datetime',
         'total_amount' => 'decimal:2',
+        'seat_subtotal' => 'integer',
+        'food_subtotal' => 'integer',
+    ];
+
+    protected $hidden = [
+        'guest_access_token_hash',
+        'ticket_email_token_nonce',
+        'ticket_email_token_hash',
+        'checkout_idempotency_key_hash',
+        'checkout_request_fingerprint_hash',
     ];
 
     public function user(): BelongsTo
@@ -45,16 +67,18 @@ class Booking extends Model
 
     public function payment(): HasOne
     {
-        return $this->hasOne(Payment::class);
+        // Backward-compatible singular access now resolves the newest attempt.
+        return $this->hasOne(Payment::class)->latestOfMany();
     }
 
-    public function getQrCodeUrlAttribute(): string
+    public function payments(): HasMany
     {
-        return sprintf(
-            'https://api.qrserver.com/v1/create-qr-code/?size=%1$dx%1$d&data=%2$s',
-            self::QR_CODE_SIZE,
-            rawurlencode($this->booking_code)
-        );
+        return $this->hasMany(Payment::class);
+    }
+
+    public function foodOrder(): HasOne
+    {
+        return $this->hasOne(Order::class);
     }
 
     public function getRecipientEmailAttribute(): ?string

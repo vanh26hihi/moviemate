@@ -7,18 +7,14 @@
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-8">
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brand-start">Thực đơn rạp</p>
-            <h1 class="mt-3 text-3xl sm:text-4xl font-bold app-text">Đặt đồ ăn khi đến rạp</h1>
-            <p class="mt-3 max-w-2xl text-sm app-muted">Chọn món, thêm vào giỏ và nhận đồ ngay khi đến rạp. Thanh toán nhanh gọn bằng chức năng giống mua vé.</p>
+            <h1 class="mt-3 text-3xl sm:text-4xl font-bold app-text">Xem thực đơn MovieMate</h1>
+            <p class="mt-3 max-w-2xl text-sm app-muted">Đồ ăn được chọn tùy ý trong checkout vé: chọn phim, suất chiếu và ghế, sau đó thêm món trước khi thanh toán ZaloPay.</p>
         </div>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <a href="{{ route('foods.cart') }}" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-start px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:shadow-brand-start/30 transition">
-                <i class="ph-fill ph-shopping-bag"></i>
-                Giỏ hàng ({{ array_sum(session('food_cart', [])) ?: 0 }})
-            </a>
-            <a href="{{ route('home') }}#home-showtime-calendar" class="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-app-card px-5 py-3 text-sm font-semibold app-text hover:border-brand-start hover:text-brand-start transition">
+            <a href="{{ route('home') }}#home-showtime-calendar" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand-start px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:shadow-brand-start/30 transition">
                 <i class="ph ph-film-strip"></i>
-                Xem lịch chiếu
+                Chọn phim và suất chiếu
             </a>
         </div>
     </div>
@@ -43,15 +39,7 @@
                 </div>
                 <p class="text-sm app-muted mb-5 min-h-[72px]">{{ $food->description ?: 'Chưa có mô tả.' }}</p>
 
-                <form action="{{ route('foods.add') }}" method="POST" class="grid gap-3">
-                    @csrf
-                    <input type="hidden" name="food_id" value="{{ $food->id }}">
-                    <div class="flex items-center gap-3">
-                        <label class="text-sm font-medium app-text">Số lượng</label>
-                        <input type="number" name="quantity" value="1" min="1" class="user-form-control !w-24 !py-2" aria-label="Số lượng {{ $food->name }}" />
-                    </div>
-                    <button type="submit" class="rounded-2xl bg-brand-start px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-start/20 hover:bg-brand-end transition">Thêm vào giỏ</button>
-                </form>
+                <a href="{{ route('home') }}#home-showtime-calendar" class="inline-flex w-full items-center justify-center rounded-2xl border border-brand-start/30 bg-brand-start/10 px-4 py-3 text-sm font-semibold text-brand-start hover:bg-brand-start hover:text-white transition">Chọn cùng vé xem phim</a>
             </article>
         @empty
             <div class="col-span-full cinema-card rounded-[2rem] p-10 text-center">

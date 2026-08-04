@@ -14,6 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'payments/zalopay/callback',
+            'booking/store',
+        ]);
+
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'role' => RequireRole::class,

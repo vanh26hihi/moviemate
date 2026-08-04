@@ -30,10 +30,24 @@ class BookingOwnershipTest extends TestCase
         $this->actingAs($otherCustomer)->get(route('user.bookings.ticket', $booking))->assertForbidden();
     }
 
-    public function test_guest_booking_remains_accessible_to_preserve_existing_public_flow(): void
+    public function test_guest_booking_requires_a_session_capability_from_its_hashed_access_token(): void
     {
         $booking = $this->bookingFor(null);
+        $token = str()->random(64);
+        $booking->update([
+            'guest_access_token_hash' => hash('sha256', $token),
+            'guest_access_expires_at' => now()->addHour(),
+        ]);
 
+        $this->get(route('user.bookings.ticket', $booking))->assertNotFound();
+        $this->get(route('user.bookings.ticket', [
+            'booking' => $booking,
+            'guest_token' => $token,
+        ]))->assertNotFound();
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $token,
+            'destination' => 'ticket',
+        ])->assertOk();
         $this->get(route('user.bookings.ticket', $booking))->assertOk();
     }
 
