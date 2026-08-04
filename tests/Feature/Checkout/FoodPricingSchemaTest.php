@@ -66,7 +66,7 @@ class FoodPricingSchemaTest extends TestCase
         $this->assertDatabaseHas('orders', ['id' => $order->id, 'booking_id' => null, 'status' => 'expired']);
     }
 
-    public function test_migration_can_roundtrip_safely(): void
+    public function test_migration_refuses_to_discard_checkout_history(): void
     {
         $migration = require database_path('migrations/2026_08_04_120000_add_checkout_pricing_and_food_snapshots.php');
         $booking = $this->bookingForScenario($this->bookingScenario(false));
@@ -79,12 +79,14 @@ class FoodPricingSchemaTest extends TestCase
             'status' => 'expired',
         ]);
 
-        $migration->down();
-        $this->assertPhaseFourColumnsAreMissing();
-        $this->assertSame(1, DB::table('bookings')->where('id', $booking->id)->count());
-        $this->assertSame(1, DB::table('orders')->where('id', $order->id)->count());
+        try {
+            $migration->down();
+            $this->fail('Rollback must refuse protected checkout history.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('protected rows exist', $exception->getMessage());
+            $this->assertStringContainsString('No rows or schema objects were changed', $exception->getMessage());
+        }
 
-        $migration->up();
         $this->assertPhaseFourColumnsExist();
         $this->assertSame(1, DB::table('bookings')->where('id', $booking->id)->count());
         $this->assertSame(1, DB::table('orders')->where('id', $order->id)->count());
@@ -151,8 +153,8 @@ class FoodPricingSchemaTest extends TestCase
             database_path('migrations/2026_08_04_120000_add_checkout_pricing_and_food_snapshots.php'),
         );
 
-        $foreignDrop = strpos($source, '$table->dropForeign(self::ORDERS_BOOKING_FOREIGN)');
-        $uniqueDrop = strpos($source, '$table->dropUnique(self::ORDERS_BOOKING_UNIQUE)');
+        $foreignDrop = strpos($source, '$table->dropForeign($foreignKey)');
+        $uniqueDrop = strpos($source, '$table->dropUnique($index)');
 
         $this->assertNotFalse($foreignDrop);
         $this->assertNotFalse($uniqueDrop);

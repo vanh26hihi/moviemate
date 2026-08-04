@@ -21,12 +21,9 @@ return new class extends Migration
 
     public function up(): void
     {
-        $state = $this->hardeningState();
-        $this->assertStateCanBeMigrated($state);
-
         $this->preflightAndNormalizeLegacyData();
 
-        if ($this->isFullyHardened($state)) {
+        if ($this->isFullyHardened($this->hardeningState())) {
             return;
         }
 
@@ -80,9 +77,6 @@ return new class extends Migration
         if ($this->isNotHardened($state)) {
             return;
         }
-        if (! $this->isFullyHardened($state)) {
-            throw new RuntimeException($this->partialStateMessage($state, 'rollback'));
-        }
 
         $rebooked = DB::table('booking_seats')
             ->groupBy('showtime_id', 'seat_id')
@@ -109,12 +103,13 @@ return new class extends Migration
             $this->dropActiveLockConstraint();
         }
 
-        if ($this->hasBookingSeatParentForeign()) {
-            Schema::table('booking_seats', function (Blueprint $table): void {
+        $parentForeign = $this->bookingSeatParentForeignName();
+        if ($parentForeign !== null) {
+            Schema::table('booking_seats', function (Blueprint $table) use ($parentForeign): void {
                 if (DB::getDriverName() === 'sqlite') {
                     $table->dropForeign(['booking_id', 'showtime_id']);
                 } else {
-                    $table->dropForeign(self::BOOKING_SEAT_PARENT_FOREIGN);
+                    $table->dropForeign($parentForeign);
                 }
             });
         }
@@ -125,9 +120,10 @@ return new class extends Migration
             });
         }
 
-        if ($this->hasBookingIdentityUnique()) {
-            Schema::table('bookings', function (Blueprint $table): void {
-                $table->dropUnique(self::BOOKING_IDENTITY_UNIQUE);
+        $identityUnique = $this->bookingIdentityUniqueName();
+        if ($identityUnique !== null) {
+            Schema::table('bookings', function (Blueprint $table) use ($identityUnique): void {
+                $table->dropUnique($identityUnique);
             });
         }
 
@@ -376,14 +372,6 @@ return new class extends Migration
     }
 
     /** @param array<string, bool> $state */
-    private function assertStateCanBeMigrated(array $state): void
-    {
-        if (! $this->isNotHardened($state) && ! $this->isFullyHardened($state)) {
-            throw new RuntimeException($this->partialStateMessage($state, 'migration'));
-        }
-    }
-
-    /** @param array<string, bool> $state */
     private function isNotHardened(array $state): bool
     {
         return ! in_array(true, $state, true);
@@ -393,16 +381,6 @@ return new class extends Migration
     private function isFullyHardened(array $state): bool
     {
         return ! in_array(false, $state, true);
-    }
-
-    /** @param array<string, bool> $state */
-    private function partialStateMessage(array $state, string $operation): string
-    {
-        $present = implode(', ', array_keys(array_filter($state)));
-        $missing = implode(', ', array_keys(array_filter($state, fn (bool $value): bool => ! $value)));
-
-        return "Cannot continue booking seat integrity {$operation}: partial DDL state detected. "
-            ."Present [{$present}]; missing [{$missing}]. Manual schema repair is required; no data was deleted.";
     }
 
     private function bookingSeatShowtimeIsNullable(): bool
@@ -422,28 +400,47 @@ return new class extends Migration
 
     private function hasBookingIdentityUnique(): bool
     {
-        if (DB::connection()->pretending()) {
-            return false;
-        }
-
-        return collect(Schema::getIndexes('bookings'))->contains(
-            fn (array $index): bool => ($index['name'] ?? null) === self::BOOKING_IDENTITY_UNIQUE
-                && ($index['unique'] ?? false)
-                && ($index['columns'] ?? []) === ['id', 'showtime_id']
-        );
+        return $this->bookingIdentityUniqueName() !== null;
     }
 
     private function hasBookingSeatParentForeign(): bool
     {
+        return $this->bookingSeatParentForeignName() !== null;
+    }
+
+    private function bookingIdentityUniqueName(): ?string
+    {
         if (DB::connection()->pretending()) {
-            return false;
+            return null;
         }
 
-        return collect(Schema::getForeignKeys('booking_seats'))->contains(
-            fn (array $foreign): bool => ($foreign['columns'] ?? []) === ['booking_id', 'showtime_id']
-                && ($foreign['foreign_table'] ?? null) === 'bookings'
-                && ($foreign['foreign_columns'] ?? []) === ['id', 'showtime_id']
+        $index = collect(Schema::getIndexes('bookings'))->first(
+            fn (array $candidate): bool => ($candidate['unique'] ?? false)
+                && ($candidate['columns'] ?? []) === ['id', 'showtime_id'],
         );
+
+        return $index['name'] ?? null;
+    }
+
+    private function bookingSeatParentForeignName(): ?string
+    {
+        if (DB::connection()->pretending()) {
+            return null;
+        }
+
+        $foreign = collect(Schema::getForeignKeys('booking_seats'))->first(
+            fn (array $candidate): bool => ($candidate['columns'] ?? []) === ['booking_id', 'showtime_id']
+                && ($candidate['foreign_table'] ?? null) === 'bookings'
+                && ($candidate['foreign_columns'] ?? []) === ['id', 'showtime_id'],
+        );
+
+        if ($foreign === null) {
+            return null;
+        }
+
+        return DB::getDriverName() === 'sqlite'
+            ? self::BOOKING_SEAT_PARENT_FOREIGN
+            : ($foreign['name'] ?? null);
     }
 
     private function hasActiveLockConstraint(): bool

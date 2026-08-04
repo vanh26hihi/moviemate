@@ -219,7 +219,7 @@ class BookingSeatIntegritySchemaTest extends TestCase
         $this->assertFalse(Schema::hasColumn('bookings', 'checkout_request_fingerprint_hash'));
     }
 
-    public function test_partial_hardening_state_is_reported_without_duplicate_ddl(): void
+    public function test_partial_hardening_state_resumes_without_duplicate_ddl(): void
     {
         $migration = $this->migration();
         $migration->down();
@@ -227,10 +227,13 @@ class BookingSeatIntegritySchemaTest extends TestCase
             $table->char('checkout_request_fingerprint_hash', 64)->nullable();
         });
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('partial DDL state detected');
-
         $migration->up();
+
+        $this->assertTrue(Schema::hasColumns('bookings', [
+            'checkout_request_fingerprint_hash',
+            'guest_access_expires_at',
+        ]));
+        $this->assertFalse(collect(Schema::getColumns('booking_seats'))->keyBy('name')['showtime_id']['nullable']);
     }
 
     public function test_down_refuses_rebook_history_and_preserves_every_row(): void

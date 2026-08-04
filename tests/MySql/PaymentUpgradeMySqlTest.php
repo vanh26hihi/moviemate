@@ -44,6 +44,7 @@ class PaymentUpgradeMySqlTest extends TestCase
         $this->assertMigrationRan('2026_07_17_000001_replace_booking_seat_unique_with_active_lock');
         $this->assertMigrationRan('2026_08_04_123000_remove_booking_seat_fk_compatibility_index');
         $this->assertMigrationRan('2026_08_04_124000_add_ticket_email_access_credentials_to_bookings');
+        $this->assertMigrationRan('2026_08_04_125000_guard_phase4_rollback_data');
         $this->assertTrue(Schema::hasColumns('bookings', [
             'ticket_email_token_nonce',
             'ticket_email_token_hash',
@@ -100,6 +101,87 @@ class PaymentUpgradeMySqlTest extends TestCase
             'ticket_email_token_hash',
             'ticket_email_token_expires_at',
         ]));
+    }
+
+    public function test_historical_layout_rollback_drops_foreigns_before_supporting_indexes_and_resumes(): void
+    {
+        $this->freshDatabase();
+        $migration = require database_path('migrations/2026_08_03_200000_create_versioned_room_layouts.php');
+        $schedule = require database_path('migrations/2026_08_04_000000_add_showtime_schedule_lookup_index.php');
+
+        $this->assertSame(
+            ['room_id', 'room_layout_id'],
+            $this->indexColumns('showtimes', 'showtimes_room_id_room_layout_id_index'),
+        );
+        $this->assertSame([], $this->indexColumns('showtimes', 'showtimes_room_id_foreign'));
+        $this->announceMutation('schedule lookup down before historical 200000 rollback');
+        $schedule->down();
+        $this->assertSame([], $this->indexColumns('showtimes', 'showtimes_room_schedule_lookup_index'));
+
+        $this->announceMutation('historical 200000 down');
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('showtimes', 'room_layout_id'));
+        $this->assertTrue($this->hasForeignColumns('showtimes', ['room_id'], 'rooms'));
+
+        $this->announceMutation('historical 200000 up');
+        $migration->up();
+        $this->announceMutation('schedule lookup up after historical 200000 re-upgrade');
+        $schedule->up();
+        $this->statement('ALTER TABLE `showtimes` DROP FOREIGN KEY `showtimes_room_layout_id_foreign`');
+        $this->announceMutation('schedule lookup down before historical partial resume');
+        $schedule->down();
+        $this->announceMutation('historical 200000 partial down resume');
+        $migration->down();
+        $this->announceMutation('historical 200000 partial up resume');
+        $migration->up();
+        $this->announceMutation('schedule lookup up after historical partial resume');
+        $schedule->up();
+
+        $this->assertTrue($this->hasForeignColumns('showtimes', ['room_id'], 'rooms'));
+        $this->assertTrue($this->hasForeignColumns('showtimes', ['room_layout_id'], 'room_layouts'));
+        $this->evidence('historical-layout-rollback', ['error_1553_avoided' => true, 'partial_resume' => true]);
+    }
+
+    public function test_exact_phase_four_down_up_roundtrip_succeeds_when_rehearsal_is_empty(): void
+    {
+        $this->freshDatabase();
+        $migrations = $this->phaseFourMigrations();
+
+        foreach (array_reverse($migrations) as $migration) {
+            $this->announceMutation('exact Phase-4 migration down');
+            $migration->down();
+        }
+        $this->assertFalse(Schema::hasColumn('payments', 'app_trans_id'));
+        $this->assertFalse(Schema::hasTable('booking_ticket_deliveries'));
+
+        foreach ($migrations as $migration) {
+            $this->announceMutation('exact Phase-4 migration up');
+            $migration->up();
+        }
+
+        $this->assertTrue(Schema::hasColumn('payments', 'active_attempt_key'));
+        $this->assertTrue(Schema::hasColumn('bookings', 'ticket_email_token_hash'));
+        $this->assertTrue(Schema::hasTable('booking_ticket_deliveries'));
+        $this->evidence('exact-phase4-roundtrip', ['empty_rollback' => true, 'reupgrade' => true]);
+    }
+
+    public function test_phase_four_guard_blocks_active_data_before_schema_changes(): void
+    {
+        $this->freshDatabase();
+        $bookingId = $this->bookingId();
+        $before = $this->showCreate('bookings');
+
+        try {
+            (require database_path('migrations/2026_08_04_125000_guard_phase4_rollback_data.php'))->down();
+            $this->fail('The Phase-4 rollback guard must refuse protected business data.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('protected business data exists', $exception->getMessage());
+            $this->assertStringContainsString('bookings=1', $exception->getMessage());
+        }
+
+        $this->assertSame($before, $this->showCreate('bookings'));
+        $this->assertSame(1, DB::table('bookings')->where('id', $bookingId)->count());
+        $this->evidence('phase4-protected-data', ['booking_id' => $bookingId, 'schema_unchanged' => true]);
     }
 
     public function test_real_inventory_classifies_all_four_supported_states_and_repairs_missing_indexes(): void
@@ -427,11 +509,7 @@ class PaymentUpgradeMySqlTest extends TestCase
     {
         $database = (string) DB::connection()->getDatabaseName();
         $this->assertNotSame('moviemate', $database);
-        $this->assertTrue(
-            $database === 'moviemate_phase4_rehearsal'
-                || str_starts_with($database, 'moviemate_phase4_mysql_test_'),
-            "Unsafe MySQL integration database [{$database}].",
-        );
+        $this->assertSame('moviemate_phase4_rehearsal', $database, "Unsafe MySQL integration database [{$database}].");
     }
 
     private function announceMutation(string $operation): void
@@ -475,6 +553,32 @@ class PaymentUpgradeMySqlTest extends TestCase
     {
         return require database_path(
             'migrations/2026_08_04_124000_add_ticket_email_access_credentials_to_bookings.php',
+        );
+    }
+
+    /** @return list<object> */
+    private function phaseFourMigrations(): array
+    {
+        return collect([
+            '2026_08_04_100000_harden_booking_foundations.php',
+            '2026_08_04_105000_harden_booking_seat_integrity.php',
+            '2026_08_04_110000_extend_payments_for_zalopay.php',
+            '2026_08_04_115000_add_payment_reconciliation_and_ticket_outbox.php',
+            '2026_08_04_120000_add_checkout_pricing_and_food_snapshots.php',
+            '2026_08_04_121000_harden_active_payment_attempt_states.php',
+            '2026_08_04_122000_create_payment_review_events_table.php',
+            '2026_08_04_123000_remove_booking_seat_fk_compatibility_index.php',
+            '2026_08_04_124000_add_ticket_email_access_credentials_to_bookings.php',
+            '2026_08_04_125000_guard_phase4_rollback_data.php',
+        ])->map(fn (string $file): object => require database_path('migrations/'.$file))->all();
+    }
+
+    /** @param list<string> $columns */
+    private function hasForeignColumns(string $table, array $columns, string $foreignTable): bool
+    {
+        return collect(Schema::getForeignKeys($table))->contains(
+            fn (array $foreign): bool => ($foreign['columns'] ?? []) === $columns
+                && ($foreign['foreign_table'] ?? null) === $foreignTable,
         );
     }
 

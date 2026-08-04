@@ -1,5 +1,27 @@
 # Payment reconciliation operations
 
+## Migration and rollback support policy
+
+The supported database lifecycle is:
+
+- Fresh install: supported.
+- Forward upgrade from an existing MovieMate schema: supported. The migration chain includes `2026_08_04_124000_add_ticket_email_access_credentials_to_bookings` and the forward rollback guard `2026_08_04_125000_guard_phase4_rollback_data`.
+- Exact Phase-4 batch rollback (`100000` through `125000`): supported only when the guard confirms that bookings, booking seats, payments, orders, order items, ticket deliveries, and payment review events are empty. A refusal is a safety result, not a request to delete data.
+- Rollback with protected business data: refused. Archive and reconcile the data, or roll forward. Never delete or null business history merely to make a rollback pass.
+- Full historical rollback: unsupported. Older migrations predate the Phase-4 safety contract and may intentionally refuse referenced room-layout or booking-seat history. Restore a tested database backup or deploy a forward compatibility migration instead.
+
+Migration `115000` is checksum-immutable. Do not invoke its `down()` directly. Its safe rollback boundary is the exact Phase-4 batch, where `125000` runs first and refuses protected data before `115000` can execute. If MySQL stopped during `115000` after auto-committing only part of its DDL, stop the deployment and compare `payments` and `booking_ticket_deliveries` with a clean rehearsal schema; repair the schema under an approved change plan before retrying. Do not repeatedly run the immutable migration against an unknown partial state.
+
+All destructive MySQL rehearsals must use only `moviemate_phase4_rehearsal`. The test bootstrap and `DatabaseSafetyGuard` hard-refuse `moviemate` and every other MySQL database name. In PowerShell, set the database explicitly and run the guarded suite:
+
+```powershell
+$env:DB_DATABASE = 'moviemate_phase4_rehearsal'
+php artisan optimize:clear
+vendor\bin\phpunit -c phpunit.mysql.xml
+```
+
+Never run `migrate:fresh`, `migrate:rollback`, a migration object's `down()`, or manual schema DDL against the primary `moviemate` database. Primary verification is read-only: confirm booking and payment counts and the absence of Phase-4 migration rows before and after rehearsal.
+
 Automatic reconciliation processes only `pending`, `processing`, and `unresolved` ZaloPay attempts within their reconciliation window. The scheduled `payments:query-pending` command deliberately excludes `review` payments.
 
 `review` is an operator-controlled state. An authorized manager or administrator with `bookings.operate` may use **Admin → Payment review** to query the existing provider order. The POST action is authenticated, CSRF protected, rate limited, and audited. It never creates a provider order. Only authoritative success for the same payment identity and amount can use the shared verified transition, and that transition re-locks the booking, payment, and reserved seats.

@@ -105,24 +105,22 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
         $this->assertSame('ACTIVE', $active->fresh()->active_attempt_key);
     }
 
-    public function test_zalopay_schema_migration_can_roundtrip_and_preserve_payment_history(): void
+    public function test_zalopay_schema_migration_refuses_to_discard_payment_history(): void
     {
-        [$zalopayMigration, $reconciliationMigration] = $this->paymentMigrations();
+        [$zalopayMigration] = $this->paymentMigrations();
         $payment = $this->pendingPayment(overrides: [
             'provider' => 'vnpay',
             'payment_method' => 'vnpay',
             'status' => Payment::STATUS_FAILED,
         ]);
 
-        $reconciliationMigration->down();
-        $zalopayMigration->down();
-
-        $this->assertZaloPayColumnsAreMissing();
-        $this->assertSame(1, DB::table('payments')->where('id', $payment->id)->count());
-        $this->assertBookingForeignKeyDeleteAction('cascade');
-
-        $zalopayMigration->up();
-        $reconciliationMigration->up();
+        try {
+            $zalopayMigration->down();
+            $this->fail('Rollback must refuse payment history.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('payment history exists', $exception->getMessage());
+            $this->assertStringContainsString('No rows or schema objects were changed', $exception->getMessage());
+        }
 
         $this->assertZaloPayColumnsExist();
         $this->assertSame(1, DB::table('payments')->where('id', $payment->id)->count());
@@ -229,8 +227,8 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
             database_path('migrations/2026_08_04_110000_extend_payments_for_zalopay.php'),
         );
 
-        $foreignDrop = strpos($source, '$table->dropForeign(self::BOOKING_FOREIGN)');
-        $indexLoop = strpos($source, 'foreach (self::INDEXES as $indexName => $indexType)');
+        $foreignDrop = strpos($source, '$this->dropBookingForeign($bookingForeign)');
+        $indexLoop = strpos($source, 'foreach (self::INDEXES as $name => $definition)', $foreignDrop);
 
         $this->assertNotFalse($foreignDrop);
         $this->assertNotFalse($indexLoop);

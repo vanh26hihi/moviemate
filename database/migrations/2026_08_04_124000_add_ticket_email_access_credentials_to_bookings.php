@@ -41,7 +41,17 @@ return new class extends Migration
             });
         }
 
-        if (! $this->hasIndex()) {
+        $namedIndex = collect(Schema::getIndexes('bookings'))->firstWhere('name', self::INDEX);
+        if ($namedIndex !== null
+            && (! (bool) ($namedIndex['unique'] ?? false)
+                || ($namedIndex['columns'] ?? []) !== ['ticket_email_token_hash'])) {
+            throw new RuntimeException(
+                'Cannot continue ticket email credential migration because '.self::INDEX
+                .' has an unexpected definition. No DDL was executed for that index.',
+            );
+        }
+
+        if ($this->indexName() === null) {
             Schema::table('bookings', function (Blueprint $table): void {
                 $table->unique('ticket_email_token_hash', self::INDEX);
             });
@@ -58,7 +68,7 @@ return new class extends Migration
             self::COLUMNS,
             fn (string $column): bool => Schema::hasColumn('bookings', $column),
         ));
-        if ($columns === []) {
+        if ($columns === [] && $this->indexName() === null) {
             return;
         }
 
@@ -73,25 +83,31 @@ return new class extends Migration
             );
         }
 
-        if ($this->hasIndex()) {
-            Schema::table('bookings', function (Blueprint $table): void {
-                $table->dropUnique(self::INDEX);
+        $index = $this->indexName();
+        if ($index !== null) {
+            Schema::table('bookings', function (Blueprint $table) use ($index): void {
+                $table->dropUnique($index);
             });
         }
 
-        Schema::table('bookings', function (Blueprint $table) use ($columns): void {
-            $table->dropColumn($columns);
-        });
+        if ($columns !== []) {
+            Schema::table('bookings', function (Blueprint $table) use ($columns): void {
+                $table->dropColumn($columns);
+            });
+        }
     }
 
-    private function hasIndex(): bool
+    private function indexName(): ?string
     {
         if (! Schema::hasTable('bookings')) {
-            return false;
+            return null;
         }
 
-        return collect(Schema::getIndexes('bookings'))->contains(
-            fn (array $index): bool => ($index['name'] ?? null) === self::INDEX,
+        $index = collect(Schema::getIndexes('bookings'))->first(
+            fn (array $candidate): bool => (bool) ($candidate['unique'] ?? false)
+                && ($candidate['columns'] ?? []) === ['ticket_email_token_hash'],
         );
+
+        return $index['name'] ?? null;
     }
 };

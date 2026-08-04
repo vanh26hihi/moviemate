@@ -16,9 +16,10 @@ final class DatabaseSafetyGuard
         $driver = strtolower((string) ($resolved['driver'] ?? ''));
         $database = (string) ($resolved['database'] ?? '');
 
-        if ($driver === 'mysql' && $database === 'moviemate') {
+        if ($driver === 'mysql' && $database !== 'moviemate_phase4_rehearsal') {
             throw new RuntimeException(
-                'Unsafe PHPUnit database configuration: refusing to use MySQL database [moviemate].'
+                'Unsafe PHPUnit database configuration: MySQL tests require [moviemate_phase4_rehearsal]; '
+                ."refusing database [{$database}]."
             );
         }
     }

@@ -2,12 +2,17 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('payment_review_events')) {
+            return;
+        }
+
         Schema::create('payment_review_events', function (Blueprint $table) {
             $table->id();
             $table->foreignId('payment_id')->constrained()->restrictOnDelete();
@@ -24,6 +29,12 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasTable('payment_review_events') && DB::table('payment_review_events')->exists()) {
+            throw new RuntimeException(
+                'Cannot roll back payment review events while audit history exists. No rows or schema objects were changed.',
+            );
+        }
+
         Schema::dropIfExists('payment_review_events');
     }
 };

@@ -12,7 +12,7 @@ class DatabaseSafetyGuardTest extends TestCase
     public function test_it_rejects_the_primary_mysql_database(): void
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('refusing to use MySQL database [moviemate]');
+        $this->expectExceptionMessage('refusing database [moviemate]');
 
         DatabaseSafetyGuard::assertSafe([
             'driver' => 'mysql',
@@ -28,6 +28,17 @@ class DatabaseSafetyGuardTest extends TestCase
             'driver' => 'sqlite',
             'database' => ':memory:',
             'url' => 'mysql://root@127.0.0.1/moviemate',
+        ]);
+    }
+
+    public function test_it_rejects_arbitrary_mysql_test_database_names(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('MySQL tests require [moviemate_phase4_rehearsal]');
+
+        DatabaseSafetyGuard::assertSafe([
+            'driver' => 'mysql',
+            'database' => 'moviemate_phase4_mysql_test_worker_1',
         ]);
     }
 
@@ -52,17 +63,9 @@ class DatabaseSafetyGuardTest extends TestCase
                 'driver' => 'sqlite',
                 'database' => ':memory:',
             ]],
-            'dedicated moviemate testing database' => [[
+            'dedicated Phase-4 rehearsal database' => [[
                 'driver' => 'mysql',
-                'database' => 'moviemate_testing',
-            ]],
-            '_test suffix' => [[
-                'driver' => 'mysql',
-                'database' => 'moviemate_test',
-            ]],
-            '_testing suffix' => [[
-                'driver' => 'mysql',
-                'database' => 'integration_testing',
+                'database' => 'moviemate_phase4_rehearsal',
             ]],
         ];
     }
