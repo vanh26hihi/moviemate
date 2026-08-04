@@ -27,14 +27,24 @@ return new class extends Migration
 
         Schema::table('orders', function (Blueprint $table) {
             if (! Schema::hasColumn('orders', 'booking_id')) {
-                $table->foreignId('booking_id')->nullable()->after('id')
-                    ->constrained('bookings')->nullOnDelete();
-                $table->unique('booking_id', 'orders_booking_id_unique');
+                $table->unsignedBigInteger('booking_id')->nullable()->after('id');
             }
             if (! Schema::hasColumn('orders', 'subtotal')) {
                 $table->unsignedBigInteger('subtotal')->default(0)->after('pickup_cinema_id');
             }
         });
+
+        if ($this->foreignKeyName('orders') === null) {
+            Schema::table('orders', function (Blueprint $table): void {
+                $table->foreign('booking_id', self::ORDERS_BOOKING_FOREIGN)
+                    ->references('id')->on('bookings')->nullOnDelete();
+            });
+        }
+        if ($this->uniqueBookingIndexName('orders') === null) {
+            Schema::table('orders', function (Blueprint $table): void {
+                $table->unique('booking_id', self::ORDERS_BOOKING_UNIQUE);
+            });
+        }
 
         Schema::table('order_items', function (Blueprint $table) {
             if (! Schema::hasColumn('order_items', 'snapshot_name')) {
@@ -51,6 +61,16 @@ return new class extends Migration
 
     public function down(): void
     {
+        $protectedTables = collect(['bookings', 'orders', 'order_items'])
+            ->filter(fn (string $table): bool => Schema::hasTable($table) && DB::table($table)->exists())
+            ->values();
+        if ($protectedTables->isNotEmpty()) {
+            throw new RuntimeException(
+                'Cannot roll back checkout pricing snapshots while protected rows exist in ['
+                .$protectedTables->implode(', ').']. No rows or schema objects were changed.',
+            );
+        }
+
         $this->dropColumnsIfPresent('order_items', [
             'snapshot_name',
             'unit_price',
@@ -58,19 +78,21 @@ return new class extends Migration
         ]);
 
         if (Schema::hasTable('orders')) {
-            if ($this->hasForeignKey('orders', self::ORDERS_BOOKING_FOREIGN)) {
-                Schema::table('orders', function (Blueprint $table): void {
+            $foreignKey = $this->foreignKeyName('orders');
+            if ($foreignKey !== null) {
+                Schema::table('orders', function (Blueprint $table) use ($foreignKey): void {
                     if (DB::getDriverName() === 'sqlite') {
                         $table->dropForeign(['booking_id']);
                     } else {
-                        $table->dropForeign(self::ORDERS_BOOKING_FOREIGN);
+                        $table->dropForeign($foreignKey);
                     }
                 });
             }
 
-            if ($this->hasIndex('orders', self::ORDERS_BOOKING_UNIQUE)) {
-                Schema::table('orders', function (Blueprint $table): void {
-                    $table->dropUnique(self::ORDERS_BOOKING_UNIQUE);
+            $index = $this->uniqueBookingIndexName('orders');
+            if ($index !== null) {
+                Schema::table('orders', function (Blueprint $table) use ($index): void {
+                    $table->dropUnique($index);
                 });
             }
 
@@ -106,46 +128,38 @@ return new class extends Migration
         });
     }
 
-    private function hasForeignKey(string $tableName, string $foreignKeyName): bool
+    private function foreignKeyName(string $tableName): ?string
     {
         if (! Schema::hasTable($tableName)) {
-            return false;
+            return null;
         }
 
-        if (DB::getDriverName() === 'mysql') {
-            return DB::table('information_schema.TABLE_CONSTRAINTS')
-                ->where('CONSTRAINT_SCHEMA', DB::getDatabaseName())
-                ->where('TABLE_NAME', $tableName)
-                ->where('CONSTRAINT_NAME', $foreignKeyName)
-                ->where('CONSTRAINT_TYPE', 'FOREIGN KEY')
-                ->exists();
-        }
-
-        return collect(Schema::getForeignKeys($tableName))->contains(
-            fn (array $foreign): bool => ($foreign['name'] ?? null) === $foreignKeyName
-                || (DB::getDriverName() === 'sqlite'
-                    && ($foreign['columns'] ?? []) === ['booking_id']
-                    && ($foreign['foreign_table'] ?? null) === 'bookings'
-                    && ($foreign['foreign_columns'] ?? []) === ['id'])
+        $foreign = collect(Schema::getForeignKeys($tableName))->first(
+            fn (array $foreign): bool => ($foreign['columns'] ?? []) === ['booking_id']
+                && ($foreign['foreign_table'] ?? null) === 'bookings'
+                && ($foreign['foreign_columns'] ?? []) === ['id']
         );
+
+        if ($foreign === null) {
+            return null;
+        }
+
+        return DB::getDriverName() === 'sqlite'
+            ? self::ORDERS_BOOKING_FOREIGN
+            : ($foreign['name'] ?? null);
     }
 
-    private function hasIndex(string $tableName, string $indexName): bool
+    private function uniqueBookingIndexName(string $tableName): ?string
     {
         if (! Schema::hasTable($tableName)) {
-            return false;
+            return null;
         }
 
-        if (DB::getDriverName() === 'mysql') {
-            return DB::table('information_schema.STATISTICS')
-                ->where('TABLE_SCHEMA', DB::getDatabaseName())
-                ->where('TABLE_NAME', $tableName)
-                ->where('INDEX_NAME', $indexName)
-                ->exists();
-        }
-
-        return collect(Schema::getIndexes($tableName))->contains(
-            fn (array $index): bool => ($index['name'] ?? null) === $indexName
+        $index = collect(Schema::getIndexes($tableName))->first(
+            fn (array $index): bool => ($index['columns'] ?? []) === ['booking_id']
+                && (bool) ($index['unique'] ?? false)
         );
+
+        return $index['name'] ?? null;
     }
 };
