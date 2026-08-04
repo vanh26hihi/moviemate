@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\FoodSelectionValidationException;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -21,12 +22,12 @@ class FoodSelectionCanonicalizer
         if (array_is_list($payload)) {
             foreach ($payload as $line) {
                 if (! is_array($line) || ! array_key_exists('food_id', $line) || ! array_key_exists('quantity', $line)) {
-                    throw new InvalidArgumentException('Each food line requires food_id and quantity.');
+                    throw FoodSelectionValidationException::invalidSelection();
                 }
 
                 $foodId = $this->positiveInteger($line['food_id'], 'food_id');
                 if (array_key_exists($foodId, $quantities)) {
-                    throw new InvalidArgumentException("Duplicate food item {$foodId}.");
+                    throw FoodSelectionValidationException::invalidSelection();
                 }
 
                 $quantities[$foodId] = $this->quantity($line['quantity']);
@@ -55,11 +56,11 @@ class FoodSelectionCanonicalizer
         } elseif (is_string($value) && preg_match('/^\d+$/', $value)) {
             $integer = (int) $value;
         } else {
-            throw new InvalidArgumentException("{$field} must be an integer.");
+            throw FoodSelectionValidationException::invalidSelection();
         }
 
         if ($integer < 1) {
-            throw new InvalidArgumentException("{$field} must be positive.");
+            throw FoodSelectionValidationException::invalidSelection();
         }
 
         return $integer;
@@ -72,11 +73,11 @@ class FoodSelectionCanonicalizer
         } elseif (is_string($value) && preg_match('/^-?\d+$/', $value)) {
             $quantity = (int) $value;
         } else {
-            throw new InvalidArgumentException('Food quantity must be an integer.');
+            throw FoodSelectionValidationException::invalidSelection();
         }
 
         if ($quantity < 0) {
-            throw new InvalidArgumentException('Food quantity cannot be negative.');
+            throw FoodSelectionValidationException::invalidSelection();
         }
 
         $maximum = config('booking.max_food_quantity', 20);
@@ -84,7 +85,7 @@ class FoodSelectionCanonicalizer
             throw new InvalidArgumentException('Maximum food quantity must be a positive integer.');
         }
         if ($quantity > $maximum) {
-            throw new InvalidArgumentException("Food quantity cannot exceed {$maximum}.");
+            throw FoodSelectionValidationException::invalidSelection();
         }
 
         return $quantity;
