@@ -8,10 +8,20 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Showtime extends Model
 {
+    public function priceForSeatType(string $seatType): float
+    {
+        return match ($seatType) {
+            'vip' => (float) ($this->vip_price ?? $this->price),
+            'couple' => (float) $this->price * 2,
+            default => (float) $this->price,
+        };
+    }
+
     protected $fillable = [
         'movie_id',
         'cinema_id',
         'room_id',
+        'room_layout_id',
         'show_date',
         'show_time',
         'price',
@@ -21,7 +31,7 @@ class Showtime extends Model
 
     protected $casts = [
         'show_date' => 'date',
-        'price'     => 'decimal:2',
+        'price' => 'decimal:2',
         'vip_price' => 'decimal:2',
     ];
 
@@ -38,6 +48,11 @@ class Showtime extends Model
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
+    }
+
+    public function roomLayout(): BelongsTo
+    {
+        return $this->belongsTo(RoomLayout::class);
     }
 
     public function bookings(): HasMany

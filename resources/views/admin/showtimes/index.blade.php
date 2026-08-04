@@ -1,61 +1,112 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Quáº£n lÃ½ suáº¥t chiáº¿u - MovieMate')
-@section('page-title', 'Quáº£n lÃ½ suáº¥t chiáº¿u')
+@section('title', 'Quản lý suất chiếu - MovieMate Admin')
+@section('page-title', 'Quản lý suất chiếu')
 
 @section('content')
-
-<div class="rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+<div class="space-y-6">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-            <h1 class="text-3xl font-black">Quáº£n lÃ½ suáº¥t chiáº¿u</h1>
-            <p class="mt-2 text-gray-400">Danh sÃ¡ch suáº¥t chiáº¿u</p>
+            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Showtimes</p>
+            <h1 class="text-3xl font-extrabold app-text">Suất chiếu</h1>
+            <p class="app-muted mt-2">Lịch vận hành phòng theo múi giờ {{ $cinemaTimezone }}, gồm {{ $cleaningBufferMinutes }} phút vệ sinh.</p>
+        </div>
+        @can('showtimes.create')
+            <a href="{{ route('admin.showtimes.create') }}" class="btn-primary"><i class="ph-bold ph-plus"></i> Thêm suất chiếu</a>
+        @endcan
+    </div>
+
+    <div class="cinema-card overflow-hidden">
+        <div class="p-5 border-b app-border">
+            <form method="GET" action="{{ route('admin.showtimes.index') }}" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_160px_160px_auto] gap-3">
+                <select name="movie_id" class="cinema-input">
+                    <option value="">Tất cả phim</option>
+                    @foreach($movies as $movie)
+                        <option value="{{ $movie->id }}" @selected(request('movie_id') == $movie->id)>{{ $movie->title }}</option>
+                    @endforeach
+                </select>
+                <input type="date" name="show_date" value="{{ request('show_date') }}" class="cinema-input">
+                <select name="status" class="cinema-input">
+                    <option value="">Trạng thái</option>
+                    <option value="active" @selected(request('status') === 'active')>Đang chiếu</option>
+                    <option value="cancelled" @selected(request('status') === 'cancelled')>Đã hủy</option>
+                    <option value="finished" @selected(request('status') === 'finished')>Đã chiếu xong</option>
+                </select>
+                <button type="submit" class="btn-secondary"><i class="ph ph-funnel"></i> Lọc</button>
+            </form>
+            <p class="text-xs app-muted mt-4">Hiển thị <span class="app-text font-bold">{{ $showtimes->total() }}</span> suất chiếu</p>
         </div>
 
-        <a href="/admin/showtimes/create" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-5 py-3 text-sm font-bold">
-            ThÃªm suáº¥t chiáº¿u
-        </a>
-    </div>
-
-    <div class="mb-6 grid gap-4 md:grid-cols-4">
-        <input placeholder="TÃ¬m kiáº¿m..." class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18] md:col-span-2">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18]">
-            <option>Tráº¡ng thÃ¡i</option>
-            <option>Äang hoáº¡t Ä‘á»™ng</option>
-            <option>Táº¡m khÃ³a</option>
-        </select>
-        <button class="rounded-2xl border border-white/10 px-5 py-3 font-bold hover:border-[#FF7A18]">Lá»c</button>
-    </div>
-
-    <div class="overflow-x-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
-            <thead class="text-gray-400">
-                <tr class="border-b border-white/10">
-                    <th class="py-4">#</th>
-                    <th>TÃªn</th>
-                    <th>ThÃ´ng tin</th>
-                    <th>NgÃ y táº¡o</th>
-                    <th>Tráº¡ng thÃ¡i</th>
-                    <th class="text-right">HÃ nh Ä‘á»™ng</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (range(1,8) as $i)
-                    <tr class="border-b border-white/5">
-                        <td class="py-4 font-bold">{{ $i }}</td>
-                        <td class="font-bold">Dá»¯ liá»‡u máº«u {{ $i }}</td>
-                        <td class="text-gray-400">ThÃ´ng tin chi tiáº¿t cá»§a báº£n ghi {{ $i }}</td>
-                        <td>20/05/2026</td>
-                        <td><span class="rounded-full bg-green-500/20 px-3 py-1 text-xs font-bold text-green-400">Hoáº¡t Ä‘á»™ng</span></td>
-                        <td class="text-right">
-                            <a href="#" class="mr-3 text-[#FF7A18]">Sá»­a</a>
-                            <a href="#" class="text-red-400">XÃ³a</a>
-                        </td>
+        <div class="overflow-x-auto">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Phim / Phòng</th>
+                        <th>Bắt đầu</th>
+                        <th>Phim kết thúc</th>
+                        <th>Phòng sẵn sàng</th>
+                        <th>Vệ sinh</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-right">Thao tác</th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @forelse($showtimes as $showtime)
+                        @php
+                            $window = $scheduleWindows->get($showtime->id);
+                            $movieCrossesMidnight = $window && !$window->movieEnd->isSameDay($window->start);
+                            $readyCrossesMidnight = $window && !$window->operationalEnd->isSameDay($window->start);
+                        @endphp
+                        <tr>
+                            <td>
+                                <span class="font-extrabold app-text text-sm block max-w-[240px]">{{ $showtime->movie->title }}</span>
+                                <span class="text-xs app-muted">{{ $showtime->room->code }} · {{ $showtime->room->name }} · layout v{{ $showtime->roomLayout?->version ?? '?' }}</span>
+                            </td>
+                            <td>
+                                <span class="font-extrabold app-text block">{{ $window?->start->format('H:i') ?? '--:--' }}</span>
+                                <span class="text-xs app-muted">{{ $window?->start->format('d/m/Y') ?? 'Runtime không hợp lệ' }}</span>
+                            </td>
+                            <td>
+                                <span class="font-bold app-text block">{{ $window?->movieEnd->format('H:i') ?? '--:--' }}</span>
+                                @if($window)<span class="text-xs app-muted">{{ $window->movieEnd->format('d/m/Y') }}@if($movieCrossesMidnight) (+1 ngày)@endif</span>@endif
+                            </td>
+                            <td>
+                                <span class="font-extrabold text-brand-start block">{{ $window?->operationalEnd->format('H:i') ?? '--:--' }}</span>
+                                @if($window)<span class="text-xs app-muted">{{ $window->operationalEnd->format('d/m/Y') }}@if($readyCrossesMidnight) (+1 ngày)@endif</span>@endif
+                            </td>
+                            <td><span class="app-text font-bold">{{ $window?->cleaningBufferMinutes ?? $cleaningBufferMinutes }} phút</span></td>
+                            <td class="text-center">
+                                @if($showtime->status === 'active')
+                                    <span class="status-badge text-success bg-success/10">Đang chiếu</span>
+                                @elseif($showtime->status === 'cancelled')
+                                    <span class="status-badge text-error bg-error/10">Đã hủy</span>
+                                @else
+                                    <span class="status-badge text-warning bg-warning/10">Đã chiếu xong</span>
+                                @endif
+                            </td>
+                            <td>
+                                <div class="flex items-center justify-end gap-2">
+                                    @can('showtimes.update')
+                                        <a href="{{ route('admin.showtimes.edit', $showtime) }}" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa"><i class="ph-bold ph-pencil-simple text-xs"></i></a>
+                                    @endcan
+                                    @can('showtimes.delete')
+                                        <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn xóa suất chiếu này?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-white hover:bg-error hover:border-error transition-colors" title="Xóa"><i class="ph-bold ph-trash text-xs"></i></button>
+                                        </form>
+                                    @endcan
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="text-center app-muted py-10">Không có suất chiếu nào.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        <div class="p-5 border-t app-border">{{ $showtimes->links() }}</div>
     </div>
 </div>
-
 @endsection

@@ -1,61 +1,92 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Quáº£n lÃ½ thá»ƒ loáº¡i - MovieMate')
-@section('page-title', 'Quáº£n lÃ½ thá»ƒ loáº¡i')
+@section('title', 'Quản lý thể loại')
+@section('page-title', 'Quản lý thể loại')
 
 @section('content')
-
-<div class="rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <div class="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-            <h1 class="text-3xl font-black">Quáº£n lÃ½ thá»ƒ loáº¡i</h1>
-            <p class="mt-2 text-gray-400">Danh sÃ¡ch thá»ƒ loáº¡i phim</p>
-        </div>
-
-        <a href="/admin/genres/create" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-5 py-3 text-sm font-bold">
-            ThÃªm thá»ƒ loáº¡i
-        </a>
+<div class="admin-page-header">
+    <div>
+        <h1 class="admin-page-title">Quản lý thể loại</h1>
+        <p class="admin-page-subtitle">Quản lý nhóm thể loại dùng để phân loại phim trong MovieMate.</p>
     </div>
+    @can('genres.create')<a href="{{ route('admin.genres.create') }}" class="admin-btn-primary">
+        <i class="ph-bold ph-plus"></i>
+        Thêm mới
+    </a>@endcan
+</div>
 
-    <div class="mb-6 grid gap-4 md:grid-cols-4">
-        <input placeholder="TÃ¬m kiáº¿m..." class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18] md:col-span-2">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-3 outline-none focus:border-[#FF7A18]">
-            <option>Tráº¡ng thÃ¡i</option>
-            <option>Äang hoáº¡t Ä‘á»™ng</option>
-            <option>Táº¡m khÃ³a</option>
-        </select>
-        <button class="rounded-2xl border border-white/10 px-5 py-3 font-bold hover:border-[#FF7A18]">Lá»c</button>
+@if(session('success'))
+    <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-semibold">
+        {{ session('success') }}
     </div>
+@endif
 
+<div class="admin-toolbar">
+    <form method="GET" action="{{ route('admin.genres.index') }}" class="flex w-full flex-col sm:flex-row gap-3">
+        <label class="relative flex-1">
+            <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 app-text-muted"></i>
+            <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Tìm kiếm tên thể loại..."
+                   class="admin-input pl-11">
+        </label>
+        <button type="submit" class="admin-btn-primary">
+            <i class="ph-bold ph-funnel"></i>
+            Tìm
+        </button>
+    </form>
+</div>
+
+<div class="admin-table-card">
     <div class="overflow-x-auto">
-        <table class="w-full min-w-[900px] text-left text-sm">
-            <thead class="text-gray-400">
-                <tr class="border-b border-white/10">
-                    <th class="py-4">#</th>
-                    <th>TÃªn</th>
-                    <th>ThÃ´ng tin</th>
-                    <th>NgÃ y táº¡o</th>
-                    <th>Tráº¡ng thÃ¡i</th>
-                    <th class="text-right">HÃ nh Ä‘á»™ng</th>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Tên</th>
+                    <th>Slug</th>
+                    <th class="text-right">Hành động</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (range(1,8) as $i)
-                    <tr class="border-b border-white/5">
-                        <td class="py-4 font-bold">{{ $i }}</td>
-                        <td class="font-bold">Dá»¯ liá»‡u máº«u {{ $i }}</td>
-                        <td class="text-gray-400">ThÃ´ng tin chi tiáº¿t cá»§a báº£n ghi {{ $i }}</td>
-                        <td>20/05/2026</td>
-                        <td><span class="rounded-full bg-green-500/20 px-3 py-1 text-xs font-bold text-green-400">Hoáº¡t Ä‘á»™ng</span></td>
-                        <td class="text-right">
-                            <a href="#" class="mr-3 text-[#FF7A18]">Sá»­a</a>
-                            <a href="#" class="text-red-400">XÃ³a</a>
+                @forelse($genres as $genre)
+                    <tr>
+                        <td class="font-mono text-xs app-text-muted">#{{ $genre->id }}</td>
+                        <td>
+                            <div class="font-extrabold app-heading">{{ $genre->name }}</div>
+                        </td>
+                        <td>
+                            <span class="font-mono text-xs app-text-muted">{{ $genre->slug }}</span>
+                        </td>
+                        <td>
+                            <div class="flex items-center justify-end gap-2">
+                                @can('genres.update')<a href="{{ route('admin.genres.edit', $genre) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
+                                    <i class="ph ph-pencil-simple"></i>
+                                </a>@endcan
+                                @can('genres.delete')<form action="{{ route('admin.genres.destroy', $genre) }}" method="POST"
+                                      onsubmit="return confirm('Bạn có chắc muốn xóa thể loại này?');" class="inline">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="admin-btn-danger admin-action-btn" title="Xóa" aria-label="Xóa" data-tooltip="Xóa">
+                                        <i class="ph ph-trash"></i>
+                                    </button>
+                                </form>@endcan
+                            </div>
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="4" class="admin-empty">
+                            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
+                                <i class="ph-fill ph-tag text-3xl"></i>
+                            </div>
+                            Chưa có thể loại nào.
+                        </td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
+    <div class="border-t app-border px-5 py-4">
+        {{ $genres->links() }}
+    </div>
 </div>
-
 @endsection
