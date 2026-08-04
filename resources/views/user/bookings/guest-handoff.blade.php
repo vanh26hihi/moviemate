@@ -10,13 +10,17 @@
     </style>
 </head>
 <body>
-<p>Đang mở booking an toàn…</p>
+<main aria-live="polite">
+    <p>Đang mở booking trong phiên truy cập an toàn…</p>
+    <noscript>Trình duyệt cần bật JavaScript để hoàn tất bước xác minh quyền truy cập.</noscript>
+</main>
 <script>
 (() => {
     const accessUrl = @json($accessUrl);
     const token = @json($guestAccessToken);
     const destination = @json($destination);
-    window.location.replace(accessUrl + '#token=' + encodeURIComponent(token) + '&destination=' + encodeURIComponent(destination));
+    const fragment = new URLSearchParams({ token, destination });
+    window.location.replace(accessUrl + '#' + fragment.toString());
 })();
 </script>
 </body>

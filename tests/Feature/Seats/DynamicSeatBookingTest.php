@@ -57,7 +57,7 @@ class DynamicSeatBookingTest extends TestCase
     {
         $response = $this->get(route('user.bookings.selectSeat', $this->showtime));
         $response->assertOk()
-            ->assertSee('Layout v1')
+            ->assertSee('Sơ đồ ghế động')
             ->assertSee('repeat(13', false)
             ->assertSee('Lối đi')
             ->assertSee('data-pair-code="K-PAIR-1"', false)
@@ -114,7 +114,7 @@ class DynamicSeatBookingTest extends TestCase
         ]);
 
         $this->get(route('user.bookings.selectSeat', $showtime))
-            ->assertOk()->assertSee('aria-label="Ghế F6, vip, maintenance', false)->assertSee('disabled', false);
+            ->assertOk()->assertSee('aria-label="Ghế F6, loại VIP, đang bảo trì', false)->assertSee('disabled', false);
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $showtime->id, 'seat_ids' => [$maintenance->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
