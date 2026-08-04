@@ -18,6 +18,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Production Leaf Transport Allow-List
+    |--------------------------------------------------------------------------
+    |
+    | Production mail graphs are recursively validated before application boot
+    | and ticket delivery. Every reachable leaf must be listed here. Composite
+    | and non-delivery transports can never be approved. MovieMate provisions
+    | SMTP by default; add another transport only after provisioning it.
+    |
+    */
+
+    'production_allowed_transports' => env('MAIL_PRODUCTION_ALLOWED_TRANSPORTS', 'smtp'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Mailer Configurations
     |--------------------------------------------------------------------------
     |
