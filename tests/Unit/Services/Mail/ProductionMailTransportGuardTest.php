@@ -5,6 +5,7 @@ namespace Tests\Unit\Services\Mail;
 use App\Exceptions\UnsafeProductionMailConfiguration;
 use App\Providers\ProductionMailServiceProvider;
 use App\Services\Mail\ProductionMailTransportGuard;
+use Aws\Ses\SesClient;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -315,9 +316,256 @@ class ProductionMailTransportGuardTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function test_dotted_mailer_collision_is_rejected_before_laravel_resolves_nested_config(): void
+    {
+        $this->configureProduction('delivery.smtp', [
+            'delivery.smtp' => ['transport' => 'smtp'],
+            'delivery' => [
+                'smtp' => ['transport' => 'log'],
+            ],
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+
+        $this->assertSame(
+            ['transport' => 'log'],
+            config('mail.mailers.delivery.smtp'),
+            'Laravel MailManager resolves the nested dot-notation path, not the literal dotted key.',
+        );
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('selected mailer name');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public function test_explicit_zero_selection_is_rejected_before_laravel_falls_back(): void
+    {
+        $this->configureProduction('smtp', ['smtp' => ['transport' => 'smtp']]);
+        $this->assertSame('smtp', $this->app->make('mail.manager')->getDefaultDriver());
+        $this->assertSame(['transport' => 'smtp'], config('mail.mailers.smtp'));
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->guard()->assertSafeForProduction('0');
+    }
+
+    public function test_default_zero_selection_is_rejected_before_runtime_lookup(): void
+    {
+        $this->configureProduction('0', [
+            '0' => ['transport' => 'smtp'],
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+        $this->assertSame('0', $this->app->make('mail.manager')->getDefaultDriver());
+        $this->assertSame(['transport' => 'smtp'], config('mail.mailers.0'));
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('selected mailer name');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    #[DataProvider('malformedSelectedMailerProvider')]
+    public function test_malformed_default_mailer_selection_fails_closed(mixed $selected): void
+    {
+        $this->configureProduction($selected, [
+            '0' => ['transport' => 'smtp'],
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('selected mailer name');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public static function malformedSelectedMailerProvider(): array
+    {
+        return [
+            'empty' => [''],
+            'whitespace' => ['  '],
+        ];
+    }
+
+    public function test_malformed_child_identifier_is_rejected_before_dot_notation_resolution(): void
+    {
+        $this->configureProduction('delivery', [
+            'delivery' => ['transport' => 'failover', 'mailers' => ['nested.smtp']],
+            'nested' => ['smtp' => ['transport' => 'log']],
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+        $this->assertSame(['transport' => 'log'], config('mail.mailers.nested.smtp'));
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('malformed reference');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public function test_shared_safe_child_can_be_reached_from_independent_branches(): void
+    {
+        $this->configureProduction('delivery', [
+            'delivery' => ['transport' => 'failover', 'mailers' => ['east', 'west']],
+            'east' => ['transport' => 'failover', 'mailers' => ['shared']],
+            'west' => ['transport' => 'roundrobin', 'mailers' => ['shared']],
+            'shared' => ['transport' => 'smtp'],
+        ]);
+
+        $this->guard()->assertSafeForProduction();
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_malformed_mailer_registry_is_rejected(): void
+    {
+        $this->configureProduction('smtp', 'not-an-array');
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('registry');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public function test_malformed_individual_mailer_configuration_is_rejected(): void
+    {
+        $this->configureProduction('delivery', [
+            'delivery' => 'not-an-array',
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('configuration is malformed');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public function test_non_string_transport_is_rejected(): void
+    {
+        $this->configureProduction('delivery', [
+            'delivery' => ['transport' => 123],
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('transport is missing or malformed');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public function test_legacy_mail_driver_ambiguity_is_rejected(): void
+    {
+        $this->configureProduction('smtp', ['smtp' => ['transport' => 'smtp']]);
+        config(['mail.driver' => 'smtp']);
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('Legacy mail.driver');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    #[DataProvider('unsafeUrlProvider')]
+    public function test_unsafe_or_malformed_url_configuration_is_rejected(mixed $url): void
+    {
+        $this->configureProduction('delivery', [
+            'delivery' => ['transport' => 'smtp', 'url' => $url],
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public static function unsafeUrlProvider(): array
+    {
+        return [
+            'malformed URL' => ['http://['],
+            'array URL' => [['smtp://localhost']],
+            'unsupported custom URL' => ['custom://localhost'],
+        ];
+    }
+
+    public function test_safe_smtp_url_and_uppercase_driver_are_normalized(): void
+    {
+        foreach (['smtp://localhost:2525', 'SMTP://localhost:2525'] as $url) {
+            $this->configureProduction('delivery', [
+                'delivery' => ['transport' => 'log', 'url' => $url],
+                'smtp' => ['transport' => 'smtp'],
+            ]);
+
+            $this->guard()->assertSafeForProduction();
+        }
+
+        $this->addToAssertionCount(2);
+    }
+
+    public function test_url_credentials_do_not_leak_from_diagnostics(): void
+    {
+        $secret = 'smtp-url-password-must-not-leak';
+        $this->configureProduction('delivery', [
+            'delivery' => [
+                'transport' => 'smtp',
+                'url' => 'custom://user:'.$secret.'@localhost',
+            ],
+            'smtp' => ['transport' => 'smtp'],
+        ]);
+
+        try {
+            $this->guard()->assertSafeForProduction();
+            $this->fail('Expected unsupported URL transport to be rejected.');
+        } catch (UnsafeProductionMailConfiguration $exception) {
+            $this->assertStringNotContainsString($secret, $exception->getMessage());
+            $this->assertStringContainsString('delivery -> custom', $exception->getMessage());
+        }
+    }
+
+    public function test_malformed_allow_list_identifier_is_rejected(): void
+    {
+        $this->configureProduction(
+            'smtp',
+            ['smtp' => ['transport' => 'smtp']],
+            'smtp/bypass',
+        );
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('allow-list');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public function test_unavailable_optional_transport_dependency_is_rejected(): void
+    {
+        $this->assertFalse(class_exists(SesClient::class));
+        $this->configureProduction('ses', ['ses' => ['transport' => 'ses']], 'ses');
+
+        $this->expectException(UnsafeProductionMailConfiguration::class);
+        $this->expectExceptionMessage('unknown value');
+        $this->guard()->assertSafeForProduction();
+    }
+
+    public function test_testing_array_boot_remains_valid(): void
+    {
+        config([
+            'mail.default' => 'array',
+            'mail.mailers' => ['array' => ['transport' => 'array']],
+        ]);
+
+        $this->provider()->boot($this->guard());
+        $this->assertTrue(app()->environment('testing'));
+    }
+
+    public function test_loaded_config_is_shared_by_guard_and_mail_manager_and_env_cannot_bypass_it(): void
+    {
+        $original = getenv('MAIL_MAILER');
+        putenv('MAIL_MAILER=array');
+        $_ENV['MAIL_MAILER'] = 'array';
+        $this->configureProduction('smtp', ['smtp' => ['transport' => 'smtp']]);
+
+        try {
+            $this->guard()->assertSafeForProduction();
+            $this->assertSame('smtp', $this->app->make('mail.manager')->getDefaultDriver());
+            $this->assertSame(['transport' => 'smtp'], config('mail.mailers.smtp'));
+        } finally {
+            if ($original === false) {
+                putenv('MAIL_MAILER');
+                unset($_ENV['MAIL_MAILER']);
+            } else {
+                putenv('MAIL_MAILER='.$original);
+                $_ENV['MAIL_MAILER'] = $original;
+            }
+        }
+    }
+
     private function configureProduction(
-        string $default,
-        array $mailers,
+        mixed $default,
+        mixed $mailers,
         mixed $allowed = 'smtp',
     ): void {
         $this->app->detectEnvironment(static fn (): string => 'production');

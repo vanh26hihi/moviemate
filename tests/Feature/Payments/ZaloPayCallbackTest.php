@@ -134,6 +134,19 @@ class ZaloPayCallbackTest extends PaymentTestCase
 
         $this->postJson(route('payments.zalopay.callback'), $body)->assertJsonPath('return_code', 1);
         $paidAt = $payment->fresh()->paid_at?->format('Y-m-d H:i:s.u');
+        $booking = $payment->booking->fresh();
+        $this->assertNull($booking->ticket_email_token_hash);
+        $credential = app(BookingTokenService::class)->issueTicketEmailCredential($booking->getKey());
+        $booking->forceFill([
+            'ticket_email_token_nonce' => $credential['nonce'],
+            'ticket_email_token_hash' => hash('sha256', $credential['token']),
+            'ticket_email_token_expires_at' => now()->addHour(),
+        ])->save();
+        $credentialBeforeDuplicate = array_intersect_key($booking->getRawOriginal(), array_flip([
+            'ticket_email_token_nonce',
+            'ticket_email_token_hash',
+            'ticket_email_token_expires_at',
+        ]));
         $this->postJson(route('payments.zalopay.callback'), $body)->assertJsonPath('return_code', 1);
 
         $this->assertSame(1, Payment::query()->count());
@@ -141,6 +154,14 @@ class ZaloPayCallbackTest extends PaymentTestCase
         $this->assertSame('paid', $payment->booking->fresh()->payment_status);
         $this->assertDatabaseCount('booking_ticket_deliveries', 1);
         $this->assertEmpty(session('guest_booking_capabilities', []));
+        $this->assertSame($credentialBeforeDuplicate, array_intersect_key(
+            $booking->fresh()->getRawOriginal(),
+            array_flip([
+                'ticket_email_token_nonce',
+                'ticket_email_token_hash',
+                'ticket_email_token_expires_at',
+            ]),
+        ));
     }
 
     public function test_success_missing_outbox_stays_missing_after_duplicate_valid_callback(): void
