@@ -31,6 +31,7 @@ class Payment extends Model
         'status',
         'description',
         'expires_at',
+        'reconcile_until',
         'transaction_code',
         'transaction_status',
         'payment_url',
@@ -62,6 +63,7 @@ class Payment extends Model
     protected $casts = [
         'paid_at' => 'datetime',
         'expires_at' => 'datetime',
+        'reconcile_until' => 'datetime',
         'callback_received_at' => 'datetime',
         'last_queried_at' => 'datetime',
         'verified_at' => 'datetime',

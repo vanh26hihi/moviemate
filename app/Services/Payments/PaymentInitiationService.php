@@ -77,6 +77,9 @@ class PaymentInitiationService
                 'status' => Payment::STATUS_PENDING,
                 'description' => 'MovieMate booking '.$lockedBooking->booking_code,
                 'expires_at' => $attemptExpiry,
+                'reconcile_until' => $attemptExpiry->copy()->addHours(
+                    max(1, (int) config('payment.reconciliation_grace_hours', 24)),
+                ),
             ]);
 
             $payment->forceFill(['order_code' => $payment->app_trans_id])->save();
@@ -152,7 +155,7 @@ class PaymentInitiationService
         $separator = str_contains($this->config->redirectUrl, '?') ? '&' : '?';
 
         return $this->config->redirectUrl.$separator.http_build_query([
-            'return_token' => $this->returnTokens->issue($payment),
+            'state' => $this->returnTokens->issue($payment),
         ], '', '&', PHP_QUERY_RFC3986);
     }
 
