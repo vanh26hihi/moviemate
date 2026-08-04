@@ -57,6 +57,53 @@ Use only VNPAY's current Sandbox test cards from the merchant documentation. A c
 
 The browser Return URL is display-only and cannot mark a booking paid. The unauthenticated IPN verifies the HMAC-SHA512 checksum before database access, and QueryDr verifies its response checksum before applying an outcome. Only a verified `00` response code plus `00` transaction status, matching merchant, reference, amount, and transaction identity can enter the shared locked fulfillment transition. Unknown, malformed, late, conflicting, or checksum-invalid outcomes never issue a ticket. Do not retry a booking while its existing attempt is `pending`, `processing`, `unresolved`, or `review`.
 
+## HTTPS tunnel, reverse proxy, and browser smoke test
+
+Laravel must trust the proxy that directly connects to PHP before it may use `X-Forwarded-For`, `X-Forwarded-Host`, `X-Forwarded-Port`, or `X-Forwarded-Proto`. MovieMate defaults to the loopback proxy addresses used by a local ngrok agent:
+
+```dotenv
+APP_URL=https://your-random-domain.ngrok-free.dev
+PAYMENT_PUBLIC_HOSTS=your-random-domain.ngrok-free.dev
+SESSION_SECURE_COOKIE=true
+SESSION_DOMAIN=
+SESSION_HTTP_ONLY=true
+SESSION_SAME_SITE=lax
+TRUSTED_PROXIES=127.0.0.1,::1
+TRUSTED_PROXIES_ALLOW_LOCAL_WILDCARD=false
+TRUSTED_HOSTS=
+```
+
+`TRUSTED_PROXIES` accepts explicit IP addresses and CIDR ranges. Production must contain only the addresses or ranges of infrastructure-controlled proxies. `*`, `**`, `REMOTE_ADDR`, `0.0.0.0/0`, and `::/0` are ignored unless `APP_ENV=local` and `TRUSTED_PROXIES_ALLOW_LOCAL_WILDCARD=true` are both explicitly set. Prefer the loopback list for local ngrok. The effective request host is then checked against exact hosts from `APP_URL`, `PAYMENT_PUBLIC_HOSTS`, and `TRUSTED_HOSTS`; arbitrary Host and forwarded-host values are rejected. Do not put a temporary tunnel hostname in committed source.
+
+For plain local HTTP, keep `APP_URL=http://localhost` and `SESSION_SECURE_COOKIE=false`. Leave `SESSION_DOMAIN` empty so the browser creates a host-only cookie. For an HTTPS tunnel, set the secure cookie to `true`; `SameSite=lax` supports normal navigation and the top-level VNPAY return GET. Do not mix localhost HTTP and ngrok HTTPS in one booking/login flow because they are different origins with different cookies.
+
+Use compiled assets for a one-tunnel browser test. An HTTP Vite development server (normally port 5173) cannot be loaded by an HTTPS page and will cause mixed content. Stop `npm run dev`, ensure its generated `public/hot` marker is gone, and run `npm run build`. If HMR is genuinely required, it needs its own correctly configured public HTTPS/WSS endpoint; never suppress the browser warning or downgrade the application page.
+
+Start and configure a local tunnel in this order:
+
+1. Start Laravel with `php artisan serve`.
+2. Start ngrok with `ngrok http 8000`.
+3. Copy the HTTPS forwarding hostname.
+4. Update the local, uncommitted `.env` values shown above. A restarted free tunnel may have a different hostname, requiring both `APP_URL` and `PAYMENT_PUBLIC_HOSTS` to change.
+5. Stop an HTTP Vite dev server and run `npm run build`.
+6. Run `php artisan optimize:clear`, then restart Laravel and any queue/scheduler workers.
+7. Run `php artisan app:https-diagnostics` and `php artisan payments:vnpay-config`.
+8. Register the exact HTTPS Return and IPN URLs with VNPAY, then open only the HTTPS ngrok origin for this flow.
+
+The free ngrok browser interstitial may appear once. Click **Visit Site** in the test browser. It is separate from Laravel and must not be bypassed by adding `ngrok-skip-browser-warning` to customer forms, payment URLs, or callbacks. Test the server-to-server IPN independently.
+
+The `app:https-diagnostics` command is read-only. It reports the public URL, generated login/Return/IPN URLs, sanitized proxy mode, cookie policy, host allow-list result, configuration-cache state, and whether Vite hot mode is active. It never prints application/payment/mail secrets, cookies, guest capabilities, or signatures. Fix every warning before a public payment test.
+
+### Manual HTTPS checklist
+
+- Authentication: home and login load over HTTPS; login and registration form actions are HTTPS; valid and invalid login, session persistence, logout, profile access, and role redirects work without 419 or a downgrade.
+- Customer booking: movie/showtime pages load; normal, VIP, and atomic couple seats work; food can be selected or skipped; review shows the server total; VNPAY opens Sandbox; Return comes back to a clean HTTPS URL; pending/success/review and scoped guest access render correctly.
+- Manager/staff: admin login and role middleware work; movie, room/layout, showtime, food, user/role, payment-review, and ticket-check pages submit to the HTTPS origin.
+- Negative checks: no form action, redirect, script, stylesheet, media URL, or XHR uses HTTP/localhost; no mixed-content block, session loss, CSRF 419, or redirect loop occurs; `/booking/store` still returns 410; browser Return alone never marks a payment paid; no payment secret or signed payload appears in HTML or logs.
+- Network check: confirm the session cookie is `Secure`, `HttpOnly`, `SameSite=Lax`, path `/`, and has no localhost domain on the tunnel host. Confirm the VNPAY IPN response does not set or require a session cookie.
+
+Password reset, email verification, profile update/password update, booking cancellation, and dedicated admin/staff login POST routes are not currently implemented in the active route set. Add HTTPS contract coverage when those features are introduced; do not treat inactive UI-demo templates as production endpoints.
+
 ## Production ticket email transport
 
 MovieMate provisions `smtp` as the only production leaf transport by default. Set `MAIL_PRODUCTION_ALLOWED_TRANSPORTS=smtp`; add another Laravel delivery leaf only after its required package and delivery mechanism have been explicitly provisioned and its named mailer exists in `config/mail.php`. Values are comma-separated transport identities, not mailer names. Every mailer name must be a simple, non-dotted identifier containing only letters, numbers, hyphens, and underscores. Unknown/custom resolvers cannot be approved by this allow-list because their behavior cannot be inspected from configuration. `log` and `array` are forbidden in every production delivery branch; `null`, `failover`, and `roundrobin` can never be allowed as leaves.

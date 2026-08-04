@@ -150,6 +150,31 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
     }
 
+    public function test_forwarded_https_return_redirects_to_a_clean_https_url_without_fulfilling(): void
+    {
+        config([
+            'trustedproxy.proxies' => ['127.0.0.1'],
+            'trustedproxy.hosts' => ['merchant.example.test'],
+        ]);
+        $payment = $this->vnpayPayment();
+        $state = app(PaymentReturnTokenService::class)->issue($payment);
+        $parameters = $this->signedParameters($payment) + ['state' => $state];
+        $path = route('payments.vnpay.return', $parameters, false);
+
+        $response = $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->withHeaders([
+                'X-Forwarded-For' => '198.51.100.42',
+                'X-Forwarded-Host' => 'merchant.example.test',
+                'X-Forwarded-Port' => '443',
+                'X-Forwarded-Proto' => 'https',
+            ])->get('http://upstream.internal'.$path);
+
+        $response->assertRedirect('https://merchant.example.test/payments/vnpay/return?ref='.$payment->order_code);
+        $this->assertStringNotContainsString('vnp_SecureHash', (string) $response->headers->get('Location'));
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
+    }
+
     public function test_forged_return_is_rejected_without_database_mutation(): void
     {
         $payment = $this->vnpayPayment();
