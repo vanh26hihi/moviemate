@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Exceptions\FoodSelectionValidationException;
 use App\Http\Controllers\Controller;
 use App\Models\FoodItem;
 use App\Services\BookingCheckoutDraftService;
@@ -10,7 +11,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use InvalidArgumentException;
 
 class BookingFoodSelectionController extends Controller
 {
@@ -49,7 +49,7 @@ class BookingFoodSelectionController extends Controller
 
         try {
             $this->previews->preview($draft);
-        } catch (InvalidArgumentException $exception) {
+        } catch (FoodSelectionValidationException $exception) {
             throw ValidationException::withMessages(['food_items' => $exception->getMessage()]);
         }
 
