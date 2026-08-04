@@ -4,9 +4,13 @@ namespace Tests\Feature\Payments;
 
 use App\Mail\BookingTicketMail;
 use App\Models\BookingTicketDelivery;
+use App\Services\BookingTokenService;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Mail\PendingMail;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 
@@ -55,6 +59,7 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
             );
             $this->assertStringContainsString('&destination=ticket', $mail->ticketAccessUrl);
             $this->assertStringNotContainsString('guest_token=', $mail->ticketAccessUrl);
+            $this->assertNull(parse_url($mail->ticketAccessUrl, PHP_URL_QUERY));
 
             return true;
         });
@@ -98,6 +103,95 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $this->assertSame(2, $delivery->attempts);
         Mail::assertSent(BookingTicketMail::class, 1);
         $this->assertSame('paid', $payment->booking->fresh()->payment_status);
+    }
+
+    public function test_transport_failure_preserves_guest_session_and_retry_reuses_email_credential(): void
+    {
+        $this->withoutVite();
+        $this->withoutMiddleware(PreventRequestForgery::class);
+        $scenario = $this->bookingScenario(false);
+        $checkoutToken = app(BookingTokenService::class)->issueCheckoutToken();
+        $reservation = $this->reserve(
+            $scenario,
+            [$scenario['seats'][0]->id],
+            token: $checkoutToken,
+        );
+        $payment = $this->pendingPayment($reservation->booking);
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))
+            ->assertJsonPath('return_code', 1);
+        $booking = $reservation->booking->fresh();
+        $guestHashBefore = $booking->getRawOriginal('guest_access_token_hash');
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $reservation->guestAccessToken,
+            'destination' => 'ticket',
+        ])->assertOk();
+        $this->get(route('user.bookings.ticket', $booking))->assertOk();
+
+        $this->configureProductionMailer('smtp', ['smtp' => ['transport' => 'smtp']]);
+        $firstRawToken = null;
+        $pending = Mockery::mock(PendingMail::class);
+        $pending->shouldReceive('send')
+            ->once()
+            ->with(Mockery::on(function (BookingTicketMail $mail) use (&$firstRawToken): bool {
+                $firstRawToken = $this->fragmentToken($mail->ticketAccessUrl);
+
+                return is_string($firstRawToken);
+            }))
+            ->andThrow(new RuntimeException('SMTP unavailable'));
+        Mail::shouldReceive('to')->once()->andReturn($pending);
+        Log::spy();
+
+        $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
+
+        $booking->refresh();
+        $this->assertIsString($firstRawToken);
+        $this->assertSame($guestHashBefore, $booking->getRawOriginal('guest_access_token_hash'));
+        $this->assertNotNull($booking->ticket_email_token_nonce);
+        $this->assertSame(
+            hash('sha256', $firstRawToken),
+            $booking->getRawOriginal('ticket_email_token_hash'),
+        );
+        $this->assertTrue($booking->ticket_email_token_expires_at->isFuture());
+        $this->assertStringNotContainsString($firstRawToken, json_encode($booking->getAttributes()));
+        $this->get(route('user.bookings.ticket', $booking))->assertOk();
+        Log::shouldHaveReceived('warning')->once()->withArgs(
+            function (string $message, array $context) use ($firstRawToken): bool {
+                return ! str_contains($message.json_encode($context), $firstRawToken);
+            },
+        );
+
+        $credentialBeforeRetry = [
+            'nonce' => $booking->getRawOriginal('ticket_email_token_nonce'),
+            'hash' => $booking->getRawOriginal('ticket_email_token_hash'),
+            'expires_at' => $booking->getRawOriginal('ticket_email_token_expires_at'),
+        ];
+        BookingTicketDelivery::query()->update(['available_at' => now()->subSecond()]);
+        $this->app->forgetInstance('mail.manager');
+        Mail::clearResolvedInstance('mail.manager');
+        Mail::fake();
+
+        $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
+
+        $sentRawToken = null;
+        Mail::assertSent(BookingTicketMail::class, function (BookingTicketMail $mail) use (&$sentRawToken): bool {
+            $this->assertNull(parse_url($mail->ticketAccessUrl, PHP_URL_QUERY));
+            $sentRawToken = $this->fragmentToken($mail->ticketAccessUrl);
+
+            return is_string($sentRawToken);
+        });
+        $booking->refresh();
+        $this->assertSame($firstRawToken, $sentRawToken);
+        $this->assertSame($credentialBeforeRetry, [
+            'nonce' => $booking->getRawOriginal('ticket_email_token_nonce'),
+            'hash' => $booking->getRawOriginal('ticket_email_token_hash'),
+            'expires_at' => $booking->getRawOriginal('ticket_email_token_expires_at'),
+        ]);
+        $this->app['session']->forget('guest_booking_capabilities');
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $sentRawToken,
+            'destination' => 'ticket',
+        ])->assertOk();
+        $this->get(route('user.bookings.ticket', $booking))->assertOk();
     }
 
     public function test_expired_processing_lease_is_reclaimed(): void
@@ -169,6 +263,7 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $this->artisan('bookings:send-pending-tickets')->assertFailed();
 
         $delivery = BookingTicketDelivery::query()->sole();
+        $this->assertSame($beforeState, $delivery->getRawOriginal());
         $this->assertSame(BookingTicketDelivery::STATUS_PENDING, $delivery->status);
         $this->assertSame(0, $delivery->attempts);
         $this->assertSame($beforeState['available_at'], $delivery->getRawOriginal('available_at'));
@@ -179,12 +274,13 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $this->assertNull($delivery->lease_expires_at);
         $this->assertNull($delivery->sent_at);
         $booking = $payment->booking->fresh();
+        $this->assertSame($bookingBeforeState, $booking->getRawOriginal());
         $this->assertSame($bookingBeforeState['ticket_emailed_at'], $booking->getRawOriginal('ticket_emailed_at'));
         $this->assertSame($bookingBeforeState['guest_access_token_hash'], $booking->getRawOriginal('guest_access_token_hash'));
         $this->assertSame($bookingBeforeState['guest_access_expires_at'], $booking->getRawOriginal('guest_access_expires_at'));
         $this->assertSame($bookingBeforeState['payment_status'], $booking->getRawOriginal('payment_status'));
         $this->assertSame($bookingBeforeState['booking_status'], $booking->getRawOriginal('booking_status'));
-        $this->assertSame($paymentBeforeState['status'], $payment->fresh()->getRawOriginal('status'));
+        $this->assertSame($paymentBeforeState, $payment->fresh()->getRawOriginal());
         Mail::assertNothingSent();
         Log::shouldNotHaveReceived('warning');
         Log::shouldNotHaveReceived('error');
@@ -257,5 +353,13 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
             'mail.mailers' => $mailers,
             'mail.production_allowed_transports' => 'smtp',
         ]);
+    }
+
+    private function fragmentToken(string $url): ?string
+    {
+        parse_str((string) parse_url($url, PHP_URL_FRAGMENT), $fragment);
+        $token = $fragment['token'] ?? null;
+
+        return is_string($token) ? $token : null;
     }
 }

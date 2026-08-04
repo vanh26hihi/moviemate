@@ -34,6 +34,7 @@ class Booking extends Model
         'used_at' => 'datetime',
         'expires_at' => 'datetime',
         'guest_access_expires_at' => 'datetime',
+        'ticket_email_token_expires_at' => 'datetime',
         'paid_at' => 'datetime',
         'ticket_emailed_at' => 'datetime',
         'total_amount' => 'decimal:2',
@@ -43,6 +44,8 @@ class Booking extends Model
 
     protected $hidden = [
         'guest_access_token_hash',
+        'ticket_email_token_nonce',
+        'ticket_email_token_hash',
         'checkout_idempotency_key_hash',
         'checkout_request_fingerprint_hash',
     ];

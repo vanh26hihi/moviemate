@@ -60,11 +60,20 @@ final class ProductionMailTransportGuard
         }
 
         $selected = $mailer ?? config('mail.default');
-        if (! $this->isSafeIdentifier($selected)) {
+        if (! $this->isSafeMailerName($selected)) {
             throw UnsafeProductionMailConfiguration::atPath(
                 ['default'],
                 'The selected mailer name is missing or malformed.',
             );
+        }
+
+        foreach (array_keys($mailers) as $name) {
+            if (! $this->isSafeMailerName($name)) {
+                throw UnsafeProductionMailConfiguration::atPath(
+                    ['mailers'],
+                    'The mailer registry contains a malformed name.',
+                );
+            }
         }
 
         $allowed = $this->allowedLeafTransports($mailers);
@@ -88,7 +97,7 @@ final class ProductionMailTransportGuard
         $allowed = [];
         foreach (explode(',', $configured) as $value) {
             $transport = strtolower(trim($value));
-            if (! $this->isSafeIdentifier($transport)
+            if (! $this->isSafeTransportIdentifier($transport)
                 || isset($allowed[$transport])
                 || in_array($transport, self::FORBIDDEN_TRANSPORTS, true)) {
                 throw UnsafeProductionMailConfiguration::atPath(
@@ -154,6 +163,13 @@ final class ProductionMailTransportGuard
         array $mailers,
         array $allowed,
     ): void {
+        if (! $this->isSafeMailerName($name)) {
+            throw UnsafeProductionMailConfiguration::atPath(
+                $path,
+                'A mailer name is malformed.',
+            );
+        }
+
         if (count($stack) >= self::MAX_DEPTH) {
             throw UnsafeProductionMailConfiguration::atPath(
                 $path,
@@ -213,7 +229,7 @@ final class ProductionMailTransportGuard
 
             $seenChildren = [];
             foreach ($children as $child) {
-                if (! $this->isSafeIdentifier($child)) {
+                if (! $this->isSafeMailerName($child)) {
                     throw UnsafeProductionMailConfiguration::atPath(
                         $transportPath,
                         'The composite mailer list contains a malformed reference.',
@@ -283,10 +299,17 @@ final class ProductionMailTransportGuard
 
         $transport = strtolower(trim($transport));
 
-        return $this->isSafeIdentifier($transport) ? $transport : null;
+        return $this->isSafeTransportIdentifier($transport) ? $transport : null;
     }
 
-    private function isSafeIdentifier(mixed $value): bool
+    private function isSafeMailerName(mixed $value): bool
+    {
+        return is_string($value)
+            && $value !== '0'
+            && preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}\z/D', $value) === 1;
+    }
+
+    private function isSafeTransportIdentifier(mixed $value): bool
     {
         return is_string($value)
             && preg_match('/\A[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}\z/D', $value) === 1;
