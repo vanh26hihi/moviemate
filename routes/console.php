@@ -15,3 +15,7 @@ Schedule::command('bookings:expire-pending')
 Schedule::command('payments:query-pending')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('bookings:send-pending-tickets')
+    ->everyMinute()
+    ->withoutOverlapping();

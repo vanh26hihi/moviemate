@@ -4,13 +4,11 @@ namespace App\Services\Payments;
 
 use App\Domain\Payments\PaymentVerificationResult;
 use App\Domain\Payments\VerifiedPaymentData;
-use App\Jobs\Payments\SendBookingTicket;
 use App\Models\Booking;
+use App\Models\BookingTicketDelivery;
 use App\Models\Order;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 class VerifiedPaymentService
 {
@@ -62,6 +60,7 @@ class VerifiedPaymentService
 
                 $this->applyAuditFields($lockedPayment, $data);
                 $lockedPayment->save();
+                $this->ensureTicketDelivery($booking);
 
                 return PaymentVerificationResult::duplicate();
             }
@@ -109,20 +108,22 @@ class VerifiedPaymentService
                 ->lockForUpdate()
                 ->first();
             $foodOrder?->forceFill(['status' => 'paid'])->save();
-
-            DB::afterCommit(function () use ($booking): void {
-                try {
-                    SendBookingTicket::dispatch($booking->id);
-                } catch (Throwable $exception) {
-                    Log::error('Paid booking ticket dispatch failed and can be retried separately.', [
-                        'booking_id' => $booking->id,
-                        'exception' => $exception::class,
-                    ]);
-                }
-            });
+            $this->ensureTicketDelivery($booking);
 
             return PaymentVerificationResult::transitioned();
         });
+    }
+
+    private function ensureTicketDelivery(Booking $booking): void
+    {
+        BookingTicketDelivery::query()->firstOrCreate(
+            ['booking_id' => $booking->getKey()],
+            [
+                'status' => BookingTicketDelivery::STATUS_PENDING,
+                'attempts' => 0,
+                'available_at' => now(),
+            ],
+        );
     }
 
     private function markReview(

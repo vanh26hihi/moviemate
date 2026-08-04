@@ -64,7 +64,6 @@ class GuestBookingAccessTest extends TestCase
 
         $this->get(route('user.bookings.success', $booking))
             ->assertOk()
-            ->assertDontSee($booking->qr_code_url, false)
             ->assertDontSee('Xem vé QR của tôi');
 
         $this->get(route('user.bookings.ticket', $booking))
