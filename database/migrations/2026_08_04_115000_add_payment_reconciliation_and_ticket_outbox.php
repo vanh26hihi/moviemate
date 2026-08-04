@@ -8,8 +8,12 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const UNSAFE_RETRY_STATUSES = ['pending', 'processing', 'unresolved', 'review'];
+
     public function up(): void
     {
+        $this->assertNoDuplicateUnsafeAttempts();
+
         Schema::table('payments', function (Blueprint $table) {
             $table->timestamp('reconcile_until')->nullable()->after('expires_at');
         });
@@ -25,35 +29,10 @@ return new class extends Migration
                 ]);
             });
 
-        DB::table('payments')
-            ->select('booking_id', 'provider')
-            ->whereIn('status', ['pending', 'processing'])
-            ->groupBy('booking_id', 'provider')
-            ->havingRaw('COUNT(*) > 1')
-            ->get()
-            ->each(function (object $group): void {
-                $keepId = DB::table('payments')
-                    ->where('booking_id', $group->booking_id)
-                    ->where('provider', $group->provider)
-                    ->whereIn('status', ['pending', 'processing'])
-                    ->max('id');
-
-                DB::table('payments')
-                    ->where('booking_id', $group->booking_id)
-                    ->where('provider', $group->provider)
-                    ->whereIn('status', ['pending', 'processing'])
-                    ->where('id', '<>', $keepId)
-                    ->update([
-                        'status' => 'review',
-                        'failure_reason' => 'duplicate_active_attempt_migration',
-                        'failed_at' => now(),
-                    ]);
-            });
-
         Schema::table('payments', function (Blueprint $table) {
             $table->string('active_attempt_key', 16)
                 ->nullable()
-                ->virtualAs("case when status in ('pending', 'processing') then 'ACTIVE' else null end")
+                ->virtualAs("case when status in ('pending', 'processing', 'unresolved', 'review') then 'ACTIVE' else null end")
                 ->after('status');
             $table->unique(
                 ['booking_id', 'provider', 'active_attempt_key'],
@@ -89,5 +68,36 @@ return new class extends Migration
             $table->dropUnique('payments_one_active_attempt_unique');
             $table->dropColumn(['active_attempt_key', 'reconcile_until']);
         });
+    }
+
+    private function assertNoDuplicateUnsafeAttempts(): void
+    {
+        $duplicates = DB::table('payments')
+            ->select('booking_id', 'provider')
+            ->whereIn('status', self::UNSAFE_RETRY_STATUSES)
+            ->groupBy('booking_id', 'provider')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        if ($duplicates->isEmpty()) {
+            return;
+        }
+
+        $details = $duplicates->map(function (object $group): string {
+            $ids = DB::table('payments')
+                ->where('booking_id', $group->booking_id)
+                ->where('provider', $group->provider)
+                ->whereIn('status', self::UNSAFE_RETRY_STATUSES)
+                ->orderBy('id')
+                ->pluck('id')
+                ->implode(',');
+
+            return "booking_id={$group->booking_id}, provider={$group->provider}, payment_ids={$ids}";
+        })->implode('; ');
+
+        throw new RuntimeException(
+            'Cannot add the active payment-attempt constraint because duplicate unsafe attempts exist. '
+            .'Resolve them explicitly before retrying this migration: '.$details,
+        );
     }
 };

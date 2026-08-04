@@ -7,6 +7,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 
 class PaymentAttemptSchemaTest extends PaymentTestCase
 {
@@ -65,11 +66,21 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
         $this->pendingPayment(overrides: ['zp_trans_id' => '123456789']);
     }
 
-    public function test_database_rejects_two_active_attempts_for_one_booking_even_for_direct_writers(): void
+    public function test_database_rejects_a_second_attempt_when_an_unresolved_attempt_exists(): void
     {
         $booking = $this->payableBooking();
-        $first = $this->pendingPayment($booking);
+        $first = $this->pendingPayment($booking, ['status' => Payment::STATUS_UNRESOLVED]);
         $this->assertSame('ACTIVE', $first->fresh()->active_attempt_key);
+
+        $this->expectException(QueryException::class);
+        $this->pendingPayment($booking);
+    }
+
+    public function test_database_keeps_manual_review_locked_against_automatic_replacement(): void
+    {
+        $booking = $this->payableBooking();
+        $review = $this->pendingPayment($booking, ['status' => Payment::STATUS_REVIEW]);
+        $this->assertSame('ACTIVE', $review->fresh()->active_attempt_key);
 
         $this->expectException(QueryException::class);
         $this->pendingPayment($booking);
@@ -116,6 +127,50 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
         $this->assertZaloPayColumnsExist();
         $this->assertSame(1, DB::table('payments')->where('id', $payment->id)->count());
         $this->assertBookingForeignKeyDeleteAction('restrict');
+    }
+
+    public function test_reconciliation_migration_aborts_before_ddl_for_duplicate_unresolved_attempts(): void
+    {
+        [, $reconciliationMigration] = $this->paymentMigrations();
+        $booking = $this->payableBooking();
+        $first = $this->pendingPayment($booking);
+
+        $reconciliationMigration->down();
+        $secondId = DB::table('payments')->insertGetId([
+            'booking_id' => $booking->id,
+            'provider' => 'zalopay',
+            'payment_method' => 'zalopay',
+            'app_id' => 2553,
+            'app_trans_id' => now('Asia/Ho_Chi_Minh')->format('ymd').'_duplicate_unresolved',
+            'app_user' => 'migration-preflight',
+            'app_time_ms' => (int) floor(microtime(true) * 1000),
+            'amount' => 50000,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_UNRESOLVED,
+            'description' => 'Migration preflight fixture',
+            'expires_at' => now()->addMinutes(10),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $statusesBefore = DB::table('payments')->orderBy('id')->pluck('status', 'id')->all();
+
+        $exception = null;
+        try {
+            $reconciliationMigration->up();
+        } catch (RuntimeException $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertInstanceOf(RuntimeException::class, $exception);
+        $this->assertStringContainsString("booking_id={$booking->id}", $exception->getMessage());
+        $this->assertStringContainsString("payment_ids={$first->id},{$secondId}", $exception->getMessage());
+        $this->assertFalse(Schema::hasColumn('payments', 'reconcile_until'));
+        $this->assertFalse(Schema::hasColumn('payments', 'active_attempt_key'));
+        $this->assertFalse(Schema::hasTable('booking_ticket_deliveries'));
+        $this->assertSame($statusesBefore, DB::table('payments')->orderBy('id')->pluck('status', 'id')->all());
+
+        DB::table('payments')->where('id', $secondId)->delete();
+        $reconciliationMigration->up();
     }
 
     public function test_zalopay_down_handles_a_missing_foreign_key_while_booking_index_remains(): void
