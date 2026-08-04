@@ -2,14 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Room extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'cinema_id',
+        'code',
         'name',
         'room_type',
         'total_seats',
@@ -33,5 +39,30 @@ class Room extends Model
     public function showtimes(): HasMany
     {
         return $this->hasMany(Showtime::class);
+    }
+
+    public function layouts(): HasMany
+    {
+        return $this->hasMany(RoomLayout::class);
+    }
+
+    public function publishedLayouts(): HasMany
+    {
+        return $this->layouts()->published()->orderByDesc('version');
+    }
+
+    public function draftLayout(): HasOne
+    {
+        return $this->hasOne(RoomLayout::class)->where('status', 'draft')->latestOfMany('version');
+    }
+
+    public function latestPublishedLayout(): HasOne
+    {
+        return $this->hasOne(RoomLayout::class)->where('status', 'published')->latestOfMany('version');
+    }
+
+    public function scopeOperational(Builder $query): Builder
+    {
+        return $query->where('status', 'active');
     }
 }

@@ -1,26 +1,57 @@
-﻿@extends('layouts.admin')
+@extends('layouts.admin')
 
-@section('title', 'Form quáº£n lÃ½ - MovieMate')
-@section('page-title', 'ThÃªm/Sá»­a dá»¯ liá»‡u')
+@section('title', 'Thêm thể loại')
+@section('page-title', 'Thêm thể loại')
 
 @section('content')
-
-<div class="mx-auto max-w-4xl rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <h1 class="text-3xl font-black">Form nháº­p dá»¯ liá»‡u</h1>
-    <p class="mt-2 text-gray-400">Giao diá»‡n form máº«u cho chá»©c nÄƒng quáº£n trá»‹.</p>
-
-    <form class="mt-8 grid gap-5 md:grid-cols-2">
-        <input placeholder="TÃªn" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <input placeholder="MÃ£ / slug" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <input placeholder="ThÃ´ng tin phá»¥" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]"><option>Tráº¡ng thÃ¡i hoáº¡t Ä‘á»™ng</option></select>
-        <textarea rows="6" placeholder="MÃ´ táº£" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18] md:col-span-2"></textarea>
-
-        <div class="flex gap-4 md:col-span-2">
-            <button type="button" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-8 py-4 font-bold">LÆ°u dá»¯ liá»‡u</button>
-            <a href="/admin/dashboard" class="rounded-2xl border border-white/10 px-8 py-4 font-bold">Há»§y</a>
-        </div>
-    </form>
+<div class="admin-page-header">
+    <div>
+        <h1 class="admin-page-title">Thêm thể loại</h1>
+        <p class="admin-page-subtitle">Tạo thể loại mới để gắn với phim trong hệ thống.</p>
+    </div>
+    <a href="{{ route('admin.genres.index') }}" class="admin-btn-secondary">
+        <i class="ph ph-arrow-left"></i>
+        Quay lại
+    </a>
 </div>
 
+@if ($errors->any())
+    <div class="mb-5 max-w-3xl rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm">
+        <ul class="list-disc list-inside">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+<form action="{{ route('admin.genres.store') }}" method="POST" class="admin-form-card max-w-3xl">
+    @csrf
+
+    <div class="space-y-5">
+        <div>
+            <label class="admin-label">Tên *</label>
+            <input type="text" name="name" value="{{ old('name') }}" required class="admin-input" placeholder="Ví dụ: Hành động">
+        </div>
+
+        <div>
+            <label class="admin-label">Slug</label>
+            <input type="text" name="slug" value="{{ old('slug') }}" class="admin-input" placeholder="Để trống để tự tạo">
+            <p class="admin-help">Slug dùng cho URL và lọc dữ liệu.</p>
+        </div>
+
+        <div>
+            <label class="admin-label">Mô tả</label>
+            <textarea name="description" rows="5" class="admin-input resize-y" placeholder="Mô tả ngắn về thể loại...">{{ old('description') }}</textarea>
+        </div>
+    </div>
+
+    <div class="mt-8 flex flex-col sm:flex-row justify-end gap-3 border-t app-border pt-5">
+        <a href="{{ route('admin.genres.index') }}" class="admin-btn-secondary">Hủy</a>
+        <button type="submit" class="admin-btn-primary">
+            <i class="ph-bold ph-floppy-disk"></i>
+            Lưu
+        </button>
+    </div>
+</form>
 @endsection

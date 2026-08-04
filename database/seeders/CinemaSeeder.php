@@ -3,44 +3,36 @@
 namespace Database\Seeders;
 
 use App\Models\Cinema;
+use App\Services\CinemaContext;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class CinemaSeeder extends Seeder
 {
     public function run(): void
     {
-        $cinemas = [
-            [
-                'name' => 'Cinema One',
-                'address' => '123 Main St',
-                'city' => 'Hanoi',
-                'phone' => '0123456789',
-                'image' => null,
-                'description' => 'Main downtown cinema',
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Cinema Two',
-                'address' => '456 Second Ave',
-                'city' => 'Ho Chi Minh City',
-                'phone' => '0987654321',
-                'image' => null,
-                'description' => 'City center cinema',
-                'status' => 'active',
-            ],
-            [
-                'name' => 'Cinema Three',
-                'address' => '789 Third Blvd',
-                'city' => 'Da Nang',
-                'phone' => null,
-                'image' => null,
-                'description' => 'Coastal cinema',
-                'status' => 'active',
-            ],
-        ];
+        DB::transaction(function (): void {
+            Cinema::query()
+                ->where(fn ($query) => $query->whereNull('canonical_key')
+                    ->orWhere('canonical_key', '!=', CinemaContext::CANONICAL_KEY))
+                ->update(['status' => 'inactive', 'is_primary' => false, 'archived_at' => now()]);
 
-        foreach ($cinemas as $data) {
-            Cinema::create($data);
-        }
+            Cinema::query()->updateOrCreate(
+                ['canonical_key' => CinemaContext::CANONICAL_KEY],
+                [
+                    'name' => 'MovieMate Cinema – FPT Polytechnic',
+                    'school_name' => CinemaContext::SCHOOL_NAME,
+                    'address' => CinemaContext::ADDRESS,
+                    'city' => CinemaContext::CITY,
+                    'country' => CinemaContext::COUNTRY,
+                    'phone' => null,
+                    'latitude' => CinemaContext::LATITUDE,
+                    'longitude' => CinemaContext::LONGITUDE,
+                    'status' => 'active',
+                    'is_primary' => true,
+                    'archived_at' => null,
+                ],
+            );
+        });
     }
 }

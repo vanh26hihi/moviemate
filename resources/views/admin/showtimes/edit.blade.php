@@ -1,26 +1,24 @@
-﻿@extends('layouts.admin')
-
-@section('title', 'Form quáº£n lÃ½ - MovieMate')
-@section('page-title', 'ThÃªm/Sá»­a dá»¯ liá»‡u')
+@extends('layouts.admin')
+@section('title', 'Chỉnh sửa suất chiếu - MovieMate Admin')
+@section('page-title', 'Chỉnh sửa suất chiếu')
 
 @section('content')
+<div class="max-w-5xl">
+    <div class="cinema-card p-6 sm:p-8">
+        <h1 class="text-2xl font-extrabold app-text mb-2">Cập nhật suất chiếu</h1>
+        <p class="app-muted mb-6">
+            Cơ sở cố định: {{ $cinema->name }} · Layout hiện tại: v{{ $showtime->roomLayout->version }}
+        </p>
 
-<div class="mx-auto max-w-4xl rounded-[28px] border border-white/10 bg-[#151A27] p-6">
-    <h1 class="text-3xl font-black">Form nháº­p dá»¯ liá»‡u</h1>
-    <p class="mt-2 text-gray-400">Giao diá»‡n form máº«u cho chá»©c nÄƒng quáº£n trá»‹.</p>
-
-    <form class="mt-8 grid gap-5 md:grid-cols-2">
-        <input placeholder="TÃªn" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <input placeholder="MÃ£ / slug" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <input placeholder="ThÃ´ng tin phá»¥" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]">
-        <select class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18]"><option>Tráº¡ng thÃ¡i hoáº¡t Ä‘á»™ng</option></select>
-        <textarea rows="6" placeholder="MÃ´ táº£" class="rounded-2xl border border-white/10 bg-[#080A12] px-5 py-4 outline-none focus:border-[#FF7A18] md:col-span-2"></textarea>
-
-        <div class="flex gap-4 md:col-span-2">
-            <button type="button" class="rounded-2xl bg-gradient-to-r from-[#FF3D57] to-[#FF7A18] px-8 py-4 font-bold">LÆ°u dá»¯ liá»‡u</button>
-            <a href="/admin/dashboard" class="rounded-2xl border border-white/10 px-8 py-4 font-bold">Há»§y</a>
-        </div>
-    </form>
+        <form method="POST" action="{{ route('admin.showtimes.update', $showtime) }}" class="space-y-6">
+            @csrf
+            @method('PUT')
+            @include('admin.showtimes._form-fields')
+            <div class="flex justify-end gap-3">
+                <a href="{{ route('admin.showtimes.index') }}" class="btn-secondary">Hủy</a>
+                <button class="btn-primary">Cập nhật</button>
+            </div>
+        </form>
+    </div>
 </div>
-
 @endsection
