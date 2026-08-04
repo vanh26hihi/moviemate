@@ -27,6 +27,7 @@ use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
 use App\Http\Controllers\User\RetiredBookingStoreController;
 use App\Http\Middleware\ProtectBookingResponses;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
@@ -127,8 +128,18 @@ Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, '
     ->name('user.bookings.access.exchange');
 
 Route::middleware(['auth', 'active'])->group(function () {
-    Route::get('/booking-history', function () {
-        return view('user.bookings.history');
+    Route::get('/booking-history', function (Request $request) {
+        $status = $request->string('status')->toString();
+        $bookings = $request->user()->bookings()
+            ->with(['showtime.movie', 'showtime.cinema', 'showtime.room', 'bookingSeats.seat', 'payment'])
+            ->when(
+                in_array($status, ['pending', 'paid', 'used', 'cancelled', 'expired'], true),
+                fn ($query) => $query->where('booking_status', $status)
+            )
+            ->latest()
+            ->paginate(10);
+
+        return view('user.bookings.history', compact('bookings'));
     })->name('user.bookings.history');
 
     Route::get('/profile', function () {

@@ -92,11 +92,28 @@ class AdminRouteAccessTest extends TestCase
 
         $customer = $this->userWithRole('user');
         $this->actingAs($customer)->get(route('user.profile'))->assertOk();
-        $this->actingAs($customer)->get(route('user.bookings.history'))->assertOk();
+
+        $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('user.loyalty.history'));
+        $this->actingAs($customer)
+            ->get(route('user.bookings.history'))
+            ->assertOk()
+            ->assertDontSee('Lịch sử điểm');
+
+        app('router')->get('/loyalty-history', fn () => '')->name('user.loyalty.history');
+        app('router')->getRoutes()->refreshNameLookups();
+
+        $loyaltyHistoryUrl = route('user.loyalty.history');
+        $this->actingAs($customer)
+            ->get(route('user.bookings.history'))
+            ->assertOk()
+            ->assertSee('href="'.$loyaltyHistoryUrl.'"', false);
 
         $customer->status = 'inactive';
         $customer->save();
-        $this->get(route('user.profile'))->assertRedirect(route('login'));
+
+        $this->actingAs($customer)->get(route('user.profile'))->assertRedirect(route('login'));
+        $this->assertGuest();
+        $this->actingAs($customer)->get(route('user.bookings.history'))->assertRedirect(route('login'));
         $this->assertGuest();
     }
 
