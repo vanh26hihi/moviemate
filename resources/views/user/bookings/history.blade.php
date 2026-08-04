@@ -72,3 +72,65 @@
                         $status = $statusMap[$booking->booking_status] ?? $statusMap['pending'];
                         $poster = $booking->showtime->movie->poster_url;
                     @endphp
+<article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
+                        <div class="absolute top-0 right-0 {{ $status['class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
+                            {{ $status['label'] }}
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-5">
+                            <div class="w-28 shrink-0">
+                                <div class="poster-frame rounded-2xl">
+                                    @if($poster)
+                                        <img src="{{ $poster }}" alt="{{ $booking->showtime->movie->title }}" loading="lazy">
+                                    @else
+                                        <div class="fallback-poster">
+                                            <i class="ph-fill ph-film-slate"></i>
+                                            <strong class="text-sm">MovieMate</strong>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <div class="flex-grow min-w-0">
+                                <h2 class="text-xl font-bold app-text mb-1 pr-20">{{ $booking->showtime->movie->title }}</h2>
+                                <p class="app-muted text-xs mb-4">Mã vé: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
+
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mb-4">
+                                    <div><p class="app-muted mb-0.5">Thời gian</p><p class="app-text font-semibold">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }} - {{ $booking->showtime?->show_date ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y') : 'Đang cập nhật' }}</p></div>
+                                    <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->bookingSeats->pluck('seat.seat_code')->join(', ') }}</p></div>
+                                    <div><p class="app-muted mb-0.5">Rạp</p><p class="app-text font-semibold">{{ $booking->showtime->cinema->name }}</p></div>
+                                    <div><p class="app-muted mb-0.5">Phòng</p><p class="app-text font-semibold">{{ $booking->showtime->room->name }}</p></div>
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
+                                    <div>
+                                        <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
+                                        <p class="app-text font-bold text-lg">{{ number_format($booking->total_amount,0,',','.') }}đ</p>
+                                        @if($booking->loyalty_points_earned > 0)
+                                            <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
+                                        @endif
+                                    </div>
+                                    <div class="flex gap-2">
+                                        @if($booking->booking_status === 'pending' && $booking->payment?->checkout_url)
+                                            <a href="{{ $booking->payment->checkout_url }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
+                                                Thanh toán tiếp
+                                            </a>
+                                        @else
+                                            <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
+                                                Xem vé QR
+                                            </a>
+                                        @endif
+                                        @if(in_array($booking->booking_status, ['pending', 'paid'], true))
+                                            <form method="POST" action="{{ route('user.bookings.cancel', $booking) }}" class="inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('{{ $booking->booking_status === 'pending' ? 'Bạn chắc chắn muốn hủy thanh toán này?' : 'Bạn chắc chắn muốn hủy vé này?' }}')">
+                                                    {{ $booking->booking_status === 'pending' ? 'Hủy thanh toán' : 'Hủy vé' }}
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
