@@ -15,6 +15,14 @@ return new class extends Migration
 
     private const BLOCKING_STATUSES = ['pending', 'processing', 'unresolved', 'review'];
 
+    private const MYSQL_CHARACTER_SETS = [
+        'armscii8', 'ascii', 'big5', 'binary', 'cp1250', 'cp1251', 'cp1256', 'cp1257', 'cp850', 'cp852',
+        'cp866', 'cp932', 'dec8', 'eucjpms', 'euckr', 'gb18030', 'gb2312', 'gbk', 'geostd8', 'greek',
+        'hebrew', 'hp8', 'keybcs2', 'koi8r', 'koi8u', 'latin1', 'latin2', 'latin5', 'latin7', 'macce',
+        'macroman', 'sjis', 'swe7', 'tis620', 'ucs2', 'ujis', 'utf8', 'utf16', 'utf16le', 'utf32',
+        'utf8mb3', 'utf8mb4',
+    ];
+
     public function up(): void
     {
         $inventory = $this->inventory();
@@ -89,7 +97,8 @@ return new class extends Migration
         );
         $reconcileColumn = DB::selectOne(
             <<<'SQL'
-                SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, EXTRA
+                SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA,
+                       GENERATION_EXPRESSION, DATETIME_PRECISION
                 FROM information_schema.COLUMNS
                 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'payments' AND COLUMN_NAME = 'reconcile_until'
                 SQL,
@@ -166,7 +175,16 @@ return new class extends Migration
                 'EXTRA' => (int) $active->hidden === 2 ? 'VIRTUAL GENERATED' : 'UNKNOWN',
                 'GENERATION_EXPRESSION' => $this->sqliteExpression((string) $table?->sql),
             ] : null,
-            'reconcile' => $reconcile ? (array) $reconcile : null,
+            'reconcile' => $reconcile ? [
+                'COLUMN_NAME' => $reconcile->name,
+                'DATA_TYPE' => strtolower((string) $reconcile->type),
+                'COLUMN_TYPE' => strtolower((string) $reconcile->type),
+                'IS_NULLABLE' => (int) $reconcile->notnull === 0 ? 'YES' : 'NO',
+                'COLUMN_DEFAULT' => $reconcile->dflt_value,
+                'EXTRA' => '',
+                'GENERATION_EXPRESSION' => (int) $reconcile->hidden === 0 ? '' : 'UNKNOWN',
+                'DATETIME_PRECISION' => null,
+            ] : null,
             'provider' => $provider ? ['IS_NULLABLE' => (int) $provider->notnull === 0 ? 'YES' : 'NO'] : null,
             'index' => $indexRows,
             'status_counts' => $table
@@ -179,17 +197,19 @@ return new class extends Migration
 
     private function sqliteExpression(string $tableSql): ?string
     {
-        $normalized = $this->normalize($tableSql);
-
-        if (str_contains($normalized, $this->normalize(self::NEW_EXPRESSION))) {
-            return self::NEW_EXPRESSION;
+        if (preg_match(
+            '/["`]?active_attempt_key["`]?\s+[^,]*?(?:generated\s+always\s+)?as\s*\(/i',
+            $tableSql,
+            $match,
+            PREG_OFFSET_CAPTURE,
+        ) !== 1) {
+            return null;
         }
 
-        if (str_contains($normalized, $this->normalize(self::OLD_EXPRESSION))) {
-            return self::OLD_EXPRESSION;
-        }
+        $open = $match[0][1] + strlen($match[0][0]) - 1;
+        $close = $this->matchingParenthesis($tableSql, $open);
 
-        return null;
+        return $close === null ? null : substr($tableSql, $open + 1, $close - $open - 1);
     }
 
     /** @param array<string, mixed> $inventory */
@@ -222,9 +242,15 @@ return new class extends Migration
             }
         }
 
-        $inventory['reconcile'] !== null
-            ? $present[] = 'reconcile_until column'
-            : $invalid[] = 'reconcile_until column is missing';
+        $reconcile = $inventory['reconcile'];
+        if ($reconcile === null) {
+            $invalid[] = 'reconcile_until column is missing';
+        } elseif (! $this->reconcileIsCorrect($reconcile, $inventory['driver'])) {
+            $invalid[] = 'reconcile_until must be nullable, non-generated TIMESTAMP with NULL default and no ON UPDATE; found '
+                .$this->reconcileDescription($reconcile);
+        } else {
+            $present[] = 'expected reconcile_until column';
+        }
 
         $provider = $inventory['provider'];
         if ($provider === null) {
@@ -245,9 +271,9 @@ return new class extends Migration
         }
 
         $expression = $active['GENERATION_EXPRESSION'] ?? null;
-        $normalizedExpression = is_string($expression) ? $this->normalize($expression) : null;
-        $old = $normalizedExpression === $this->normalize(self::OLD_EXPRESSION);
-        $new = $normalizedExpression === $this->normalize(self::NEW_EXPRESSION);
+        $expressionState = is_string($expression) ? $this->classifyExpression($expression) : null;
+        $old = $expressionState === 'OLD';
+        $new = $expressionState === 'NEW';
         if ($active !== null && ! $old && ! $new) {
             $invalid[] = 'active_attempt_key has an unknown generated expression';
         } elseif ($old) {
@@ -378,11 +404,172 @@ return new class extends Migration
         );
     }
 
-    private function normalize(string $expression): string
+    /** @param array<string, mixed> $column */
+    private function reconcileIsCorrect(array $column, string $driver): bool
     {
-        $expression = strtolower($expression);
-        $expression = preg_replace('/_[a-z0-9]+/', '', $expression) ?? $expression;
+        $dataType = strtolower((string) ($column['DATA_TYPE'] ?? ''));
+        $columnType = strtolower((string) ($column['COLUMN_TYPE'] ?? ''));
+        $expectedType = $driver === 'mysql'
+            ? $dataType === 'timestamp' && $columnType === 'timestamp'
+            : in_array($dataType, ['datetime', 'timestamp'], true)
+                && in_array($columnType, ['datetime', 'timestamp'], true);
+        $precision = $column['DATETIME_PRECISION'] ?? null;
+        $expectedPrecision = $driver !== 'mysql' || ($precision !== null && (int) $precision === 0);
+        $extra = trim((string) ($column['EXTRA'] ?? ''));
+        $generation = trim((string) ($column['GENERATION_EXPRESSION'] ?? ''));
 
-        return preg_replace('/[^a-z0-9,]+/', '', $expression) ?? $expression;
+        return $expectedType
+            && strtoupper((string) ($column['IS_NULLABLE'] ?? '')) === 'YES'
+            && array_key_exists('COLUMN_DEFAULT', $column)
+            && $column['COLUMN_DEFAULT'] === null
+            && $extra === ''
+            && $generation === ''
+            && $expectedPrecision;
+    }
+
+    /** @param array<string, mixed> $column */
+    private function reconcileDescription(array $column): string
+    {
+        $default = array_key_exists('COLUMN_DEFAULT', $column) && $column['COLUMN_DEFAULT'] === null
+            ? 'NULL'
+            : (string) ($column['COLUMN_DEFAULT'] ?? 'missing');
+        $generation = trim((string) ($column['GENERATION_EXPRESSION'] ?? ''));
+
+        return 'DATA_TYPE='.(string) ($column['DATA_TYPE'] ?? 'missing')
+            .', COLUMN_TYPE='.(string) ($column['COLUMN_TYPE'] ?? 'missing')
+            .', IS_NULLABLE='.(string) ($column['IS_NULLABLE'] ?? 'missing')
+            .', COLUMN_DEFAULT='.$default
+            .', EXTRA='.(string) ($column['EXTRA'] ?? 'missing')
+            .', GENERATION_EXPRESSION='.($generation === '' ? 'empty' : 'present')
+            .', DATETIME_PRECISION='.(string) ($column['DATETIME_PRECISION'] ?? 'NULL');
+    }
+
+    private function classifyExpression(string $expression): ?string
+    {
+        $components = $this->parseExpression($expression);
+
+        if ($components === null || $components['result'] !== 'ACTIVE') {
+            return null;
+        }
+
+        return match ($components['statuses']) {
+            ['pending', 'processing'] => 'OLD',
+            ['pending', 'processing', 'unresolved', 'review'] => 'NEW',
+            default => null,
+        };
+    }
+
+    /** @return array{statuses: list<string>, result: string}|null */
+    private function parseExpression(string $expression): ?array
+    {
+        $expression = $this->stripOuterParentheses(trim($expression));
+        $literal = "(?:_[a-z][a-z0-9]*)?\\\\?'[a-z0-9_]+\\\\?'";
+        $pattern = '~\\Acase\\s+when\\s+(?<condition>.+?)\\s+then\\s+(?<result>'.$literal.')'
+            .'\\s+else\\s+null\\s+end\\z~isD';
+
+        if (preg_match($pattern, $expression, $matches) !== 1) {
+            return null;
+        }
+
+        $condition = $this->stripOuterParentheses(trim($matches['condition']));
+        $conditionPattern = '~\\A(?:(?:`payments`|payments)\\s*\\.\\s*)?(?:`status`|status)'
+            .'\\s+in\\s*\\(\\s*(?<statuses>'.$literal.'(?:\\s*,\\s*'.$literal.')*)\\s*\\)\\z~iD';
+        if (preg_match($conditionPattern, $condition, $conditionMatches) !== 1) {
+            return null;
+        }
+
+        $statuses = [];
+        $offset = 0;
+        $statusPattern = '~\\G\\s*(?<literal>'.$literal.')\\s*(?:,|\\z)~i';
+        $statusSource = $conditionMatches['statuses'];
+        while ($offset < strlen($statusSource)) {
+            if (preg_match($statusPattern, $statusSource, $statusMatch, PREG_OFFSET_CAPTURE, $offset) !== 1
+                || $statusMatch[0][1] !== $offset) {
+                return null;
+            }
+
+            $value = $this->decodeLiteral($statusMatch['literal'][0]);
+            if ($value === null) {
+                return null;
+            }
+
+            $statuses[] = $value;
+            $offset += strlen($statusMatch[0][0]);
+        }
+
+        $result = $this->decodeLiteral($matches['result']);
+
+        return $result === null ? null : ['statuses' => $statuses, 'result' => $result];
+    }
+
+    private function decodeLiteral(string $literal): ?string
+    {
+        if (preg_match(
+            "~\\A(?:_(?<charset>[a-z][a-z0-9]*))?\\\\?'(?<value>[a-z0-9_]+)\\\\?'\\z~iD",
+            $literal,
+            $match,
+        ) !== 1) {
+            return null;
+        }
+
+        $charset = strtolower((string) ($match['charset'] ?? ''));
+        if ($charset !== '' && ! in_array($charset, self::MYSQL_CHARACTER_SETS, true)) {
+            return null;
+        }
+
+        return $match['value'];
+    }
+
+    private function stripOuterParentheses(string $expression): string
+    {
+        while (str_starts_with($expression, '(')) {
+            $close = $this->matchingParenthesis($expression, 0);
+            if ($close !== strlen($expression) - 1) {
+                break;
+            }
+
+            $expression = trim(substr($expression, 1, -1));
+        }
+
+        return $expression;
+    }
+
+    private function matchingParenthesis(string $value, int $open): ?int
+    {
+        $depth = 0;
+        $quoted = false;
+        $backticked = false;
+        $length = strlen($value);
+
+        for ($offset = $open; $offset < $length; $offset++) {
+            $character = $value[$offset];
+            if ($quoted) {
+                if ($character === "'" && ($offset + 1 >= $length || $value[$offset + 1] !== "'")) {
+                    $quoted = false;
+                } elseif ($character === "'" && $offset + 1 < $length && $value[$offset + 1] === "'") {
+                    $offset++;
+                }
+
+                continue;
+            }
+            if ($backticked) {
+                if ($character === '`') {
+                    $backticked = false;
+                }
+
+                continue;
+            }
+            if ($character === "'") {
+                $quoted = true;
+            } elseif ($character === '`') {
+                $backticked = true;
+            } elseif ($character === '(') {
+                $depth++;
+            } elseif ($character === ')' && --$depth === 0) {
+                return $offset;
+            }
+        }
+
+        return null;
     }
 };

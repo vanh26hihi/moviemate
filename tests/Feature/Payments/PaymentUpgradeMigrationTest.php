@@ -240,17 +240,14 @@ class PaymentUpgradeMigrationTest extends PaymentTestCase
         $this->assertStringContainsString("('pending', 'processing', 'unresolved', 'review')", $source);
     }
 
-    public function test_mysql_charset_qualified_generated_expression_is_normalized_as_old(): void
+    public function test_mysql_charset_qualified_generated_expression_is_classified_as_old(): void
     {
         $migration = $this->upgradeMigration();
-        $normalize = new \ReflectionMethod($migration, 'normalize');
+        $classify = new \ReflectionMethod($migration, 'classifyExpression');
         $mysqlExpression = "(case when (`status` in (_utf8mb4'pending',_utf8mb4'processing')) "
             ."then _utf8mb4'ACTIVE' else NULL end)";
 
-        $this->assertSame(
-            $normalize->invoke($migration, self::OLD),
-            $normalize->invoke($migration, $mysqlExpression),
-        );
+        $this->assertSame('OLD', $classify->invoke($migration, $mysqlExpression));
     }
 
     public function test_provider_cannot_be_changed_by_ordinary_mass_assignment(): void
@@ -262,6 +259,51 @@ class PaymentUpgradeMigrationTest extends PaymentTestCase
         $this->assertSame('zalopay', $payment->fresh()->provider);
         $this->assertSame('updated safely', $payment->fresh()->description);
         $this->assertNotContains('provider', $payment->getFillable());
+    }
+
+    public function test_explicit_provider_is_trimmed_lowercased_and_cannot_be_overridden(): void
+    {
+        $booking = $this->payableBooking();
+        $payment = Payment::createForProvider(' ZaloPay ', [
+            'booking_id' => $booking->id,
+            'provider' => 'vnpay',
+            'payment_method' => 'zalopay',
+            'amount' => 50000,
+            'status' => Payment::STATUS_PENDING,
+        ]);
+
+        $this->assertSame('zalopay', $payment->provider);
+        $this->assertSame('zalopay', $payment->fresh()->provider);
+    }
+
+    #[DataProvider('invalidProviders')]
+    public function test_invalid_provider_is_rejected_before_insert(string $provider): void
+    {
+        $count = Payment::query()->count();
+
+        try {
+            Payment::createForProvider($provider, [
+                'booking_id' => PHP_INT_MAX,
+                'payment_method' => 'invalid',
+                'amount' => 1,
+                'status' => Payment::STATUS_PENDING,
+            ]);
+            $this->fail('Invalid providers must be rejected.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame('Unsupported payment provider.', $exception->getMessage());
+        }
+
+        $this->assertSame($count, Payment::query()->count());
+    }
+
+    /** @return array<string, array{string}> */
+    public static function invalidProviders(): array
+    {
+        return [
+            'empty' => [''],
+            'whitespace' => ['   '],
+            'unsupported' => ['stripe'],
+        ];
     }
 
     private function oldMigration(): object
