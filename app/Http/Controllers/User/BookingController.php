@@ -194,6 +194,7 @@ class BookingController extends Controller
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
+            'foodOrder.items',
         ]);
 
         return view('user.bookings.success', compact('booking'));
@@ -210,6 +211,7 @@ class BookingController extends Controller
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
+            'foodOrder.items',
         ]);
 
         return view('user.bookings.ticket', compact('booking'));

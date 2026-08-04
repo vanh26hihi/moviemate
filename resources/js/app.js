@@ -40,6 +40,213 @@ function applyTheme(theme) {
 
 applyTheme(readTheme());
 
+const vndFormatter = new Intl.NumberFormat('vi-VN');
+
+function formatVnd(amount) {
+    return `${vndFormatter.format(Math.max(0, Number(amount) || 0))} VND`;
+}
+
+function initializeSeatPickers() {
+    document.querySelectorAll('[data-seat-picker]').forEach((form) => {
+        const buttons = Array.from(form.querySelectorAll('.seat-button:not(:disabled)'));
+        const selected = new Map();
+        const input = form.querySelector('#selectedSeatsInput');
+        const display = document.getElementById('selectedSeatsDisplay');
+        const totalDisplay = document.getElementById('totalAmountDisplay');
+        const continueButton = document.getElementById('continueBookingButton');
+        const hint = document.getElementById('seatSelectionHint');
+
+        if (!(input instanceof HTMLInputElement) || !display || !totalDisplay || !continueButton) return;
+        hint?.setAttribute('aria-live', 'polite');
+
+        function targetsFor(button) {
+            if (button.dataset.seatType !== 'couple') return [button];
+
+            return buttons.filter((candidate) => (
+                candidate.dataset.pairCode
+                && candidate.dataset.pairCode === button.dataset.pairCode
+            ));
+        }
+
+        function setSelected(button, value) {
+            const seatId = button.dataset.seatId;
+            if (!seatId) return;
+
+            if (value) {
+                selected.set(seatId, {
+                    id: seatId,
+                    code: button.dataset.seatCode || '',
+                    price: Number(button.dataset.price) || 0,
+                });
+            } else {
+                selected.delete(seatId);
+            }
+
+            button.setAttribute('aria-pressed', String(value));
+        }
+
+        function refresh() {
+            const values = Array.from(selected.values());
+            input.value = values.map((item) => item.id).join(',');
+            display.textContent = values.length ? values.map((item) => item.code).join(', ') : 'Chưa chọn';
+            totalDisplay.textContent = formatVnd(values.reduce((total, item) => total + item.price, 0));
+            continueButton.disabled = values.length === 0;
+        }
+
+        buttons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const targets = targetsFor(button);
+                const expectedCount = button.dataset.seatType === 'couple' ? 2 : 1;
+
+                if (targets.length !== expectedCount) {
+                    if (hint) hint.textContent = 'Cặp ghế đôi này hiện không khả dụng. Vui lòng chọn ghế khác.';
+                    return;
+                }
+
+                const shouldSelect = !targets.every((target) => selected.has(target.dataset.seatId));
+                targets.forEach((target) => setSelected(target, shouldSelect));
+                refresh();
+
+                if (hint && button.dataset.seatType === 'couple') {
+                    hint.textContent = shouldSelect
+                        ? `Đã chọn cả cặp ghế ${targets.map((target) => target.dataset.seatCode).join(' và ')}.`
+                        : 'Đã bỏ chọn cả cặp ghế đôi.';
+                }
+            });
+        });
+
+        refresh();
+    });
+}
+
+function initializeFoodPickers() {
+    document.querySelectorAll('[data-food-picker]').forEach((form) => {
+        const cards = Array.from(form.querySelectorAll('[data-food-card]'));
+        const subtotalDisplay = document.querySelector('[data-food-subtotal]');
+        const grandTotalDisplay = document.querySelector('[data-food-grand-total]');
+        const seatSubtotal = Number(grandTotalDisplay?.dataset.seatSubtotal) || 0;
+
+        function normalizedQuantity(input) {
+            const minimum = Number(input.min) || 0;
+            const maximum = Number(input.max) || 20;
+            const value = Number.parseInt(input.value, 10);
+
+            return Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum));
+        }
+
+        function refresh() {
+            let subtotal = 0;
+
+            cards.forEach((card) => {
+                const input = card.querySelector('[data-food-quantity]');
+                if (!(input instanceof HTMLInputElement)) return;
+
+                const quantity = normalizedQuantity(input);
+                const unitPrice = Number(card.dataset.unitPrice) || 0;
+                const lineTotal = quantity * unitPrice;
+                input.value = String(quantity);
+                subtotal += lineTotal;
+
+                const lineTotalDisplay = card.querySelector('[data-food-line-total]');
+                if (lineTotalDisplay) lineTotalDisplay.textContent = formatVnd(lineTotal);
+
+                const decrease = card.querySelector('[data-quantity-decrease]');
+                const increase = card.querySelector('[data-quantity-increase]');
+                if (decrease instanceof HTMLButtonElement) decrease.disabled = quantity <= Number(input.min || 0);
+                if (increase instanceof HTMLButtonElement) increase.disabled = quantity >= Number(input.max || 20);
+            });
+
+            if (subtotalDisplay) subtotalDisplay.textContent = formatVnd(subtotal);
+            if (grandTotalDisplay) grandTotalDisplay.textContent = formatVnd(seatSubtotal + subtotal);
+        }
+
+        form.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-quantity-decrease], [data-quantity-increase]');
+            if (!button) return;
+
+            const input = button.closest('[data-food-card]')?.querySelector('[data-food-quantity]');
+            if (!(input instanceof HTMLInputElement)) return;
+
+            const direction = button.hasAttribute('data-quantity-increase') ? 1 : -1;
+            input.value = String(normalizedQuantity(input) + direction);
+            refresh();
+            input.focus();
+        });
+
+        form.addEventListener('input', (event) => {
+            if (event.target.matches('[data-food-quantity]')) refresh();
+        });
+
+        form.addEventListener('change', (event) => {
+            if (event.target.matches('[data-food-quantity]')) refresh();
+        });
+
+        refresh();
+    });
+}
+
+function initializeSubmitGuards() {
+    document.querySelectorAll('form[data-submit-once]').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (form.dataset.submitting === 'true') {
+                event.preventDefault();
+                return;
+            }
+
+            form.dataset.submitting = 'true';
+            const submitter = event.submitter;
+
+            if (submitter instanceof HTMLButtonElement && submitter.name) {
+                const submittedValue = document.createElement('input');
+                submittedValue.type = 'hidden';
+                submittedValue.name = submitter.name;
+                submittedValue.value = submitter.value;
+                form.appendChild(submittedValue);
+            }
+
+            const loadingLabel = submitter?.dataset.loadingLabel || 'Đang xử lý…';
+            form.querySelectorAll('button[type="submit"]').forEach((button) => {
+                button.disabled = true;
+                button.setAttribute('aria-disabled', 'true');
+            });
+
+            if (submitter instanceof HTMLButtonElement) {
+                submitter.innerHTML = `<i class="ph-bold ph-spinner-gap animate-spin" aria-hidden="true"></i>${loadingLabel}`;
+            }
+
+            const status = form.querySelector('[data-submit-status]');
+            if (status) status.textContent = loadingLabel;
+        });
+    });
+}
+
+function initializeCountdowns() {
+    document.querySelectorAll('[data-countdown]').forEach((element) => {
+        const deadline = Date.parse(element.dataset.countdown || '');
+        if (!Number.isFinite(deadline)) return;
+
+        function refresh() {
+            const remainingSeconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+
+            element.textContent = remainingSeconds > 0
+                ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+                : (element.dataset.expiredLabel || 'Đã hết thời gian');
+
+            if (remainingSeconds === 0) window.clearInterval(intervalId);
+        }
+
+        const intervalId = window.setInterval(refresh, 1000);
+        refresh();
+    });
+}
+
+initializeSeatPickers();
+initializeFoodPickers();
+initializeSubmitGuards();
+initializeCountdowns();
+
 document.addEventListener('click', (event) => {
     const mobileMenuButton = event.target.closest('#mobile-menu-btn');
 

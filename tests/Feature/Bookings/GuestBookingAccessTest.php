@@ -148,7 +148,7 @@ class GuestBookingAccessTest extends TestCase
             ->assertViewHas('guestAccessToken', $guestToken)
             ->assertHeader('Referrer-Policy', 'no-referrer')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
-            ->assertSee("'#token='", false)
+            ->assertSee('new URLSearchParams({ token, destination })', false)
             ->assertDontSee('guest_token=', false);
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
 
