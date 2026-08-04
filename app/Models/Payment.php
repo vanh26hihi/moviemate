@@ -34,7 +34,6 @@ class Payment extends Model
 
     protected $fillable = [
         'booking_id',
-        'provider',
         'app_id',
         'app_trans_id',
         'app_user',
@@ -74,6 +73,19 @@ class Payment extends Model
         'callback_payload_hash',
         'query_response_hash',
     ];
+
+    /** @param array<string, mixed> $attributes */
+    public static function createForProvider(string $provider, array $attributes): self
+    {
+        unset($attributes['provider']);
+
+        $payment = new self;
+        $payment->fill($attributes);
+        $payment->forceFill(['provider' => $provider]);
+        $payment->save();
+
+        return $payment;
+    }
 
     protected $casts = [
         'paid_at' => 'datetime',

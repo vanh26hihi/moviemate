@@ -64,9 +64,8 @@ class PaymentInitiationService
                 $attemptExpiry = $lockedBooking->expires_at->copy();
             }
 
-            $payment = Payment::query()->create([
+            $payment = Payment::createForProvider('zalopay', [
                 'booking_id' => $lockedBooking->id,
-                'provider' => 'zalopay',
                 'payment_method' => 'zalopay',
                 'app_id' => $this->config->appId,
                 'app_trans_id' => $this->transactionIds->generate(),
