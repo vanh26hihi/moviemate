@@ -4,10 +4,11 @@
 
 @section('content')
 @php
+    $providerLabel = $payment->provider === 'vnpay' ? 'VNPAY' : 'ZaloPay';
     $states = [
         \App\Models\Payment::STATUS_PENDING => [
             'title' => 'Đang chờ xác minh thanh toán',
-            'message' => 'MovieMate chưa nhận được kết quả cuối cùng từ ZaloPay. Booking chưa phải là vé điện tử.',
+            'message' => "MovieMate chưa nhận được kết quả cuối cùng từ {$providerLabel}. Booking chưa phải là vé điện tử.",
             'icon' => 'ph-hourglass-medium',
             'colour' => 'text-warning',
         ],
@@ -19,7 +20,7 @@
         ],
         \App\Models\Payment::STATUS_FAILED => [
             'title' => 'Thanh toán không thành công',
-            'message' => 'ZaloPay đã trả về trạng thái không thành công. Booking này chưa có vé điện tử.',
+            'message' => "{$providerLabel} đã trả về trạng thái không thành công. Booking này chưa có vé điện tử.",
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
         ],
@@ -73,7 +74,7 @@
                 @else
                     <div class="flex justify-between gap-4"><dt class="app-muted">Lần thanh toán</dt><dd class="text-right font-mono font-bold text-brand-start">#{{ $payment->id }}</dd></div>
                 @endif
-                <div class="mt-3 flex justify-between gap-4"><dt class="app-muted">Kênh thanh toán</dt><dd class="font-bold app-text">ZaloPay</dd></div>
+                <div class="mt-3 flex justify-between gap-4"><dt class="app-muted">Kênh thanh toán</dt><dd class="font-bold app-text">{{ $providerLabel }}</dd></div>
                 <div class="mt-3 flex justify-between gap-4 border-t pt-3 app-border"><dt class="font-bold app-text">Số tiền</dt><dd class="font-extrabold text-brand-start">{{ number_format((int) $payment->amount, 0, ',', '.') }} {{ $payment->currency ?: 'VND' }}</dd></div>
             </dl>
 
@@ -85,7 +86,7 @@
 
             @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_REVIEW], true))
                 <div class="mx-auto mt-5 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-left text-sm leading-relaxed text-warning" role="note">
-                    <strong>Không tạo lại thanh toán một cách mù.</strong> Nếu ZaloPay đã trừ tiền, hãy giữ mã booking và chờ MovieMate xác minh hoặc đối soát lần hiện tại.
+                    <strong>Không tạo lại thanh toán một cách mù.</strong> Nếu {{ $providerLabel }} đã trừ tiền, hãy giữ mã booking và chờ MovieMate xác minh hoặc đối soát lần hiện tại.
                 </div>
             @endif
 

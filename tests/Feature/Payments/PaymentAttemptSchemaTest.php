@@ -22,6 +22,7 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
             'server_time_ms', 'callback_received_at', 'last_queried_at', 'verified_at',
             'paid_at', 'failed_at', 'failure_reason', 'create_response_hash',
             'callback_payload_hash', 'query_response_hash',
+            'provider_transaction_created_at', 'provider_paid_at',
         ]));
         $this->assertTrue(Schema::hasColumn('bookings', 'ticket_emailed_at'));
         $this->assertTrue(Schema::hasColumns('booking_ticket_deliveries', [
@@ -34,6 +35,43 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
         $this->assertFalse(Schema::hasColumn('payments', 'key1'));
         $this->assertFalse(Schema::hasColumn('payments', 'key2'));
         $this->assertFalse(Schema::hasColumn('payments', 'mac'));
+    }
+
+    public function test_vnpay_transaction_identity_is_unique_within_provider(): void
+    {
+        $this->pendingPayment(overrides: [
+            'provider' => 'vnpay', 'payment_method' => 'vnpay',
+            'transaction_id' => '123456789', 'status' => Payment::STATUS_FAILED,
+        ]);
+
+        $this->expectException(QueryException::class);
+        $this->pendingPayment(overrides: [
+            'provider' => 'vnpay', 'payment_method' => 'vnpay',
+            'transaction_id' => '123456789', 'status' => Payment::STATUS_FAILED,
+        ]);
+    }
+
+    public function test_vnpay_audit_migration_empty_down_up_and_protected_data_refusal(): void
+    {
+        $migration = $this->vnpayAuditMigration();
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('payments', 'provider_paid_at'));
+        $migration->up();
+        $this->assertTrue(Schema::hasColumns('payments', [
+            'provider_transaction_created_at', 'provider_paid_at',
+        ]));
+
+        $payment = $this->pendingPayment(overrides: [
+            'provider' => 'vnpay', 'payment_method' => 'vnpay', 'status' => Payment::STATUS_FAILED,
+        ]);
+        try {
+            $migration->down();
+            $this->fail('VNPAY history must block rollback.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('protected provider payment data exists', $exception->getMessage());
+        }
+        $this->assertSame('vnpay', $payment->fresh()->provider);
+        $this->assertTrue(Schema::hasColumn('payments', 'provider_paid_at'));
     }
 
     public function test_booking_supports_many_attempts_and_singular_relationship_returns_latest(): void
@@ -247,6 +285,11 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
     private function upgradeMigration(): object
     {
         return require database_path('migrations/2026_08_04_121000_harden_active_payment_attempt_states.php');
+    }
+
+    private function vnpayAuditMigration(): object
+    {
+        return require database_path('migrations/2026_08_05_000000_add_vnpay_provider_audit_fields_to_payments.php');
     }
 
     private function assertZaloPayColumnsAreMissing(): void

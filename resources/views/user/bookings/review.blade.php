@@ -8,6 +8,7 @@
     $checkoutDeadline = \Carbon\Carbon::createFromTimestamp((int) $draft['created_at'])
         ->addMinutes((int) config('booking.checkout_token_ttl_minutes', 15));
     $pendingMinutes = (int) config('booking.pending_ttl_minutes', 15);
+    $defaultProvider = ($paymentProviders['vnpay'] ?? false) ? 'vnpay' : 'zalopay';
 @endphp
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
@@ -19,7 +20,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.24em] text-brand-start">Bước 3/4 · Kiểm tra lần cuối</p>
                     <h1 id="review-title" class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">Xác nhận đơn đặt vé</h1>
-                    <p class="mt-2 app-muted">Vui lòng kiểm tra suất chiếu, ghế, đồ ăn và email trước khi sang ZaloPay.</p>
+                    <p class="mt-2 app-muted">Vui lòng kiểm tra suất chiếu, ghế, đồ ăn, email và kênh thanh toán.</p>
                 </div>
                 <div class="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 sm:max-w-xs" data-countdown-wrapper>
                     <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian phiên checkout còn lại</p>
@@ -73,7 +74,7 @@
                 <aside class="self-start rounded-2xl app-secondary p-5 sm:p-6 lg:sticky lg:top-24" aria-labelledby="payment-summary-title">
                     <div class="flex items-center justify-between gap-3">
                         <h2 id="payment-summary-title" class="font-bold app-text">Chi tiết thanh toán</h2>
-                        <span class="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-extrabold text-white">ZaloPay</span>
+                        <span class="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-extrabold text-white">VND</span>
                     </div>
 
                     <dl class="mt-5 space-y-3 text-sm">
@@ -95,8 +96,25 @@
                     <div class="mt-6 flex flex-col gap-3">
                         <form method="POST" action="{{ route('user.bookings.confirm') }}" data-submit-once>
                             @csrf
-                            <button type="submit" class="btn-primary w-full" data-loading-label="Đang chuyển đến ZaloPay…">
-                                Thanh toán bằng ZaloPay
+                            <fieldset class="mb-4 space-y-3">
+                                <legend class="mb-2 text-sm font-bold app-text">Chọn cổng thanh toán</legend>
+                                <label class="flex cursor-pointer items-center gap-3 rounded-xl border app-border bg-white/5 p-3">
+                                    <input type="radio" name="payment_method" value="vnpay" class="accent-red-600" @checked(old('payment_method', $defaultProvider) === 'vnpay') @disabled(!($paymentProviders['vnpay'] ?? false))>
+                                    <i class="ph-bold ph-qr-code text-2xl text-red-500" aria-hidden="true"></i>
+                                    <span><strong class="block app-text">Thanh toán bằng VNPAY</strong><small class="app-muted">Bạn sẽ được chuyển đến VNPAY để quét QR hoặc chọn ngân hàng.</small></span>
+                                    @unless($paymentProviders['vnpay'] ?? false)<small class="ml-auto text-warning">Chưa cấu hình</small>@endunless
+                                </label>
+                                @if($paymentProviders['zalopay'] ?? false)
+                                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border app-border bg-white/5 p-3">
+                                        <input type="radio" name="payment_method" value="zalopay" class="accent-blue-600" @checked(old('payment_method', $defaultProvider) === 'zalopay')>
+                                        <i class="ph-bold ph-wallet text-2xl text-blue-500" aria-hidden="true"></i>
+                                        <span><strong class="block app-text">ZaloPay</strong><small class="app-muted">Kênh thanh toán nội bộ hiện có</small></span>
+                                    </label>
+                                @endif
+                            </fieldset>
+                            @error('payment_method')<p class="mb-3 text-sm text-error" role="alert">{{ $message }}</p>@enderror
+                            <button type="submit" class="btn-primary w-full" data-loading-label="Đang chuyển đến cổng thanh toán…">
+                                Tiếp tục thanh toán
                                 <i class="ph-bold ph-arrow-square-out" aria-hidden="true"></i>
                             </button>
                             <p class="mt-2 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>

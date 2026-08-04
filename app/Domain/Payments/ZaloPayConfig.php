@@ -30,10 +30,6 @@ final readonly class ZaloPayConfig
 
     public function __construct()
     {
-        if (config('payment.driver') !== 'zalopay') {
-            throw new PaymentConfigurationException('The configured payment driver is not supported.');
-        }
-
         $environment = config('payment.zalopay.environment');
         $appId = config('payment.zalopay.app_id');
         $key1 = config('payment.zalopay.key1');
@@ -105,6 +101,20 @@ final readonly class ZaloPayConfig
         $this->queryIntervalSeconds = $queryInterval;
         $this->createEndpoint = $createEndpoint;
         $this->queryEndpoint = $queryEndpoint;
+    }
+
+    public static function isConfigured(): bool
+    {
+        $appId = config('payment.zalopay.app_id');
+
+        return is_numeric($appId)
+            && (int) $appId > 0
+            && is_string(config('payment.zalopay.key1'))
+            && trim((string) config('payment.zalopay.key1')) !== ''
+            && is_string(config('payment.zalopay.key2'))
+            && trim((string) config('payment.zalopay.key2')) !== ''
+            && filter_var(config('payment.zalopay.callback_url'), FILTER_VALIDATE_URL) !== false
+            && filter_var(config('payment.zalopay.redirect_url'), FILTER_VALIDATE_URL) !== false;
     }
 
     private function validatePublicUrl(string $url, string $expectedPath, string $name): void

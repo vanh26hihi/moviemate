@@ -64,13 +64,14 @@ class ZaloPayCallbackService
 
         try {
             $result = $this->verifiedPayments->verify($payment, new VerifiedPaymentData(
-                appId: $data['app_id'],
-                appTransId: $data['app_trans_id'],
+                provider: 'zalopay',
+                merchantReference: $data['app_trans_id'],
                 amount: $data['amount'],
-                zpTransId: $this->normalizeTransactionId($data['zp_trans_id'] ?? null),
-                serverTimeMs: is_int($data['server_time'] ?? null) ? $data['server_time'] : null,
+                providerTransactionId: $this->normalizeTransactionId($data['zp_trans_id'] ?? null),
                 source: 'callback',
                 payloadHash: hash('sha256', $rawData),
+                appId: $data['app_id'],
+                serverTimeMs: is_int($data['server_time'] ?? null) ? $data['server_time'] : null,
             ));
         } catch (Throwable $exception) {
             Log::error('ZaloPay callback processing failed transiently.', [

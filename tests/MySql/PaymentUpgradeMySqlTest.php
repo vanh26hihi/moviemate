@@ -45,6 +45,14 @@ class PaymentUpgradeMySqlTest extends TestCase
         $this->assertMigrationRan('2026_08_04_123000_remove_booking_seat_fk_compatibility_index');
         $this->assertMigrationRan('2026_08_04_124000_add_ticket_email_access_credentials_to_bookings');
         $this->assertMigrationRan('2026_08_04_125000_guard_phase4_rollback_data');
+        $this->assertMigrationRan('2026_08_05_000000_add_vnpay_provider_audit_fields_to_payments');
+        $this->assertTrue(Schema::hasColumns('payments', [
+            'provider_transaction_created_at', 'provider_paid_at',
+        ]));
+        $this->assertSame(
+            ['provider', 'transaction_id'],
+            $this->indexColumns('payments', 'payments_provider_transaction_id_unique'),
+        );
         $this->assertTrue(Schema::hasColumns('bookings', [
             'ticket_email_token_nonce',
             'ticket_email_token_hash',
@@ -66,6 +74,31 @@ class PaymentUpgradeMySqlTest extends TestCase
             'compatibility_ddl' => count($ddl),
             'final_showtime_index' => $this->indexColumns('booking_seats', 'booking_seats_showtime_seat_index'),
         ]);
+    }
+
+    public function test_vnpay_audit_migration_rehearses_empty_down_up_and_refuses_provider_history(): void
+    {
+        $this->freshDatabase();
+        $migration = $this->vnpayAuditMigration();
+        $this->announceMutation('VNPAY audit migration empty down/up rehearsal');
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('payments', 'provider_paid_at'));
+        $migration->up();
+        $this->assertTrue(Schema::hasColumn('payments', 'provider_paid_at'));
+
+        $bookingId = $this->bookingId();
+        DB::table('payments')->insert([
+            'booking_id' => $bookingId,
+            'provider' => 'vnpay',
+            'payment_method' => 'vnpay',
+            'order_code' => 'MMMYSQLVNPAY1',
+            'amount' => 50000,
+            'status' => 'failed',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->assertMigrationRejectedOnDown($migration, 'protected provider payment data exists');
+        $this->assertTrue(Schema::hasColumn('payments', 'provider_paid_at'));
     }
 
     public function test_ticket_email_credential_migration_refuses_active_data_and_rehearses_down_up(): void
@@ -553,6 +586,13 @@ class PaymentUpgradeMySqlTest extends TestCase
     {
         return require database_path(
             'migrations/2026_08_04_124000_add_ticket_email_access_credentials_to_bookings.php',
+        );
+    }
+
+    private function vnpayAuditMigration(): object
+    {
+        return require database_path(
+            'migrations/2026_08_05_000000_add_vnpay_provider_audit_fields_to_payments.php',
         );
     }
 

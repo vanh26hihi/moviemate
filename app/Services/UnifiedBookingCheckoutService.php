@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\VnpayResponseException;
+use App\Exceptions\VnpayTransportException;
 use App\Exceptions\ZaloPayResponseException;
 use App\Exceptions\ZaloPayTransportException;
 use App\Services\Payments\PaymentInitiationService;
@@ -14,8 +16,10 @@ class UnifiedBookingCheckoutService
         private readonly PaymentInitiationService $payments,
     ) {}
 
-    public function confirm(array $draft, ?int $userId): UnifiedBookingCheckoutResult
+    public function confirm(array $draft, ?int $userId, ?string $provider = null, string $clientIp = '127.0.0.1'): UnifiedBookingCheckoutResult
     {
+        $provider ??= (string) config('payment.driver', 'vnpay');
+        $this->payments->assertAvailable($provider);
         // BookingCheckoutService commits the entire booking/seat/food aggregate before
         // this service performs any network I/O through PaymentInitiationService.
         $checkout = $this->bookings->createPendingBooking(
@@ -28,14 +32,14 @@ class UnifiedBookingCheckoutService
         );
 
         try {
-            $payment = $this->payments->initiate($checkout->booking);
+            $payment = $this->payments->initiate($checkout->booking, $provider, $clientIp);
 
             return new UnifiedBookingCheckoutResult(
                 $checkout,
                 $payment->payment,
                 $payment->orderUrl,
             );
-        } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException) {
+        } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
             return new UnifiedBookingCheckoutResult(
                 $checkout,
                 $checkout->booking->payments()->latest('id')->first(),

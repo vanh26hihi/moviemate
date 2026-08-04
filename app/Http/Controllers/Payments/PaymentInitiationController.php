@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Payments;
 
 use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\VnpayResponseException;
+use App\Exceptions\VnpayTransportException;
 use App\Exceptions\ZaloPayResponseException;
 use App\Exceptions\ZaloPayTransportException;
 use App\Http\Controllers\Controller;
@@ -25,8 +27,12 @@ class PaymentInitiationController extends Controller
     ): RedirectResponse {
         $this->authorizeBooking($request, $booking, $guestAccess);
         try {
-            $result = $payments->initiate($booking);
-        } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException) {
+            $result = $payments->initiate(
+                $booking,
+                (string) $request->route('payment_provider', config('payment.driver')),
+                $request->ip(),
+            );
+        } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
             $paymentStatus = $booking->payments()->latest('id')->value('status');
             $statusRoute = match ($paymentStatus) {
                 Payment::STATUS_SUCCESS => 'user.bookings.success',

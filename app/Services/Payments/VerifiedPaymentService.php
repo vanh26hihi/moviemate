@@ -46,9 +46,7 @@ class VerifiedPaymentService
                 );
             }
 
-            if ($lockedPayment->provider !== 'zalopay'
-                || $lockedPayment->app_id !== $data->appId
-                || $lockedPayment->app_trans_id !== $data->appTransId) {
+            if (! $this->identityMatches($lockedPayment, $data)) {
                 return PaymentVerificationResult::rejected('Invalid payment identity.');
             }
 
@@ -58,31 +56,36 @@ class VerifiedPaymentService
                 return PaymentVerificationResult::rejected('Payment amount mismatch.');
             }
 
-            if ($data->zpTransId === null) {
-                $this->markReview($lockedPayment, $data, 'missing_zp_trans_id');
+            if ($data->providerTransactionId === null) {
+                $this->markReview($lockedPayment, $data, $lockedPayment->provider === 'zalopay'
+                    ? 'missing_zp_trans_id' : 'missing_provider_transaction_id');
 
-                return PaymentVerificationResult::rejected('Missing verified ZaloPay transaction identity.');
+                return PaymentVerificationResult::rejected('Missing verified provider transaction identity.');
             }
 
-            if ($lockedPayment->zp_trans_id !== null
-                && $lockedPayment->zp_trans_id !== $data->zpTransId) {
-                $this->markReview($lockedPayment, $data, 'zp_trans_id_mismatch', false);
+            $storedTransactionId = $this->storedTransactionId($lockedPayment);
+            if ($storedTransactionId !== null
+                && $storedTransactionId !== $data->providerTransactionId) {
+                $this->markReview($lockedPayment, $data, $lockedPayment->provider === 'zalopay'
+                    ? 'zp_trans_id_mismatch' : 'provider_transaction_id_mismatch', false);
 
-                return PaymentVerificationResult::rejected('ZaloPay transaction identity mismatch.');
+                return PaymentVerificationResult::rejected('Provider transaction identity mismatch.');
             }
 
-            if ($data->zpTransId !== null) {
+            if ($data->providerTransactionId !== null) {
+                $transactionColumn = $lockedPayment->provider === 'zalopay' ? 'zp_trans_id' : 'transaction_id';
                 $duplicateTransaction = Payment::query()
-                    ->where('provider', 'zalopay')
-                    ->where('zp_trans_id', $data->zpTransId)
+                    ->where('provider', $lockedPayment->provider)
+                    ->where($transactionColumn, $data->providerTransactionId)
                     ->whereKeyNot($lockedPayment->getKey())
                     ->lockForUpdate()
                     ->exists();
 
                 if ($duplicateTransaction) {
-                    $this->markReview($lockedPayment, $data, 'duplicate_zp_trans_id', false);
+                    $this->markReview($lockedPayment, $data, $lockedPayment->provider === 'zalopay'
+                        ? 'duplicate_zp_trans_id' : 'duplicate_provider_transaction_id', false);
 
-                    return PaymentVerificationResult::rejected('ZaloPay transaction belongs to another attempt.');
+                    return PaymentVerificationResult::rejected('Provider transaction belongs to another attempt.');
                 }
             }
 
@@ -140,7 +143,7 @@ class VerifiedPaymentService
             ])->save();
 
             $booking->forceFill([
-                'payment_method' => 'zalopay',
+                'payment_method' => $lockedPayment->provider,
                 'payment_status' => 'paid',
                 'booking_status' => 'paid',
                 'paid_at' => $now,
@@ -193,11 +196,21 @@ class VerifiedPaymentService
             'server_time_ms' => $data->serverTimeMs,
         ];
 
-        if ($storeTransactionId && $data->zpTransId !== null) {
-            $fields['zp_trans_id'] = $data->zpTransId;
+        if ($storeTransactionId && $data->providerTransactionId !== null) {
+            $fields[$payment->provider === 'zalopay' ? 'zp_trans_id' : 'transaction_id'] = $data->providerTransactionId;
         }
 
-        if ($data->source === 'callback') {
+        if ($payment->provider === 'vnpay') {
+            $fields += [
+                'response_code' => $data->responseCode,
+                'transaction_status' => $data->transactionStatus,
+                'bank_code' => $data->bankCode,
+                'card_type' => $data->cardType,
+                'provider_paid_at' => $data->providerPaidAt,
+            ];
+        }
+
+        if (in_array($data->source, ['callback', 'ipn'], true)) {
             $fields['callback_received_at'] = now();
             $fields['callback_payload_hash'] = $data->payloadHash;
         } elseif ($data->source === 'query') {
@@ -205,5 +218,25 @@ class VerifiedPaymentService
         }
 
         $payment->forceFill($fields);
+    }
+
+    private function identityMatches(Payment $payment, VerifiedPaymentData $data): bool
+    {
+        if ($payment->provider !== $data->provider) {
+            return false;
+        }
+
+        return match ($payment->provider) {
+            'zalopay' => $data->appId !== null
+                && $payment->app_id === $data->appId
+                && $payment->app_trans_id === $data->merchantReference,
+            'vnpay' => $payment->order_code === $data->merchantReference,
+            default => false,
+        };
+    }
+
+    private function storedTransactionId(Payment $payment): ?string
+    {
+        return $payment->provider === 'zalopay' ? $payment->zp_trans_id : $payment->transaction_id;
     }
 }
