@@ -6,6 +6,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\Group;
 use ReflectionMethod;
 use RuntimeException;
@@ -42,6 +43,12 @@ class PaymentUpgradeMySqlTest extends TestCase
         $this->assertMigrationRan('2026_07_16_235959_ensure_booking_seat_showtime_fk_support');
         $this->assertMigrationRan('2026_07_17_000001_replace_booking_seat_unique_with_active_lock');
         $this->assertMigrationRan('2026_08_04_123000_remove_booking_seat_fk_compatibility_index');
+        $this->assertMigrationRan('2026_08_04_124000_add_ticket_email_access_credentials_to_bookings');
+        $this->assertTrue(Schema::hasColumns('bookings', [
+            'ticket_email_token_nonce',
+            'ticket_email_token_hash',
+            'ticket_email_token_expires_at',
+        ]));
         $this->assertSame(
             ['showtime_id', 'seat_id'],
             $this->indexColumns('booking_seats', 'booking_seats_showtime_seat_index'),
@@ -58,6 +65,41 @@ class PaymentUpgradeMySqlTest extends TestCase
             'compatibility_ddl' => count($ddl),
             'final_showtime_index' => $this->indexColumns('booking_seats', 'booking_seats_showtime_seat_index'),
         ]);
+    }
+
+    public function test_ticket_email_credential_migration_refuses_active_data_and_rehearses_down_up(): void
+    {
+        $this->freshDatabase();
+        $bookingId = $this->bookingId();
+        DB::table('bookings')->where('id', $bookingId)->update([
+            'ticket_email_token_nonce' => str_repeat('n', 43),
+            'ticket_email_token_hash' => hash('sha256', 'mysql-ticket-email-token'),
+            'ticket_email_token_expires_at' => now()->addHour(),
+        ]);
+        $migration = $this->ticketEmailCredentialMigration();
+
+        try {
+            $migration->down();
+            $this->fail('Rollback must refuse populated ticket email credentials.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('credential data exists', $exception->getMessage());
+        }
+        $this->assertTrue(Schema::hasColumn('bookings', 'ticket_email_token_hash'));
+
+        DB::table('bookings')->where('id', $bookingId)->update([
+            'ticket_email_token_nonce' => null,
+            'ticket_email_token_hash' => null,
+            'ticket_email_token_expires_at' => null,
+        ]);
+        $this->announceMutation('ticket email credential migration down/up rehearsal');
+        $migration->down();
+        $this->assertFalse(Schema::hasColumn('bookings', 'ticket_email_token_hash'));
+        $migration->up();
+        $this->assertTrue(Schema::hasColumns('bookings', [
+            'ticket_email_token_nonce',
+            'ticket_email_token_hash',
+            'ticket_email_token_expires_at',
+        ]));
     }
 
     public function test_real_inventory_classifies_all_four_supported_states_and_repairs_missing_indexes(): void
@@ -427,6 +469,13 @@ class PaymentUpgradeMySqlTest extends TestCase
     private function cleanupMigration(): object
     {
         return require database_path('migrations/2026_08_04_123000_remove_booking_seat_fk_compatibility_index.php');
+    }
+
+    private function ticketEmailCredentialMigration(): object
+    {
+        return require database_path(
+            'migrations/2026_08_04_124000_add_ticket_email_access_credentials_to_bookings.php',
+        );
     }
 
     private function inventoryState(object $migration): string

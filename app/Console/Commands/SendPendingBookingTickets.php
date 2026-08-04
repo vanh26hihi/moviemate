@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\UnsafeProductionMailConfiguration;
 use App\Mail\BookingTicketMail;
 use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
 use App\Services\BookingTokenService;
+use App\Services\Mail\ProductionMailTransportGuard;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,8 +21,18 @@ class SendPendingBookingTickets extends Command
 
     protected $description = 'Send paid booking tickets from the durable delivery outbox';
 
-    public function handle(BookingTokenService $tokens): int
-    {
+    public function handle(
+        BookingTokenService $tokens,
+        ProductionMailTransportGuard $mailGuard,
+    ): int {
+        try {
+            $mailGuard->assertSafeForProduction();
+        } catch (UnsafeProductionMailConfiguration $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
         $configuredBatch = (int) config('payment.ticket_delivery.batch_size', 100);
         $batch = $this->option('batch') === null
             ? $configuredBatch
@@ -92,49 +104,25 @@ class SendPendingBookingTickets extends Command
 
     private function send(BookingTicketDelivery $delivery, BookingTokenService $tokens): void
     {
-        $mailer = (string) config('mail.default');
-        if (app()->environment('production') && in_array($mailer, ['log', 'array'], true)) {
-            Log::warning('Ticket delivery rejected an unsafe production mailer.', [
-                'delivery_id' => $delivery->getKey(),
-                'mailer' => $mailer,
-            ]);
-            throw new RuntimeException('unsafe_production_mailer');
-        }
-
-        $booking = Booking::query()->with([
+        [$booking, $ticketEmailToken] = $this->prepareBookingForDelivery($delivery, $tokens);
+        $booking->load([
             'user',
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
             'payment',
-        ])->find($delivery->booking_id);
-        if (! $booking
-            || $booking->payment_status !== 'paid'
-            || $booking->booking_status !== 'paid') {
-            throw new RuntimeException('booking_not_paid');
-        }
+        ]);
 
         $recipient = $booking->recipient_email;
         if (! is_string($recipient) || $recipient === '') {
             throw new RuntimeException('recipient_missing');
         }
 
-        $guestAccessToken = null;
-        if ($booking->user_id === null) {
-            $guestAccessToken = $tokens->issueGuestAccessToken();
-            $booking->forceFill([
-                'guest_access_token_hash' => $tokens->hash($guestAccessToken),
-                'guest_access_expires_at' => now()->addMinutes(
-                    max(1, (int) config('booking.guest_access_ttl_minutes', 1440)),
-                ),
-            ])->save();
-        }
-
-        $ticketAccessUrl = $guestAccessToken === null
+        $ticketAccessUrl = $ticketEmailToken === null
             ? route('user.bookings.ticket', $booking)
             : route('user.bookings.access.show', $booking)
-                .'#token='.rawurlencode($guestAccessToken).'&destination=ticket';
+                .'#token='.rawurlencode($ticketEmailToken).'&destination=ticket';
 
         Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl));
 
@@ -160,6 +148,70 @@ class SendPendingBookingTickets extends Command
                 'ticket_emailed_at' => now(),
             ]);
         });
+    }
+
+    /** @return array{0: Booking, 1: ?string} */
+    private function prepareBookingForDelivery(
+        BookingTicketDelivery $delivery,
+        BookingTokenService $tokens,
+    ): array {
+        return DB::transaction(function () use ($delivery, $tokens): array {
+            $lockedDelivery = BookingTicketDelivery::query()
+                ->whereKey($delivery->getKey())
+                ->lockForUpdate()
+                ->first();
+            if (! $lockedDelivery
+                || $lockedDelivery->status !== BookingTicketDelivery::STATUS_PROCESSING
+                || $lockedDelivery->getRawOriginal('processing_started_at')
+                    !== $delivery->getRawOriginal('processing_started_at')) {
+                throw new RuntimeException('delivery_lease_lost');
+            }
+
+            $booking = Booking::query()
+                ->whereKey($lockedDelivery->booking_id)
+                ->lockForUpdate()
+                ->first();
+            if (! $booking
+                || $booking->payment_status !== 'paid'
+                || $booking->booking_status !== 'paid') {
+                throw new RuntimeException('booking_not_paid');
+            }
+
+            $ticketEmailToken = $booking->user_id === null
+                ? $this->ticketEmailToken($booking, $tokens)
+                : null;
+
+            return [$booking, $ticketEmailToken];
+        });
+    }
+
+    private function ticketEmailToken(Booking $booking, BookingTokenService $tokens): string
+    {
+        $nonce = $booking->ticket_email_token_nonce;
+        $hash = $booking->ticket_email_token_hash;
+        if (is_string($nonce)
+            && is_string($hash)
+            && $booking->ticket_email_token_expires_at?->isFuture()) {
+            try {
+                $token = $tokens->ticketEmailTokenForNonce($booking->getKey(), $nonce);
+                if ($tokens->verifyHash($hash, $token)) {
+                    return $token;
+                }
+            } catch (\InvalidArgumentException) {
+                // A malformed or incomplete credential is replaced while the row is locked.
+            }
+        }
+
+        $credential = $tokens->issueTicketEmailCredential($booking->getKey());
+        $booking->forceFill([
+            'ticket_email_token_nonce' => $credential['nonce'],
+            'ticket_email_token_hash' => $tokens->hash($credential['token']),
+            'ticket_email_token_expires_at' => now()->addMinutes(
+                max(1, (int) config('booking.ticket_email_access_ttl_minutes', 10080)),
+            ),
+        ])->save();
+
+        return $credential['token'];
     }
 
     private function failDelivery(BookingTicketDelivery $delivery, Throwable $exception): void

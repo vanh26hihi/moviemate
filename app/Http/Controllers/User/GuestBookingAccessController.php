@@ -11,15 +11,9 @@ use Illuminate\Http\Request;
 
 class GuestBookingAccessController extends Controller
 {
-    public function show(Booking $booking): View
+    public function show(Booking $booking, GuestBookingAccessService $access): View
     {
-        abort_unless(
-            $booking->user_id === null
-                && $booking->guest_access_expires_at
-                && $booking->guest_access_expires_at->isFuture()
-                && is_string($booking->guest_access_token_hash),
-            404,
-        );
+        abort_unless($access->hasExchangeableCredential($booking), 404);
 
         return view('user.bookings.access', compact('booking'));
     }
