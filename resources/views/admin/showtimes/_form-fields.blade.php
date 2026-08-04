@@ -4,6 +4,13 @@
     $roomValue = old('room_id', $editing ? $showtime->room_id : '');
     $dateValue = old('show_date', $editing ? $showtime->show_date?->format('Y-m-d') : '');
     $timeValue = old('show_time', $editing ? substr((string) $showtime->show_time, 0, 5) : '');
+    $priceValue = session()->hasOldInput('price')
+        ? old('price')
+        : ($editing ? (string) \App\Domain\Money\VndAmount::fromDatabase($showtime->getRawOriginal('price')) : '');
+    $storedVipPrice = $editing ? $showtime->getRawOriginal('vip_price') : null;
+    $vipPriceValue = session()->hasOldInput('vip_price')
+        ? old('vip_price')
+        : ($storedVipPrice === null ? '' : (string) \App\Domain\Money\VndAmount::fromDatabase($storedVipPrice));
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -52,13 +59,13 @@
 
     <div>
         <label class="cinema-label" for="price">Giá thường (VND) *</label>
-        <input id="price" type="number" name="price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ old('price', $editing ? $showtime->price : '') }}" class="cinema-input">
+        <input id="price" type="number" name="price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ $priceValue }}" class="cinema-input">
         @error('price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
 
     <div>
         <label class="cinema-label" for="vip_price">Giá VIP (VND)</label>
-        <input id="vip_price" type="number" name="vip_price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ old('vip_price', $editing ? $showtime->vip_price : '') }}" class="cinema-input">
+        <input id="vip_price" type="number" name="vip_price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ $vipPriceValue }}" class="cinema-input">
         @error('vip_price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
 

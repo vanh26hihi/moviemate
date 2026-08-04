@@ -3,6 +3,12 @@
 @section('title', $food->exists ? 'Sửa món ăn - MovieMate Admin' : 'Thêm món ăn - MovieMate Admin')
 @section('page-title', $food->exists ? 'Sửa món ăn' : 'Thêm món ăn')
 
+@php
+    $priceValue = session()->hasOldInput('price')
+        ? old('price')
+        : ($food->exists ? (string) \App\Domain\Money\VndAmount::fromDatabase($food->getRawOriginal('price')) : '');
+@endphp
+
 @section('content')
 <div class="admin-page-header">
     <div>
@@ -53,7 +59,7 @@
         <div class="lg:col-span-4 space-y-5">
             <div>
                 <label class="admin-label">Giá *</label>
-                <input type="number" name="price" min="0" max="{{ \App\Models\FoodItem::MAX_PRICE }}" step="1" value="{{ old('price', $food->price ?? '') }}" class="admin-input" placeholder="100000" required />
+                <input type="number" name="price" min="0" max="{{ \App\Models\FoodItem::MAX_PRICE }}" step="1" value="{{ $priceValue }}" class="admin-input" placeholder="100000" required />
                 @error('price')<p class="mt-2 text-sm text-error">{{ $message }}</p>@enderror
             </div>
 
