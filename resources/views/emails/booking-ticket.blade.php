@@ -23,7 +23,8 @@
             ] as $label => $value)
                 <tr><td style="padding:10px 0;color:#9ca3af">{{ $label }}</td><td style="padding:10px 0;text-align:right;font-weight:bold">{{ $value }}</td></tr>
             @endforeach
-            <tr><td style="padding:10px 0;color:#9ca3af">Tổng thanh toán</td><td style="padding:10px 0;text-align:right;font-weight:bold;color:#ff3d57">{{ number_format($booking->total_amount, 0, ',', '.') }}đ</td></tr>
+            <tr><td style="padding:10px 0;color:#9ca3af">Trạng thái</td><td style="padding:10px 0;text-align:right;font-weight:bold">{{ $booking->status_label }}</td></tr>
+            <tr><td style="padding:10px 0;color:#9ca3af">Tổng thanh toán</td><td style="padding:10px 0;text-align:right;font-weight:bold;color:#ff3d57">{{ $booking->formatted_total }}</td></tr>
         </table>
         <p style="margin:24px 0 0;color:#9ca3af;font-size:13px;line-height:1.6">Khi đến rạp, vui lòng đưa mã vé cho nhân viên soát vé.</p>
     </div>

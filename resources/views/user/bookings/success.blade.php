@@ -50,7 +50,7 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-text-sub">Tổng tiền</span>
-                    <span class="text-white font-bold text-right">{{ number_format($booking->total_amount,0,',','.') }}đ</span>
+                    <span class="text-white font-bold text-right">{{ $booking->formatted_total }}</span>
                 </div>
             </div>
         </div>
