@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -94,6 +95,73 @@ class Phase4CheckoutAcceptanceTest extends PaymentTestCase
         $this->assertDatabaseCount('order_items', 0);
         $this->assertDatabaseCount('payments', 0);
         Http::assertNothingSent();
+    }
+
+    public function test_food_deleted_after_review_is_rejected_before_any_aggregate_or_network_call(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        $food = $this->food('Deleted inventory combo', 30_000);
+        Http::fake();
+
+        $this->get(route('user.bookings.checkout', [
+            'showtime' => $scenario['showtime'],
+            'selected_seats' => $scenario['seats'][0]->id,
+        ]))->assertOk();
+        $this->post(route('user.bookings.food.store'), [
+            'customer_email' => 'deleted@example.test',
+            'food_items' => [['food_id' => $food->id, 'quantity' => 1]],
+        ])->assertRedirect(route('user.bookings.review'));
+        $this->get(route('user.bookings.review'))->assertOk();
+
+        $food->delete();
+
+        $this->from(route('user.bookings.review'))
+            ->post(route('user.bookings.confirm'))
+            ->assertRedirect(route('user.bookings.review'))
+            ->assertSessionHasErrors('food_items');
+
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('booking_seats', 0);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
+        $this->assertDatabaseCount('payments', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_tampered_food_quantity_in_the_session_is_validation_not_a_server_error(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        $food = $this->food('Quantity combo', 30_000);
+        Http::fake();
+
+        $this->startFoodDraft($scenario, $food, 'quantity@example.test');
+        $draft = session('booking_checkout_draft');
+        $draft['food_items'][0]['quantity'] = 999;
+
+        $this->withSession(['booking_checkout_draft' => $draft])
+            ->from(route('user.bookings.review'))
+            ->post(route('user.bookings.confirm'))
+            ->assertRedirect(route('user.bookings.review'))
+            ->assertSessionHasErrors('food_items');
+
+        $this->assertNoCheckoutAggregateOrNetworkCall();
+    }
+
+    public function test_fractional_database_food_price_is_validation_not_a_server_error(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        $food = $this->food('Fractional combo', 30_000);
+        Http::fake();
+
+        $this->startFoodDraft($scenario, $food, 'fractional@example.test');
+        DB::table('food_items')->where('id', $food->id)->update(['price' => '30000.50']);
+
+        $this->from(route('user.bookings.review'))
+            ->post(route('user.bookings.confirm'))
+            ->assertRedirect(route('user.bookings.review'))
+            ->assertSessionHasErrors('food_items');
+
+        $this->assertNoCheckoutAggregateOrNetworkCall();
     }
 
     public function test_seat_locked_by_another_checkout_after_review_is_rejected_before_payment(): void
@@ -208,6 +276,30 @@ class Phase4CheckoutAcceptanceTest extends PaymentTestCase
             'customer_email' => $email,
             'skip_food' => true,
         ])->assertRedirect(route('user.bookings.review'));
+    }
+
+    private function startFoodDraft(array $scenario, FoodItem $food, string $email): void
+    {
+        $this->get(route('user.bookings.checkout', [
+            'showtime' => $scenario['showtime'],
+            'selected_seats' => $scenario['seats'][0]->id,
+        ]))->assertOk();
+
+        $this->post(route('user.bookings.food.store'), [
+            'customer_email' => $email,
+            'food_items' => [['food_id' => $food->id, 'quantity' => 1]],
+        ])->assertRedirect(route('user.bookings.review'));
+        $this->get(route('user.bookings.review'))->assertOk();
+    }
+
+    private function assertNoCheckoutAggregateOrNetworkCall(): void
+    {
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('booking_seats', 0);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
+        $this->assertDatabaseCount('payments', 0);
+        Http::assertNothingSent();
     }
 
     private function food(string $name, int $price): FoodItem

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Exceptions\FoodSelectionValidationException;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\BookingCheckoutDraftService;
@@ -32,8 +33,17 @@ class BookingCheckoutConfirmController extends Controller
         ]);
 
         $draft = $drafts->current($request, true);
-        $previews->preview($draft);
-        $result = $checkout->confirm($draft, $request->user()?->getAuthIdentifier());
+
+        try {
+            $previews->preview($draft);
+            $result = $checkout->confirm($draft, $request->user()?->getAuthIdentifier());
+        } catch (FoodSelectionValidationException $exception) {
+            return redirect()
+                ->route('user.bookings.review')
+                ->withErrors(['food_items' => $exception->getMessage()])
+                ->withInput();
+        }
+
         $booking = $result->checkout->booking;
 
         if ($result->checkout->guestAccessToken !== null) {
