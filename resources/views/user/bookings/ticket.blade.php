@@ -4,14 +4,6 @@
 
 @php
     $seatCodes = $booking->seat_codes;
-    $statusMap = [
-        'paid' => ['label' => 'Chưa sử dụng', 'class' => 'bg-green-100 text-green-700 border-green-200', 'icon' => 'ph-check-circle'],
-        'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700 border-blue-200', 'icon' => 'ph-checks'],
-        'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-red-100 text-red-700 border-red-200', 'icon' => 'ph-x-circle'],
-        'expired' => ['label' => 'Hết hạn', 'class' => 'bg-gray-100 text-gray-700 border-gray-200', 'icon' => 'ph-clock'],
-        'pending' => ['label' => 'Đang xử lý', 'class' => 'bg-amber-100 text-amber-700 border-amber-200', 'icon' => 'ph-hourglass'],
-    ];
-    $status = $statusMap[$booking->booking_status] ?? $statusMap['pending'];
 @endphp
 
 @section('content')
@@ -48,6 +40,7 @@
                 </div>
                 <p class="text-gray-500 text-sm font-medium">Mã quét vé tại cổng rạp</p>
                 <p class="text-2xl font-bold text-gray-900 font-mono mt-1 tracking-widest">{{ $booking->booking_code }}</p>
+                <span class="mt-3 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700">{{ $booking->status_label }}</span>
             </div>
 
             <div class="p-8 bg-white text-gray-900">

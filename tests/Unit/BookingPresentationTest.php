@@ -49,6 +49,17 @@ class BookingPresentationTest extends TestCase
         $this->assertSame('A1, A2', $booking->seat_codes);
     }
 
+    public function test_it_formats_ticket_status_and_total(): void
+    {
+        $booking = new Booking([
+            'booking_status' => 'paid',
+            'total_amount' => 180000,
+        ]);
+
+        $this->assertSame('Chưa sử dụng', $booking->status_label);
+        $this->assertSame('180.000đ', $booking->formatted_total);
+    }
+
     private function bookingSeatWithCode(string $code): BookingSeat
     {
         $bookingSeat = new BookingSeat;
