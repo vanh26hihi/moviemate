@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Exceptions\ZaloPayTransportException;
 use App\Models\Payment;
 use App\Services\Payments\PaymentReconciliationService;
 use Illuminate\Http\Client\Request;
@@ -42,6 +43,35 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->assertNotNull($payment->fresh()->last_queried_at);
     }
 
+    public function test_query_timeout_keeps_attempt_active_and_retryable_as_unresolved(): void
+    {
+        $payment = $this->pendingPayment();
+        Http::fake(['*' => Http::failedConnection('query timed out')]);
+
+        try {
+            app(PaymentReconciliationService::class)->reconcile($payment);
+            $this->fail('A query timeout should be reported to the reconciliation runner.');
+        } catch (ZaloPayTransportException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
+        $this->assertSame('query_transport_unknown', $payment->fresh()->failure_reason);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
+        $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
+    }
+
+    public function test_provider_pending_keeps_an_unresolved_attempt_active(): void
+    {
+        $payment = $this->pendingPayment(overrides: ['status' => Payment::STATUS_UNRESOLVED]);
+        Http::fake(['*' => Http::response(['return_code' => 3, 'return_message' => 'Pending'], 200)]);
+
+        $status = app(PaymentReconciliationService::class)->reconcile($payment);
+
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $status);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
+    }
+
     public function test_command_queries_pending_attempt_before_expiry(): void
     {
         $payment = $this->pendingPayment();
@@ -78,8 +108,9 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->artisan('payments:query-pending')->assertSuccessful();
 
         Http::assertNothingSent();
-        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
         $this->assertSame('reconciliation_window_elapsed', $payment->fresh()->failure_reason);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
     }
 
     public function test_command_recovers_success_when_callback_was_missed(): void
@@ -107,7 +138,7 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->assertSame('query_expired', $payment->fresh()->failure_reason);
     }
 
-    public function test_query_minus_101_moves_attempt_to_review(): void
+    public function test_query_minus_101_keeps_attempt_unresolved(): void
     {
         $payment = $this->pendingPayment();
         Http::fake(['*' => Http::response([
@@ -115,9 +146,10 @@ class PaymentReconciliationTest extends PaymentTestCase
             'sub_return_code' => -101, 'sub_return_message' => 'Not found',
         ], 200)]);
 
-        $this->assertSame(Payment::STATUS_REVIEW, app(PaymentReconciliationService::class)->reconcile($payment));
-        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, app(PaymentReconciliationService::class)->reconcile($payment));
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
         $this->assertSame('query_unresolved', $payment->fresh()->failure_reason);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
     }
 
     public function test_query_amount_mismatch_moves_attempt_to_review(): void
@@ -223,7 +255,7 @@ class PaymentReconciliationTest extends PaymentTestCase
             ->assertSuccessful()
             ->expectsOutputToContain('errors: 1');
 
-        $this->assertSame(Payment::STATUS_PENDING, $first->fresh()->status);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $first->fresh()->status);
         $this->assertSame('query_response_unknown', $first->fresh()->failure_reason);
         $this->assertSame(Payment::STATUS_SUCCESS, $second->fresh()->status);
     }

@@ -26,14 +26,14 @@ class PaymentReconciliationService
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
 
-            if ($lockedPayment->status !== Payment::STATUS_PENDING) {
+            if (! in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true)) {
                 return false;
             }
 
             if (! $lockedPayment->reconcile_until || $lockedPayment->reconcile_until->isPast()) {
                 $lockedPayment->forceFill([
-                    'status' => Payment::STATUS_REVIEW,
-                    'failed_at' => now(),
+                    'status' => Payment::STATUS_UNRESOLVED,
+                    'failed_at' => null,
                     'failure_reason' => 'reconciliation_window_elapsed',
                 ])->save();
 
@@ -112,7 +112,7 @@ class PaymentReconciliationService
         if ($subCode === -101) {
             return $this->applyOutcome(
                 $payment,
-                Payment::STATUS_REVIEW,
+                Payment::STATUS_UNRESOLVED,
                 'query_unresolved',
                 $payload,
                 $response->hash,
@@ -134,8 +134,13 @@ class PaymentReconciliationService
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             Payment::query()
                 ->whereKey($payment->getKey())
-                ->where('status', Payment::STATUS_PENDING)
-                ->update(['failure_reason' => $reason, 'updated_at' => now()]);
+                ->whereIn('status', Payment::RECONCILABLE_STATUSES)
+                ->update([
+                    'status' => Payment::STATUS_UNRESOLVED,
+                    'failed_at' => null,
+                    'failure_reason' => $reason,
+                    'updated_at' => now(),
+                ]);
         });
     }
 
@@ -154,10 +159,12 @@ class PaymentReconciliationService
                 $this->fillQueryAudit($lockedPayment, $payload, $hash);
             }
 
-            if ($lockedPayment->status === Payment::STATUS_PENDING) {
+            if (in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true)) {
                 $lockedPayment->forceFill([
                     'status' => $status,
-                    'failed_at' => now(),
+                    'failed_at' => in_array($status, Payment::RECONCILABLE_STATUSES, true)
+                        ? null
+                        : now(),
                     'failure_reason' => $reason,
                 ]);
             }

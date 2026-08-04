@@ -9,6 +9,10 @@ class Payment extends Model
 {
     public const STATUS_PENDING = 'pending';
 
+    public const STATUS_PROCESSING = 'processing';
+
+    public const STATUS_UNRESOLVED = 'unresolved';
+
     public const STATUS_SUCCESS = 'success';
 
     public const STATUS_FAILED = 'failed';
@@ -16,6 +20,17 @@ class Payment extends Model
     public const STATUS_EXPIRED = 'expired';
 
     public const STATUS_REVIEW = 'review';
+
+    public const RECONCILABLE_STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_PROCESSING,
+        self::STATUS_UNRESOLVED,
+    ];
+
+    public const UNSAFE_RETRY_STATUSES = [
+        ...self::RECONCILABLE_STATUSES,
+        self::STATUS_REVIEW,
+    ];
 
     protected $fillable = [
         'booking_id',

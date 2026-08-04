@@ -62,6 +62,7 @@ class BookingCheckoutConfirmController extends Controller
             Payment::STATUS_FAILED => 'user.bookings.failed',
             Payment::STATUS_REVIEW => 'user.bookings.payment-review',
             Payment::STATUS_EXPIRED => 'user.bookings.expired',
+            Payment::STATUS_UNRESOLVED => 'user.bookings.pending',
             default => 'user.bookings.pending',
         };
 
