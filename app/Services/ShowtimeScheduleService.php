@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Domain\Money\VndAmount;
 use App\Domain\Showtimes\ShowtimeWindow;
 use App\Exceptions\InvalidMovieRuntimeException;
 use App\Exceptions\ShowtimeConflictException;
@@ -258,8 +259,10 @@ class ShowtimeScheduleService
             'room_layout_id' => $layout->id,
             'show_date' => $window->start->toDateString(),
             'show_time' => $window->start->format('H:i:s'),
-            'price' => $data['price'],
-            'vip_price' => $data['vip_price'] ?? null,
+            'price' => VndAmount::fromInput($data['price'], Showtime::MAX_PRICE)->value(),
+            'vip_price' => isset($data['vip_price'])
+                ? VndAmount::fromInput($data['vip_price'], Showtime::MAX_PRICE)->value()
+                : null,
             'status' => $data['status'],
         ];
     }

@@ -26,6 +26,31 @@ final readonly class VndAmount
         return new self($amount);
     }
 
+    public static function fromInput(mixed $amount, int $maximum = PHP_INT_MAX): self
+    {
+        if ($maximum < 0) {
+            throw new InvalidArgumentException('VND maximum must be a non-negative integer.');
+        }
+
+        if (is_int($amount)) {
+            if ($amount < 0) {
+                throw new InvalidArgumentException('VND input cannot be negative.');
+            }
+
+            $normalized = (string) $amount;
+        } elseif (is_string($amount) && preg_match('/^(?:0|[1-9][0-9]*)$/D', $amount) === 1) {
+            $normalized = $amount;
+        } else {
+            throw new InvalidArgumentException('VND input must be a canonical non-negative integer.');
+        }
+
+        if (self::exceeds($normalized, (string) $maximum)) {
+            throw new OverflowException('VND input exceeds the supported range.');
+        }
+
+        return new self((int) $normalized);
+    }
+
     public static function fromDatabase(mixed $amount): self
     {
         if (is_int($amount)) {
@@ -45,8 +70,7 @@ final readonly class VndAmount
         $normalized = $normalized === '' ? '0' : $normalized;
         $maximum = (string) PHP_INT_MAX;
 
-        if (strlen($normalized) > strlen($maximum)
-            || (strlen($normalized) === strlen($maximum) && strcmp($normalized, $maximum) > 0)) {
+        if (self::exceeds($normalized, $maximum)) {
             throw new OverflowException('VND amount exceeds the supported integer range.');
         }
 
@@ -101,5 +125,11 @@ final readonly class VndAmount
     public function __toString(): string
     {
         return (string) $this->amount;
+    }
+
+    private static function exceeds(string $amount, string $maximum): bool
+    {
+        return strlen($amount) > strlen($maximum)
+            || (strlen($amount) === strlen($maximum) && strcmp($amount, $maximum) > 0);
     }
 }

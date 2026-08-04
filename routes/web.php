@@ -25,6 +25,7 @@ use App\Http\Controllers\User\GuestBookingAccessController;
 use App\Http\Controllers\User\HomeController;
 use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
+use App\Http\Controllers\User\RetiredBookingStoreController;
 use App\Http\Middleware\ProtectBookingResponses;
 use Illuminate\Support\Facades\Route;
 
@@ -89,7 +90,7 @@ Route::post('/booking/confirm', BookingCheckoutConfirmController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
     ->name('user.bookings.confirm');
 
-Route::post('/booking/store', [BookingController::class, 'store'])
+Route::post('/booking/store', RetiredBookingStoreController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
     ->name('user.bookings.store');
 

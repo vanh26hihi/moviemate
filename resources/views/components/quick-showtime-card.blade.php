@@ -44,11 +44,11 @@
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     <span class="inline-flex items-center rounded-xl border app-border app-secondary px-3 py-1.5 text-xs font-bold app-text">
-                        {{ number_format((float) ($showtime->price ?? 0), 0, ',', '.') }}đ
+                        {{ number_format((int) ($showtime->price ?? 0), 0, ',', '.') }}đ
                     </span>
                     @if(! empty($showtime->vip_price))
                         <span class="inline-flex items-center rounded-xl border border-ai-start/25 bg-ai-start/10 px-3 py-1.5 text-xs font-bold text-ai-start">
-                            VIP {{ number_format((float) $showtime->vip_price, 0, ',', '.') }}đ
+                            VIP {{ number_format((int) $showtime->vip_price, 0, ',', '.') }}đ
                         </span>
                     @endif
                 </div>

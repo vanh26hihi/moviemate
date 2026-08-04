@@ -301,7 +301,7 @@ class PaymentInitiationTest extends PaymentTestCase
             'seat_ids' => [$scenario['seats'][0]->id],
             'customer_email' => 'guest@example.test',
             'checkout_token' => $checkoutToken,
-        ])->assertConflict();
+        ])->assertGone();
 
         $this->post(route('payments.zalopay.initiate', $booking))->assertForbidden();
         $this->assertSame(0, $booking->payments()->count());

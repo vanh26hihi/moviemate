@@ -53,7 +53,8 @@
         <div class="lg:col-span-4 space-y-5">
             <div>
                 <label class="admin-label">Giá *</label>
-                <input type="number" name="price" step="0.01" value="{{ old('price', $food->price ?? '') }}" class="admin-input" placeholder="100000" required />
+                <input type="number" name="price" min="0" max="{{ \App\Models\FoodItem::MAX_PRICE }}" step="1" value="{{ old('price', $food->price ?? '') }}" class="admin-input" placeholder="100000" required />
+                @error('price')<p class="mt-2 text-sm text-error">{{ $message }}</p>@enderror
             </div>
 
             <div class="flex items-center gap-3">

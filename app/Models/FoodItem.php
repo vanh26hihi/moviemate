@@ -9,8 +9,10 @@ class FoodItem extends Model
 {
     use HasFactory;
 
+    public const MAX_PRICE = 999_999;
+
     protected $fillable = [
-        'name', 'description', 'price', 'image', 'active'
+        'name', 'description', 'price', 'image', 'active',
     ];
 
     protected $casts = [
