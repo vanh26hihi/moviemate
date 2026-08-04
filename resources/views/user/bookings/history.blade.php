@@ -18,6 +18,7 @@
                     <p class="text-2xl font-extrabold text-ai-start">{{ number_format(Auth::user()->loyalty_points, 0, ',', '.') }}</p>
                     <p class="text-xs app-muted">điểm khả dụng</p>
                 </div>
+
                 <div class="w-full space-y-1 text-left">
                     <a href="{{ route('user.profile') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
                         <i class="ph ph-user text-lg"></i> Thông tin cá nhân
@@ -34,6 +35,7 @@
                 </div>
             </div>
         </aside>
+
         <section class="lg:col-span-3">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
@@ -53,6 +55,7 @@
                     <button type="submit" class="px-4 py-2 bg-brand-start text-white text-sm font-bold rounded-xl">Lọc</button>
                 </form>
             </div>
+
             @if($errors->any())
                 <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-semibold">
                     {{ $errors->first() }}
@@ -72,7 +75,8 @@
                         $status = $statusMap[$booking->booking_status] ?? $statusMap['pending'];
                         $poster = $booking->showtime->movie->poster_url;
                     @endphp
-<article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
+
+                    <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
                         <div class="absolute top-0 right-0 {{ $status['class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
                             {{ $status['label'] }}
                         </div>
@@ -134,3 +138,18 @@
                             </div>
                         </div>
                     </article>
+                @empty
+                    <div class="app-card border app-border rounded-3xl p-10 text-center">
+                        <div class="w-16 h-16 rounded-2xl bg-brand-start/10 text-brand-start flex items-center justify-center mx-auto mb-4">
+                            <i class="ph ph-ticket text-3xl"></i>
+                        </div>
+                        <p class="app-muted">Bạn chưa có vé nào.</p>
+                    </div>
+                @endforelse
+
+                {{ $bookings->withQueryString()->links() }}
+            </div>
+        </section>
+    </div>
+</div>
+@endsection
