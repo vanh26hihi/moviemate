@@ -5,9 +5,12 @@ namespace Tests\Feature\Admin;
 use App\Models\FoodItem;
 use App\Models\Showtime;
 use App\Services\ShowtimeScheduleService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Showtimes\ShowtimeTestCase;
+use Throwable;
 
 class VndInputValidationTest extends ShowtimeTestCase
 {
@@ -162,6 +165,135 @@ class VndInputValidationTest extends ShowtimeTestCase
         $this->assertSame('50000.00', $food->fresh()->price);
     }
 
+    public function test_edit_forms_render_whole_decimal_database_prices_as_canonical_integer_strings(): void
+    {
+        $movie = $this->movie();
+        $showtime = $this->existing($movie, $this->rooms['P01'], [
+            'price' => 50_000,
+            'vip_price' => 75_000,
+        ]);
+        $food = FoodItem::query()->create([
+            'name' => 'Bắp rang',
+            'price' => 35_000,
+            'active' => true,
+        ]);
+        $admin = $this->userWithRole('admin');
+
+        $showtimeResponse = $this->actingAs($admin)->get(route('admin.showtimes.edit', $showtime));
+        $showtimeResponse->assertOk();
+        $this->assertInputValue($showtimeResponse, 'price', '50000');
+        $this->assertInputValue($showtimeResponse, 'vip_price', '75000');
+
+        $foodResponse = $this->get(route('admin.foods.edit', $food));
+        $foodResponse->assertOk();
+        $this->assertInputValue($foodResponse, 'price', '35000');
+    }
+
+    public function test_unchanged_showtime_edit_and_food_non_price_edit_succeed_with_canonical_form_values(): void
+    {
+        $movie = $this->movie();
+        $room = $this->rooms['P01'];
+        $showtime = $this->existing($movie, $room, [
+            'price' => 50_000,
+            'vip_price' => 75_000,
+        ]);
+        $food = FoodItem::query()->create([
+            'name' => 'Bắp rang',
+            'price' => 35_000,
+            'active' => true,
+        ]);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->put(route('admin.showtimes.update', $showtime), $this->payload($movie, $room, [
+                'price' => '50000',
+                'vip_price' => '75000',
+            ]))
+            ->assertRedirect(route('admin.showtimes.index'))
+            ->assertSessionHasNoErrors();
+
+        $this->put(route('admin.foods.update', $food), [
+            'name' => 'Bắp rang bơ',
+            'price' => '35000',
+            'active' => '1',
+        ])->assertRedirect(route('admin.foods.index'))->assertSessionHasNoErrors();
+
+        $this->assertSame('50000.00', $showtime->fresh()->price);
+        $this->assertSame('75000.00', $showtime->fresh()->vip_price);
+        $this->assertSame('Bắp rang bơ', $food->fresh()->name);
+        $this->assertSame('35000.00', $food->fresh()->price);
+    }
+
+    public function test_old_invalid_price_takes_precedence_and_remains_visible_after_validation_failure(): void
+    {
+        $movie = $this->movie();
+        $room = $this->rooms['P01'];
+        $showtime = $this->existing($movie, $room, [
+            'price' => 50_000,
+            'vip_price' => 75_000,
+        ]);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)
+            ->from(route('admin.showtimes.edit', $showtime))
+            ->put(route('admin.showtimes.update', $showtime), $this->payload($movie, $room, [
+                'price' => '50000.5',
+                'vip_price' => '75000',
+            ]))
+            ->assertRedirect(route('admin.showtimes.edit', $showtime))
+            ->assertSessionHasErrors('price');
+
+        $response = $this->get(route('admin.showtimes.edit', $showtime));
+        $response->assertOk();
+        $this->assertInputValue($response, 'price', '50000.5');
+    }
+
+    public function test_fractional_stored_values_fail_closed_instead_of_rendering_lower_integers(): void
+    {
+        $movie = $this->movie();
+        $showtime = $this->existing($movie, $this->rooms['P01']);
+        $food = FoodItem::query()->create([
+            'name' => 'Bắp rang',
+            'price' => 35_000,
+            'active' => true,
+        ]);
+        DB::table('showtimes')->where('id', $showtime->id)->update(['price' => '50000.50']);
+        DB::table('food_items')->where('id', $food->id)->update(['price' => '35000.50']);
+        $this->actingAs($this->userWithRole('admin'))->withoutExceptionHandling();
+
+        foreach ([
+            route('admin.showtimes.edit', $showtime),
+            route('admin.foods.edit', $food),
+        ] as $uri) {
+            try {
+                $this->get($uri);
+                $this->fail("Fractional stored VND unexpectedly rendered at {$uri}.");
+            } catch (Throwable $exception) {
+                $messages = $exception->getMessage();
+                while ($exception = $exception->getPrevious()) {
+                    $messages .= ' '.$exception->getMessage();
+                }
+
+                $this->assertStringContainsString('VND', $messages);
+                $this->assertStringContainsString('database amount', $messages);
+            }
+        }
+    }
+
+    public function test_create_forms_keep_price_inputs_blank(): void
+    {
+        $admin = $this->userWithRole('admin');
+
+        $showtimeResponse = $this->actingAs($admin)->get(route('admin.showtimes.create'));
+        $showtimeResponse->assertOk();
+        $this->assertInputValue($showtimeResponse, 'price', '');
+        $this->assertInputValue($showtimeResponse, 'vip_price', '');
+
+        $foodResponse = $this->get(route('admin.foods.create'));
+        $foodResponse->assertOk();
+        $this->assertInputValue($foodResponse, 'price', '');
+    }
+
     public static function invalidShowtimeVndInputs(): array
     {
         return [
@@ -187,5 +319,13 @@ class VndInputValidationTest extends ShowtimeTestCase
             ...self::invalidShowtimeVndInputs(),
             'food database overflow' => [(string) (FoodItem::MAX_PRICE + 1)],
         ];
+    }
+
+    private function assertInputValue(TestResponse $response, string $name, string $value): void
+    {
+        $this->assertMatchesRegularExpression(
+            '/<input\b[^>]*\bname="'.preg_quote($name, '/').'"[^>]*\bvalue="'.preg_quote($value, '/').'"[^>]*>/i',
+            (string) $response->getContent()
+        );
     }
 }

@@ -91,7 +91,7 @@ Route::post('/booking/confirm', BookingCheckoutConfirmController::class)
     ->name('user.bookings.confirm');
 
 Route::post('/booking/store', RetiredBookingStoreController::class)
-    ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
+    ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.store');
 
 Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
