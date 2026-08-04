@@ -18,3 +18,19 @@
                     <p class="text-2xl font-extrabold text-ai-start">{{ number_format(Auth::user()->loyalty_points, 0, ',', '.') }}</p>
                     <p class="text-xs app-muted">điểm khả dụng</p>
                 </div>
+                <div class="w-full space-y-1 text-left">
+                    <a href="{{ route('user.profile') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
+                        <i class="ph ph-user text-lg"></i> Thông tin cá nhân
+                    </a>
+                    <a href="{{ route('user.bookings.history') }}" class="flex items-center gap-3 px-4 py-2.5 bg-brand-start/10 text-brand-start rounded-xl font-bold border border-brand-start/20 text-sm">
+                        <i class="ph-fill ph-ticket text-lg"></i> Lịch sử đặt vé
+                    </a>
+                    <a href="{{ route('user.loyalty.history') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
+                        <i class="ph ph-coins text-lg"></i> Lịch sử điểm
+                    </a>
+                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
+                        <i class="ph ph-star text-lg"></i> Đánh giá của tôi
+                    </a>
+                </div>
+            </div>
+        </aside>
