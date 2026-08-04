@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\UnsafeProductionMailConfiguration;
 use App\Mail\BookingTicketMail;
 use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
 use App\Services\BookingTokenService;
+use App\Services\Mail\ProductionMailTransportGuard;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,8 +21,18 @@ class SendPendingBookingTickets extends Command
 
     protected $description = 'Send paid booking tickets from the durable delivery outbox';
 
-    public function handle(BookingTokenService $tokens): int
-    {
+    public function handle(
+        BookingTokenService $tokens,
+        ProductionMailTransportGuard $mailGuard,
+    ): int {
+        try {
+            $mailGuard->assertSafeForProduction();
+        } catch (UnsafeProductionMailConfiguration $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
         $configuredBatch = (int) config('payment.ticket_delivery.batch_size', 100);
         $batch = $this->option('batch') === null
             ? $configuredBatch
@@ -92,15 +104,6 @@ class SendPendingBookingTickets extends Command
 
     private function send(BookingTicketDelivery $delivery, BookingTokenService $tokens): void
     {
-        $mailer = (string) config('mail.default');
-        if (app()->environment('production') && in_array($mailer, ['log', 'array'], true)) {
-            Log::warning('Ticket delivery rejected an unsafe production mailer.', [
-                'delivery_id' => $delivery->getKey(),
-                'mailer' => $mailer,
-            ]);
-            throw new RuntimeException('unsafe_production_mailer');
-        }
-
         $booking = Booking::query()->with([
             'user',
             'showtime.movie',
