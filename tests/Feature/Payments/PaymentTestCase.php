@@ -50,7 +50,7 @@ abstract class PaymentTestCase extends TestCase
     {
         $booking ??= $this->payableBooking();
 
-        return Payment::query()->create(array_merge([
+        $attributes = array_merge([
             'booking_id' => $booking->id,
             'provider' => 'zalopay',
             'payment_method' => 'zalopay',
@@ -64,7 +64,11 @@ abstract class PaymentTestCase extends TestCase
             'description' => 'Test booking',
             'expires_at' => now()->addMinutes(10),
             'reconcile_until' => now()->addHours(24),
-        ], $overrides));
+        ], $overrides);
+        $provider = $attributes['provider'];
+        unset($attributes['provider']);
+
+        return Payment::createForProvider($provider, $attributes);
     }
 
     protected function callbackBody(Payment $payment, array $overrides = [], bool $validMac = true): array

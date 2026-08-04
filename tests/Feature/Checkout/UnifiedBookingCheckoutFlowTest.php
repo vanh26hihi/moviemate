@@ -171,7 +171,7 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
 
         $first = app(UnifiedBookingCheckoutService::class)->confirm($draft, null);
         $this->assertTrue($first->paymentPendingReview);
-        $this->assertSame(Payment::STATUS_PENDING, $first->payment->status);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $first->payment->status);
         $this->assertSame('create_transport_unknown', $first->payment->failure_reason);
 
         Http::fake(['*' => Http::response([

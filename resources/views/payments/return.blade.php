@@ -36,6 +36,7 @@
             'colour' => 'text-slate-500',
         ],
     ];
+    $states[\App\Models\Payment::STATUS_UNRESOLVED] = $states[\App\Models\Payment::STATUS_PENDING];
     $state = $states[$payment->status] ?? [
         'title' => 'Đang xử lý trạng thái',
         'message' => 'MovieMate đang kiểm tra dữ liệu giao dịch hiện tại.',
@@ -59,7 +60,7 @@
             <h1 id="payment-state-title" class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">{{ $state['title'] }}</h1>
             <p class="mx-auto mt-3 max-w-xl leading-relaxed app-muted">{{ $state['message'] }}</p>
 
-            @if($payment->status === \App\Models\Payment::STATUS_PENDING && $payment->expires_at)
+            @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED], true) && $payment->expires_at)
                 <div class="mx-auto mt-6 max-w-md rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4" data-countdown-wrapper>
                     <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian lần thanh toán còn lại</p>
                     <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $payment->expires_at->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
@@ -82,7 +83,7 @@
                 và không thể tự đánh dấu giao dịch là đã thanh toán.
             </p>
 
-            @if($payment->status === \App\Models\Payment::STATUS_PENDING || $payment->status === \App\Models\Payment::STATUS_REVIEW)
+            @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_REVIEW], true))
                 <div class="mx-auto mt-5 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-left text-sm leading-relaxed text-warning" role="note">
                     <strong>Không tạo lại thanh toán một cách mù.</strong> Nếu ZaloPay đã trừ tiền, hãy giữ mã booking và chờ MovieMate xác minh hoặc đối soát lần hiện tại.
                 </div>

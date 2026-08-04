@@ -7,7 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
+    public const SUPPORTED_PROVIDERS = ['zalopay', 'vnpay'];
+
     public const STATUS_PENDING = 'pending';
+
+    public const STATUS_PROCESSING = 'processing';
+
+    public const STATUS_UNRESOLVED = 'unresolved';
 
     public const STATUS_SUCCESS = 'success';
 
@@ -17,9 +23,19 @@ class Payment extends Model
 
     public const STATUS_REVIEW = 'review';
 
+    public const RECONCILABLE_STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_PROCESSING,
+        self::STATUS_UNRESOLVED,
+    ];
+
+    public const UNSAFE_RETRY_STATUSES = [
+        ...self::RECONCILABLE_STATUSES,
+        self::STATUS_REVIEW,
+    ];
+
     protected $fillable = [
         'booking_id',
-        'provider',
         'app_id',
         'app_trans_id',
         'app_user',
@@ -59,6 +75,24 @@ class Payment extends Model
         'callback_payload_hash',
         'query_response_hash',
     ];
+
+    /** @param array<string, mixed> $attributes */
+    public static function createForProvider(string $provider, array $attributes): self
+    {
+        $provider = strtolower(trim($provider));
+        if (! in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
+            throw new \InvalidArgumentException('Unsupported payment provider.');
+        }
+
+        unset($attributes['provider']);
+
+        $payment = new self;
+        $payment->fill($attributes);
+        $payment->forceFill(['provider' => $provider]);
+        $payment->save();
+
+        return $payment;
+    }
 
     protected $casts = [
         'paid_at' => 'datetime',

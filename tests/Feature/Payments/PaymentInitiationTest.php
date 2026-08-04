@@ -83,20 +83,110 @@ class PaymentInitiationTest extends PaymentTestCase
         $this->assertSame('pending_payment', $booking->fresh()->booking_status);
     }
 
-    public function test_network_timeout_keeps_attempt_pending_for_safe_query_and_never_pays_booking(): void
+    public function test_create_timeout_keeps_attempt_unresolved_and_retry_queries_it_without_another_create(): void
     {
-        Http::fake(['*' => Http::failedConnection('timed out')]);
+        Http::fakeSequence()
+            ->pushFailedConnection('timed out')
+            ->push(['return_code' => 3, 'return_message' => 'Pending'], 200);
         $booking = $this->payableBooking();
-
-        $this->expectException(ZaloPayTransportException::class);
 
         try {
             app(PaymentInitiationService::class)->initiate($booking);
-        } finally {
-            $this->assertSame(Payment::STATUS_PENDING, $booking->payments()->firstOrFail()->status);
-            $this->assertSame('create_transport_unknown', $booking->payments()->firstOrFail()->failure_reason);
-            $this->assertSame('unpaid', $booking->fresh()->payment_status);
+            $this->fail('Create timeout should escape for safe pending handling.');
+        } catch (ZaloPayTransportException) {
+            $this->addToAssertionCount(1);
         }
+
+        $payment = $booking->payments()->sole();
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->status);
+        $this->assertSame('create_transport_unknown', $payment->failure_reason);
+        $this->assertSame('unpaid', $booking->fresh()->payment_status);
+
+        try {
+            app(PaymentInitiationService::class)->initiate($booking);
+            $this->fail('An unresolved attempt without an order URL should remain pending.');
+        } catch (PaymentInitiationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame($payment->id, $booking->payments()->sole()->id);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
+        Http::assertSentCount(2);
+        $this->assertCount(1, Http::recorded(
+            fn (Request $request): bool => str_ends_with($request->url(), '/v2/create'),
+        ));
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v2/query'));
+    }
+
+    public function test_missing_order_url_stays_unresolved_and_cannot_be_replaced(): void
+    {
+        Http::fakeSequence()->push([
+            'return_code' => 1,
+            'return_message' => 'Success',
+            'sub_return_code' => 1,
+            'sub_return_message' => 'Success',
+            'zp_trans_token' => 'token-without-url',
+        ], 200)->push(['return_code' => 3, 'return_message' => 'Pending'], 200);
+        $booking = $this->payableBooking();
+
+        try {
+            app(PaymentInitiationService::class)->initiate($booking);
+            $this->fail('A missing provider order URL should not be treated as a usable response.');
+        } catch (PaymentInitiationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $payment = $booking->payments()->sole();
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->status);
+        $this->assertSame('create_missing_order_url', $payment->failure_reason);
+
+        try {
+            app(PaymentInitiationService::class)->initiate($booking);
+            $this->fail('Retry should reconcile the attempt that has no order URL.');
+        } catch (PaymentInitiationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame($payment->id, $booking->payments()->sole()->id);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
+        Http::assertSentCount(2);
+        $this->assertCount(1, Http::recorded(
+            fn (Request $request): bool => str_ends_with($request->url(), '/v2/create'),
+        ));
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v2/query'));
+    }
+
+    public function test_unsupported_create_result_stays_unresolved_and_cannot_be_replaced(): void
+    {
+        Http::fakeSequence()
+            ->push(['return_code' => 99, 'return_message' => 'Unknown'], 200)
+            ->push(['return_code' => 3, 'return_message' => 'Pending'], 200);
+        $booking = $this->payableBooking();
+
+        try {
+            app(PaymentInitiationService::class)->initiate($booking);
+            $this->fail('An unsupported create result must remain unresolved.');
+        } catch (PaymentInitiationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $payment = $booking->payments()->sole();
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->status);
+        $this->assertSame('create_response_unknown', $payment->failure_reason);
+
+        try {
+            app(PaymentInitiationService::class)->initiate($booking);
+            $this->fail('Retry must reconcile the uncertain attempt instead of replacing it.');
+        } catch (PaymentInitiationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame($payment->id, $booking->payments()->sole()->id);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
+        $this->assertCount(1, Http::recorded(
+            fn (Request $request): bool => str_ends_with($request->url(), '/v2/create'),
+        ));
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/v2/query'));
     }
 
     public function test_duplicate_create_minus_68_queries_existing_attempt_without_issuing_ticket(): void

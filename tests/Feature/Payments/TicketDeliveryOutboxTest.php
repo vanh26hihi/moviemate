@@ -113,6 +113,39 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         Mail::assertSent(BookingTicketMail::class, 1);
     }
 
+    public function test_missing_outbox_requires_explicit_authorized_recovery_command(): void
+    {
+        $this->seedRbac();
+        $payment = $this->verifiedPayment();
+        BookingTicketDelivery::query()->delete();
+        $operator = $this->userWithRole('manager');
+
+        $this->artisan('payments:recover-ticket-delivery', [
+            'payment' => $payment->id,
+            '--actor' => $operator->id,
+        ])->assertSuccessful()->expectsOutputToContain('Created pending ticket delivery');
+
+        $delivery = BookingTicketDelivery::query()->sole();
+        $this->assertSame($payment->booking_id, $delivery->booking_id);
+        $this->assertSame(BookingTicketDelivery::STATUS_PENDING, $delivery->status);
+        $this->assertSame(0, $delivery->attempts);
+    }
+
+    public function test_recovery_command_rejects_unauthorized_actor_without_writing(): void
+    {
+        $this->seedRbac();
+        $payment = $this->verifiedPayment();
+        BookingTicketDelivery::query()->delete();
+        $customer = $this->userWithRole('user');
+
+        $this->artisan('payments:recover-ticket-delivery', [
+            'payment' => $payment->id,
+            '--actor' => $customer->id,
+        ])->assertFailed()->expectsOutputToContain('bookings.operate permission is required');
+
+        $this->assertDatabaseCount('booking_ticket_deliveries', 0);
+    }
+
     public function test_log_mailer_is_rejected_in_production_without_losing_outbox(): void
     {
         Log::spy();
