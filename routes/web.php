@@ -14,6 +14,8 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Payments\PaymentInitiationController;
+use App\Http\Controllers\Payments\VnpayIpnController;
+use App\Http\Controllers\Payments\VnpayReturnController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
@@ -27,8 +29,13 @@ use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
 use App\Http\Controllers\User\RetiredBookingStoreController;
 use App\Http\Middleware\ProtectBookingResponses;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 
@@ -40,9 +47,29 @@ Route::get('/payments/zalopay/return', ZaloPayReturnController::class)
     ->middleware(ProtectBookingResponses::class)
     ->name('payments.zalopay.return');
 
+Route::get('/payments/vnpay/ipn', VnpayIpnController::class)
+    ->withoutMiddleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+    ])
+    ->name('payments.vnpay.ipn');
+
+Route::get('/payments/vnpay/return', VnpayReturnController::class)
+    ->middleware(ProtectBookingResponses::class)
+    ->name('payments.vnpay.return');
+
 Route::post('/payments/zalopay/bookings/{booking}', PaymentInitiationController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->defaults('payment_provider', 'zalopay')
     ->name('payments.zalopay.initiate');
+
+Route::post('/payments/vnpay/bookings/{booking}', PaymentInitiationController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->defaults('payment_provider', 'vnpay')
+    ->name('payments.vnpay.initiate');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', function () {

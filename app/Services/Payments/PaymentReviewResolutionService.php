@@ -96,13 +96,14 @@ class PaymentReviewResolutionService
         }
 
         $result = $this->verifiedPayments->verifyReview($payment, new VerifiedPaymentData(
-            appId: $this->config->appId,
-            appTransId: $payment->app_trans_id,
+            provider: 'zalopay',
+            merchantReference: $payment->app_trans_id,
             amount: $payload['amount'],
-            zpTransId: $this->normalizeTransactionId($payload['zp_trans_id'] ?? null),
-            serverTimeMs: is_int($payload['server_time'] ?? null) ? $payload['server_time'] : null,
+            providerTransactionId: $this->normalizeTransactionId($payload['zp_trans_id'] ?? null),
             source: 'query',
             payloadHash: $response->hash,
+            appId: $this->config->appId,
+            serverTimeMs: is_int($payload['server_time'] ?? null) ? $payload['server_time'] : null,
         ));
 
         return $this->finish(

@@ -22,7 +22,7 @@ vendor\bin\phpunit -c phpunit.mysql.xml
 
 Never run `migrate:fresh`, `migrate:rollback`, a migration object's `down()`, or manual schema DDL against the primary `moviemate` database. Primary verification is read-only: confirm booking and payment counts and the absence of Phase-4 migration rows before and after rehearsal.
 
-Automatic reconciliation processes only `pending`, `processing`, and `unresolved` ZaloPay attempts within their reconciliation window. The scheduled `payments:query-pending` command deliberately excludes `review` payments.
+Automatic reconciliation processes only `pending`, `processing`, and `unresolved` ZaloPay or VNPAY attempts within their reconciliation window. The scheduled `payments:query-pending` command deliberately excludes `review` payments.
 
 `review` is an operator-controlled state. An authorized manager or administrator with `bookings.operate` may use **Admin → Payment review** to query the existing provider order. The POST action is authenticated, CSRF protected, rate limited, and audited. It never creates a provider order. Only authoritative success for the same payment identity and amount can use the shared verified transition, and that transition re-locks the booking, payment, and reserved seats.
 
@@ -31,6 +31,31 @@ Keep the payment in review when the provider remains uncertain, the amount or tr
 Do not initiate a replacement payment while any attempt for the same booking and provider is `pending`, `processing`, `unresolved`, or `review`. Resolve the existing attempt and its refund exposure first.
 
 Duplicate callbacks never repair ticket delivery. For a historical `success` payment whose booking is still fully paid but whose outbox row is missing, an active operator with `bookings.operate` must run `php artisan payments:recover-ticket-delivery PAYMENT_ID --actor=USER_ID`. The command locks and revalidates the payment and booking, creates only the missing pending delivery row, and logs the operator/payment/booking IDs. It never queries or creates a provider order.
+
+## VNPAY Sandbox setup and operations
+
+Register a Sandbox merchant with VNPAY and obtain the merchant `TmnCode` and `HashSecret`. Never commit either credential or paste it into logs, tickets, screenshots, or diagnostic output. Set `PAYMENT_DRIVER=vnpay`, `VNPAY_ENVIRONMENT=sandbox`, `VNPAY_TMN_CODE`, and `VNPAY_HASH_SECRET` in the deployed environment. Keep the supplied Sandbox payment and QueryDr URLs unless VNPAY explicitly changes them. `VNPAY_BANK_CODE` may be blank to let the customer select a channel on VNPAY; the default `VNPAYQR` opens the QR flow.
+
+VNPAY must reach two public MovieMate endpoints:
+
+- Return URL: `https://YOUR_HOST/payments/vnpay/return`
+- IPN URL: `https://YOUR_HOST/payments/vnpay/ipn`
+
+For local Sandbox testing, expose the application through an HTTPS tunnel and set `APP_URL` to its stable public origin before caching configuration. Register the exact Return and IPN URLs in the VNPAY Sandbox portal. Do not use localhost, a loopback address, an HTTP production origin, or a tunnel belonging to an untrusted account. Production additionally requires `VNPAY_ENVIRONMENT=production`, HTTPS provider URLs, and the public host in `PAYMENT_PUBLIC_HOSTS`.
+
+After every environment change, run:
+
+```powershell
+php artisan optimize:clear
+php artisan payments:vnpay-config
+php artisan config:cache
+```
+
+The diagnostic command prints only environment labels, credential-presence booleans, and URL hosts. It never prints the `HashSecret`, signatures, full payment URLs, or provider payloads. Restart web, scheduler, queue, and command workers after rebuilding the configuration cache.
+
+Use only VNPAY's current Sandbox test cards from the merchant documentation. A commonly documented NCB Sandbox card is `9704198526191432198`, cardholder `NGUYEN VAN A`, expiry `07/15`, OTP `123456`; verify it remains current in the Sandbox portal before testing. Do not store test card data in MovieMate.
+
+The browser Return URL is display-only and cannot mark a booking paid. The unauthenticated IPN verifies the HMAC-SHA512 checksum before database access, and QueryDr verifies its response checksum before applying an outcome. Only a verified `00` response code plus `00` transaction status, matching merchant, reference, amount, and transaction identity can enter the shared locked fulfillment transition. Unknown, malformed, late, conflicting, or checksum-invalid outcomes never issue a ticket. Do not retry a booking while its existing attempt is `pending`, `processing`, `unresolved`, or `review`.
 
 ## Production ticket email transport
 

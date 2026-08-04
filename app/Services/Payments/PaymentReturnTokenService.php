@@ -11,9 +11,9 @@ class PaymentReturnTokenService
 {
     private const VERSION = 'v1';
 
-    private const AUDIENCE = 'zalopay-return';
+    private const AUDIENCE = 'payment-return';
 
-    private const SESSION_KEY = 'zalopay_return_attempts';
+    private const SESSION_KEY = 'payment_return_attempts';
 
     public function issue(Payment $payment): string
     {
@@ -22,7 +22,7 @@ class PaymentReturnTokenService
             'v' => 1,
             'aud' => self::AUDIENCE,
             'pid' => $payment->getKey(),
-            'attempt' => $payment->app_trans_id,
+            'attempt' => $this->attemptReference($payment),
             'iat' => $issuedAt,
             'exp' => $issuedAt + ($this->ttlMinutes() * 60),
             'nonce' => $this->base64UrlEncode(random_bytes(16)),
@@ -58,7 +58,7 @@ class PaymentReturnTokenService
             $attempts = [];
         }
         $attempts[(string) $payment->getKey()] = [
-            'attempt_hash' => hash('sha256', $payment->app_trans_id),
+            'attempt_hash' => hash('sha256', $this->attemptReference($payment)),
             'expires_at' => $claims['exp'],
         ];
         $request->session()->put(self::SESSION_KEY, $attempts);
@@ -75,7 +75,7 @@ class PaymentReturnTokenService
             || ! is_int($grant['expires_at'] ?? null)
             || $grant['expires_at'] <= now()->getTimestamp()
             || ! is_string($grant['attempt_hash'] ?? null)
-            || ! hash_equals(hash('sha256', $payment->app_trans_id), $grant['attempt_hash'])) {
+            || ! hash_equals(hash('sha256', $this->attemptReference($payment)), $grant['attempt_hash'])) {
             if (is_array($attempts)) {
                 unset($attempts[(string) $payment->getKey()]);
                 $request->session()->put(self::SESSION_KEY, $attempts);
@@ -118,7 +118,7 @@ class PaymentReturnTokenService
             || ($claims['v'] ?? null) !== 1
             || ($claims['aud'] ?? null) !== self::AUDIENCE
             || ($claims['pid'] ?? null) !== $payment->getKey()
-            || ($claims['attempt'] ?? null) !== $payment->app_trans_id
+            || ($claims['attempt'] ?? null) !== $this->attemptReference($payment)
             || ! is_int($claims['iat'] ?? null)
             || ! is_int($claims['exp'] ?? null)
             || ! is_string($claims['nonce'] ?? null)
@@ -140,6 +140,16 @@ class PaymentReturnTokenService
             $this->derivedKey(),
             true,
         ));
+    }
+
+    private function attemptReference(Payment $payment): string
+    {
+        $reference = $payment->provider === 'vnpay' ? $payment->order_code : $payment->app_trans_id;
+        if (! is_string($reference) || $reference === '') {
+            throw new PaymentConfigurationException('Payment attempt reference is missing.');
+        }
+
+        return $reference;
     }
 
     private function derivedKey(): string

@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Payments\ZaloPayConfig;
 use App\Models\Payment;
 use App\Services\Payments\PaymentReconciliationService;
 use Illuminate\Console\Command;
@@ -12,16 +11,20 @@ class QueryPendingPayments extends Command
 {
     protected $signature = 'payments:query-pending {--batch=100 : Maximum attempts to query}';
 
-    protected $description = 'Reconcile pending ZaloPay payment attempts';
+    protected $description = 'Reconcile pending provider payment attempts';
 
-    public function handle(PaymentReconciliationService $reconciliation, ZaloPayConfig $config): int
+    public function handle(PaymentReconciliationService $reconciliation): int
     {
         $batch = max(1, min(1000, (int) $this->option('batch')));
-        $cutoff = now()->subSeconds($config->queryIntervalSeconds);
+        $interval = min(
+            max(1, (int) config('payment.vnpay.query_interval_seconds', 60)),
+            max(1, (int) config('payment.zalopay.query_interval_seconds', 60)),
+        );
+        $cutoff = now()->subSeconds($interval);
         $counts = ['checked' => 0, 'success' => 0, 'pending' => 0, 'failed' => 0, 'errors' => 0];
 
         Payment::query()
-            ->where('provider', 'zalopay')
+            ->whereIn('provider', Payment::SUPPORTED_PROVIDERS)
             ->whereIn('status', Payment::RECONCILABLE_STATUSES)
             ->where(function ($query): void {
                 $query->whereNull('reconcile_until')->orWhere('reconcile_until', '<=', now());
@@ -34,7 +37,7 @@ class QueryPendingPayments extends Command
             ]);
 
         Payment::query()
-            ->where('provider', 'zalopay')
+            ->whereIn('provider', Payment::SUPPORTED_PROVIDERS)
             ->whereIn('status', Payment::RECONCILABLE_STATUSES)
             ->where('reconcile_until', '>', now())
             ->where(function ($query) use ($cutoff) {

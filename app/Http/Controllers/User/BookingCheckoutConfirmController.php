@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Exceptions\FoodSelectionValidationException;
+use App\Exceptions\PaymentInitiationException;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\BookingCheckoutDraftService;
@@ -30,17 +31,28 @@ class BookingCheckoutConfirmController extends Controller
             'food_subtotal' => ['prohibited'],
             'total_amount' => ['prohibited'],
             'payment_status' => ['prohibited'],
+            'payment_method' => ['nullable', 'string', 'in:vnpay,zalopay'],
         ]);
 
         $draft = $drafts->current($request, true);
 
         try {
             $previews->preview($draft);
-            $result = $checkout->confirm($draft, $request->user()?->getAuthIdentifier());
+            $result = $checkout->confirm(
+                $draft,
+                $request->user()?->getAuthIdentifier(),
+                $request->input('payment_method', config('payment.driver', 'vnpay')),
+                $request->ip(),
+            );
         } catch (FoodSelectionValidationException $exception) {
             return redirect()
                 ->route('user.bookings.review')
                 ->withErrors(['food_items' => $exception->getMessage()])
+                ->withInput();
+        } catch (PaymentInitiationException $exception) {
+            return redirect()
+                ->route('user.bookings.review')
+                ->withErrors(['payment_method' => $exception->getMessage()])
                 ->withInput();
         }
 

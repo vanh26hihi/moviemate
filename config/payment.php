@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'driver' => env('PAYMENT_DRIVER', 'zalopay'),
+    'driver' => env('PAYMENT_DRIVER', 'vnpay'),
     'reconciliation_grace_hours' => (int) env('PAYMENT_RECONCILIATION_GRACE_HOURS', 24),
     'return_state_ttl_minutes' => (int) env('PAYMENT_RETURN_STATE_TTL_MINUTES', 30),
     'public_hosts' => array_values(array_filter(array_map(
@@ -14,6 +14,21 @@ return [
         'lease_seconds' => (int) env('TICKET_DELIVERY_LEASE_SECONDS', 300),
         'backoff_base_seconds' => (int) env('TICKET_DELIVERY_BACKOFF_BASE_SECONDS', 60),
         'backoff_max_seconds' => (int) env('TICKET_DELIVERY_BACKOFF_MAX_SECONDS', 3600),
+    ],
+
+    'vnpay' => [
+        'environment' => env('VNPAY_ENVIRONMENT', 'sandbox'),
+        'tmn_code' => env('VNPAY_TMN_CODE'),
+        'hash_secret' => env('VNPAY_HASH_SECRET'),
+        'payment_url' => env('VNPAY_PAYMENT_URL', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
+        'query_url' => env('VNPAY_QUERY_URL', 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction'),
+        'bank_code' => env('VNPAY_BANK_CODE', 'VNPAYQR'),
+        'locale' => env('VNPAY_LOCALE', 'vn'),
+        'order_type' => env('VNPAY_ORDER_TYPE', 'other'),
+        'payment_ttl_minutes' => (int) env('VNPAY_PAYMENT_TTL_MINUTES', 15),
+        'http_timeout_seconds' => (int) env('VNPAY_HTTP_TIMEOUT_SECONDS', 10),
+        'query_interval_seconds' => (int) env('VNPAY_QUERY_INTERVAL_SECONDS', 60),
+        'query_ip' => env('VNPAY_QUERY_IP', '127.0.0.1'),
     ],
 
     'zalopay' => [
