@@ -4,6 +4,8 @@ namespace Tests\Feature\Payments;
 
 use App\Models\Payment;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class PaymentAttemptSchemaTest extends PaymentTestCase
@@ -90,5 +92,165 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
         $this->assertNull($failed->fresh()->active_attempt_key);
         $this->assertNull($successful->fresh()->active_attempt_key);
         $this->assertSame('ACTIVE', $active->fresh()->active_attempt_key);
+    }
+
+    public function test_zalopay_schema_migration_can_roundtrip_and_preserve_payment_history(): void
+    {
+        [$zalopayMigration, $reconciliationMigration] = $this->paymentMigrations();
+        $payment = $this->pendingPayment(overrides: [
+            'provider' => 'vnpay',
+            'payment_method' => 'vnpay',
+            'status' => Payment::STATUS_FAILED,
+        ]);
+
+        $reconciliationMigration->down();
+        $zalopayMigration->down();
+
+        $this->assertZaloPayColumnsAreMissing();
+        $this->assertSame(1, DB::table('payments')->where('id', $payment->id)->count());
+        $this->assertBookingForeignKeyDeleteAction('cascade');
+
+        $zalopayMigration->up();
+        $reconciliationMigration->up();
+
+        $this->assertZaloPayColumnsExist();
+        $this->assertSame(1, DB::table('payments')->where('id', $payment->id)->count());
+        $this->assertBookingForeignKeyDeleteAction('restrict');
+    }
+
+    public function test_zalopay_down_handles_a_missing_foreign_key_while_booking_index_remains(): void
+    {
+        [$zalopayMigration, $reconciliationMigration] = $this->paymentMigrations();
+        $reconciliationMigration->down();
+
+        Schema::table('payments', function (Blueprint $table): void {
+            $table->dropForeign(['booking_id']);
+        });
+
+        $this->assertTrue($this->hasPaymentIndex('payments_booking_status_index'));
+
+        $zalopayMigration->down();
+
+        $this->assertZaloPayColumnsAreMissing();
+        $this->assertBookingForeignKeyDeleteAction('cascade');
+
+        $zalopayMigration->up();
+        $reconciliationMigration->up();
+        $this->assertZaloPayColumnsExist();
+    }
+
+    public function test_zalopay_down_is_safe_for_missing_indexes_and_columns_after_partial_ddl(): void
+    {
+        [$zalopayMigration, $reconciliationMigration] = $this->paymentMigrations();
+        $reconciliationMigration->down();
+
+        Schema::table('payments', function (Blueprint $table): void {
+            $table->dropForeign(['booking_id']);
+        });
+        Schema::table('payments', function (Blueprint $table): void {
+            $table->dropUnique('payments_provider_app_trans_unique');
+            $table->dropIndex('payments_provider_status_expiry_index');
+        });
+        Schema::table('payments', function (Blueprint $table): void {
+            $table->dropColumn('failure_reason');
+        });
+        Schema::table('bookings', function (Blueprint $table): void {
+            $table->dropColumn('ticket_emailed_at');
+        });
+
+        $zalopayMigration->down();
+        $zalopayMigration->down();
+        $this->assertZaloPayColumnsAreMissing();
+        $this->assertBookingForeignKeyDeleteAction('cascade');
+
+        $zalopayMigration->up();
+        $reconciliationMigration->up();
+        $this->assertZaloPayColumnsExist();
+    }
+
+    public function test_zalopay_down_declares_foreign_key_drop_before_booking_index_drop(): void
+    {
+        $source = file_get_contents(
+            database_path('migrations/2026_08_04_110000_extend_payments_for_zalopay.php'),
+        );
+
+        $foreignDrop = strpos($source, '$table->dropForeign(self::BOOKING_FOREIGN)');
+        $indexLoop = strpos($source, 'foreach (self::INDEXES as $indexName => $indexType)');
+
+        $this->assertNotFalse($foreignDrop);
+        $this->assertNotFalse($indexLoop);
+        $this->assertLessThan($indexLoop, $foreignDrop);
+    }
+
+    /** @return array{0: object, 1: object} */
+    private function paymentMigrations(): array
+    {
+        return [
+            require database_path('migrations/2026_08_04_110000_extend_payments_for_zalopay.php'),
+            require database_path('migrations/2026_08_04_115000_add_payment_reconciliation_and_ticket_outbox.php'),
+        ];
+    }
+
+    private function assertZaloPayColumnsAreMissing(): void
+    {
+        foreach ($this->zaloPayColumns() as $column) {
+            $this->assertFalse(Schema::hasColumn('payments', $column));
+        }
+        $this->assertFalse(Schema::hasColumn('bookings', 'ticket_emailed_at'));
+
+        foreach ($this->zaloPayIndexes() as $index) {
+            $this->assertFalse($this->hasPaymentIndex($index));
+        }
+    }
+
+    private function assertZaloPayColumnsExist(): void
+    {
+        $this->assertTrue(Schema::hasColumns('payments', $this->zaloPayColumns()));
+        $this->assertTrue(Schema::hasColumn('bookings', 'ticket_emailed_at'));
+
+        foreach ($this->zaloPayIndexes() as $index) {
+            $this->assertTrue($this->hasPaymentIndex($index));
+        }
+    }
+
+    private function assertBookingForeignKeyDeleteAction(string $expected): void
+    {
+        $foreignKey = collect(Schema::getForeignKeys('payments'))->first(
+            fn (array $key): bool => ($key['columns'] ?? []) === ['booking_id'],
+        );
+
+        $this->assertNotNull($foreignKey);
+        $this->assertSame($expected, strtolower((string) $foreignKey['on_delete']));
+    }
+
+    private function hasPaymentIndex(string $name): bool
+    {
+        return collect(Schema::getIndexes('payments'))->contains(
+            fn (array $index): bool => ($index['name'] ?? null) === $name,
+        );
+    }
+
+    /** @return list<string> */
+    private function zaloPayColumns(): array
+    {
+        return [
+            'app_id', 'app_trans_id', 'app_user', 'app_time_ms', 'currency', 'description',
+            'expires_at', 'zp_trans_id', 'zp_trans_token', 'order_token', 'order_url', 'qr_code',
+            'provider_return_code', 'provider_sub_return_code', 'provider_return_message',
+            'provider_sub_return_message', 'server_time_ms', 'callback_received_at',
+            'last_queried_at', 'verified_at', 'failed_at', 'failure_reason',
+            'create_response_hash', 'callback_payload_hash', 'query_response_hash',
+        ];
+    }
+
+    /** @return list<string> */
+    private function zaloPayIndexes(): array
+    {
+        return [
+            'payments_provider_app_trans_unique',
+            'payments_provider_zp_trans_unique',
+            'payments_booking_status_index',
+            'payments_provider_status_expiry_index',
+        ];
     }
 }

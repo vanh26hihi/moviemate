@@ -7,6 +7,43 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const BOOKING_FOREIGN = 'payments_booking_id_foreign';
+
+    private const INDEXES = [
+        'payments_provider_app_trans_unique' => 'unique',
+        'payments_provider_zp_trans_unique' => 'unique',
+        'payments_booking_status_index' => 'index',
+        'payments_provider_status_expiry_index' => 'index',
+    ];
+
+    private const ZALOPAY_COLUMNS = [
+        'app_id',
+        'app_trans_id',
+        'app_user',
+        'app_time_ms',
+        'currency',
+        'description',
+        'expires_at',
+        'zp_trans_id',
+        'zp_trans_token',
+        'order_token',
+        'order_url',
+        'qr_code',
+        'provider_return_code',
+        'provider_sub_return_code',
+        'provider_return_message',
+        'provider_sub_return_message',
+        'server_time_ms',
+        'callback_received_at',
+        'last_queried_at',
+        'verified_at',
+        'failed_at',
+        'failure_reason',
+        'create_response_hash',
+        'callback_payload_hash',
+        'query_response_hash',
+    ];
+
     public function up(): void
     {
         Schema::table('payments', function (Blueprint $table) {
@@ -58,47 +95,105 @@ return new class extends Migration
             throw new RuntimeException('Cannot roll back ZaloPay payment fields while ZaloPay attempts exist.');
         }
 
-        Schema::table('bookings', function (Blueprint $table) {
-            $table->dropColumn('ticket_emailed_at');
-        });
+        if ($this->hasForeignKey('payments', self::BOOKING_FOREIGN)) {
+            Schema::table('payments', function (Blueprint $table): void {
+                if (DB::getDriverName() === 'sqlite') {
+                    $table->dropForeign(['booking_id']);
+                } else {
+                    $table->dropForeign(self::BOOKING_FOREIGN);
+                }
+            });
+        }
 
-        Schema::table('payments', function (Blueprint $table) {
-            $table->dropUnique('payments_provider_app_trans_unique');
-            $table->dropUnique('payments_provider_zp_trans_unique');
-            $table->dropIndex('payments_booking_status_index');
-            $table->dropIndex('payments_provider_status_expiry_index');
-            $table->dropForeign(['booking_id']);
-            $table->dropColumn([
-                'app_id',
-                'app_trans_id',
-                'app_user',
-                'app_time_ms',
-                'currency',
-                'description',
-                'expires_at',
-                'zp_trans_id',
-                'zp_trans_token',
-                'order_token',
-                'order_url',
-                'qr_code',
-                'provider_return_code',
-                'provider_sub_return_code',
-                'provider_return_message',
-                'provider_sub_return_message',
-                'server_time_ms',
-                'callback_received_at',
-                'last_queried_at',
-                'verified_at',
-                'failed_at',
-                'failure_reason',
-                'create_response_hash',
-                'callback_payload_hash',
-                'query_response_hash',
-            ]);
-        });
+        foreach (self::INDEXES as $indexName => $indexType) {
+            if (! $this->hasIndex('payments', $indexName)) {
+                continue;
+            }
 
-        Schema::table('payments', function (Blueprint $table) {
-            $table->foreign('booking_id')->references('id')->on('bookings')->cascadeOnDelete();
+            Schema::table('payments', function (Blueprint $table) use ($indexName, $indexType): void {
+                if ($indexType === 'unique') {
+                    $table->dropUnique($indexName);
+                } else {
+                    $table->dropIndex($indexName);
+                }
+            });
+        }
+
+        $this->dropColumnsIfPresent('payments', self::ZALOPAY_COLUMNS);
+        $this->dropColumnsIfPresent('bookings', ['ticket_emailed_at']);
+
+        if (Schema::hasTable('payments')
+            && Schema::hasColumn('payments', 'booking_id')
+            && Schema::hasTable('bookings')
+            && Schema::hasColumn('bookings', 'id')
+            && ! $this->hasForeignKey('payments', self::BOOKING_FOREIGN)) {
+            Schema::table('payments', function (Blueprint $table): void {
+                $table->foreign('booking_id')->references('id')->on('bookings')->cascadeOnDelete();
+            });
+        }
+    }
+
+    /** @param list<string> $columns */
+    private function dropColumnsIfPresent(string $tableName, array $columns): void
+    {
+        if (! Schema::hasTable($tableName)) {
+            return;
+        }
+
+        $existingColumns = array_values(array_filter(
+            $columns,
+            fn (string $column): bool => Schema::hasColumn($tableName, $column),
+        ));
+
+        if ($existingColumns === []) {
+            return;
+        }
+
+        Schema::table($tableName, function (Blueprint $table) use ($existingColumns): void {
+            $table->dropColumn($existingColumns);
         });
+    }
+
+    private function hasForeignKey(string $tableName, string $foreignKeyName): bool
+    {
+        if (! Schema::hasTable($tableName)) {
+            return false;
+        }
+
+        if (DB::getDriverName() === 'mysql') {
+            return DB::table('information_schema.TABLE_CONSTRAINTS')
+                ->where('CONSTRAINT_SCHEMA', DB::getDatabaseName())
+                ->where('TABLE_NAME', $tableName)
+                ->where('CONSTRAINT_NAME', $foreignKeyName)
+                ->where('CONSTRAINT_TYPE', 'FOREIGN KEY')
+                ->exists();
+        }
+
+        return collect(Schema::getForeignKeys($tableName))->contains(
+            fn (array $foreign): bool => ($foreign['name'] ?? null) === $foreignKeyName
+                || (DB::getDriverName() === 'sqlite'
+                    && ($foreign['columns'] ?? []) === ['booking_id']
+                    && ($foreign['foreign_table'] ?? null) === 'bookings'
+                    && ($foreign['foreign_columns'] ?? []) === ['id'])
+        );
+    }
+
+    private function hasIndex(string $tableName, string $indexName): bool
+    {
+        if (! Schema::hasTable($tableName)) {
+            return false;
+        }
+
+        if (DB::getDriverName() === 'mysql') {
+            return DB::table('information_schema.STATISTICS')
+                ->where('TABLE_SCHEMA', DB::getDatabaseName())
+                ->where('TABLE_NAME', $tableName)
+                ->where('INDEX_NAME', $indexName)
+                ->exists();
+        }
+
+        return collect(Schema::getIndexes($tableName))->contains(
+            fn (array $index): bool => ($index['name'] ?? null) === $indexName
+        );
     }
 };
