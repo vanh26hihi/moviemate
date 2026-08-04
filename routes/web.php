@@ -147,11 +147,13 @@ Route::get('/admin/rooms/{room}/layout/preview', [AdminSeatController::class, 'p
     ->name('admin.rooms.layout.preview');
 
 Route::get('/foods', [UserFoodController::class, 'index'])->name('foods.index');
-Route::post('/foods/add', [UserFoodController::class, 'addToCart'])->name('foods.add');
-Route::get('/foods/cart', [UserOrderController::class, 'cart'])->name('foods.cart');
-Route::get('/foods/checkout', [UserOrderController::class, 'checkout'])->name('foods.checkout');
-Route::post('/foods/store', [UserOrderController::class, 'store'])->name('foods.store');
-Route::get('/foods/success/{order}', [UserOrderController::class, 'success'])->name('foods.success');
+Route::post('/foods/add', [UserOrderController::class, 'retired'])->name('foods.add');
+Route::get('/foods/cart', [UserOrderController::class, 'retired'])->name('foods.cart');
+Route::get('/foods/checkout', [UserOrderController::class, 'retired'])->name('foods.checkout');
+Route::post('/foods/store', [UserOrderController::class, 'retired'])->name('foods.store');
+Route::get('/foods/success/{order}', [UserOrderController::class, 'retired'])
+    ->whereNumber('order')
+    ->name('foods.success');
 
 Route::prefix('admin')->name('admin.')
     ->middleware(['auth', 'active', 'permission:admin.access'])

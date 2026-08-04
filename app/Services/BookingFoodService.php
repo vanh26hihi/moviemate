@@ -5,11 +5,13 @@ namespace App\Services;
 use App\Domain\Bookings\FoodLine;
 use App\Domain\Bookings\FoodPriceBreakdown;
 use App\Domain\Money\VndAmount;
+use App\Exceptions\FoodSelectionValidationException;
 use App\Models\Booking;
 use App\Models\FoodItem;
 use App\Models\Order;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
+use OverflowException;
 
 class BookingFoodService
 {
@@ -33,14 +35,20 @@ class BookingFoodService
             /** @var FoodItem|null $food */
             $food = $foods->get($foodId);
             if (! $food) {
-                throw new InvalidArgumentException("Food item {$foodId} does not exist.");
+                throw FoodSelectionValidationException::unavailable();
             }
             if (! $food->active) {
-                throw new InvalidArgumentException("Food item {$foodId} is not available.");
+                throw FoodSelectionValidationException::unavailable();
             }
 
-            $unitPrice = VndAmount::fromDatabase($food->getRawOriginal('price') ?? $food->price);
-            $lineTotal = $unitPrice->multiply($quantity);
+            try {
+                $unitPrice = VndAmount::fromDatabase($food->getRawOriginal('price') ?? $food->price);
+                $lineTotal = $unitPrice->multiply($quantity);
+                $subtotal = $subtotal->add($lineTotal);
+            } catch (InvalidArgumentException|OverflowException $exception) {
+                throw FoodSelectionValidationException::invalidPrice();
+            }
+
             $lines[] = new FoodLine(
                 (int) $food->getKey(),
                 (string) $food->name,
@@ -48,7 +56,6 @@ class BookingFoodService
                 $quantity,
                 $lineTotal->value(),
             );
-            $subtotal = $subtotal->add($lineTotal);
         }
 
         return new FoodPriceBreakdown(
@@ -71,20 +78,21 @@ class BookingFoodService
             throw new InvalidArgumentException('Food pickup must use the canonical cinema.');
         }
 
-        $booking = null;
-        if (isset($attributes['booking_id'])) {
-            $booking = Booking::query()->lockForUpdate()->findOrFail((int) $attributes['booking_id']);
-            if ($booking->booking_status !== 'pending_payment' || $booking->payment_status !== 'unpaid') {
-                throw new InvalidArgumentException('Unified food can only be attached to an unpaid pending booking.');
-            }
+        if (! isset($attributes['booking_id'])) {
+            throw new InvalidArgumentException('Food orders must belong to a unified booking checkout.');
+        }
+
+        $booking = Booking::query()->lockForUpdate()->findOrFail((int) $attributes['booking_id']);
+        if ($booking->booking_status !== 'pending_payment' || $booking->payment_status !== 'unpaid') {
+            throw new InvalidArgumentException('Unified food can only be attached to an unpaid pending booking.');
         }
 
         $order = Order::query()->create([
-            'booking_id' => $booking?->id,
-            'user_id' => $booking?->user_id ?? ($attributes['user_id'] ?? null),
-            'customer_name' => $attributes['customer_name'] ?? '',
-            'customer_phone' => $attributes['customer_phone'] ?? null,
-            'customer_email' => $booking?->customer_email ?? ($attributes['customer_email'] ?? null),
+            'booking_id' => $booking->id,
+            'user_id' => $booking->user_id,
+            'customer_name' => '',
+            'customer_phone' => null,
+            'customer_email' => $booking->customer_email,
             'pickup_cinema_id' => $canonicalCinemaId,
             'subtotal' => $food->foodSubtotal,
             'total_amount' => $food->foodSubtotal,

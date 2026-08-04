@@ -191,7 +191,7 @@ class SingleCinemaOperationsTest extends TestCase
         $this->assertDatabaseCount('bookings', 0);
     }
 
-    public function test_public_ui_has_no_cinema_selector_and_food_pickup_is_server_assigned(): void
+    public function test_public_ui_has_no_cinema_selector_and_standalone_food_checkout_is_retired(): void
     {
         $canonical = app(CinemaContext::class)->current();
         $legacy = Cinema::factory()->legacy()->create();
@@ -205,19 +205,16 @@ class SingleCinemaOperationsTest extends TestCase
 
         $this->withSession(['food_cart' => [$food->id => 2]])
             ->get(route('foods.checkout'))
-            ->assertOk()
-            ->assertSee($canonical->name)
+            ->assertGone()
             ->assertDontSee('name="pickup_cinema_id"', false);
 
         $this->withSession(['food_cart' => [$food->id => 2]])
             ->post(route('foods.store'), [
                 'customer_name' => 'Khách thử nghiệm',
                 'pickup_cinema_id' => $legacy->id,
-            ])->assertRedirect();
+            ])->assertGone();
 
-        $this->assertDatabaseHas('orders', [
-            'customer_name' => 'Khách thử nghiệm',
-            'pickup_cinema_id' => $canonical->id,
-        ]);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('order_items', 0);
     }
 }
