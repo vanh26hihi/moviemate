@@ -79,4 +79,15 @@ class Booking extends Model
         return $this->showtime->show_date->format('d/m/Y').' '
             .Carbon::parse($this->showtime->show_time)->format('H:i');
     }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->booking_status) {
+            'paid' => 'Chưa sử dụng',
+            'used' => 'Đã sử dụng',
+            'cancelled' => 'Đã hủy',
+            'expired' => 'Hết hạn',
+            default => 'Đang xử lý',
+        };
+    }
 }
