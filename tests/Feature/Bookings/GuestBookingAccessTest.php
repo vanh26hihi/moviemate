@@ -16,6 +16,7 @@ class GuestBookingAccessTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutVite();
         $this->seedRbac();
     }
 
@@ -101,6 +102,61 @@ class GuestBookingAccessTest extends TestCase
             'destination' => 'ticket',
         ])->assertNotFound();
         $this->get(route('user.bookings.ticket', $secondBooking))->assertNotFound();
+    }
+
+    public function test_ticket_email_token_is_scoped_to_its_exact_booking(): void
+    {
+        [$firstBooking] = $this->guestBooking();
+        [$secondBooking] = $this->guestBooking();
+        $firstToken = $this->addTicketEmailCredential($firstBooking);
+        $this->addTicketEmailCredential($secondBooking);
+
+        $this->post(route('user.bookings.access.exchange', $secondBooking), [
+            'token' => $firstToken,
+            'destination' => 'ticket',
+        ])->assertNotFound();
+        $this->get(route('user.bookings.ticket', $secondBooking))->assertNotFound();
+    }
+
+    public function test_expired_ticket_email_token_is_rejected(): void
+    {
+        [$booking] = $this->guestBooking();
+        $rawToken = $this->addTicketEmailCredential($booking);
+        $booking->forceFill([
+            'guest_access_expires_at' => now()->subSecond(),
+            'ticket_email_token_expires_at' => now()->subSecond(),
+        ])->save();
+
+        $this->get(route('user.bookings.access.show', $booking))->assertNotFound();
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => $rawToken,
+            'destination' => 'ticket',
+        ])->assertNotFound();
+    }
+
+    public function test_invalid_ticket_email_token_is_rejected(): void
+    {
+        [$booking] = $this->guestBooking();
+        $this->addTicketEmailCredential($booking);
+
+        $this->post(route('user.bookings.access.exchange', $booking), [
+            'token' => 'invalid-ticket-email-token',
+            'destination' => 'ticket',
+        ])->assertNotFound();
+        $this->get(route('user.bookings.ticket', $booking))->assertNotFound();
+    }
+
+    public function test_ticket_email_exchange_creates_an_independent_session_capability(): void
+    {
+        [$booking] = $this->guestBooking();
+        $rawToken = $this->addTicketEmailCredential($booking);
+
+        $this->exchange($booking, $rawToken);
+        $booking->forceFill([
+            'guest_access_token_hash' => hash('sha256', 'rotated-checkout-capability'),
+        ])->save();
+
+        $this->get(route('user.bookings.ticket', $booking))->assertOk();
     }
 
     public function test_expired_guest_link_cannot_be_shown_or_exchanged(): void
@@ -241,5 +297,18 @@ class GuestBookingAccessTest extends TestCase
         ]);
 
         return [$booking, $rawToken];
+    }
+
+    private function addTicketEmailCredential(Booking $booking): string
+    {
+        $tokens = app(BookingTokenService::class);
+        $credential = $tokens->issueTicketEmailCredential($booking->getKey());
+        $booking->forceFill([
+            'ticket_email_token_nonce' => $credential['nonce'],
+            'ticket_email_token_hash' => $tokens->hash($credential['token']),
+            'ticket_email_token_expires_at' => now()->addHour(),
+        ])->save();
+
+        return $credential['token'];
     }
 }

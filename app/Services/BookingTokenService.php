@@ -8,6 +8,8 @@ class BookingTokenService
 {
     private const CHECKOUT_VERSION = 'v2';
 
+    private const TICKET_EMAIL_VERSION = 'v1';
+
     public function issueCheckoutToken(): string
     {
         $payload = $this->base64UrlEncode(
@@ -64,6 +66,32 @@ class BookingTokenService
     public function issueGuestAccessToken(): string
     {
         return $this->base64UrlEncode(random_bytes(32));
+    }
+
+    /** @return array{token: string, nonce: string} */
+    public function issueTicketEmailCredential(int $bookingId): array
+    {
+        $nonce = $this->base64UrlEncode(random_bytes(32));
+
+        return [
+            'token' => $this->ticketEmailTokenForNonce($bookingId, $nonce),
+            'nonce' => $nonce,
+        ];
+    }
+
+    public function ticketEmailTokenForNonce(int $bookingId, string $nonce): string
+    {
+        $decodedNonce = $this->base64UrlDecode($nonce);
+        if ($bookingId < 1 || $decodedNonce === false || strlen($decodedNonce) !== 32) {
+            throw new \InvalidArgumentException('The ticket email credential nonce is malformed.');
+        }
+
+        return $this->base64UrlEncode(hash_hmac(
+            'sha256',
+            self::TICKET_EMAIL_VERSION.':booking:'.$bookingId.':'.$decodedNonce,
+            $this->signingKey(),
+            true,
+        ));
     }
 
     public function verifyHash(?string $storedHash, ?string $rawToken): bool
