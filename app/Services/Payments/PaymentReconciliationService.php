@@ -6,6 +6,7 @@ use App\Domain\Payments\VerifiedPaymentData;
 use App\Domain\Payments\ZaloPayConfig;
 use App\Exceptions\ZaloPayAuthenticationException;
 use App\Exceptions\ZaloPayResponseException;
+use App\Exceptions\ZaloPayTransportException;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\ZaloPay\ZaloPayGateway;
@@ -29,6 +30,16 @@ class PaymentReconciliationService
                 return false;
             }
 
+            if (! $lockedPayment->reconcile_until || $lockedPayment->reconcile_until->isPast()) {
+                $lockedPayment->forceFill([
+                    'status' => Payment::STATUS_REVIEW,
+                    'failed_at' => now(),
+                    'failure_reason' => 'reconciliation_window_elapsed',
+                ])->save();
+
+                return false;
+            }
+
             $lockedPayment->forceFill(['last_queried_at' => now()])->save();
 
             return true;
@@ -46,12 +57,21 @@ class PaymentReconciliationService
                 Payment::STATUS_REVIEW,
                 'query_authentication_error',
             );
+        } catch (ZaloPayTransportException $exception) {
+            $this->recordUnknown($payment, 'query_transport_unknown');
+
+            throw $exception;
+        } catch (ZaloPayResponseException $exception) {
+            $this->recordUnknown($payment, 'query_response_unknown');
+
+            throw $exception;
         }
 
         $payload = $response->payload;
 
         if ($payload['return_code'] === 1) {
             if (! is_int($payload['amount'] ?? null)) {
+                $this->recordUnknown($payment, 'query_response_unknown');
                 throw new ZaloPayResponseException('ZaloPay successful query omitted an integer amount.');
             }
 
@@ -74,6 +94,7 @@ class PaymentReconciliationService
         }
 
         if ($payload['return_code'] !== 2) {
+            $this->recordUnknown($payment, 'query_response_unknown');
             throw new ZaloPayResponseException('ZaloPay query returned an unsupported return code.');
         }
 
@@ -105,6 +126,17 @@ class PaymentReconciliationService
             $payload,
             $response->hash,
         );
+    }
+
+    private function recordUnknown(Payment $payment, string $reason): void
+    {
+        DB::transaction(function () use ($payment, $reason): void {
+            Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
+            Payment::query()
+                ->whereKey($payment->getKey())
+                ->where('status', Payment::STATUS_PENDING)
+                ->update(['failure_reason' => $reason, 'updated_at' => now()]);
+        });
     }
 
     private function applyOutcome(

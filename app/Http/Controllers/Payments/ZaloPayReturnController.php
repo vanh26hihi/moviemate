@@ -35,12 +35,11 @@ class ZaloPayReturnController extends Controller
         if (Auth::check()) {
             Gate::authorize('view', $payment->booking);
         } else {
-            $returnToken = $request->query('return_token');
-            if (is_string($returnToken)) {
-                abort_unless($returnTokens->verify($payment, $returnToken), 404);
-                abort_unless($guestAccess->grantPaymentReturn($request, $payment->booking), 404);
+            $returnState = $request->query('state');
+            if (is_string($returnState)) {
+                abort_unless($returnTokens->exchange($request, $payment, $returnState), 404);
             } else {
-                abort_unless($guestAccess->allows($request, $payment->booking), 404);
+                abort_unless($returnTokens->allows($request, $payment), 404);
             }
         }
 
@@ -62,11 +61,14 @@ class ZaloPayReturnController extends Controller
 
         $payment->refresh();
         $payment->load('booking');
+        $canViewBooking = Auth::check() || $guestAccess->allows($request, $payment->booking);
 
         return view('payments.return', [
             'payment' => $payment,
             'booking' => $payment->booking,
             'integrityVerified' => $integrityVerified,
+            'canViewTicket' => $canViewBooking,
+            'canViewBooking' => $canViewBooking,
         ]);
     }
 }

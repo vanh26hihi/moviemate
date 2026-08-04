@@ -63,6 +63,7 @@ abstract class PaymentTestCase extends TestCase
             'status' => Payment::STATUS_PENDING,
             'description' => 'Test booking',
             'expires_at' => now()->addMinutes(10),
+            'reconcile_until' => now()->addHours(24),
         ], $overrides));
     }
 
