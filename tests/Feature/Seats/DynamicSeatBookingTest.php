@@ -75,7 +75,7 @@ class DynamicSeatBookingTest extends TestCase
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$half->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
             'checkout_token' => $this->checkoutToken,
-        ])->assertSessionHasErrors('seat_ids');
+        ])->assertGone();
         $this->assertDatabaseCount('bookings', 0);
     }
 
@@ -99,7 +99,7 @@ class DynamicSeatBookingTest extends TestCase
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$foreign->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
             'checkout_token' => $this->checkoutToken,
-        ])->assertSessionHasErrors('seat_ids');
+        ])->assertGone();
     }
 
     public function test_maintenance_seat_is_disabled_and_rejected_by_backend(): void
@@ -119,7 +119,7 @@ class DynamicSeatBookingTest extends TestCase
             'showtime_id' => $showtime->id, 'seat_ids' => [$maintenance->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
             'checkout_token' => $this->checkoutToken,
-        ])->assertSessionHasErrors('seat_ids');
+        ])->assertGone();
     }
 
     public function test_booked_seat_is_disabled(): void
@@ -142,7 +142,7 @@ class DynamicSeatBookingTest extends TestCase
             ->assertOk()->assertSee('aria-label="Ghế A1', false)->assertSee('cursor-not-allowed', false);
     }
 
-    public function test_fake_frontend_total_is_ignored_and_backend_recalculates(): void
+    public function test_legacy_forged_frontend_total_is_gone_and_creates_nothing(): void
     {
         Mail::fake();
         $seat = Seat::query()->where('room_id', $this->rooms['P01']->id)->where('seat_code', 'A1')->firstOrFail();
@@ -152,15 +152,10 @@ class DynamicSeatBookingTest extends TestCase
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
             'checkout_token' => $this->checkoutToken,
             'total_amount' => 1, 'price' => 1, 'room_id' => $this->rooms['P02']->id, 'room_layout_id' => 999,
-        ])->assertOk()->assertViewIs('user.bookings.guest-handoff');
+        ])->assertGone();
 
-        $this->assertDatabaseHas('bookings', ['showtime_id' => $this->showtime->id, 'total_amount' => 50000]);
-        $this->assertDatabaseHas('bookings', [
-            'showtime_id' => $this->showtime->id,
-            'total_amount' => 50000,
-            'booking_status' => 'pending_payment',
-            'payment_status' => 'unpaid',
-        ]);
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('booking_seats', 0);
         $this->assertDatabaseCount('payments', 0);
         Mail::assertNothingSent();
     }

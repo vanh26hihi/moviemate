@@ -52,13 +52,13 @@
 
     <div>
         <label class="cinema-label" for="price">Giá thường (VND) *</label>
-        <input id="price" type="number" name="price" min="0" step="1000" value="{{ old('price', $editing ? $showtime->price : '') }}" class="cinema-input">
+        <input id="price" type="number" name="price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ old('price', $editing ? $showtime->price : '') }}" class="cinema-input">
         @error('price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
 
     <div>
         <label class="cinema-label" for="vip_price">Giá VIP (VND)</label>
-        <input id="vip_price" type="number" name="vip_price" min="0" step="1000" value="{{ old('vip_price', $editing ? $showtime->vip_price : '') }}" class="cinema-input">
+        <input id="vip_price" type="number" name="vip_price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ old('vip_price', $editing ? $showtime->vip_price : '') }}" class="cinema-input">
         @error('vip_price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
 

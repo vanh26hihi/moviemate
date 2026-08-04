@@ -101,19 +101,18 @@ class BookingFoodSecurityIntegrationTest extends TestCase
         $this->assertStringNotContainsString((string) $result->guestAccessToken, route('foods.success', $order));
     }
 
-    public function test_http_checkout_ignores_frontend_totals_prices_tokens_and_pickup_cinema(): void
+    public function test_unified_http_draft_ignores_forged_food_prices_and_uses_server_totals(): void
     {
         $scenario = $this->bookingScenario();
         $food = $this->food('HTTP combo', 30_000);
 
-        $this->post(route('user.bookings.store'), [
-            'showtime_id' => $scenario['showtime']->id,
-            'seat_ids' => [$scenario['seats'][0]->id],
+        $this->get(route('user.bookings.checkout', [
+            'showtime' => $scenario['showtime'],
+            'selected_seats' => $scenario['seats'][0]->id,
+        ]))->assertOk();
+
+        $this->post(route('user.bookings.food.store'), [
             'customer_email' => 'guest@example.test',
-            'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
-            'total_amount' => 1,
-            'pickup_cinema_id' => 999999,
-            'guest_access_token' => 'frontend-secret',
             'food_items' => [[
                 'food_id' => $food->id,
                 'quantity' => 2,
@@ -121,19 +120,17 @@ class BookingFoodSecurityIntegrationTest extends TestCase
                 'unit_price' => 1,
                 'line_total' => 1,
             ]],
-        ])->assertOk()->assertViewIs('user.bookings.guest-handoff');
+        ])->assertRedirect(route('user.bookings.review'));
 
-        $booking = $scenario['showtime']->bookings()->sole();
-        $order = Order::query()->with('items')->sole();
-        $this->assertSame('110000.00', $booking->total_amount);
-        $this->assertSame(60_000, $booking->food_subtotal);
-        $this->assertSame(60_000, $order->subtotal);
-        $this->assertSame(30_000, $order->items->sole()->unit_price);
-        $this->assertSame(app(CinemaContext::class)->id(), $order->pickup_cinema_id);
-        $this->assertStringNotContainsString(
-            'frontend-secret',
-            json_encode([$order->getAttributes(), $order->items->first()->getAttributes()]),
-        );
+        $this->get(route('user.bookings.review'))
+            ->assertOk()
+            ->assertSee('30.000 VND')
+            ->assertSee('60.000 VND')
+            ->assertSee('110.000 VND')
+            ->assertDontSee('1 VND');
+
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('orders', 0);
     }
 
     public function test_empty_and_zero_food_are_equivalent_and_do_not_create_an_order(): void

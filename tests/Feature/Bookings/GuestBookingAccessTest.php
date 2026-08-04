@@ -185,12 +185,10 @@ class GuestBookingAccessTest extends TestCase
         $this->get(route('user.bookings.ticket', $expiringBooking))->assertNotFound();
     }
 
-    public function test_guest_checkout_uses_fragment_handoff_and_protected_response_headers(): void
+    public function test_retired_guest_checkout_endpoint_exposes_no_handoff_or_database_write(): void
     {
         $scenario = $this->bookingScenario();
         $checkoutToken = app(BookingTokenService::class)->issueCheckoutToken();
-        $guestToken = app(BookingTokenService::class)->guestAccessTokenForCheckout($checkoutToken);
-
         $response = $this->post(route('user.bookings.store'), [
             'showtime_id' => $scenario['showtime']->id,
             'seat_ids' => [$scenario['seats'][0]->id],
@@ -198,21 +196,13 @@ class GuestBookingAccessTest extends TestCase
             'checkout_token' => $checkoutToken,
         ]);
 
-        $response->assertOk()
-            ->assertViewIs('user.bookings.guest-handoff')
-            ->assertViewHas('guestAccessToken', $guestToken)
+        $response->assertGone()
             ->assertHeader('Referrer-Policy', 'no-referrer')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
-            ->assertSee('new URLSearchParams({ token, destination })', false)
-            ->assertDontSee('guest_token=', false);
+            ->assertDontSee($checkoutToken);
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
-
-        $booking = Booking::query()->sole();
-        $this->assertSame(
-            route('user.bookings.access.show', $booking),
-            $response->viewData('accessUrl'),
-        );
-        $this->assertTrue($booking->guest_access_expires_at->isFuture());
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('booking_seats', 0);
     }
 
     public function test_access_page_removes_referrer_and_cache_leakage(): void

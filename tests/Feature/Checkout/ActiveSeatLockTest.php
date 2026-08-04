@@ -236,7 +236,7 @@ class ActiveSeatLockTest extends TestCase
         );
     }
 
-    public function test_http_checkout_replay_with_changed_payload_returns_conflict(): void
+    public function test_retired_http_checkout_replay_with_changed_payload_is_always_gone(): void
     {
         $scenario = $this->bookingScenario();
         $token = app(BookingTokenService::class)->issueCheckoutToken();
@@ -247,16 +247,14 @@ class ActiveSeatLockTest extends TestCase
             'checkout_token' => $token,
         ];
 
-        $this->post(route('user.bookings.store'), $payload)->assertOk();
+        $this->post(route('user.bookings.store'), $payload)->assertGone();
         $this->postJson(route('user.bookings.store'), [
             ...$payload,
             'customer_email' => 'attacker@example.test',
-        ])->assertConflict()->assertExactJson([
-            'message' => 'Checkout token was already used for a different booking request.',
-        ]);
+        ])->assertGone();
 
-        $this->assertDatabaseCount('bookings', 1);
-        $this->assertDatabaseCount('booking_seats', 1);
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('booking_seats', 0);
     }
 
     public function test_predictable_client_supplied_checkout_key_is_rejected(): void
@@ -288,7 +286,7 @@ class ActiveSeatLockTest extends TestCase
         $this->assertArrayNotHasKey('checkout_request_fingerprint_hash', $booking->toArray());
     }
 
-    public function test_http_checkout_creates_pending_booking_without_payment_or_email(): void
+    public function test_retired_http_checkout_creates_no_booking_payment_or_email(): void
     {
         Mail::fake();
         $scenario = $this->bookingScenario();
@@ -299,12 +297,10 @@ class ActiveSeatLockTest extends TestCase
             'seat_ids' => [$scenario['seats'][0]->id],
             'customer_email' => 'guest@example.test',
             'checkout_token' => $token,
-        ])->assertOk()->assertViewIs('user.bookings.guest-handoff');
+        ])->assertGone();
 
-        $this->assertDatabaseHas('bookings', [
-            'booking_status' => 'pending_payment',
-            'payment_status' => 'unpaid',
-        ]);
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('booking_seats', 0);
         $this->assertDatabaseCount('payments', 0);
         Mail::assertNothingSent();
     }

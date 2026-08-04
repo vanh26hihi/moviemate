@@ -10,8 +10,6 @@ use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
-use App\Services\BookingCheckoutService;
-use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use App\Services\GuestBookingAccessService;
 use App\Services\RoomLayoutService;
@@ -19,15 +17,12 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
     public function __construct(
         private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
-        private readonly BookingCheckoutService $checkoutService,
-        private readonly BookingTokenService $tokens,
         private readonly GuestBookingAccessService $guestAccess,
         private readonly BookingCheckoutDraftService $drafts,
         private readonly BookingCheckoutPreviewService $previews,
@@ -129,55 +124,6 @@ class BookingController extends Controller
         $foods = FoodItem::query()->where('active', true)->orderBy('name')->get();
 
         return view('user.bookings.food', compact('draft', 'preview', 'foods'));
-    }
-
-    /**
-     * Store a pending booking reservation. Payment confirmation is out of scope.
-     *
-     * @throws \Throwable
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'showtime_id' => ['required', 'integer', 'exists:showtimes,id'],
-            'seat_ids' => ['required', 'array', 'min:1'],
-            'seat_ids.*' => ['integer', 'distinct'],
-            'customer_email' => ['required', 'email:rfc', 'max:255'],
-            'checkout_token' => ['required', 'string', 'max:200'],
-            'food_items' => ['sometimes', 'array'],
-            'food_items.*.food_id' => ['required', 'integer', 'distinct', 'min:1'],
-            'food_items.*.quantity' => ['required', 'integer', 'min:0', 'max:'.config('booking.max_food_quantity', 20)],
-        ], [
-            'seat_ids.required' => 'Vui lòng chọn ít nhất một ghế.',
-            'seat_ids.array' => 'Dữ liệu ghế không hợp lệ.',
-            'seat_ids.*.distinct' => 'Danh sách ghế bị trùng.',
-            'checkout_token.required' => 'Phiên xác nhận đặt ghế không hợp lệ.',
-        ]);
-
-        if (! $this->tokens->isValidCheckoutToken($validated['checkout_token'])) {
-            throw ValidationException::withMessages([
-                'checkout_token' => 'Phiên xác nhận đặt ghế không hợp lệ.',
-            ]);
-        }
-
-        $result = $this->checkoutService->createPendingBooking(
-            (int) $validated['showtime_id'],
-            $validated['seat_ids'],
-            Auth::id(),
-            $validated['customer_email'],
-            $validated['checkout_token'],
-            $validated['food_items'] ?? [],
-        );
-
-        if ($result->guestAccessToken !== null) {
-            return response()->view('user.bookings.guest-handoff', [
-                'accessUrl' => route('user.bookings.access.show', $result->booking),
-                'guestAccessToken' => $result->guestAccessToken,
-                'destination' => 'success',
-            ]);
-        }
-
-        return redirect()->route('user.bookings.success', $result->booking);
     }
 
     /**

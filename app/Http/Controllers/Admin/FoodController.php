@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Money\VndAmount;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\SaveFoodRequest;
+use App\Models\FoodItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use App\Models\FoodItem;
 
 class FoodController extends Controller
 {
@@ -16,27 +18,23 @@ class FoodController extends Controller
         $foods = FoodItem::orderBy('name')
             ->when($search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             })
             ->paginate(20)
             ->withQueryString();
 
         return view('admin.foods.index', compact('foods', 'search'));
     }
+
     public function create()
     {
-        return view('admin.foods.form', ['food' => new FoodItem()]);
+        return view('admin.foods.form', ['food' => new FoodItem]);
     }
 
-    public function store(Request $request)
+    public function store(SaveFoodRequest $request)
     {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'image' => 'nullable|image|max:4096',
-            'active' => 'sometimes|boolean',
-        ]);
+        $data = $request->validated();
+        $data['price'] = VndAmount::fromInput($data['price'], FoodItem::MAX_PRICE)->value();
 
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('food_images', 'public');
@@ -54,15 +52,10 @@ class FoodController extends Controller
         return view('admin.foods.form', compact('food'));
     }
 
-    public function update(Request $request, FoodItem $food)
+    public function update(SaveFoodRequest $request, FoodItem $food)
     {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'image' => 'nullable|image|max:4096',
-            'active' => 'sometimes|boolean',
-        ]);
+        $data = $request->validated();
+        $data['price'] = VndAmount::fromInput($data['price'], FoodItem::MAX_PRICE)->value();
 
         if ($request->hasFile('image')) {
             if ($food->image && Storage::disk('public')->exists($food->image)) {
@@ -81,6 +74,7 @@ class FoodController extends Controller
     public function destroy(FoodItem $food)
     {
         $food->delete();
+
         return redirect()->route('admin.foods.index')->with('success', 'Food deleted');
     }
 }

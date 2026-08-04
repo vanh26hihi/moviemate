@@ -187,7 +187,7 @@ class SingleCinemaOperationsTest extends TestCase
             'payment_method' => 'fake',
             'customer_email' => 'customer@example.com',
             'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
-        ])->assertSessionHasErrors('showtime');
+        ])->assertGone();
         $this->assertDatabaseCount('bookings', 0);
     }
 
