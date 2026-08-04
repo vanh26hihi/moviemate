@@ -6,6 +6,7 @@ use App\Domain\Payments\AppTransIdGenerator;
 use App\Domain\Payments\VndAmount;
 use App\Domain\Payments\ZaloPayConfig;
 use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\ZaloPayResponseException;
 use App\Exceptions\ZaloPayTransportException;
 use App\Models\Booking;
 use App\Models\Payment;
@@ -13,7 +14,6 @@ use App\Services\ZaloPay\ZaloPayGateway;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Throwable;
 
 class PaymentInitiationService
 {
@@ -43,7 +43,7 @@ class PaymentInitiationService
             $activeAttempt = Payment::query()
                 ->where('booking_id', $lockedBooking->id)
                 ->where('provider', 'zalopay')
-                ->where('status', Payment::STATUS_PENDING)
+                ->whereIn('status', Payment::UNSAFE_RETRY_STATUSES)
                 ->latest('id')
                 ->lockForUpdate()
                 ->first();
@@ -64,9 +64,8 @@ class PaymentInitiationService
                 $attemptExpiry = $lockedBooking->expires_at->copy();
             }
 
-            $payment = Payment::query()->create([
+            $payment = Payment::createForProvider('zalopay', [
                 'booking_id' => $lockedBooking->id,
-                'provider' => 'zalopay',
                 'payment_method' => 'zalopay',
                 'app_id' => $this->config->appId,
                 'app_trans_id' => $this->transactionIds->generate(),
@@ -88,6 +87,7 @@ class PaymentInitiationService
         });
 
         if ($replayed
+            && in_array($payment->status, Payment::RECONCILABLE_STATUSES, true)
             && $payment->expires_at?->isFuture()
             && is_string($payment->order_url)
             && $payment->order_url !== '') {
@@ -95,7 +95,20 @@ class PaymentInitiationService
         }
 
         if ($replayed) {
+            if (! in_array($payment->status, Payment::RECONCILABLE_STATUSES, true)) {
+                throw new PaymentInitiationException(
+                    'The existing payment attempt requires manual review and cannot be replaced.',
+                );
+            }
+
             $this->reconciliation->reconcile($payment);
+
+            $payment->refresh();
+            if ($payment->expires_at?->isFuture()
+                && is_string($payment->order_url)
+                && $payment->order_url !== '') {
+                return new PaymentInitiationResult($payment, $payment->order_url, true);
+            }
 
             throw new PaymentInitiationException('The existing payment attempt is being reconciled.');
         }
@@ -104,9 +117,9 @@ class PaymentInitiationService
 
         try {
             $response = $this->gateway->create($payment, $returnUrl);
-        } catch (Throwable $exception) {
+        } catch (ZaloPayTransportException|ZaloPayResponseException $exception) {
             $payment->forceFill([
-                'status' => Payment::STATUS_PENDING,
+                'status' => Payment::STATUS_UNRESOLVED,
                 'failed_at' => null,
                 'failure_reason' => $exception instanceof ZaloPayTransportException
                     ? 'create_transport_unknown' : 'create_response_unknown',
@@ -123,8 +136,8 @@ class PaymentInitiationService
 
             if (! is_string($orderUrl) || filter_var($orderUrl, FILTER_VALIDATE_URL) === false) {
                 $payment->forceFill([
-                    'status' => Payment::STATUS_REVIEW,
-                    'failed_at' => now(),
+                    'status' => Payment::STATUS_UNRESOLVED,
+                    'failed_at' => null,
                     'failure_reason' => 'create_missing_order_url',
                 ])->save();
                 throw new PaymentInitiationException('ZaloPay did not provide a valid order URL.');
@@ -139,6 +152,16 @@ class PaymentInitiationService
             $this->reconciliation->reconcile($payment);
 
             return new PaymentInitiationResult($payment->fresh(), $payment->fresh()->order_url, false);
+        }
+
+        if ($payload['return_code'] !== 2) {
+            $payment->forceFill([
+                'status' => Payment::STATUS_UNRESOLVED,
+                'failed_at' => null,
+                'failure_reason' => 'create_response_unknown',
+            ])->save();
+
+            throw new PaymentInitiationException('ZaloPay returned an uncertain create order result.');
         }
 
         $payment->forceFill([

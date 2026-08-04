@@ -24,6 +24,44 @@ class ZaloPayCallbackTest extends PaymentTestCase
         $this->assertNotNull($payment->callback_payload_hash);
     }
 
+    public function test_verified_callback_completes_the_same_unresolved_attempt(): void
+    {
+        $payment = $this->pendingPayment(overrides: [
+            'status' => Payment::STATUS_UNRESOLVED,
+            'failure_reason' => 'create_transport_unknown',
+        ]);
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'zp_trans_id' => 741852963,
+        ]))->assertJsonPath('return_code', 1);
+
+        $this->assertSame(Payment::STATUS_SUCCESS, $payment->fresh()->status);
+        $this->assertSame('paid', $payment->booking->fresh()->booking_status);
+        $this->assertSame(1, $payment->booking->payments()->count());
+        $this->assertDatabaseCount('booking_ticket_deliveries', 1);
+    }
+
+    public function test_unresolved_attempt_cannot_fulfill_when_an_incompatible_later_attempt_exists(): void
+    {
+        $booking = $this->payableBooking();
+        $payment = $this->pendingPayment($booking, ['status' => Payment::STATUS_UNRESOLVED]);
+        $later = $this->pendingPayment($booking, [
+            'status' => Payment::STATUS_FAILED,
+            'failure_reason' => 'provider_rejected',
+        ]);
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'zp_trans_id' => 147258369,
+        ]))->assertJsonPath('return_code', 2);
+
+        $this->assertGreaterThan($payment->id, $later->id);
+        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame('incompatible_later_attempt', $payment->fresh()->failure_reason);
+        $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+        $this->assertSame('unpaid', $booking->fresh()->payment_status);
+        $this->assertDatabaseCount('booking_ticket_deliveries', 0);
+    }
+
     public function test_valid_callback_marks_booking_paid_without_changing_total(): void
     {
         $payment = $this->pendingPayment();
@@ -103,6 +141,93 @@ class ZaloPayCallbackTest extends PaymentTestCase
         $this->assertSame('paid', $payment->booking->fresh()->payment_status);
         $this->assertDatabaseCount('booking_ticket_deliveries', 1);
         $this->assertEmpty(session('guest_booking_capabilities', []));
+    }
+
+    public function test_success_missing_outbox_stays_missing_after_duplicate_valid_callback(): void
+    {
+        [$payment, $body] = $this->successfulPaymentWithoutOutbox(314159265);
+        $paymentBefore = $payment->fresh()->getAttributes();
+        $bookingBefore = $payment->booking->fresh()->getAttributes();
+
+        $this->postJson(route('payments.zalopay.callback'), $body)->assertJsonPath('return_code', 1);
+
+        $this->assertSuccessfulStateUnchanged($payment, $paymentBefore, $bookingBefore);
+    }
+
+    public function test_amount_mismatch_callback_cannot_repair_missing_delivery_or_mutate_success(): void
+    {
+        [$payment] = $this->successfulPaymentWithoutOutbox(314159266);
+        $paymentBefore = $payment->fresh()->getAttributes();
+        $bookingBefore = $payment->booking->fresh()->getAttributes();
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'amount' => $payment->amount + 1,
+            'zp_trans_id' => 314159266,
+        ]))->assertJsonPath('return_code', 1);
+
+        $this->assertSuccessfulStateUnchanged($payment, $paymentBefore, $bookingBefore);
+    }
+
+    public function test_zp_trans_id_mismatch_cannot_repair_missing_delivery_or_mutate_success(): void
+    {
+        [$payment] = $this->successfulPaymentWithoutOutbox(314159267);
+        $paymentBefore = $payment->fresh()->getAttributes();
+        $bookingBefore = $payment->booking->fresh()->getAttributes();
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'zp_trans_id' => 999159267,
+        ]))->assertJsonPath('return_code', 1);
+
+        $this->assertSuccessfulStateUnchanged($payment, $paymentBefore, $bookingBefore);
+    }
+
+    public function test_historical_success_remains_write_free_after_booking_status_changes(): void
+    {
+        [$payment, $body] = $this->successfulPaymentWithoutOutbox(314159268);
+        $payment->booking->forceFill([
+            'booking_status' => 'cancelled',
+            'payment_status' => 'refunded',
+        ])->save();
+        $paymentBefore = $payment->fresh()->getAttributes();
+        $bookingBefore = $payment->booking->fresh()->getAttributes();
+
+        $this->postJson(route('payments.zalopay.callback'), $body)->assertJsonPath('return_code', 1);
+
+        $this->assertSuccessfulStateUnchanged($payment, $paymentBefore, $bookingBefore);
+        $this->assertSame('cancelled', $payment->booking->fresh()->booking_status);
+        $this->assertSame('refunded', $payment->booking->fresh()->payment_status);
+    }
+
+    public function test_success_cannot_be_downgraded_by_abnormal_duplicate_callbacks(): void
+    {
+        $payment = $this->pendingPayment();
+        $initial = $this->callbackBody($payment, ['zp_trans_id' => 246813579]);
+
+        $this->postJson(route('payments.zalopay.callback'), $initial)
+            ->assertJsonPath('return_code', 1);
+        $paidAt = $payment->fresh()->paid_at?->format('Y-m-d H:i:s.u');
+        $payloadHash = $payment->fresh()->callback_payload_hash;
+
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'amount' => $payment->amount + 1,
+            'zp_trans_id' => 246813579,
+        ]))->assertJsonPath('return_code', 1);
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'zp_trans_id' => 975318642,
+        ]))->assertJsonPath('return_code', 1);
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+            'zp_trans_id' => null,
+        ]))->assertJsonPath('return_code', 1);
+
+        $payment->refresh();
+        $this->assertSame(Payment::STATUS_SUCCESS, $payment->status);
+        $this->assertSame('246813579', $payment->zp_trans_id);
+        $this->assertSame($paidAt, $payment->paid_at?->format('Y-m-d H:i:s.u'));
+        $this->assertSame($payloadHash, $payment->callback_payload_hash);
+        $this->assertNull($payment->failure_reason);
+        $this->assertSame('paid', $payment->booking->fresh()->booking_status);
+        $this->assertSame('paid', $payment->booking->fresh()->payment_status);
+        $this->assertDatabaseCount('booking_ticket_deliveries', 1);
     }
 
     public function test_verified_success_creates_one_pending_outbox_row(): void
@@ -276,5 +401,31 @@ class ZaloPayCallbackTest extends PaymentTestCase
 
         $this->assertDatabaseCount('booking_ticket_deliveries', 0);
         $this->assertNull($booking->fresh()->ticket_emailed_at);
+    }
+
+    /** @return array{Payment, array<string, mixed>} */
+    private function successfulPaymentWithoutOutbox(int $zpTransId): array
+    {
+        $payment = $this->pendingPayment();
+        $body = $this->callbackBody($payment, ['zp_trans_id' => $zpTransId]);
+        $this->postJson(route('payments.zalopay.callback'), $body)->assertJsonPath('return_code', 1);
+        BookingTicketDelivery::query()->where('booking_id', $payment->booking_id)->delete();
+        $this->assertDatabaseCount('booking_ticket_deliveries', 0);
+
+        return [$payment->fresh(), $body];
+    }
+
+    /**
+     * @param  array<string, mixed>  $paymentBefore
+     * @param  array<string, mixed>  $bookingBefore
+     */
+    private function assertSuccessfulStateUnchanged(
+        Payment $payment,
+        array $paymentBefore,
+        array $bookingBefore,
+    ): void {
+        $this->assertSame($paymentBefore, $payment->fresh()->getAttributes());
+        $this->assertSame($bookingBefore, $payment->booking->fresh()->getAttributes());
+        $this->assertDatabaseCount('booking_ticket_deliveries', 0);
     }
 }

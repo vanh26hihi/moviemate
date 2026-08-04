@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Exceptions\ZaloPayResponseException;
+use App\Exceptions\ZaloPayTransportException;
 use App\Models\Payment;
 use App\Services\Payments\PaymentReconciliationService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class PaymentReconciliationTest extends PaymentTestCase
 {
@@ -40,6 +43,38 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
         $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
         $this->assertNotNull($payment->fresh()->last_queried_at);
+        $this->assertSame(3, $payment->fresh()->provider_return_code);
+        $this->assertSame('Pending', $payment->fresh()->provider_return_message);
+        $this->assertNotNull($payment->fresh()->query_response_hash);
+    }
+
+    public function test_query_timeout_keeps_attempt_active_and_retryable_as_unresolved(): void
+    {
+        $payment = $this->pendingPayment();
+        Http::fake(['*' => Http::failedConnection('query timed out')]);
+
+        try {
+            app(PaymentReconciliationService::class)->reconcile($payment);
+            $this->fail('A query timeout should be reported to the reconciliation runner.');
+        } catch (ZaloPayTransportException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
+        $this->assertSame('query_transport_unknown', $payment->fresh()->failure_reason);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
+        $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
+    }
+
+    public function test_provider_pending_keeps_an_unresolved_attempt_active(): void
+    {
+        $payment = $this->pendingPayment(overrides: ['status' => Payment::STATUS_UNRESOLVED]);
+        Http::fake(['*' => Http::response(['return_code' => 3, 'return_message' => 'Pending'], 200)]);
+
+        $status = app(PaymentReconciliationService::class)->reconcile($payment);
+
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $status);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
     }
 
     public function test_command_queries_pending_attempt_before_expiry(): void
@@ -78,8 +113,9 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->artisan('payments:query-pending')->assertSuccessful();
 
         Http::assertNothingSent();
-        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
         $this->assertSame('reconciliation_window_elapsed', $payment->fresh()->failure_reason);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
     }
 
     public function test_command_recovers_success_when_callback_was_missed(): void
@@ -107,7 +143,7 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->assertSame('query_expired', $payment->fresh()->failure_reason);
     }
 
-    public function test_query_minus_101_moves_attempt_to_review(): void
+    public function test_query_minus_101_keeps_attempt_unresolved(): void
     {
         $payment = $this->pendingPayment();
         Http::fake(['*' => Http::response([
@@ -115,9 +151,10 @@ class PaymentReconciliationTest extends PaymentTestCase
             'sub_return_code' => -101, 'sub_return_message' => 'Not found',
         ], 200)]);
 
-        $this->assertSame(Payment::STATUS_REVIEW, app(PaymentReconciliationService::class)->reconcile($payment));
-        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, app(PaymentReconciliationService::class)->reconcile($payment));
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
         $this->assertSame('query_unresolved', $payment->fresh()->failure_reason);
+        $this->assertSame('ACTIVE', $payment->fresh()->active_attempt_key);
     }
 
     public function test_query_amount_mismatch_moves_attempt_to_review(): void
@@ -130,6 +167,96 @@ class PaymentReconciliationTest extends PaymentTestCase
         $this->assertSame(Payment::STATUS_REVIEW, $status);
         $this->assertSame('amount_mismatch', $payment->fresh()->failure_reason);
         $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
+    }
+
+    #[DataProvider('inFlightQueryResponses')]
+    public function test_in_flight_query_cannot_write_after_callback_success(
+        string $scenario,
+        bool $responseExceptionExpected,
+    ): void {
+        $payment = $this->pendingPayment();
+        $zpTransId = 987654321;
+        $paymentAttributesAfterCallback = null;
+        $bookingAttributesAfterCallback = null;
+        $outboxCountAfterCallback = null;
+        $callbackRanDuringQuery = false;
+        $providerResponse = match ($scenario) {
+            'success' => $this->querySuccess($payment, ['zp_trans_id' => $zpTransId]),
+            'pending' => ['return_code' => 3, 'return_message' => 'Pending'],
+            'malformed' => '{malformed json',
+            'mismatch' => $this->querySuccess($payment, [
+                'amount' => $payment->amount + 1,
+                'zp_trans_id' => $zpTransId + 1,
+            ]),
+        };
+
+        Http::fake(function (Request $request) use (
+            $payment,
+            $zpTransId,
+            $providerResponse,
+            &$paymentAttributesAfterCallback,
+            &$bookingAttributesAfterCallback,
+            &$outboxCountAfterCallback,
+            &$callbackRanDuringQuery,
+        ) {
+            $this->assertSame('https://sb-openapi.zalopay.vn/v2/query', $request->url());
+            $this->assertNotNull($payment->fresh()->last_queried_at);
+
+            $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment, [
+                'zp_trans_id' => $zpTransId,
+            ]))->assertJsonPath('return_code', 1);
+
+            $callbackRanDuringQuery = true;
+            $paymentAttributesAfterCallback = $payment->fresh()->getRawOriginal();
+            $bookingAttributesAfterCallback = $payment->booking->fresh()->getRawOriginal();
+            $outboxCountAfterCallback = $this->getConnection()
+                ->table('booking_ticket_deliveries')
+                ->where('booking_id', $payment->booking_id)
+                ->count();
+
+            return Http::response($providerResponse, 200);
+        });
+
+        try {
+            $status = app(PaymentReconciliationService::class)->reconcile($payment);
+            $this->assertFalse($responseExceptionExpected, 'A malformed response must be reported.');
+            $this->assertSame(Payment::STATUS_SUCCESS, $status);
+        } catch (ZaloPayResponseException) {
+            $this->assertTrue($responseExceptionExpected, 'Only malformed responses may throw here.');
+        }
+
+        $finalPayment = $payment->fresh();
+        $finalBooking = $payment->booking->fresh();
+
+        $this->assertTrue($callbackRanDuringQuery);
+        $this->assertSame($paymentAttributesAfterCallback, $finalPayment->getRawOriginal());
+        $this->assertSame($bookingAttributesAfterCallback, $finalBooking->getRawOriginal());
+        $this->assertSame(Payment::STATUS_SUCCESS, $finalPayment->status);
+        $this->assertSame((string) $zpTransId, $finalPayment->zp_trans_id);
+        $this->assertNotNull($finalPayment->paid_at);
+        $this->assertSame('paid', $finalBooking->payment_status);
+        $this->assertSame('paid', $finalBooking->booking_status);
+        $this->assertSame(
+            $bookingAttributesAfterCallback['ticket_emailed_at'] ?? null,
+            $finalBooking->getRawOriginal('ticket_emailed_at'),
+        );
+        $this->assertSame(1, $outboxCountAfterCallback);
+        $this->assertDatabaseCount('booking_ticket_deliveries', 1);
+        Http::assertSentCount(1);
+        Http::assertNotSent(
+            fn (Request $request): bool => $request->url() === 'https://sb-openapi.zalopay.vn/v2/create',
+        );
+    }
+
+    /** @return array<string, array{string, bool}> */
+    public static function inFlightQueryResponses(): array
+    {
+        return [
+            'successful provider query' => ['success', false],
+            'pending provider query' => ['pending', false],
+            'malformed provider query' => ['malformed', true],
+            'amount and identity mismatch' => ['mismatch', false],
+        ];
     }
 
     public function test_callback_then_query_success_is_idempotent(): void
@@ -223,7 +350,7 @@ class PaymentReconciliationTest extends PaymentTestCase
             ->assertSuccessful()
             ->expectsOutputToContain('errors: 1');
 
-        $this->assertSame(Payment::STATUS_PENDING, $first->fresh()->status);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $first->fresh()->status);
         $this->assertSame('query_response_unknown', $first->fresh()->failure_reason);
         $this->assertSame(Payment::STATUS_SUCCESS, $second->fresh()->status);
     }

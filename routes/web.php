@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\FoodController as AdminFoodController;
 use App\Http\Controllers\Admin\FoodOrderController as AdminFoodOrderController;
 use App\Http\Controllers\Admin\GenreController as AdminGenreController;
 use App\Http\Controllers\Admin\MovieController as AdminMovieController;
+use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
@@ -220,6 +221,13 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:food-orders.view')->name('food-orders.index');
         Route::get('/food-orders/{order}', [AdminFoodOrderController::class, 'show'])
             ->middleware('permission:food-orders.view')->name('food-orders.show');
+
+        Route::get('/payment-reviews', [AdminPaymentReviewController::class, 'index'])
+            ->middleware('permission:bookings.operate')->name('payment-reviews.index');
+        Route::post('/payment-reviews/{paymentId}/reconcile', [AdminPaymentReviewController::class, 'resolve'])
+            ->whereNumber('paymentId')
+            ->middleware(['permission:bookings.operate', 'throttle:6,1'])
+            ->name('payment-reviews.resolve');
 
         Route::get('/users', [AdminUserController::class, 'index'])
             ->middleware('permission:users.view')->name('users.index');
