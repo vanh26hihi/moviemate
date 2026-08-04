@@ -34,3 +34,22 @@
                 </div>
             </div>
         </aside>
+        <section class="lg:col-span-3">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold app-text">Lịch sử đặt vé</h1>
+                    <p class="app-muted mt-1">Theo dõi vé đã đặt và mã QR của bạn.</p>
+                </div>
+
+                <form method="GET" action="{{ route('user.bookings.history') }}" class="flex gap-2">
+                    <select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
+                        <option value="">Tất cả</option>
+                        <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Chờ thanh toán</option>
+                        <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Chưa sử dụng</option>
+                        <option value="used" {{ request('status') == 'used' ? 'selected' : '' }}>Đã sử dụng</option>
+                        <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Đã hủy</option>
+                        <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Hết hạn</option>
+                    </select>
+                    <button type="submit" class="px-4 py-2 bg-brand-start text-white text-sm font-bold rounded-xl">Lọc</button>
+                </form>
+            </div>
