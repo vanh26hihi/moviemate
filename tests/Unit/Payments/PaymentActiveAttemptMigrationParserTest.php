@@ -72,6 +72,9 @@ class PaymentActiveAttemptMigrationParserTest extends TestCase
             'unknown charset introducer' => ["case when status in (_notcharset'pending', 'processing') then 'ACTIVE' else null end"],
             'underscore outside literal' => ["case when _status in ('pending', 'processing') then 'ACTIVE' else null end"],
             'wrong qualifier' => ["case when other.status in ('pending', 'processing') then 'ACTIVE' else null end"],
+            'reordered old statuses' => ["case when status in ('processing', 'pending') then 'ACTIVE' else null end"],
+            'reverse reordered new statuses' => ["case when status in ('review', 'unresolved', 'processing', 'pending') then 'ACTIVE' else null end"],
+            'mixed reordered new statuses' => ["case when status in ('pending', 'unresolved', 'processing', 'review') then 'ACTIVE' else null end"],
         ];
     }
 

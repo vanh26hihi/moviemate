@@ -84,9 +84,12 @@ class PaymentReconciliationService
                 source: 'query',
                 payloadHash: $response->hash,
             ));
-            $status = $this->storeQueryAudit($payment, $payload, $response->hash);
 
-            return $result->accepted ? Payment::STATUS_SUCCESS : $status;
+            if ($result->accepted) {
+                return Payment::STATUS_SUCCESS;
+            }
+
+            return $this->storeQueryAudit($payment, $payload, $response->hash);
         }
 
         if ($payload['return_code'] === 3) {
@@ -132,15 +135,21 @@ class PaymentReconciliationService
     {
         DB::transaction(function () use ($payment, $reason): void {
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
-            Payment::query()
-                ->whereKey($payment->getKey())
-                ->whereIn('status', Payment::RECONCILABLE_STATUSES)
-                ->update([
-                    'status' => Payment::STATUS_UNRESOLVED,
-                    'failed_at' => null,
-                    'failure_reason' => $reason,
-                    'updated_at' => now(),
-                ]);
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+
+            if ($lockedPayment->status === Payment::STATUS_SUCCESS) {
+                return;
+            }
+
+            if (! in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true)) {
+                return;
+            }
+
+            $lockedPayment->forceFill([
+                'status' => Payment::STATUS_UNRESOLVED,
+                'failed_at' => null,
+                'failure_reason' => $reason,
+            ])->save();
         });
     }
 
@@ -154,6 +163,10 @@ class PaymentReconciliationService
         return DB::transaction(function () use ($payment, $status, $reason, $payload, $hash): string {
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+
+            if ($lockedPayment->status === Payment::STATUS_SUCCESS) {
+                return Payment::STATUS_SUCCESS;
+            }
 
             if ($payload !== null && $hash !== null) {
                 $this->fillQueryAudit($lockedPayment, $payload, $hash);
@@ -180,6 +193,11 @@ class PaymentReconciliationService
         return DB::transaction(function () use ($payment, $payload, $hash): string {
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+
+            if ($lockedPayment->status === Payment::STATUS_SUCCESS) {
+                return Payment::STATUS_SUCCESS;
+            }
+
             $this->fillQueryAudit($lockedPayment, $payload, $hash);
             $lockedPayment->save();
 
