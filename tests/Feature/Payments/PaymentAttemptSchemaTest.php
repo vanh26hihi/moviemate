@@ -131,11 +131,11 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
 
     public function test_reconciliation_migration_aborts_before_ddl_for_duplicate_unresolved_attempts(): void
     {
-        [, $reconciliationMigration] = $this->paymentMigrations();
+        $upgradeMigration = $this->upgradeMigration();
         $booking = $this->payableBooking();
         $first = $this->pendingPayment($booking);
 
-        $reconciliationMigration->down();
+        $upgradeMigration->down();
         $secondId = DB::table('payments')->insertGetId([
             'booking_id' => $booking->id,
             'provider' => 'zalopay',
@@ -156,21 +156,21 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
 
         $exception = null;
         try {
-            $reconciliationMigration->up();
+            $upgradeMigration->up();
         } catch (RuntimeException $caught) {
             $exception = $caught;
         }
 
         $this->assertInstanceOf(RuntimeException::class, $exception);
         $this->assertStringContainsString("booking_id={$booking->id}", $exception->getMessage());
-        $this->assertStringContainsString("payment_ids={$first->id},{$secondId}", $exception->getMessage());
-        $this->assertFalse(Schema::hasColumn('payments', 'reconcile_until'));
-        $this->assertFalse(Schema::hasColumn('payments', 'active_attempt_key'));
-        $this->assertFalse(Schema::hasTable('booking_ticket_deliveries'));
+        $this->assertStringContainsString("payments={$first->id}:pending|{$secondId}:unresolved", $exception->getMessage());
+        $this->assertTrue(Schema::hasColumn('payments', 'reconcile_until'));
+        $this->assertTrue(Schema::hasColumn('payments', 'active_attempt_key'));
+        $this->assertTrue(Schema::hasTable('booking_ticket_deliveries'));
         $this->assertSame($statusesBefore, DB::table('payments')->orderBy('id')->pluck('status', 'id')->all());
 
         DB::table('payments')->where('id', $secondId)->delete();
-        $reconciliationMigration->up();
+        $upgradeMigration->up();
     }
 
     public function test_zalopay_down_handles_a_missing_foreign_key_while_booking_index_remains(): void
@@ -244,6 +244,11 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
             require database_path('migrations/2026_08_04_110000_extend_payments_for_zalopay.php'),
             require database_path('migrations/2026_08_04_115000_add_payment_reconciliation_and_ticket_outbox.php'),
         ];
+    }
+
+    private function upgradeMigration(): object
+    {
+        return require database_path('migrations/2026_08_04_121000_harden_active_payment_attempt_states.php');
     }
 
     private function assertZaloPayColumnsAreMissing(): void

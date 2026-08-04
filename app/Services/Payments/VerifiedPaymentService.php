@@ -15,19 +15,32 @@ class VerifiedPaymentService
 {
     public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
     {
-        return DB::transaction(function () use ($payment, $data): PaymentVerificationResult {
+        return $this->verifyEligiblePayment($payment, $data, false);
+    }
+
+    public function verifyReview(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
+    {
+        return $this->verifyEligiblePayment($payment, $data, true);
+    }
+
+    private function verifyEligiblePayment(
+        Payment $payment,
+        VerifiedPaymentData $data,
+        bool $allowReview,
+    ): PaymentVerificationResult {
+        return DB::transaction(function () use ($payment, $data, $allowReview): PaymentVerificationResult {
             $booking = Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
 
             if ($lockedPayment->status === Payment::STATUS_SUCCESS) {
-                if ($booking->payment_status === 'paid' && $booking->booking_status === 'paid') {
-                    $this->ensureTicketDelivery($booking);
-                }
-
                 return PaymentVerificationResult::duplicate();
             }
 
-            if (! in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true)) {
+            $eligible = $allowReview
+                ? $lockedPayment->status === Payment::STATUS_REVIEW
+                : in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true);
+
+            if (! $eligible) {
                 return PaymentVerificationResult::rejected(
                     'Payment attempt is not eligible for automatic fulfillment.',
                 );
@@ -49,6 +62,13 @@ class VerifiedPaymentService
                 $this->markReview($lockedPayment, $data, 'missing_zp_trans_id');
 
                 return PaymentVerificationResult::rejected('Missing verified ZaloPay transaction identity.');
+            }
+
+            if ($lockedPayment->zp_trans_id !== null
+                && $lockedPayment->zp_trans_id !== $data->zpTransId) {
+                $this->markReview($lockedPayment, $data, 'zp_trans_id_mismatch', false);
+
+                return PaymentVerificationResult::rejected('ZaloPay transaction identity mismatch.');
             }
 
             if ($data->zpTransId !== null) {
