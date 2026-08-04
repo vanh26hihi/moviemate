@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
+    public const SUPPORTED_PROVIDERS = ['zalopay', 'vnpay'];
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_PROCESSING = 'processing';
@@ -77,6 +79,11 @@ class Payment extends Model
     /** @param array<string, mixed> $attributes */
     public static function createForProvider(string $provider, array $attributes): self
     {
+        $provider = strtolower(trim($provider));
+        if (! in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
+            throw new \InvalidArgumentException('Unsupported payment provider.');
+        }
+
         unset($attributes['provider']);
 
         $payment = new self;
