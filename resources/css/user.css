@@ -94,6 +94,130 @@ html.light .user-app {
     outline: none;
 }
 
+.user-app .checkout-progress {
+    width: 100%;
+    max-width: 48rem;
+    margin-inline: auto;
+}
+
+.user-app .checkout-progress__step {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--mm-muted);
+    text-align: center;
+}
+
+.user-app .checkout-progress__rail {
+    position: absolute;
+    top: 1rem;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--mm-border);
+}
+
+.user-app .checkout-progress__step:first-child .checkout-progress__rail {
+    left: 50%;
+    width: 50%;
+}
+
+.user-app .checkout-progress__step:last-child .checkout-progress__rail {
+    width: 50%;
+}
+
+.user-app .checkout-progress__marker {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--mm-border);
+    border-radius: 999px;
+    background: var(--mm-bg);
+    color: inherit;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.user-app .checkout-progress__label {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.user-app .checkout-progress__step.is-complete,
+.user-app .checkout-progress__step.is-active {
+    color: var(--mm-primary);
+}
+
+.user-app .checkout-progress__step.is-complete .checkout-progress__rail {
+    background: var(--mm-primary);
+}
+
+.user-app .checkout-progress__step.is-complete .checkout-progress__marker,
+.user-app .checkout-progress__step.is-active .checkout-progress__marker {
+    border-color: var(--mm-primary);
+    background: var(--mm-primary);
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(255, 61, 87, 0.12);
+}
+
+.user-app .checkout-progress__step.is-active .checkout-progress__label {
+    color: var(--mm-text);
+}
+
+.user-app .checkout-seat {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    touch-action: manipulation;
+}
+
+.user-app .checkout-seat[aria-pressed="true"] {
+    border-color: var(--mm-primary) !important;
+    background: var(--mm-primary) !important;
+    color: #fff !important;
+    box-shadow: 0 8px 22px rgba(255, 61, 87, 0.28);
+    transform: translateY(-2px);
+}
+
+.user-app .checkout-quantity-button {
+    display: inline-flex;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--mm-border);
+    border-radius: 0.75rem;
+    color: var(--mm-text);
+    transition: border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.user-app .checkout-quantity-button:hover:not(:disabled) {
+    border-color: var(--mm-primary);
+    color: var(--mm-primary);
+    background: rgba(255, 61, 87, 0.08);
+}
+
+.user-app .checkout-quantity-button:disabled,
+.user-app [data-submit-once] button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+@media (min-width: 640px) {
+    .user-app .checkout-progress__label { font-size: 0.875rem; }
+}
+
 @media (max-width: 767px) {
     .user-app .user-account-dropdown { max-width: calc(100vw - 2rem); }
 }

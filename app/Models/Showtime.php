@@ -2,18 +2,26 @@
 
 namespace App\Models;
 
+use App\Domain\Money\VndAmount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Showtime extends Model
 {
-    public function priceForSeatType(string $seatType): float
+    public const MAX_PRICE = 99_999_999;
+
+    public function priceForSeatType(string $seatType): int
     {
+        $basePrice = VndAmount::fromDatabase($this->getRawOriginal('price') ?? $this->price);
+        $vipPrice = $this->vip_price === null
+            ? $basePrice
+            : VndAmount::fromDatabase($this->getRawOriginal('vip_price') ?? $this->vip_price);
+
         return match ($seatType) {
-            'vip' => (float) ($this->vip_price ?? $this->price),
-            'couple' => (float) $this->price * 2,
-            default => (float) $this->price,
+            'vip' => $vipPrice->value(),
+            'couple' => $basePrice->multiply(config('booking.couple_price_multiplier', 2))->value(),
+            default => $basePrice->value(),
         };
     }
 

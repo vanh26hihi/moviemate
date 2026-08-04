@@ -12,12 +12,11 @@ use Tests\TestCase;
 
 class BookingPresentationTest extends TestCase
 {
-    public function test_it_builds_an_encoded_qr_url(): void
+    public function test_it_does_not_expose_an_external_qr_url_accessor(): void
     {
         $booking = new Booking(['booking_code' => 'MMT 2026/0001']);
 
-        $this->assertStringContainsString('size=200x200', $booking->qr_code_url);
-        $this->assertStringEndsWith('data=MMT%202026%2F0001', $booking->qr_code_url);
+        $this->assertFalse(method_exists($booking, 'getQrCodeUrlAttribute'));
     }
 
     public function test_it_prefers_checkout_email_and_falls_back_to_user_email(): void

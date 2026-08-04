@@ -2,13 +2,13 @@
 
 namespace Tests\Feature\Seats;
 
-use App\Mail\BookingTicketMail;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Cinema;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +24,8 @@ class DynamicSeatBookingTest extends TestCase
     private $rooms;
 
     private Showtime $showtime;
+
+    private string $checkoutToken;
 
     protected function setUp(): void
     {
@@ -48,13 +50,14 @@ class DynamicSeatBookingTest extends TestCase
             'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);
+        $this->checkoutToken = app(BookingTokenService::class)->issueCheckoutToken();
     }
 
     public function test_user_map_renders_dynamic_coordinates_aisle_screen_and_pair_metadata(): void
     {
         $response = $this->get(route('user.bookings.selectSeat', $this->showtime));
         $response->assertOk()
-            ->assertSee('Layout v1')
+            ->assertSee('Sơ đồ ghế động')
             ->assertSee('repeat(13', false)
             ->assertSee('Lối đi')
             ->assertSee('data-pair-code="K-PAIR-1"', false)
@@ -71,7 +74,8 @@ class DynamicSeatBookingTest extends TestCase
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$half->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
-        ])->assertSessionHasErrors('seat_ids');
+            'checkout_token' => $this->checkoutToken,
+        ])->assertGone();
         $this->assertDatabaseCount('bookings', 0);
     }
 
@@ -94,7 +98,8 @@ class DynamicSeatBookingTest extends TestCase
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$foreign->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
-        ])->assertSessionHasErrors('seat_ids');
+            'checkout_token' => $this->checkoutToken,
+        ])->assertGone();
     }
 
     public function test_maintenance_seat_is_disabled_and_rejected_by_backend(): void
@@ -109,11 +114,12 @@ class DynamicSeatBookingTest extends TestCase
         ]);
 
         $this->get(route('user.bookings.selectSeat', $showtime))
-            ->assertOk()->assertSee('aria-label="Ghế F6, vip, maintenance', false)->assertSee('disabled', false);
+            ->assertOk()->assertSee('aria-label="Ghế F6, loại VIP, đang bảo trì', false)->assertSee('disabled', false);
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $showtime->id, 'seat_ids' => [$maintenance->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
-        ])->assertSessionHasErrors('seat_ids');
+            'checkout_token' => $this->checkoutToken,
+        ])->assertGone();
     }
 
     public function test_booked_seat_is_disabled(): void
@@ -124,13 +130,19 @@ class DynamicSeatBookingTest extends TestCase
             'booking_code' => 'MMT-2026-9999', 'total_amount' => 50000,
             'payment_status' => 'paid', 'booking_status' => 'paid',
         ]);
-        BookingSeat::query()->create(['booking_id' => $booking->id, 'seat_id' => $seat->id, 'price' => 50000]);
+        BookingSeat::query()->create([
+            'booking_id' => $booking->id,
+            'showtime_id' => $this->showtime->id,
+            'seat_id' => $seat->id,
+            'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
+            'price' => 50000,
+        ]);
 
         $this->get(route('user.bookings.selectSeat', $this->showtime))
             ->assertOk()->assertSee('aria-label="Ghế A1', false)->assertSee('cursor-not-allowed', false);
     }
 
-    public function test_fake_frontend_total_is_ignored_and_backend_recalculates(): void
+    public function test_legacy_forged_frontend_total_is_gone_and_creates_nothing(): void
     {
         Mail::fake();
         $seat = Seat::query()->where('room_id', $this->rooms['P01']->id)->where('seat_code', 'A1')->firstOrFail();
@@ -138,12 +150,14 @@ class DynamicSeatBookingTest extends TestCase
         $this->post(route('user.bookings.store'), [
             'showtime_id' => $this->showtime->id, 'seat_ids' => [$seat->id],
             'payment_method' => 'fake', 'customer_email' => 'guest@example.test',
+            'checkout_token' => $this->checkoutToken,
             'total_amount' => 1, 'price' => 1, 'room_id' => $this->rooms['P02']->id, 'room_layout_id' => 999,
-        ])->assertRedirect();
+        ])->assertGone();
 
-        $this->assertDatabaseHas('bookings', ['showtime_id' => $this->showtime->id, 'total_amount' => 50000]);
-        $this->assertDatabaseHas('payments', ['amount' => 50000, 'status' => 'success']);
-        Mail::assertSent(BookingTicketMail::class);
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('booking_seats', 0);
+        $this->assertDatabaseCount('payments', 0);
+        Mail::assertNothingSent();
     }
 
     public function test_showtime_without_published_layout_cannot_open_seat_map(): void
