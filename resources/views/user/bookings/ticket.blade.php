@@ -5,16 +5,25 @@
 @php
     $seatCodes = $booking->seat_codes;
     $isUsable = $booking->payment_status === 'paid' && $booking->booking_status === 'paid';
+    $foodItems = $booking->foodOrder?->items ?? collect();
+    $currency = $booking->currency ?: 'VND';
     $statusMap = [
         'paid' => ['label' => 'Chưa sử dụng', 'class' => 'bg-green-100 text-green-700 border-green-200', 'icon' => 'ph-check-circle'],
         'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700 border-blue-200', 'icon' => 'ph-checks'],
         'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-red-100 text-red-700 border-red-200', 'icon' => 'ph-x-circle'],
         'expired' => ['label' => 'Hết hạn', 'class' => 'bg-gray-100 text-gray-700 border-gray-200', 'icon' => 'ph-clock'],
         'review' => ['label' => 'Cần đối soát', 'class' => 'bg-orange-100 text-orange-700 border-orange-200', 'icon' => 'ph-warning'],
+        'failed' => ['label' => 'Thanh toán không thành công', 'class' => 'bg-red-100 text-red-700 border-red-200', 'icon' => 'ph-x-circle'],
         'pending_payment' => ['label' => 'Chờ thanh toán', 'class' => 'bg-amber-100 text-amber-700 border-amber-200', 'icon' => 'ph-hourglass'],
         'pending' => ['label' => 'Đang xử lý', 'class' => 'bg-amber-100 text-amber-700 border-amber-200', 'icon' => 'ph-hourglass'],
     ];
-    $status = $statusMap[$booking->booking_status] ?? $statusMap['pending'];
+    $ticketState = match (true) {
+        in_array($booking->booking_status, ['used', 'cancelled', 'expired', 'paid'], true) => $booking->booking_status,
+        $booking->payment?->status === \App\Models\Payment::STATUS_REVIEW => 'review',
+        $booking->payment?->status === \App\Models\Payment::STATUS_FAILED => 'failed',
+        default => $booking->booking_status,
+    };
+    $status = $statusMap[$ticketState] ?? $statusMap['pending'];
 @endphp
 
 @section('content')
@@ -34,7 +43,7 @@
             @endif
         </div>
 
-        <div id="ticket-image-card" class="bg-white rounded-3xl overflow-hidden shadow-2xl relative">
+        <div id="ticket-image-card" class="bg-white rounded-3xl overflow-hidden shadow-2xl relative" data-ticket-state="{{ $isUsable ? 'usable' : $booking->booking_status }}">
             <div class="bg-gradient-to-r from-brand-start to-brand-end p-6 text-center relative overflow-hidden">
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.24),transparent_52%)]"></div>
                 <div class="relative z-10">
@@ -64,6 +73,7 @@
                 <div class="text-center mb-6">
                     <h2 class="text-xl font-bold text-gray-900 mb-1">{{ $booking->showtime?->movie?->title ?? 'Thông tin phim đang cập nhật' }}</h2>
                     <p class="text-gray-500 font-medium">{{ $booking->showtime?->room?->room_type ? ucfirst($booking->showtime->room->room_type) : 'Phòng chiếu' }} {{ $booking->showtime?->movie?->age_rating ?? '' }}</p>
+                    <span class="mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-bold {{ $status['class'] }}"><i class="ph-bold {{ $status['icon'] }} mr-1" aria-hidden="true"></i>{{ $status['label'] }}</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-y-6 gap-x-4 mb-6">
@@ -82,6 +92,33 @@
                     <div class="text-right">
                         <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Phòng chiếu</p>
                         <p class="font-bold text-gray-900">{{ $booking->showtime?->room?->name ?? 'Đang cập nhật' }}</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs text-gray-400 uppercase tracking-wider">Ghế</p>
+                            <p class="mt-1 font-bold text-gray-900">{{ $seatCodes ?: 'Đang cập nhật' }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-400 uppercase tracking-wider">Tổng tiền</p>
+                            <p class="mt-1 font-bold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-5 rounded-2xl bg-gray-50 p-4 text-left">
+                        <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Đồ ăn</p>
+                        <div class="mt-2 space-y-2 text-sm">
+                            @forelse($foodItems as $item)
+                                <div class="flex justify-between gap-3 text-gray-700">
+                                    <span>{{ $item->snapshot_name }} × {{ $item->quantity }}</span>
+                                    <strong class="whitespace-nowrap text-gray-900">{{ number_format((int) $item->line_total, 0, ',', '.') }} {{ $currency }}</strong>
+                                </div>
+                            @empty
+                                <p class="text-gray-500">Không có đồ ăn trong đơn.</p>
+                            @endforelse
+                        </div>
                     </div>
                 </div>
             </div>

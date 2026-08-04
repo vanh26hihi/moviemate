@@ -49,8 +49,8 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
         $this->get(route('user.bookings.review'))
             ->assertOk()
             ->assertViewIs('user.bookings.review')
-            ->assertSee('50.000đ')
-            ->assertSee('70.000đ')
+            ->assertSee('50.000 VND')
+            ->assertSee('70.000 VND')
             ->assertSee('120.000 VND')
             ->assertDontSee('name="total_amount"', false);
 
@@ -83,7 +83,7 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
 
         $this->get(route('user.bookings.pending', $booking))
             ->assertOk()
-            ->assertSee('Đang chờ thanh toán')
+            ->assertSee('Đang chờ xác minh thanh toán')
             ->assertDontSee($booking->qr_code_url, false);
     }
 
