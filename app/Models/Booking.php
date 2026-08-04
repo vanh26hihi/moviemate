@@ -90,4 +90,9 @@ class Booking extends Model
             default => 'Đang xử lý',
         };
     }
+
+    public function getFormattedTotalAttribute(): string
+    {
+        return number_format((float) $this->total_amount, 0, ',', '.').'đ';
+    }
 }
