@@ -27,6 +27,11 @@
                     <a href="{{ route('admin.rooms.layout.preview', ['room' => $room, 'version' => $published->version]) }}" class="btn-secondary"><i class="ph ph-eye" aria-hidden="true"></i> {{ __('rooms.actions.preview') }}</a>
                 @endif
             @endcan
+            @can('seats.maintenance.view')
+                @if($room->status === 'active')
+                    <a href="{{ route('admin.seats.index', ['room_id' => $room->id]) }}" class="btn-secondary"><i class="ph ph-wrench" aria-hidden="true"></i> Bảo trì ghế</a>
+                @endif
+            @endcan
         </div>
     </div>
 

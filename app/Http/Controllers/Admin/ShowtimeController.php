@@ -9,15 +9,18 @@ use App\Http\Requests\Admin\UpdateShowtimeRequest;
 use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Showtime;
+use App\Services\ActivityLogger;
 use App\Services\CinemaContext;
 use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ShowtimeController extends Controller
 {
     public function __construct(
         private readonly CinemaContext $cinemaContext,
         private readonly ShowtimeScheduleService $schedule,
+        private readonly ActivityLogger $activityLogger,
     ) {}
 
     public function index(Request $request)
@@ -61,7 +64,14 @@ class ShowtimeController extends Controller
     public function store(StoreShowtimeRequest $request)
     {
         try {
-            $this->schedule->schedule($request->validated());
+            DB::transaction(function () use ($request): void {
+                $showtime = $this->schedule->schedule($request->validated());
+                $this->activityLogger->log(
+                    'showtime.created',
+                    $showtime,
+                    after: $this->auditData($showtime),
+                );
+            });
         } catch (ShowtimeScheduleException $exception) {
             return back()->withErrors([$exception->field => $exception->getMessage()])->withInput();
         }
@@ -85,8 +95,17 @@ class ShowtimeController extends Controller
     {
         $this->assertOperationalShowtime($showtime);
 
+        $before = $this->auditData($showtime);
         try {
-            $this->schedule->reschedule($showtime, $request->validated());
+            DB::transaction(function () use ($request, $showtime, $before): void {
+                $updated = $this->schedule->reschedule($showtime, $request->validated());
+                $this->activityLogger->log(
+                    'showtime.updated',
+                    $updated,
+                    $before,
+                    $this->auditData($updated),
+                );
+            });
         } catch (ShowtimeScheduleException $exception) {
             return back()->withErrors([$exception->field => $exception->getMessage()])->withInput();
         }
@@ -97,7 +116,11 @@ class ShowtimeController extends Controller
     public function destroy(Showtime $showtime)
     {
         $this->assertOperationalShowtime($showtime);
-        $showtime->delete();
+        DB::transaction(function () use ($showtime): void {
+            $before = $this->auditData($showtime);
+            $showtime->delete();
+            $this->activityLogger->log('showtime.cancelled', $showtime, $before, ['status' => 'cancelled']);
+        });
 
         return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được xóa.');
     }
@@ -129,5 +152,21 @@ class ShowtimeController extends Controller
             && $showtime->room?->status === 'active',
             404
         );
+    }
+
+    /** @return array<string, mixed> */
+    private function auditData(Showtime $showtime): array
+    {
+        return [
+            'showtime_id' => $showtime->id,
+            'movie_id' => $showtime->movie_id,
+            'room_id' => $showtime->room_id,
+            'room_layout_id' => $showtime->room_layout_id,
+            'show_date' => $showtime->show_date?->format('Y-m-d'),
+            'show_time' => (string) $showtime->show_time,
+            'price' => (int) $showtime->price,
+            'vip_price' => $showtime->vip_price === null ? null : (int) $showtime->vip_price,
+            'status' => $showtime->status,
+        ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\ActivityLog;
 use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -29,6 +30,7 @@ class UserManagementTest extends TestCase
         $this->actingAs($admin)->patch(route('admin.users.role.update', $staff), ['role' => 'manager'])
             ->assertSessionHasNoErrors();
         $this->assertTrue($staff->fresh()->hasRole('manager'));
+        $this->assertSame(2, ActivityLog::query()->where('action', 'user.role_updated')->count());
     }
 
     public function test_manager_staff_and_customer_cannot_change_roles(): void
@@ -56,6 +58,7 @@ class UserManagementTest extends TestCase
             ->patch(route('admin.users.status.update', $admin), ['status' => 'inactive'])
             ->assertSessionHasErrors('admin');
         $this->assertSame('active', $admin->fresh()->status);
+        $this->assertDatabaseCount('activity_logs', 0);
     }
 
     public function test_with_two_active_admins_one_admin_can_update_the_other(): void
@@ -69,6 +72,7 @@ class UserManagementTest extends TestCase
 
         $this->assertSame('inactive', $target->fresh()->status);
         $this->assertSame('active', $actor->fresh()->status);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'user.status_updated', 'subject_id' => (string) $target->id]);
     }
 
     public function test_invalid_status_is_rejected(): void
@@ -103,5 +107,23 @@ class UserManagementTest extends TestCase
             ->assertSessionHasErrors('permissions.0');
 
         $this->assertFalse($managerRole->fresh()->hasPermission('users.view'));
+        $this->assertDatabaseCount('activity_logs', 0);
+    }
+
+    public function test_successful_role_permission_update_is_audited_once(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $managerRole = Role::query()->where('slug', 'manager')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->patch(route('admin.roles.permissions.update', $managerRole), ['permissions' => ['dashboard.view']])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(1, ActivityLog::query()->where('action', 'role.permissions_updated')->count());
+        $this->assertDatabaseHas('activity_logs', [
+            'action' => 'role.permissions_updated',
+            'subject_id' => (string) $managerRole->id,
+            'actor_user_id' => $admin->id,
+        ]);
     }
 }

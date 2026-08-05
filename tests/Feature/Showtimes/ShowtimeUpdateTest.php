@@ -35,6 +35,21 @@ class ShowtimeUpdateTest extends ShowtimeTestCase
         ]))->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('showtimes', ['id' => $showtime->id, 'show_time' => '21:00:00', 'price' => 95000]);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'showtime.updated', 'subject_id' => (string) $showtime->id]);
+    }
+
+    public function test_delete_records_a_showtime_cancellation_event(): void
+    {
+        $movie = $this->movie(90);
+        $room = $this->rooms['P01'];
+        $showtime = $this->existing($movie, $room);
+
+        $this->actingAs($this->userWithRole('admin'))
+            ->delete(route('admin.showtimes.destroy', $showtime))
+            ->assertRedirect(route('admin.showtimes.index'));
+
+        $this->assertDatabaseMissing('showtimes', ['id' => $showtime->id]);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'showtime.cancelled', 'subject_id' => (string) $showtime->id]);
     }
 
     public function test_conflicting_update_rolls_back_every_field(): void

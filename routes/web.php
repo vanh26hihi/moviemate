@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Admin\CinemaController as AdminCinemaController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FoodController as AdminFoodController;
@@ -209,6 +210,12 @@ Route::prefix('admin')->name('admin.')
         Route::get('/', AdminDashboardController::class)
             ->middleware('permission:dashboard.view')->name('dashboard');
 
+        Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])
+            ->middleware('permission:activity_logs.view')->name('activity-logs.index');
+        Route::get('/activity-logs/{activityLog}', [AdminActivityLogController::class, 'show'])
+            ->whereNumber('activityLog')
+            ->middleware('permission:activity_logs.view')->name('activity-logs.show');
+
         Route::resource('foods', AdminFoodController::class)->except(['show'])
             ->middlewareFor('index', 'permission:foods.view')
             ->middlewareFor(['create', 'store'], 'permission:foods.create')
@@ -252,13 +259,13 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:seats.manage')->name('rooms.layout.publish');
 
         Route::get('/seats', [AdminSeatController::class, 'index'])
-            ->middleware('permission:seats.view')->name('seats.index');
+            ->middleware('permission:seats.maintenance.view')->name('seats.index');
         Route::get('/seats/manage/{room}', [AdminSeatController::class, 'manage'])
             ->middleware('permission:seats.manage')->name('seats.manage');
         Route::post('/seats/generate/{room}', [AdminSeatController::class, 'generate'])
             ->middleware('permission:seats.manage')->name('seats.generate');
         Route::patch('/seats/{seat}', [AdminSeatController::class, 'update'])
-            ->middleware('permission:seats.manage')->name('seats.update');
+            ->middleware('permission:seats.maintenance.update')->name('seats.update');
 
         Route::resource('showtimes', AdminShowtimeController::class)->except(['show'])
             ->middlewareFor('index', 'permission:showtimes.view')
@@ -272,10 +279,10 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:food-orders.view')->name('food-orders.show');
 
         Route::get('/payment-reviews', [AdminPaymentReviewController::class, 'index'])
-            ->middleware('permission:bookings.operate')->name('payment-reviews.index');
+            ->middleware('permission:payments.reconcile')->name('payment-reviews.index');
         Route::post('/payment-reviews/{paymentId}/reconcile', [AdminPaymentReviewController::class, 'resolve'])
             ->whereNumber('paymentId')
-            ->middleware(['permission:bookings.operate', 'throttle:6,1'])
+            ->middleware(['permission:payments.reconcile', 'throttle:6,1'])
             ->name('payment-reviews.resolve');
 
         Route::get('/users', [AdminUserController::class, 'index'])

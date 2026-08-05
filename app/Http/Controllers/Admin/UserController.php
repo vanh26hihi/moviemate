@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,40 +51,56 @@ class UserController extends Controller
         ]);
     }
 
-    public function updateRole(Request $request, User $user): RedirectResponse
+    public function updateRole(Request $request, User $user, ActivityLogger $activityLogger): RedirectResponse
     {
         Gate::authorize('manageRole', User::class);
         $validated = $request->validate(['role' => ['required', 'string', 'exists:roles,slug']]);
         $newRole = Role::query()->where('slug', $validated['role'])->firstOrFail();
 
-        DB::transaction(function () use ($user, $newRole): void {
+        DB::transaction(function () use ($user, $newRole, $activityLogger): void {
             Role::query()->where('slug', 'admin')->lockForUpdate()->firstOrFail();
             $target = User::query()->lockForUpdate()->findOrFail($user->id);
             $target->load('role');
+            $beforeRole = $target->role?->slug;
             if ($target->isActive() && $target->hasRole('admin') && $newRole->slug !== 'admin') {
                 $this->ensureAnotherActiveAdminExists($target);
             }
             $target->role()->associate($newRole);
             $target->save();
+            $activityLogger->log(
+                'user.role_updated',
+                $target,
+                ['role_slug' => $beforeRole],
+                ['role_slug' => $newRole->slug],
+            );
         });
 
         return back()->with('success', 'Đã cập nhật vai trò người dùng.');
     }
 
-    public function updateStatus(Request $request, User $user): RedirectResponse
+    public function updateStatus(Request $request, User $user, ActivityLogger $activityLogger): RedirectResponse
     {
         Gate::authorize('manageStatus', User::class);
         $validated = $request->validate(['status' => ['required', 'in:active,inactive']]);
 
-        DB::transaction(function () use ($user, $validated): void {
+        DB::transaction(function () use ($user, $validated, $activityLogger): void {
             Role::query()->where('slug', 'admin')->lockForUpdate()->firstOrFail();
             $target = User::query()->lockForUpdate()->findOrFail($user->id);
             $target->load('role');
+            $beforeStatus = $target->status;
             if ($target->isActive() && $target->hasRole('admin') && $validated['status'] === 'inactive') {
                 $this->ensureAnotherActiveAdminExists($target);
             }
             $target->status = $validated['status'];
             $target->save();
+            if ($beforeStatus !== $target->status) {
+                $activityLogger->log(
+                    'user.status_updated',
+                    $target,
+                    ['status' => $beforeStatus],
+                    ['status' => $target->status],
+                );
+            }
         });
 
         return back()->with('success', 'Đã cập nhật trạng thái người dùng.');
