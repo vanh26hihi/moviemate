@@ -29,7 +29,7 @@
         <nav class="flex-grow py-4 px-4 space-y-0.5 overflow-y-auto hide-scrollbar">
             @can('dashboard.view')
                 <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-4 first:mt-0">Tổng quan</p>
-                <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Dashboard" icon="ph-squares-four" />
+                <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Tổng quan" icon="ph-squares-four" />
             @endcan
 
             <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Vận hành &amp; phim</p>
