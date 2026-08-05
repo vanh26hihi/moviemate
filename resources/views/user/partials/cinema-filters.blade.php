@@ -36,12 +36,13 @@
             </div>
         </div>
 
-        @if($isNearby)
+         @if($isNearby)
             <div class="inline-flex items-center gap-2 text-xs font-bold text-brand-start bg-brand-start/10 border border-brand-start/20 rounded-2xl px-3 py-2 w-fit">
                 <i class="ph-fill ph-crosshair"></i>
                 Đang gợi ý rạp gần vị trí của bạn
             </div>
         @endif
+
 
         
     </div>
