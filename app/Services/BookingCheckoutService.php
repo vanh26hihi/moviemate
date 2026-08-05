@@ -6,6 +6,7 @@ use App\Exceptions\BookingCheckoutConflictException;
 use App\Models\Booking;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Support\SeatPresentation;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
@@ -238,7 +239,8 @@ class BookingCheckoutService
                     ->count()
                 : 0;
 
-            if ($selectedPair->count() !== 2 || ! $validPositions || $layoutPairCount !== 2) {
+            if ($selectedPair->count() !== 2 || ! $validPositions || $layoutPairCount !== 2
+                || ! SeatPresentation::isValidCouple($selectedPair)) {
                 throw ValidationException::withMessages([
                     'seat_ids' => 'Ghế đôi phải được giữ đủ cả cặp trong cùng layout.',
                 ]);

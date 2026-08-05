@@ -13,9 +13,11 @@
         </div>
     </div>
 
-    @if(session('success') || session('error'))
-        <div class="rounded-2xl border {{ session('success') ? 'border-success/30 bg-success/10 text-success' : 'border-error/30 bg-error/10 text-error' }} px-4 py-3 text-sm font-bold">
-            {{ session('success') ?? session('error') }}
+    @if(session('success') || session('error') || $errors->any())
+        @php $seatMessage = session('success') ?? session('error') ?? $errors->first(); @endphp
+        <div class="flex items-start gap-3 rounded-2xl border {{ session('success') ? 'border-success/30 bg-success/10 text-success' : 'border-error/30 bg-error/10 text-error' }} px-4 py-3 text-sm font-bold" role="{{ session('success') ? 'status' : 'alert' }}">
+            <i class="ph-fill {{ session('success') ? 'ph-check-circle' : 'ph-warning-octagon' }} mt-0.5 text-lg" aria-hidden="true"></i>
+            <span>{{ $seatMessage }}</span>
         </div>
     @endif
 
@@ -31,7 +33,7 @@
                     @endforeach
                 </select>
                 <button type="submit" class="btn-secondary">
-                    <i class="ph ph-funnel"></i> Lọc
+                    <i class="ph ph-funnel" aria-hidden="true"></i> Lọc
                 </button>
             </form>
         </div>
@@ -77,7 +79,7 @@
                                     <select name="type" class="cinema-input !py-2 !text-xs lg:w-28">
                                         <option value="normal" {{ $seat->type == 'normal' ? 'selected' : '' }}>Ghế thường</option>
                                         <option value="vip" {{ $seat->type == 'vip' ? 'selected' : '' }}>VIP</option>
-                                        <option value="couple" {{ $seat->type == 'couple' ? 'selected' : '' }}>Ghế đôi</option>
+                                        @if($seat->type === 'couple')<option value="couple" selected>Ghế đôi (cả cặp)</option>@endif
                                     </select>
                                     <select name="status" class="cinema-input !py-2 !text-xs lg:w-36">
                                         <option value="active" {{ $seat->status == 'active' ? 'selected' : '' }}>Đang sử dụng</option>

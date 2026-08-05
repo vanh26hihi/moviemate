@@ -80,10 +80,60 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $p02 = $this->actingAs($staff)->get(route('staff.rooms.layout.preview', $this->rooms['P02']))->assertOk();
         $p03 = $this->actingAs($staff)->get(route('staff.rooms.layout.preview', $this->rooms['P03']))->assertOk();
 
-        $p01->assertSee('repeat(13', false)->assertSee('K12');
+        $p01->assertSee('repeat(13', false)->assertSee('K1–K2')->assertSee('col-span-2', false)->assertSee('K12');
         $p02->assertSee('repeat(14', false)->assertSee('F6')->assertSee('Đang bảo trì');
         $p03->assertSee('repeat(13', false)->assertSee('104');
         $this->assertSame(113, $this->rooms['P03']->latestPublishedLayout()->first()->cells()->count());
+    }
+
+    public function test_editor_restores_invalid_draft_and_exposes_accessible_cell_errors(): void
+    {
+        $manager = $this->userWithRole('manager');
+        $room = $this->rooms['P01'];
+        $this->actingAs($manager)->post(route('admin.rooms.layout.draft', $room))->assertRedirect();
+        $payload = [
+            'name' => 'Bản nháp lỗi', 'rows' => 1, 'columns' => 2, 'screen_position' => 'top',
+            'cells' => [[
+                'kind' => 'couple', 'type' => 'couple', 'x' => 1, 'y' => 1,
+                'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'status' => 'active',
+                'pair_code' => 'A-INCOMPLETE', 'pair_position' => 'left',
+            ]],
+        ];
+
+        $response = $this->actingAs($manager)
+            ->from(route('admin.rooms.layout.show', $room))
+            ->followingRedirects()
+            ->patch(route('admin.rooms.layout.update', $room), ['layout' => json_encode($payload)]);
+
+        $response->assertOk()
+            ->assertSee('layoutServerErrors', false)
+            ->assertSee('role="alert"', false)
+            ->assertSee('Bản nháp lỗi')
+            ->assertSee('A-INCOMPLETE')
+            ->assertSee('aria-invalid', false)
+            ->assertSee('ph-warning-octagon', false);
+    }
+
+    public function test_editor_exposes_freeform_canvas_row_modes_and_server_summary(): void
+    {
+        $manager = $this->userWithRole('manager');
+        $room = $this->rooms['P01'];
+        $this->actingAs($manager)->post(route('admin.rooms.layout.draft', $room))->assertRedirect();
+
+        $this->actingAs($manager)->get(route('admin.rooms.layout.show', $room))
+            ->assertOk()
+            ->assertSee('Chiều rộng vùng thiết kế')
+            ->assertSee('Mỗi hàng có thể sử dụng số ô khác nhau')
+            ->assertSee('Mở rộng bên trái')
+            ->assertSee('Mở rộng hàng')
+            ->assertSee('Di chuyển hàng')
+            ->assertSee('Thêm 2 ô bên trái')
+            ->assertSee('Thêm hàng phía sau')
+            ->assertSee('Hoàn tác thao tác gần nhất')
+            ->assertSee('Tách ghế đôi')
+            ->assertSee('Tóm tắt sơ đồ do máy chủ tính toán')
+            ->assertSee('expected_updated_at', false)
+            ->assertSee('seat_id', false);
     }
 
     public function test_showtime_create_ignores_client_layout_id_and_assigns_latest_published(): void

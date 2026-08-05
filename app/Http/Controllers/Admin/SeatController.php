@@ -9,8 +9,11 @@ use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Services\CinemaContext;
 use App\Services\RoomLayoutService;
+use App\Support\SeatPresentation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SeatController extends Controller
 {
@@ -46,10 +49,13 @@ class SeatController extends Controller
     {
         $this->assertOperationalRoom($room);
         $room->load('cinema');
-        $layout = $room->draftLayout()->with('cells.seat')->first()
-            ?? $room->latestPublishedLayout()->with('cells.seat')->first();
+        $seatRelation = fn ($query) => $query->withCount('bookingSeats');
+        $layout = $room->draftLayout()->with(['cells.seat' => $seatRelation])->first()
+            ?? $room->latestPublishedLayout()->with(['cells.seat' => $seatRelation])->first();
+        $roomSeatCodes = Seat::query()->where('room_id', $room->id)->pluck('seat_code')->values();
+        $layoutSummary = $this->layoutSummary($layout);
 
-        return view('admin.rooms.layout', compact('room', 'layout'));
+        return view('admin.rooms.layout', compact('room', 'layout', 'roomSeatCodes', 'layoutSummary'));
     }
 
     public function createDraft(Request $request, Room $room)
@@ -124,9 +130,47 @@ class SeatController extends Controller
             'type' => ['required', 'in:normal,vip,couple'],
             'status' => ['required', 'in:active,maintenance,inactive,retired'],
         ]);
-        $seat->update($validated);
+        DB::transaction(function () use ($seat, $validated): void {
+            $locked = Seat::query()->whereKey($seat->id)->lockForUpdate()->firstOrFail();
+            if ($locked->type !== 'couple' && $validated['type'] === 'couple') {
+                throw ValidationException::withMessages([
+                    'seat' => 'Hãy tạo ghế đôi trong trình thiết kế để hệ thống ghép đủ hai vị trí liền nhau.',
+                ]);
+            }
 
-        return back()->with('success', 'Cập nhật trạng thái ghế thành công.');
+            if ($locked->type === 'couple') {
+                $pair = Seat::query()
+                    ->where('room_id', $locked->room_id)
+                    ->where('pair_code', $locked->pair_code)
+                    ->lockForUpdate()
+                    ->get();
+                if (! SeatPresentation::isValidCouple($pair)) {
+                    throw ValidationException::withMessages([
+                        'seat' => 'Dữ liệu cặp ghế này không đồng nhất. Hãy sửa trong trình thiết kế sơ đồ ghế.',
+                    ]);
+                }
+                if ($validated['type'] !== 'couple' && $pair->contains(fn (Seat $member): bool => $member->bookingSeats()->exists())) {
+                    throw ValidationException::withMessages([
+                        'seat' => 'Không thể tách ghế đôi đã có lịch sử đặt vé.',
+                    ]);
+                }
+
+                foreach ($pair as $member) {
+                    $member->update([
+                        'type' => $validated['type'],
+                        'status' => $validated['status'],
+                        'pair_code' => $validated['type'] === 'couple' ? $member->pair_code : null,
+                        'pair_position' => $validated['type'] === 'couple' ? $member->pair_position : null,
+                    ]);
+                }
+
+                return;
+            }
+
+            $locked->update($validated);
+        });
+
+        return back()->with('success', 'Cập nhật ghế thành công.');
     }
 
     private function operationalRooms()
@@ -143,5 +187,29 @@ class SeatController extends Controller
     private function assertManagedRoom(Room $room): void
     {
         abort_unless($room->cinema_id === $this->cinemaContext->id(), 404);
+    }
+
+    private function layoutSummary(?RoomLayout $layout): array
+    {
+        if (! $layout) {
+            return [];
+        }
+
+        $seats = $layout->cells->where('cell_type', 'seat')->pluck('seat')->filter();
+        $used = $layout->cells->count();
+
+        return [
+            'rows' => $layout->rows,
+            'columns' => $layout->columns,
+            'used' => $used,
+            'empty' => max(0, ($layout->rows * $layout->columns) - $used),
+            'normal' => $seats->where('type', 'normal')->count(),
+            'vip' => $seats->where('type', 'vip')->count(),
+            'couple_pairs' => $seats->where('type', 'couple')->pluck('pair_code')->filter()->unique()->count(),
+            'aisles' => $layout->cells->where('cell_type', 'aisle')->count(),
+            'maintenance' => $seats->where('status', 'maintenance')->count(),
+            'inactive' => $seats->whereIn('status', ['inactive', 'retired'])->count(),
+            'capacity' => $seats->where('status', 'active')->count(),
+        ];
     }
 }

@@ -87,6 +87,24 @@ class RoomLayoutService
             if ($locked->status !== 'draft') {
                 throw ValidationException::withMessages(['layout' => 'Chỉ bản nháp sơ đồ ghế mới được chỉnh sửa.']);
             }
+            if ($normalized['expected_updated_at'] !== null
+                && $locked->updated_at?->format('Y-m-d H:i:s.u') !== $normalized['expected_updated_at']) {
+                throw ValidationException::withMessages([
+                    'layout' => 'Hàng ghế đã được thay đổi ở phiên quản trị khác. Hãy tải lại trang trước khi tiếp tục.',
+                ]);
+            }
+            $this->assertBookedSeatSemanticsArePreserved($locked, $normalized['cells']);
+            $this->assertShrunkBoundsPreserveCells($locked, $normalized);
+
+            // Update the canvas bounds before creating cells in newly expanded
+            // coordinates. The surrounding transaction rolls this back on failure.
+            $locked->update([
+                'name' => $normalized['name'],
+                'rows' => $normalized['rows'],
+                'columns' => $normalized['columns'],
+                'screen_position' => $normalized['screen_position'],
+                'updated_by' => $userId,
+            ]);
 
             $locked->cells()->delete();
             $seatTypeIds = $this->seatTypeIds();
@@ -103,23 +121,33 @@ class RoomLayoutService
                     continue;
                 }
 
-                $seat = Seat::query()->updateOrCreate(
-                    ['room_id' => $locked->room_id, 'seat_code' => $cell['seat_code']],
-                    [
-                        'row' => $cell['row'],
-                        'number' => $cell['number'],
-                        'type' => $cell['type'],
-                        'seat_type_id' => $seatTypeIds[$cell['type']],
-                        'pair_code' => $cell['pair_code'],
-                        'pair_position' => $cell['pair_position'],
-                        'row_label' => $cell['row'],
-                        'seat_number' => $cell['number'],
-                        'x_position' => $cell['x_position'],
-                        'y_position' => $cell['y_position'],
-                        'is_center' => false,
-                        'status' => $cell['status'],
-                    ]
-                );
+                $attributes = [
+                    'row' => $cell['row'],
+                    'number' => $cell['number'],
+                    'type' => $cell['type'],
+                    'seat_type_id' => $seatTypeIds[$cell['type']],
+                    'pair_code' => $cell['pair_code'],
+                    'pair_position' => $cell['pair_position'],
+                    'row_label' => $cell['row'],
+                    'seat_number' => $cell['number'],
+                    'x_position' => $cell['x_position'],
+                    'y_position' => $cell['y_position'],
+                    'is_center' => false,
+                    'status' => $cell['status'],
+                ];
+                if ($cell['seat_id']) {
+                    $seat = Seat::query()
+                        ->whereKey($cell['seat_id'])
+                        ->where('room_id', $locked->room_id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                    $seat->update($attributes);
+                } else {
+                    $seat = Seat::query()->create($attributes + [
+                        'room_id' => $locked->room_id,
+                        'seat_code' => $cell['seat_code'],
+                    ]);
+                }
 
                 $locked->cells()->create([
                     'x_position' => $cell['x_position'],
@@ -133,14 +161,6 @@ class RoomLayoutService
                 ->whereDoesntHave('layoutCells')
                 ->whereDoesntHave('bookingSeats')
                 ->delete();
-
-            $locked->update([
-                'name' => $normalized['name'],
-                'rows' => $normalized['rows'],
-                'columns' => $normalized['columns'],
-                'screen_position' => $normalized['screen_position'],
-                'updated_by' => $userId,
-            ]);
 
             return $locked->fresh(['cells.seat']);
         });
@@ -165,6 +185,12 @@ class RoomLayoutService
         $codes = [];
         $pairs = [];
         $normalized = [];
+        $layout->loadMissing('cells.seat');
+        $roomSeats = Seat::query()->where('room_id', $layout->room_id)->get()->keyBy('id');
+        $roomSeatsByCode = $roomSeats->keyBy('seat_code');
+        $layoutSeatIds = $layout->cells->where('cell_type', 'seat')->pluck('seat_id')->filter()->mapWithKeys(
+            fn ($id): array => [(int) $id => true]
+        );
 
         foreach ($payload['cells'] as $index => $input) {
             if (! is_array($input)) {
@@ -211,6 +237,9 @@ class RoomLayoutService
             if (! preg_match('/^[A-Z]{1,2}$/', $row) || ! $number || $number > 99 || $code !== $row.$number) {
                 throw ValidationException::withMessages(["cells.{$index}.seat_code" => 'Mã ghế phải khớp hàng và số ghế, ví dụ A1.']);
             }
+            if ($row !== $this->rowLabel($y)) {
+                throw ValidationException::withMessages(["cells.{$index}.seat_code" => "Mã ghế {$code} không thuộc hàng {$this->rowLabel($y)}."]);
+            }
             if (isset($codes[$code])) {
                 throw ValidationException::withMessages(["cells.{$index}.seat_code" => 'Mã ghế bị trùng trong phòng.']);
             }
@@ -219,13 +248,29 @@ class RoomLayoutService
             }
             $codes[$code] = true;
 
+            $seatId = filter_var($input['seat_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+            if ($seatId) {
+                $existingSeat = $roomSeats->get($seatId);
+                if (! $existingSeat || ! $layoutSeatIds->has($seatId)) {
+                    throw ValidationException::withMessages(["cells.{$index}.seat_id" => 'Ghế không thuộc bản nháp đang chỉnh sửa.']);
+                }
+                if ($existingSeat->seat_code !== $code) {
+                    throw ValidationException::withMessages(["cells.{$index}.seat_code" => "Không thể đổi mã ghế {$existingSeat->seat_code} thành {$code}. Mã ghế đã tạo phải được giữ ổn định."]);
+                }
+            } elseif ($existingSeat = $roomSeatsByCode->get($code)) {
+                if (! $layoutSeatIds->has((int) $existingSeat->id)) {
+                    throw ValidationException::withMessages(["cells.{$index}.seat_code" => "Mã ghế {$code} đã tồn tại trong phòng."]);
+                }
+                $seatId = (int) $existingSeat->id;
+            }
+
             $pairCode = $type === 'couple' ? trim((string) ($input['pair_code'] ?? '')) : null;
             $pairPosition = $type === 'couple' ? strtolower(trim((string) ($input['pair_position'] ?? ''))) : null;
             if ($type === 'couple') {
                 if ($pairCode === '' || ! in_array($pairPosition, ['left', 'right'], true)) {
                     throw ValidationException::withMessages(["cells.{$index}.pair_code" => 'Ghế đôi phải có mã cặp và vị trí trái/phải.']);
                 }
-                $pairs[$pairCode][] = compact('row', 'number', 'x', 'y', 'pairPosition');
+                $pairs[$pairCode][] = compact('row', 'number', 'x', 'y', 'pairPosition', 'status', 'index');
             }
 
             $normalized[] = [
@@ -239,18 +284,28 @@ class RoomLayoutService
                 'status' => $status,
                 'pair_code' => $pairCode,
                 'pair_position' => $pairPosition,
+                'seat_id' => $seatId,
+                'source_index' => $index,
             ];
         }
 
         foreach ($pairs as $pairCode => $pair) {
+            $byPosition = collect($pair)->keyBy('pairPosition');
             $valid = count($pair) === 2
                 && $pair[0]['row'] === $pair[1]['row']
                 && $pair[0]['y'] === $pair[1]['y']
                 && abs($pair[0]['number'] - $pair[1]['number']) === 1
                 && abs($pair[0]['x'] - $pair[1]['x']) === 1
-                && collect($pair)->pluck('pairPosition')->sort()->values()->all() === ['left', 'right'];
+                && $byPosition->keys()->sort()->values()->all() === ['left', 'right']
+                && $byPosition->get('left')['x'] < $byPosition->get('right')['x']
+                && $byPosition->get('left')['number'] < $byPosition->get('right')['number']
+                && collect($pair)->pluck('status')->unique()->count() === 1;
             if (! $valid) {
-                throw ValidationException::withMessages(['cells' => "Cặp {$pairCode} phải có đúng hai ghế liền nhau, cùng hàng và đủ vị trí trái/phải."]);
+                $message = "Cặp {$pairCode} phải có đúng hai ghế liền nhau, cùng hàng, không bị ngăn bởi lối đi và đủ vị trí trái/phải.";
+                $messages = collect($pair)
+                    ->mapWithKeys(fn (array $member): array => ["cells.{$member['index']}" => $message])
+                    ->all();
+                throw ValidationException::withMessages($messages ?: ['cells' => $message]);
             }
         }
 
@@ -259,6 +314,9 @@ class RoomLayoutService
             'rows' => $rows,
             'columns' => $columns,
             'screen_position' => $screen,
+            'expected_updated_at' => isset($payload['expected_updated_at'])
+                ? trim((string) $payload['expected_updated_at'])
+                : null,
             'cells' => $normalized,
         ];
     }
@@ -280,7 +338,11 @@ class RoomLayoutService
                 'published_at' => now(),
                 'updated_by' => $userId,
             ]);
-            $locked->room()->update(['total_seats' => $locked->cells()->where('cell_type', 'seat')->count()]);
+            $usableCapacity = $locked->cells()
+                ->where('cell_type', 'seat')
+                ->whereHas('seat', fn ($query) => $query->where('status', 'active'))
+                ->count();
+            $locked->room()->update(['total_seats' => $usableCapacity]);
 
             return $locked->fresh(['cells.seat']);
         });
@@ -345,6 +407,69 @@ class RoomLayoutService
         }
     }
 
+    /** @param array<int, array<string, mixed>> $cells */
+    private function assertBookedSeatSemanticsArePreserved(RoomLayout $layout, array $cells): void
+    {
+        $submitted = collect($cells)
+            ->where('cell_type', 'seat')
+            ->filter(fn (array $cell): bool => (int) ($cell['seat_id'] ?? 0) > 0)
+            ->keyBy('seat_id');
+        $historicalSeats = Seat::query()
+            ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layout->id))
+            ->whereHas('bookingSeats')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($historicalSeats as $seat) {
+            $replacement = $submitted->get($seat->id);
+            if (! $replacement) {
+                throw ValidationException::withMessages([
+                    'cells' => "Không thể xóa ghế {$seat->seat_code} vì ghế đã có lịch sử đặt vé.",
+                ]);
+            }
+
+            $changedPairSemantics = (string) $replacement['type'] !== (string) $seat->type
+                || (string) ($replacement['pair_code'] ?? '') !== (string) ($seat->pair_code ?? '')
+                || (string) ($replacement['pair_position'] ?? '') !== (string) ($seat->pair_position ?? '');
+            if ($changedPairSemantics) {
+                $index = (int) ($replacement['source_index'] ?? 0);
+                throw ValidationException::withMessages([
+                    "cells.{$index}" => "Ghế {$seat->seat_code} đã có lịch sử đặt vé nên không thể đổi cấu trúc ghế đơn/ghế đôi. Bạn chỉ có thể đổi trạng thái an toàn của ghế.",
+                ]);
+            }
+        }
+    }
+
+    /** @param array{name: ?string, rows: int, columns: int, cells: array<int, array<string, mixed>>} $normalized */
+    private function assertShrunkBoundsPreserveCells(RoomLayout $layout, array $normalized): void
+    {
+        if ($normalized['rows'] >= $layout->rows && $normalized['columns'] >= $layout->columns) {
+            return;
+        }
+
+        $layout->loadMissing('cells');
+        $outside = $layout->cells->filter(fn (RoomLayoutCell $cell): bool => (
+            $cell->x_position > $normalized['columns'] || $cell->y_position > $normalized['rows']
+        ));
+        if ($outside->isEmpty()) {
+            return;
+        }
+
+        $submittedSeatIds = collect($normalized['cells'])->pluck('seat_id')->filter()->map(fn ($id): int => (int) $id);
+        $oldAisles = $layout->cells->where('cell_type', 'aisle')->count();
+        $submittedAisles = collect($normalized['cells'])->where('cell_type', 'aisle')->count();
+        $lostSeat = $outside->where('cell_type', 'seat')->contains(
+            fn (RoomLayoutCell $cell): bool => ! $submittedSeatIds->contains((int) $cell->seat_id)
+        );
+        $lostAisle = $outside->where('cell_type', 'aisle')->isNotEmpty() && $submittedAisles < $oldAisles;
+
+        if ($lostSeat || $lostAisle) {
+            throw ValidationException::withMessages([
+                'layout' => 'Không thể thu nhỏ vùng thiết kế vì thao tác sẽ làm mất ghế hoặc lối đi. Hãy di chuyển hoặc xóa rõ ràng rồi lưu trước.',
+            ]);
+        }
+    }
+
     private function seatTypeIds(): array
     {
         $rows = DB::table('seat_types')->where('status', true)->get();
@@ -369,9 +494,18 @@ class RoomLayoutService
         return $resolved;
     }
 
+    private function rowLabel(int $index): string
+    {
+        return $index <= 26
+            ? chr(64 + $index)
+            : 'A'.chr(64 + $index - 26);
+    }
+
     private function payloadFromLayout(RoomLayout $layout): array
     {
         return [
+            'schema_version' => 3,
+            'expected_updated_at' => $layout->updated_at?->format('Y-m-d H:i:s.u'),
             'name' => $layout->name,
             'rows' => $layout->rows,
             'columns' => $layout->columns,
@@ -383,6 +517,7 @@ class RoomLayoutService
 
                 return [
                     'kind' => $cell->seat->type,
+                    'seat_id' => $cell->seat_id,
                     'x' => $cell->x_position,
                     'y' => $cell->y_position,
                     'seat_code' => $cell->seat->seat_code,

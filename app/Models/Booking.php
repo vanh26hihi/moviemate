@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Support\SeatPresentation;
 use App\Support\StatusLabel;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 class Booking extends Model
 {
@@ -94,10 +96,12 @@ class Booking extends Model
 
     public function getSeatCodesAttribute(): string
     {
-        return $this->bookingSeats
-            ->pluck('seat.seat_code')
-            ->filter()
-            ->join(', ');
+        return $this->seat_display_groups->pluck('label')->filter()->join(', ');
+    }
+
+    public function getSeatDisplayGroupsAttribute(): Collection
+    {
+        return SeatPresentation::groups($this->bookingSeats->pluck('seat')->filter()->values());
     }
 
     public function getShowtimeLabelAttribute(): string

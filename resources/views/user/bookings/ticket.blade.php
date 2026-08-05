@@ -99,10 +99,12 @@
                 <section class="cinema-ticket-order" aria-labelledby="ticket-order-title">
                     <h3 id="ticket-order-title">Chi tiết đơn</h3>
                     <div class="cinema-ticket-seats">
-                        @foreach($booking->bookingSeats as $bookingSeat)
+                        @foreach($booking->seat_display_groups as $seatGroup)
                             <span>
-                                Ghế {{ $bookingSeat->seat?->seat_code }}
-                                · {{ $seatTypeLabels[$bookingSeat->seat?->type] ?? \App\Support\StatusLabel::for('seat_type', $bookingSeat->seat?->type) }}
+                                {{ $seatGroup['label'] }}
+                                @unless($seatGroup['is_couple'])
+                                    · {{ $seatTypeLabels[$seatGroup['type']] ?? \App\Support\StatusLabel::for('seat_type', $seatGroup['type']) }}
+                                @endunless
                             </span>
                         @endforeach
                     </div>
@@ -155,7 +157,7 @@
 
     @if($isUsable)
         <section class="seat-admission-list" aria-label="Phiếu vào cửa theo ghế">
-            @foreach($booking->bookingSeats as $bookingSeat)
+            @foreach($booking->seat_display_groups as $seatGroup)
                 <article class="seat-admission-ticket">
                     <div>
                         <p class="seat-admission-brand">MOVIEMATE · PHIẾU VÀO CỬA</p>
@@ -164,8 +166,8 @@
                     </div>
                     <div class="seat-admission-seat">
                         <span>GHẾ</span>
-                        <strong>{{ $bookingSeat->seat?->seat_code }}</strong>
-                        <small>{{ $seatTypeLabels[$bookingSeat->seat?->type] ?? \App\Support\StatusLabel::for('seat_type', $bookingSeat->seat?->type) }}</small>
+                        <strong>{{ $seatGroup['seat_code'] }}</strong>
+                        <small>{{ $seatGroup['is_couple'] ? 'Ghế đôi' : ($seatTypeLabels[$seatGroup['type']] ?? \App\Support\StatusLabel::for('seat_type', $seatGroup['type'])) }}</small>
                     </div>
                 </article>
             @endforeach

@@ -49,7 +49,11 @@
                         <div class="mt-4 space-y-3">
                             @foreach($preview->seatSummaries() as $seat)
                                 <div class="flex items-center justify-between gap-3 text-sm">
-                                    <span class="app-text">Ghế <strong>{{ $seat['seat_code'] }}</strong> · {{ $seatTypeLabels[$seat['type']] ?? \App\Support\StatusLabel::for('seat_type', $seat['type']) }}</span>
+                                    <span class="app-text">
+                                        @if($seat['is_couple'])<strong>{{ $seat['label'] }}</strong>
+                                        @else Ghế <strong>{{ $seat['seat_code'] }}</strong> · {{ $seatTypeLabels[$seat['type']] ?? \App\Support\StatusLabel::for('seat_type', $seat['type']) }}
+                                        @endif
+                                    </span>
                                     <strong class="whitespace-nowrap app-text">{{ number_format($seat['price'], 0, ',', '.') }} VNĐ</strong>
                                 </div>
                             @endforeach
