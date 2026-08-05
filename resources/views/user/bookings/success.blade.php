@@ -189,10 +189,12 @@
                     <div class="mt-5 border-t pt-4 app-border">
                         <h3 class="text-sm font-bold app-text">Ghế</h3>
                         <div class="mt-3 flex flex-wrap gap-2">
-                            @foreach($booking->bookingSeats as $bookingSeat)
+                            @foreach($booking->seat_display_groups as $seatGroup)
                                 <span class="rounded-xl app-secondary px-3 py-2 text-sm font-bold app-text">
-                                    {{ $bookingSeat->seat?->seat_code }}
-                                    <span class="ml-1 font-normal app-muted">· {{ $seatTypeLabels[$bookingSeat->seat?->type] ?? \App\Support\StatusLabel::for('seat_type', $bookingSeat->seat?->type) }}</span>
+                                    {{ $seatGroup['label'] }}
+                                    @unless($seatGroup['is_couple'])
+                                        <span class="ml-1 font-normal app-muted">· {{ $seatTypeLabels[$seatGroup['type']] ?? \App\Support\StatusLabel::for('seat_type', $seatGroup['type']) }}</span>
+                                    @endunless
                                 </span>
                             @endforeach
                         </div>

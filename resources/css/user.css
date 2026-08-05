@@ -181,6 +181,24 @@ html.light .user-app {
     touch-action: manipulation;
 }
 
+.user-app .checkout-seat-couple {
+    position: relative;
+    min-width: 5.5rem;
+    border-radius: 0.85rem;
+    letter-spacing: 0.02em;
+}
+
+.user-app .checkout-seat-couple::after {
+    position: absolute;
+    right: 50%;
+    bottom: 0.28rem;
+    width: 1px;
+    height: 0.45rem;
+    background: currentColor;
+    content: '';
+    opacity: 0.28;
+}
+
 .user-app .checkout-seat[aria-pressed="true"] {
     border-color: var(--mm-primary) !important;
     background: var(--mm-primary) !important;

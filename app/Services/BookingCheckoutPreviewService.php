@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BookingSeat;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Support\SeatPresentation;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -89,7 +90,8 @@ class BookingCheckoutPreviewService
                     ->count()
                 : 0;
 
-            if ($pair->count() !== 2 || $positions !== ['left', 'right'] || $layoutPairCount !== 2) {
+            if ($pair->count() !== 2 || $positions !== ['left', 'right'] || $layoutPairCount !== 2
+                || ! SeatPresentation::isValidCouple($pair)) {
                 throw ValidationException::withMessages([
                     'seat_ids' => 'Ghế đôi phải được chọn đủ cả cặp.',
                 ]);

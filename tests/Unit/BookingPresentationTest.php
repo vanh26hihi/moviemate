@@ -59,10 +59,38 @@ class BookingPresentationTest extends TestCase
         $this->assertSame('180.000 VNĐ', $booking->formatted_total);
     }
 
-    private function bookingSeatWithCode(string $code): BookingSeat
+    public function test_it_presents_a_couple_pair_once_with_a_combined_label(): void
     {
+        $booking = new Booking;
+        $left = $this->bookingSeatWithCode('H13', 'couple', 'H-PAIR-7', 'left', 13);
+        $right = $this->bookingSeatWithCode('H14', 'couple', 'H-PAIR-7', 'right', 14);
+        $booking->setRelation('bookingSeats', new Collection([$left, $right]));
+
+        $this->assertSame('Ghế đôi H13–H14', $booking->seat_codes);
+        $this->assertCount(1, $booking->seat_display_groups);
+        $this->assertSame([13, 14], $booking->seat_display_groups->first()['seat_ids']);
+    }
+
+    private function bookingSeatWithCode(
+        string $code,
+        string $type = 'normal',
+        ?string $pairCode = null,
+        ?string $pairPosition = null,
+        ?int $id = null,
+    ): BookingSeat {
         $bookingSeat = new BookingSeat;
-        $bookingSeat->setRelation('seat', new Seat(['seat_code' => $code]));
+        $seat = new Seat([
+            'seat_code' => $code,
+            'row' => preg_replace('/\d+/', '', $code),
+            'number' => (int) preg_replace('/\D+/', '', $code),
+            'type' => $type,
+            'pair_code' => $pairCode,
+            'pair_position' => $pairPosition,
+        ]);
+        if ($id !== null) {
+            $seat->setAttribute('id', $id);
+        }
+        $bookingSeat->setRelation('seat', $seat);
 
         return $bookingSeat;
     }

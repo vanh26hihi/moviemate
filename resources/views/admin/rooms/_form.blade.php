@@ -10,12 +10,12 @@
         <label for="code" class="cinema-label">{{ __('rooms.fields.code') }} <span aria-hidden="true">*</span></label>
         <input id="code" type="text" name="code" value="{{ old('code', $room->code ?? '') }}" required maxlength="32" class="cinema-input @error('code') !border-error @enderror" placeholder="Ví dụ: P04" aria-describedby="code-help code-error">
         <p id="code-help" class="mt-1 text-xs app-muted">Mã dùng để nhận diện phòng và không trùng trong cùng cơ sở.</p>
-        @error('code')<p id="code-error" class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
+        @error('code')<p id="code-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
     </div>
     <div>
         <label for="name" class="cinema-label">{{ __('rooms.fields.name') }} <span aria-hidden="true">*</span></label>
         <input id="name" type="text" name="name" value="{{ old('name', $room->name ?? '') }}" required maxlength="255" class="cinema-input @error('name') !border-error @enderror" placeholder="Ví dụ: Phòng 1" aria-describedby="name-error">
-        @error('name')<p id="name-error" class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
+        @error('name')<p id="name-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
     </div>
 </div>
 
@@ -27,7 +27,7 @@
                 <option value="{{ $type }}" @selected(old('room_type', $room->room_type ?? '2D') === $type)>{{ $type }}</option>
             @endforeach
         </select>
-        @error('room_type')<p id="room-type-error" class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
+        @error('room_type')<p id="room-type-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
     </div>
     <div>
         <label for="status" class="cinema-label">{{ __('rooms.fields.status') }} <span aria-hidden="true">*</span></label>
@@ -36,7 +36,7 @@
             <option value="inactive" @selected(old('status', $room->status ?? 'active') === 'inactive')>{{ \App\Support\StatusLabel::for('room', 'inactive') }}</option>
         </select>
         <p id="status-help" class="mt-1 text-xs app-muted">Không thể ngừng phòng đang có suất chiếu sắp tới.</p>
-        @error('status')<p id="status-error" class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
+        @error('status')<p id="status-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
     </div>
 </div>
 

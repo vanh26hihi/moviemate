@@ -15,6 +15,7 @@ use App\Services\GuestBookingAccessService;
 use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\RoomLayoutService;
 use App\Services\Tickets\BookingTicketEligibility;
+use App\Support\SeatPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -265,7 +266,8 @@ class BookingController extends Controller
         $couples = $seats->where('type', 'couple')->groupBy('pair_code');
         foreach ($couples as $pairCode => $selectedPair) {
             if (! $pairCode || $selectedPair->count() !== 2
-                || $selectedPair->pluck('pair_position')->sort()->values()->all() !== ['left', 'right']) {
+                || $selectedPair->pluck('pair_position')->sort()->values()->all() !== ['left', 'right']
+                || ! SeatPresentation::isValidCouple($selectedPair)) {
                 return false;
             }
 

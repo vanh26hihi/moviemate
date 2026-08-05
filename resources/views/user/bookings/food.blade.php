@@ -115,7 +115,7 @@
                 <div class="mt-5 space-y-3">
                     @foreach($preview->seatSummaries() as $seat)
                         <div class="flex justify-between gap-3 text-sm">
-                            <span class="app-text">Ghế {{ $seat['seat_code'] }}</span>
+                            <span class="app-text">{{ $seat['is_couple'] ? $seat['label'] : 'Ghế '.$seat['seat_code'] }}</span>
                             <strong class="app-text">{{ number_format($seat['price'], 0, ',', '.') }} VNĐ</strong>
                         </div>
                     @endforeach

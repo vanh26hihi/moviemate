@@ -27,6 +27,8 @@ class SaveRoomLayoutRequest extends FormRequest
     {
         return [
             'layout' => ['required', 'array'],
+            'layout.schema_version' => ['nullable', 'integer', 'in:2,3'],
+            'layout.expected_updated_at' => ['nullable', 'string', 'max:40'],
             'layout.name' => ['nullable', 'string', 'max:255'],
             'layout.rows' => ['required', 'integer', 'min:1', 'max:30'],
             'layout.columns' => ['required', 'integer', 'min:1', 'max:40'],

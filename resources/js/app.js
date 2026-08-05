@@ -63,27 +63,21 @@ function initializeSeatPickers() {
         if (!(input instanceof HTMLInputElement) || !display || !totalDisplay || !continueButton) return;
         hint?.setAttribute('aria-live', 'polite');
 
-        function targetsFor(button) {
-            if (button.dataset.seatType !== 'couple') return [button];
-
-            return buttons.filter((candidate) => (
-                candidate.dataset.pairCode
-                && candidate.dataset.pairCode === button.dataset.pairCode
-            ));
-        }
-
         function setSelected(button, value) {
-            const seatId = button.dataset.seatId;
-            if (!seatId) return;
+            const seatIds = (button.dataset.seatIds || '')
+                .split(',')
+                .map((seatId) => seatId.trim())
+                .filter(Boolean);
+            if (!seatIds.length) return;
 
             if (value) {
-                selected.set(seatId, {
-                    id: seatId,
+                selected.set(seatIds.join(','), {
+                    ids: seatIds,
                     code: button.dataset.seatCode || '',
                     price: Number(button.dataset.price) || 0,
                 });
             } else {
-                selected.delete(seatId);
+                selected.delete(seatIds.join(','));
             }
 
             button.setAttribute('aria-pressed', String(value));
@@ -91,7 +85,7 @@ function initializeSeatPickers() {
 
         function refresh() {
             const values = Array.from(selected.values());
-            input.value = values.map((item) => item.id).join(',');
+            input.value = values.flatMap((item) => item.ids).join(',');
             display.textContent = values.length ? values.map((item) => item.code).join(', ') : 'Chưa chọn';
             totalDisplay.textContent = formatVnd(values.reduce((total, item) => total + item.price, 0));
             continueButton.disabled = values.length === 0;
@@ -99,21 +93,20 @@ function initializeSeatPickers() {
 
         buttons.forEach((button) => {
             button.addEventListener('click', () => {
-                const targets = targetsFor(button);
-                const expectedCount = button.dataset.seatType === 'couple' ? 2 : 1;
-
-                if (targets.length !== expectedCount) {
+                const seatIds = (button.dataset.seatIds || '').split(',').filter(Boolean);
+                if (button.dataset.seatType === 'couple' && seatIds.length !== 2) {
                     if (hint) hint.textContent = 'Cặp ghế đôi này hiện không khả dụng. Vui lòng chọn ghế khác.';
                     return;
                 }
 
-                const shouldSelect = !targets.every((target) => selected.has(target.dataset.seatId));
-                targets.forEach((target) => setSelected(target, shouldSelect));
+                const selectionKey = seatIds.join(',');
+                const shouldSelect = !selected.has(selectionKey);
+                setSelected(button, shouldSelect);
                 refresh();
 
                 if (hint && button.dataset.seatType === 'couple') {
                     hint.textContent = shouldSelect
-                        ? `Đã chọn cả cặp ghế ${targets.map((target) => target.dataset.seatCode).join(' và ')}.`
+                        ? `Đã chọn ghế đôi ${button.dataset.seatCode}.`
                         : 'Đã bỏ chọn cả cặp ghế đôi.';
                 }
             });

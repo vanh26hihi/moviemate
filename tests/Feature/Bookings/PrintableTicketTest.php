@@ -160,6 +160,31 @@ class PrintableTicketTest extends PaymentTestCase
             ->assertSee(route('user.bookings.ticket.print', $booking), false);
     }
 
+    public function test_couple_pair_uses_one_combined_label_on_ticket_and_email(): void
+    {
+        $owner = $this->userWithRole('user');
+        $scenario = $this->bookingScenario(true);
+        $pair = $scenario['seats']->where('type', 'couple')->values();
+        $booking = $this->reserve($scenario, $pair->pluck('id')->all(), $owner->id)->booking;
+        $payment = $this->pendingPayment($booking);
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))
+            ->assertJsonPath('return_code', 1);
+        $booking = $booking->fresh()->load([
+            'bookingSeats.seat', 'showtime.movie', 'showtime.room', 'showtime.cinema',
+            'payments', 'foodOrder.items', 'user',
+        ]);
+
+        $ticket = $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))->assertOk();
+        $ticket->assertSee('Ghế đôi B1–B2')->assertDontSee('Ghế B1 ·')->assertDontSee('Ghế B2 ·');
+
+        $email = view('emails.booking-ticket', [
+            'booking' => $booking,
+            'ticketAccessUrl' => 'https://example.test/ticket',
+        ])->render();
+        $this->assertStringContainsString('Ghế đôi B1–B2', $email);
+        $this->assertStringNotContainsString('Ghế B1, Ghế B2', $email);
+    }
+
     private function paidOwnerBooking(): array
     {
         $owner = $this->userWithRole('user');
