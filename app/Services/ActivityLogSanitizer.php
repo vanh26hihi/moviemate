@@ -17,6 +17,7 @@ final class ActivityLogSanitizer
         'movie_id',
         'payment_id',
         'payment_status',
+        'reconciliation_result',
         'permission_slugs',
         'previous_status',
         'price',

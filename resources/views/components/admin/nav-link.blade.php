@@ -3,6 +3,7 @@
     'label',
     'icon',
     'activePattern' => null,
+    'badge' => null,
 ])
 
 @php
@@ -18,5 +19,6 @@
        data-admin-nav-route="{{ $routeName }}">
         <i class="{{ $active ? 'ph-fill' : 'ph' }} {{ $icon }} shrink-0 text-lg" aria-hidden="true"></i>
         <span>{{ $label }}</span>
+        @if(filled($badge))<span class="ml-auto rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-extrabold text-warning" aria-label="{{ $badge }} giao dịch cần chú ý">{{ $badge }}</span>@endif
     </a>
 @endif
