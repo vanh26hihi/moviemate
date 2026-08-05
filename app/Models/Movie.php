@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Storage;
 
 class Movie extends Model
 {
@@ -39,37 +40,19 @@ class Movie extends Model
 
     public static function imageUrl(?string $path): ?string
     {
-        $path = static::normalizeImagePath($path);
+        $path = static::canonicalImagePath($path);
 
-        if (! $path) {
-            return null;
-        }
-
-        if (preg_match('/^https?:\/\//i', $path)) {
-            return $path;
-        }
-
-        if (str_starts_with($path, 'storage/')) {
-            return asset($path);
-        }
-
-        return asset('storage/'.$path);
+        return $path && Storage::disk('public')->exists($path)
+            ? '/storage/'.$path
+            : null;
     }
 
     public static function storageDiskPath(?string $path): ?string
     {
-        $path = static::normalizeImagePath($path);
-
-        if (! $path || preg_match('/^https?:\/\//i', $path)) {
-            return null;
-        }
-
-        return str_starts_with($path, 'storage/')
-            ? substr($path, strlen('storage/'))
-            : $path;
+        return static::canonicalImagePath($path);
     }
 
-    protected static function normalizeImagePath(?string $path): ?string
+    public static function canonicalImagePath(?string $path): ?string
     {
         if (! is_string($path) || trim($path) === '') {
             return null;
@@ -78,25 +61,48 @@ class Movie extends Model
         $path = trim(str_replace('\\', '/', $path));
 
         if (preg_match('/^https?:\/\//i', $path)) {
-            return $path;
+            $parts = parse_url($path);
+
+            if (! is_array($parts) || isset($parts['query']) || isset($parts['fragment'])) {
+                return null;
+            }
+
+            $path = (string) ($parts['path'] ?? '');
+        } elseif (preg_match('/^[a-z][a-z0-9+.-]*:/i', $path)
+            || preg_match('/^[a-z]:\//i', $path)
+            || str_starts_with($path, '//')) {
+            return null;
+        }
+
+        if (str_contains($path, "\0") || str_contains($path, '?') || str_contains($path, '#') || str_contains($path, '%')) {
+            return null;
         }
 
         $path = ltrim($path, '/');
+        $prefixes = ['storage/app/public/', 'public/storage/', 'public/', 'storage/'];
 
-        foreach (['storage/app/public/', 'public/storage/'] as $prefix) {
-            $position = stripos($path, $prefix);
-
-            if ($position !== false) {
-                $path = substr($path, $position + strlen($prefix));
-                break;
+        do {
+            $stripped = false;
+            foreach ($prefixes as $prefix) {
+                if (str_starts_with(strtolower($path), $prefix)) {
+                    $path = substr($path, strlen($prefix));
+                    $stripped = true;
+                    break;
+                }
             }
+        } while ($stripped);
+
+        if (! preg_match('#^movies/(posters|banners|covers)/([^/]+)$#', $path, $matches)) {
+            return null;
         }
 
-        if (str_starts_with($path, 'storage/')) {
-            return $path;
+        $filename = $matches[2];
+        if ($filename === '.' || $filename === '..' || str_contains($filename, '..')
+            || ! preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]*$/', $filename)) {
+            return null;
         }
 
-        return ltrim($path, '/');
+        return 'movies/'.$matches[1].'/'.$filename;
     }
 
     public function genres(): BelongsToMany
@@ -108,5 +114,4 @@ class Movie extends Model
     {
         return $this->hasMany(Showtime::class);
     }
-
 }

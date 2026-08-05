@@ -25,7 +25,7 @@
     </div>
 @endif
 
-<form action="{{ route('admin.movies.store') }}" method="POST" enctype="multipart/form-data" class="admin-form-card">
+<form action="{{ route('admin.movies.store') }}" method="POST" enctype="multipart/form-data" class="admin-form-card" data-submit-once>
     @csrf
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -88,12 +88,24 @@
 
             <div>
                 <label class="admin-label">Poster</label>
-                <input type="file" name="poster" accept="image/*" class="admin-input file:mr-4 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                <div class="mb-3 aspect-[2/3] max-w-48 overflow-hidden rounded-xl bg-slate-950">
+                    <img id="poster-preview" alt="Xem trước poster" class="hidden h-full w-full object-cover">
+                    <div data-image-fallback class="admin-media-fallback h-full w-full">Poster</div>
+                </div>
+                <input type="file" name="poster" accept="image/jpeg,image/png,image/webp" data-image-preview="poster-preview" class="admin-input file:mr-4 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                <p class="admin-help">JPG, PNG hoặc WebP; tối đa 4 MB. Tỷ lệ đề xuất 2:3.</p>
+                @error('poster')<p class="mt-1 text-sm text-error">{{ $message }}</p>@enderror
             </div>
 
             <div>
-                <label class="admin-label">Cover image</label>
-                <input type="file" name="cover_image" accept="image/*" class="admin-input file:mr-4 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                <label class="admin-label">Banner</label>
+                <div class="mb-3 aspect-video overflow-hidden rounded-xl bg-slate-950">
+                    <img id="banner-preview" alt="Xem trước banner" class="hidden h-full w-full object-cover">
+                    <div data-image-fallback class="admin-media-fallback h-full w-full">Banner</div>
+                </div>
+                <input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp" data-image-preview="banner-preview" class="admin-input file:mr-4 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                <p class="admin-help">JPG, PNG hoặc WebP; tối đa 8 MB. Tỷ lệ đề xuất 16:9.</p>
+                @error('cover_image')<p class="mt-1 text-sm text-error">{{ $message }}</p>@enderror
             </div>
 
             <div>
@@ -112,7 +124,7 @@
 
     <div class="mt-8 flex flex-col sm:flex-row justify-end gap-3 border-t app-border pt-5">
         <a href="{{ route('admin.movies.index') }}" class="admin-btn-secondary">Hủy</a>
-        <button type="submit" class="admin-btn-primary">
+        <button type="submit" class="admin-btn-primary" data-loading-label="Đang lưu…">
             <i class="ph-bold ph-floppy-disk"></i>
             Lưu phim
         </button>
