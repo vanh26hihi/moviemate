@@ -5,11 +5,14 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Genre;
 use App\Models\Movie;
+use App\Services\CinemaContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class MovieController extends Controller
 {
+    public function __construct(private readonly CinemaContext $cinemaContext) {}
+
     /**
      * Hiển thị danh sách phim cho người dùng.
      */

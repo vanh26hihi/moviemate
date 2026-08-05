@@ -1,39 +1,16 @@
 <?php
 
-namespace App\Services;
+namespace App\Models;
 
-use App\Models\Order;
-use App\Models\FoodItem;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-class OrderService
+class Genre extends Model
 {
-    public function createOrder($data)
+    protected $fillable = ['name', 'slug', 'description'];
+
+    public function movies(): BelongsToMany
     {
-        return DB::transaction(function () use ($data) {
-
-            $order = Order::create([
-                'user_name' => $data['user_name'],
-                'total_price' => 0,
-                'status' => 'pending'
-            ]);
-
-            $total = 0;
-
-            foreach ($data['items'] as $item) {
-                $food = FoodItem::findOrFail($item['id']);
-                $qty = $item['quantity'];
-
-                $order->foodItems()->attach($food->id, [
-                    'quantity' => $qty
-                ]);
-
-                $total += $food->price * $qty;
-            }
-
-            $order->update(['total_price' => $total]);
-
-            return $order->load('foodItems');
-        });
+        return $this->belongsToMany(Movie::class, 'movie_genre');
     }
 }

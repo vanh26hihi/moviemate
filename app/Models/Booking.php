@@ -1,449 +1,122 @@
 <?php
 
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-use App\Models\Booking;
-
-class BookingMegaController extends Controller
-{
-    public function index()
-    {
-        return Booking::latest()->paginate(10);
-    }
-
-    public function stats()
-    {
-        return [
-            'total' => Booking::count(),
-            'paid' => Booking::where('payment_status', 'paid')->count(),
-            'pending' => Booking::where('payment_status', 'pending')->count(),
-        ];
-    }
-
-    public function generateFake()
-    {
-        $data = [];
-
-        for ($i = 1; $i <= 300; $i++) {
-            $data[] = [
-                'code' => 'BK' . rand(1000, 9999),
-                'amount' => rand(10000, 500000),
-                'status' => ['paid', 'pending'][rand(0, 1)],
-            ];
-        }
-
-        return $data;
-    }
-
-    public function heavyProcess()
-    {
-        $sum = 0;
-
-        for ($i = 0; $i < 10000; $i++) {
-            $sum += $i * rand(1, 10);
-        }
-
-        return ['result' => $sum];
-    }
-
-    public function testLoop()
-    {
-        $arr = [];
-
-        for ($i = 0; $i < 500; $i++) {
-            $arr[] = "Line number " . $i;
-        }
-
-        return $arr;
-    }
-
-    public function bigResponse()
-    {
-        return response()->json([
-            'status' => true,
-            'message' => 'Huge data',
-            'data' => $this->testLoop()
-        ]);
-    }
-    <?php
-
-namespace App\Services;
-
-class MegaAnalyticsService
-{
-    public function generateTraffic($days = 365)
-    {
-        $data = [];
-
-        for ($i = 0; $i < $days; $i++) {
-            $data[] = [
-                'day' => $i,
-                'visits' => rand(100, 5000),
-                'clicks' => rand(50, 2000),
-                'conversions' => rand(1, 300),
-            ];
-        }
-
-        return $data;
-    }
-
-    public function calculateConversionRate($traffic)
-    {
-        $result = [];
-
-        foreach ($traffic as $t) {
-            $rate = $t['clicks'] > 0
-                ? ($t['conversions'] / $t['clicks']) * 100
-                : 0;
-
-            $result[] = [
-                'day' => $t['day'],
-                'rate' => round($rate, 2),
-            ];
-        }
-
-        return $result;
-    }
-
-    public function summary()
-    {
-        $traffic = $this->generateTraffic();
-
-        $totalVisits = array_sum(array_column($traffic, 'visits'));
-        $totalClicks = array_sum(array_column($traffic, 'clicks'));
-        $totalConversions = array_sum(array_column($traffic, 'conversions'));
-
-        return [
-            'visits' => $totalVisits,
-            'clicks' => $totalClicks,
-            'conversions' => $totalConversions,
-        ];
-    }
-}
-<?php
-
-namespace App\Services;
-
-class MegaCacheSimulator
-{
-    protected $cache = [];
-
-    public function put($key, $value)
-    {
-        $this->cache[$key] = [
-            'value' => $value,
-            'time' => time()
-        ];
-    }
-
-    public function get($key)
-    {
-        return $this->cache[$key]['value'] ?? null;
-    }
-
-    public function warmUp()
-    {
-        for ($i = 0; $i < 1000; $i++) {
-            $this->put("key_{$i}", rand(1, 99999));
-        }
-    }
-
-    public function stats()
-    {
-        return [
-            'total_keys' => count($this->cache),
-            'memory_estimate' => strlen(json_encode($this->cache))
-        ];
-    }
-}
-<?php
-
-namespace App\Services;
-
-class MegaPaymentService
-{
-    public function process($amount)
-    {
-        return [
-            'amount' => $amount,
-            'status' => rand(0, 1) ? 'success' : 'failed',
-            'transaction_id' => uniqid('txn_'),
-            'time' => now()
-        ];
-    }
-
-    public function bulkPayments($n = 200)
-    {
-        $results = [];
-
-        for ($i = 0; $i < $n; $i++) {
-            $results[] = $this->process(rand(100, 10000));
-        }
-
-        return $results;
-    }
-
-    public function totalSuccess($payments)
-    {
-        return count(array_filter($payments, fn($p) => $p['status'] === 'success'));
-    }
-}
-<?php
-
-namespace App\Services;
-
-class MegaNotificationService
-{
-    public function send($user, $message)
-    {
-        return [
-            'user' => $user,
-            'message' => $message,
-            'sent_at' => now(),
-            'status' => 'sent'
-        ];
-    }
-
-    public function broadcast($users)
-    {
-        $logs = [];
-
-        foreach ($users as $u) {
-            $logs[] = $this->send($u, "Hello {$u}");
-        }
-
-        return $logs;
-    }
-}
-<?php
-
-namespace App\Jobs;
-
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-
-class MegaJob implements ShouldQueue
-{
-    use Queueable;
-
-    public function handle()
-    {
-        $sum = 0;
-
-        for ($i = 0; $i < 50000; $i++) {
-            $sum += sqrt($i) * rand(1, 100);
-        }
-
-        \Log::info("MegaJob done: " . $sum);
-    }
-}
-<?php
-
-namespace App\Repositories;
-
-class MegaRepository
-{
-    protected $data = [];
-
-    public function seed($n = 500)
-    {
-        for ($i = 0; $i < $n; $i++) {
-            $this->data[] = [
-                'id' => $i,
-                'value' => rand(1, 9999)
-            ];
-        }
-    }
-
-    public function all()
-    {
-        return $this->data;
-    }
-
-    public function find($id)
-    {
-        foreach ($this->data as $d) {
-            if ($d['id'] == $id) return $d;
-        }
-
-        return null;
-    }
-}
-<?php
-
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Booking extends Model
 {
     protected $fillable = [
         'user_id',
+        'customer_email',
+        'guest_access_token_hash',
+        'guest_access_expires_at',
+        'checkout_idempotency_key_hash',
+        'checkout_request_fingerprint_hash',
         'showtime_id',
-        'total_price',
-        'status'
+        'booking_code',
+        'total_amount',
+        'seat_subtotal',
+        'food_subtotal',
+        'currency',
+        'payment_status',
+        'booking_status',
+        'expires_at',
+        'paid_at',
+        'used_at',
     ];
 
     protected $casts = [
-        'total_price' => 'decimal:2'
+        'used_at' => 'datetime',
+        'expires_at' => 'datetime',
+        'guest_access_expires_at' => 'datetime',
+        'ticket_email_token_expires_at' => 'datetime',
+        'paid_at' => 'datetime',
+        'ticket_emailed_at' => 'datetime',
+        'total_amount' => 'decimal:2',
+        'seat_subtotal' => 'integer',
+        'food_subtotal' => 'integer',
     ];
 
-    public function user()
+    protected $hidden = [
+        'guest_access_token_hash',
+        'ticket_email_token_nonce',
+        'ticket_email_token_hash',
+        'checkout_idempotency_key_hash',
+        'checkout_request_fingerprint_hash',
+    ];
+
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function showtime()
+    public function showtime(): BelongsTo
     {
         return $this->belongsTo(Showtime::class);
     }
 
-    public function tickets()
+    public function bookingSeats(): HasMany
     {
-        return $this->hasMany(Ticket::class);
-    }
-}
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class BookingSeat extends Model
-{
-    protected $fillable = [
-        'booking_id',
-        'seat_id',
-        'price'
-    ];
-
-    protected $casts = [
-        'price' => 'decimal:2'
-    ];
-
-    public function booking()
-    {
-        return $this->belongsTo(Booking::class);
+        return $this->hasMany(BookingSeat::class);
     }
 
-    public function seat()
+    public function payment(): HasOne
     {
-        return $this->belongsTo(Seat::class);
-    }
-}
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class Episode extends Model
-{
-    protected $fillable = [
-        'movie_id',
-        'title',
-        'episode_number',
-        'video_url',
-        'duration'
-    ];
-
-    protected $casts = [
-        'duration' => 'integer'
-    ];
-
-    public function movie()
-    {
-        return $this->belongsTo(Movie::class);
-    }
-}
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class Episode extends Model
-{
-    protected $fillable = [
-        'movie_id',
-        'title',
-        'episode_number',
-        'video_url',
-        'duration'
-    ];
-
-    protected $casts = [
-        'duration' => 'integer'
-    ];
-
-    public function movie()
-    {
-        return $this->belongsTo(Movie::class);
-    }
-}
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class TicketType extends Model
-{
-    protected $fillable = [
-        'name',
-        'price_multiplier'
-    ];
-
-    protected $casts = [
-        'price_multiplier' => 'float'
-    ];
-}
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
-class MegaMovie extends Model
-{
-    protected $fillable = [
-        'title',
-        'slug',
-        'description',
-        'duration',
-        'views',
-        'rating',
-        'status'
-    ];
-
-    protected $casts = [
-        'duration' => 'integer',
-        'views' => 'integer',
-        'rating' => 'float'
-    ];
-
-    public function episodes(): HasMany
-    {
-        return $this->hasMany(Episode::class, 'movie_id');
+        // Backward-compatible singular access now resolves the newest attempt.
+        return $this->hasOne(Payment::class)->latestOfMany();
     }
 
-    public function scopeActive($query)
+    public function payments(): HasMany
     {
-        return $query->where('status', 1);
+        return $this->hasMany(Payment::class);
     }
 
-    public function increaseViews()
+    public function foodOrder(): HasOne
     {
-        $this->increment('views');
+        return $this->hasOne(Order::class);
     }
 
-    public function getRatingLabelAttribute()
+    public function getRecipientEmailAttribute(): ?string
     {
-        if ($this->rating >= 8) return 'Hot';
-        if ($this->rating >= 5) return 'Normal';
-        return 'Bad';
+        return $this->customer_email ?: $this->user?->email;
     }
-}
+
+    public function getSeatCodesAttribute(): string
+    {
+        return $this->bookingSeats
+            ->pluck('seat.seat_code')
+            ->filter()
+            ->join(', ');
+    }
+
+    public function getShowtimeLabelAttribute(): string
+    {
+        if (! $this->showtime?->show_date || ! $this->showtime?->show_time) {
+            return 'Đang cập nhật';
+        }
+
+        return $this->showtime->show_date->format('d/m/Y').' '
+            .Carbon::parse($this->showtime->show_time)->format('H:i');
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->booking_status) {
+            'paid' => 'Chưa sử dụng',
+            'used' => 'Đã sử dụng',
+            'cancelled' => 'Đã hủy',
+            'expired' => 'Hết hạn',
+            default => 'Đang xử lý',
+        };
+    }
+
+    public function getFormattedTotalAttribute(): string
+    {
+        return number_format((float) $this->total_amount, 0, ',', '.').'đ';
+    }
 }

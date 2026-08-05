@@ -3,7 +3,7 @@
 @section('title', 'Trang chủ - MovieMate')
 
 @php
-    $featuredMovie = $nowShowingMovies->first() ?? $comingSoonMovies->first();
+    $featuredMovie = $nowShowing->first() ?? $comingSoon->first();
     $featuredGenres = $featuredMovie?->genres?->pluck('name')->take(3)->join(', ') ?: 'Điện ảnh';
 @endphp
 
@@ -32,7 +32,6 @@
                             <span class="px-3 py-1.5 rounded-full app-secondary border app-border app-text">{{ $featuredGenres }}</span>
                             <span class="px-3 py-1.5 rounded-full app-secondary border app-border app-text">{{ $featuredMovie->duration ?? '--' }} phút</span>
                             <span class="px-3 py-1.5 rounded-full bg-brand-start/10 border border-brand-start/30 text-brand-start font-bold">{{ $featuredMovie->age_rating ?? 'P' }}</span>
-                            <span class="px-3 py-1.5 rounded-full app-secondary border app-border app-text"><i class="ph-fill ph-star text-brand-start"></i> 8.6</span>
                         </div>
                         <p class="mt-4 app-muted line-clamp-2">{{ $featuredMovie->description ?? 'Thông tin phim đang được cập nhật.' }}</p>
                     </div>
@@ -80,21 +79,9 @@
             </div>
         </div>
 
-        <form action="{{ route('user.ai.recommend.submit') }}" method="POST" class="mt-10 cinema-card p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3">
-            @csrf
-            <input type="hidden" name="mood" value="chill">
-            <input type="hidden" name="preferred_time" value="tonight">
-            <input type="hidden" name="companion" value="friends">
-            <label class="flex items-center gap-3 px-3 sm:px-4 py-2 app-input border app-border rounded-2xl">
-                <i class="ph-fill ph-sparkle text-ai-start text-xl"></i>
-                <span class="hidden md:inline app-text font-bold whitespace-nowrap">Bạn muốn xem phim gì hôm nay?</span>
-                <input name="location" type="text" class="w-full bg-transparent app-text placeholder:text-text-sub/70 focus:outline-none py-2" placeholder="Ví dụ: Tôi thích phim hành động, muốn xem tối nay ở Hà Nội...">
-            </label>
-            <button class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-ai-start to-ai-end text-white font-extrabold">
-                <i class="ph-fill ph-magic-wand"></i>
-                Gợi ý bằng AI
-            </button>
-        </form>
+        @if (\Illuminate\Support\Facades\Route::has('user.ai.recommend.submit'))
+            @include('components.home-ai-search')
+        @endif
     </div>
 </section>
 
@@ -111,74 +98,8 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-        @forelse(($latestShowtimes ?? collect())->take(6) as $showtime)
-            @php
-                $movie = $showtime->movie;
-                $showDate = $showtime->show_date ? \Carbon\Carbon::parse($showtime->show_date)->format('d/m') : '--/--';
-                $showTime = $showtime->show_time ? \Carbon\Carbon::parse($showtime->show_time)->format('H:i') : '--:--';
-                $bookingUrl = route('user.bookings.selectSeat', $showtime);
-                $detailUrl = $movie?->slug ? route('user.movies.show', $movie->slug) : ($movie?->id ? url('/movies/'.$movie->id) : route('user.movies.index'));
-            @endphp
-
-            <article class="cinema-card group h-full p-5 rounded-3xl border app-border transition-all duration-300 hover:-translate-y-1 hover:border-brand-start/55 hover:shadow-2xl hover:shadow-brand-start/10">
-                <div class="flex h-full flex-col sm:flex-row gap-4">
-                    <a href="{{ $detailUrl }}" class="w-full sm:w-24 md:w-28 shrink-0">
-                        <div class="aspect-[2/3] rounded-2xl overflow-hidden bg-gradient-to-br from-slate-800 via-slate-950 to-black shadow-lg shadow-black/15">
-                            @if($movie?->poster_url)
-                                <img src="{{ $movie->poster_url }}" alt="{{ $movie->title }}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy">
-                            @else
-                                <div class="flex h-full w-full flex-col items-center justify-center px-3 text-center text-white">
-                                    <div class="mb-2 rounded-full bg-brand-start/20 p-3 text-brand-start">
-                                        <i class="ph-fill ph-film-slate text-2xl"></i>
-                                    </div>
-                                    <p class="text-sm font-black">MovieMate</p>
-                                    <p class="mt-1 line-clamp-2 text-[11px] text-slate-300">{{ $movie->title ?? 'Phim đang chiếu' }}</p>
-                                </div>
-                            @endif
-                        </div>
-                    </a>
-
-                    <div class="min-w-0 flex flex-1 flex-col">
-                        <div class="flex-1">
-                            <div class="mb-3 flex flex-wrap items-center gap-2">
-                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-start/10 border border-brand-start/25 px-3 py-1 text-xs font-extrabold text-brand-start">
-                                    <i class="ph-fill ph-clock"></i>{{ $showDate }} • {{ $showTime }}
-                                </span>
-                                @if($movie?->age_rating)
-                                    <span class="rounded-full app-secondary border app-border px-2.5 py-1 text-xs font-extrabold app-text">{{ $movie->age_rating }}</span>
-                                @endif
-                            </div>
-
-                            <h3 class="text-lg font-extrabold app-text line-clamp-2">
-                                <a href="{{ $detailUrl }}" class="hover:text-brand-start transition-colors">{{ $movie->title ?? 'Phim MovieMate' }}</a>
-                            </h3>
-                            <p class="mt-2 text-sm app-muted line-clamp-2">
-                                {{ $showtime->cinema->name ?? 'Rạp MovieMate' }} • {{ $showtime->room->name ?? 'Phòng chiếu' }}
-                            </p>
-
-                            <div class="mt-4 flex flex-wrap gap-2">
-                                <span class="inline-flex items-center rounded-xl app-secondary border app-border px-3 py-1.5 text-xs font-bold app-text">
-                                    {{ number_format((float) ($showtime->price ?? 0), 0, ',', '.') }}đ
-                                </span>
-                                @if(! empty($showtime->vip_price))
-                                    <span class="inline-flex items-center rounded-xl bg-ai-start/10 border border-ai-start/25 px-3 py-1.5 text-xs font-bold text-ai-start">
-                                        VIP {{ number_format((float) $showtime->vip_price, 0, ',', '.') }}đ
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="mt-5 grid grid-cols-2 gap-2">
-                            <a href="{{ $detailUrl }}" class="btn-secondary !rounded-2xl !px-3 !py-2.5 text-sm">
-                                Chi tiết
-                            </a>
-                            <a href="{{ $bookingUrl }}" class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-start to-brand-end px-3 py-2.5 text-sm font-extrabold text-white shadow-lg shadow-brand-start/20 transition-all hover:shadow-brand-start/35">
-                                <i class="ph-fill ph-ticket"></i> Đặt vé
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </article>
+        @forelse(($quickShowtimes ?? collect())->take(6) as $showtime)
+            @include('components.quick-showtime-card', ['showtime' => $showtime])
         @empty
             <div class="col-span-full cinema-card rounded-3xl border app-border p-8 sm:p-10 text-center">
                 <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
@@ -209,8 +130,8 @@
     </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        @forelse($nowShowingMovies as $movie)
-            @include('user.movies._home-movie-card', ['movie' => $movie, 'type' => 'now_showing'])
+        @forelse($nowShowing as $movie)
+            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'now_showing'])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                 <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
@@ -240,8 +161,8 @@
     </div>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        @forelse($comingSoonMovies as $movie)
-            @include('user.movies._home-movie-card', ['movie' => $movie, 'type' => 'coming_soon'])
+        @forelse($comingSoon as $movie)
+            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'coming_soon'])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                 <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-pink-500/10 text-pink-400">

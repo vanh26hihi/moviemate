@@ -3,11 +3,14 @@
 @section('title', 'Đăng nhập - MovieMate')
 
 @section('content')
+@php
+    $errors = $errors ?? new \Illuminate\Support\ViewErrorBag();
+@endphp
 <div class="min-h-[calc(100svh-4rem)] md:min-h-[calc(100svh-5rem)] flex">
         <div class="hidden lg:flex w-1/2 relative dark-surface border-r border-white/10 overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-t from-[var(--bg-main)] via-[var(--bg-main)]/40 to-transparent z-10"></div>
-            <img src="https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80"
-                 alt="Cinema" class="w-full h-full object-cover opacity-50">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_28%_24%,rgba(255,61,87,0.28),transparent_34%),radial-gradient(circle_at_72%_68%,rgba(124,58,237,0.22),transparent_38%),linear-gradient(145deg,#151A27,#080A12)]" aria-hidden="true"></div>
+            <div class="absolute inset-0 flex items-center justify-center text-white/10" aria-hidden="true"><i class="ph-fill ph-film-strip text-[15rem]"></i></div>
             <div class="absolute bottom-20 left-12 right-12 z-20">
                 <h2 class="text-3xl font-bold text-white mb-3 leading-tight">Mở ra thế giới điện ảnh<br>của riêng bạn.</h2>
                 <p class="surface-muted text-base">Hàng ngàn bộ phim bom tấn và tính năng AI đề xuất thông minh đang chờ đón bạn.</p>
@@ -29,7 +32,7 @@
                         {{ $errors->first() }}
                     </div>
                 @endif
-<form action="{{ route('login.post') }}" method="POST" class="space-y-5">
+                <form action="{{ route('login.store') }}" method="POST" class="space-y-5">
                     @csrf
 
                     <div>
@@ -38,9 +41,9 @@
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i class="ph ph-envelope app-text-muted text-lg"></i>
                             </div>
-                            <input type="email" id="email" name="email" value="{{ old('email') }}"
+                            <input type="email" id="email" name="email" value="{{ old('email') }}" autocomplete="email"
                                    class="app-input w-full pl-11 pr-4 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập email của bạn" required>
+                                   placeholder="Nhập email của bạn" required autofocus @error('email') aria-invalid="true" @enderror>
                         </div>
                         @error('email')
                             <p class="mt-2 text-xs font-semibold text-error">{{ $message }}</p>
@@ -52,10 +55,10 @@
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i class="ph ph-lock-key app-text-muted text-lg"></i>
                             </div>
-                            <input type="password" id="password" name="password"
+                            <input type="password" id="password" name="password" autocomplete="current-password"
                                    class="app-input w-full pl-11 pr-11 py-3 border app-border rounded-xl focus:outline-none focus:border-brand-start focus:ring-1 focus:ring-brand-start transition-colors text-sm"
-                                   placeholder="Nhập mật khẩu" required>
-                            <button type="button" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu">
+                                   placeholder="Nhập mật khẩu" required @error('password') aria-invalid="true" @enderror>
+                            <button type="button" data-password-toggle="password" class="absolute inset-y-0 right-0 pr-4 flex items-center app-text-muted hover:app-text" aria-label="Hiển thị mật khẩu">
                                 <i class="ph ph-eye text-lg"></i>
                             </button>
                         </div>
@@ -70,11 +73,12 @@
                                    class="h-4 w-4 rounded border-dark-border bg-dark-main text-brand-start focus:ring-brand-start">
                             <span class="text-sm app-text-muted">Ghi nhớ đăng nhập</span>
                         </label>
-                        <a href="#" class="text-sm font-semibold text-brand-start hover:text-brand-end">Quên mật khẩu?</a>
+                        <span class="text-sm app-text-muted">Quên mật khẩu?</span>
                     </div>
-                    <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5 text-sm">
-                        Đăng nhập
-                    </button>
+                    @error('remember')
+                        <p class="text-xs font-semibold text-error">{{ $message }}</p>
+                    @enderror
+                    <button type="submit" class="w-full rounded-xl bg-gradient-to-r from-brand-start to-brand-end py-3.5 text-sm font-bold text-white transition-all hover:shadow-lg hover:shadow-brand-start/25">Đăng nhập</button>
                 </form>
                 <div class="mt-6 relative">
                     <div class="absolute inset-0 flex items-center"><div class="w-full border-t app-border"></div></div>
@@ -83,13 +87,8 @@
                     </div>
                 </div>
 
-                <div class="mt-5 grid grid-cols-2 gap-3">
-                    <button type="button" class="flex items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted hover:app-text hover:border-brand-start transition-colors text-sm font-medium">
-                        <i class="ph-fill ph-google-logo text-lg"></i> Google
-                    </button>
-                    <button type="button" class="flex items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted hover:app-text hover:border-brand-start transition-colors text-sm font-medium">
-                        <i class="ph-fill ph-facebook-logo text-lg text-blue-500"></i> Facebook
-                    </button>
+                <div class="mt-5">
+                    <button type="button" disabled class="flex cursor-not-allowed items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted opacity-60 text-sm font-medium"><i class="ph-fill ph-google-logo text-lg"></i> Google chưa khả dụng</button>
                 </div>
 
                 <p class="mt-6 text-center text-sm app-text-muted">

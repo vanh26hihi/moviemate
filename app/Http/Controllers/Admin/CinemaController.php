@@ -3,42 +3,44 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\AiMovieContentService;
+use App\Services\CinemaContext;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\View\View;
 
-class AiContentController extends Controller
+class CinemaController extends Controller
 {
-    public function __construct(
-        protected AiMovieContentService $movieContentService
-    ) {}
+    public function __construct(private readonly CinemaContext $cinemaContext) {}
 
-    public function movieContent()
+    public function show(): View
     {
-        return view('admin.ai.movie-content', [
-            'input' => [],
-            'result' => null,
-            'meta' => null,
+        $cinema = $this->cinemaContext->current()->loadCount([
+            'rooms',
+            'rooms as active_rooms_count' => fn ($query) => $query->where('status', 'active'),
         ]);
+
+        return view('admin.cinemas.show', compact('cinema'));
     }
 
-    public function movieContentStore(Request $request)
+    public function update(Request $request): RedirectResponse
     {
-        $input = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'genres' => ['nullable', 'string', 'max:255'],
-            'original_description' => ['nullable', 'string', 'max:3000'],
-            'tone' => ['required', 'string', 'in:attractive,mysterious,professional,funny,emotional'],
-        ], [
-            'title.required' => 'Vui lòng nhập tên phim.',
-            'tone.required' => 'Vui lòng chọn tone nội dung.',
+        $cinema = $this->cinemaContext->current();
+        $validated = $request->validate([
+            'phone' => ['nullable', 'string', 'max:30'],
+            'image' => ['nullable', 'image', 'max:4096'],
+            'description' => ['nullable', 'string'],
         ]);
 
-        $generated = $this->movieContentService->generate($input);
+        if ($request->hasFile('image')) {
+            if ($cinema->image && Storage::disk('public')->exists($cinema->image)) {
+                Storage::disk('public')->delete($cinema->image);
+            }
+            $validated['image'] = $request->file('image')->store('cinema_images', 'public');
+        }
 
-        return view('admin.ai.movie-content', [
-            'input' => $input,
-            'result' => $generated['content'],
-            'meta' => $generated,
-        ]);
+        $cinema->update($validated);
+
+        return redirect()->route('admin.cinema.show')->with('success', 'Đã cập nhật thông tin rạp.');
     }
 }

@@ -71,7 +71,7 @@
                                 @endif
                             </td>
                             <td>
-                                <form action="{{ route('admin.seats.update', $seat) }}" method="POST" class="flex flex-col lg:flex-row justify-end gap-2">
+                                @can('seats.manage')<form action="{{ route('admin.seats.update', $seat) }}" method="POST" class="flex flex-col lg:flex-row justify-end gap-2">
                                     @csrf
                                     @method('PATCH')
                                     <select name="type" class="cinema-input !py-2 !text-xs lg:w-28">
@@ -84,7 +84,7 @@
                                         <option value="maintenance" {{ $seat->status == 'maintenance' ? 'selected' : '' }}>Maintenance</option>
                                     </select>
                                     <button type="submit" class="btn-primary !rounded-xl !px-3 !py-2 text-xs">Lưu</button>
-                                </form>
+                                </form>@else<span class="text-xs app-muted">Chỉ xem</span>@endcan
                             </td>
                         </tr>
                     @empty

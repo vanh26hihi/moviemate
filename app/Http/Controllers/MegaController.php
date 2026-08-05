@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
-class MegaOnePageController extends Controller
+class MegaController extends Controller
 {
     // ================= BASIC =================
 
