@@ -23,11 +23,11 @@
         <p class="admin-page-subtitle">Thông tin chi tiết, media, thể loại và trạng thái phát hành.</p>
     </div>
     <div class="flex flex-wrap gap-2">
-        <a href="{{ route('admin.movies.edit', $movie) }}" class="admin-btn-warning">
+        @can('movies.update')<a href="{{ route('admin.movies.edit', $movie) }}" class="admin-btn-warning">
             <i class="ph ph-pencil-simple"></i>
             Sửa phim
-        </a>
-        <form action="{{ route('admin.movies.destroy', $movie) }}" method="POST"
+        </a>@endcan
+        @can('movies.delete')<form action="{{ route('admin.movies.destroy', $movie) }}" method="POST"
               onsubmit="return confirm('Bạn có chắc muốn xóa phim này?');" class="inline">
             @csrf
             @method('DELETE')
@@ -35,7 +35,7 @@
                 <i class="ph ph-trash"></i>
                 Xóa
             </button>
-        </form>
+        </form>@endcan
     </div>
 </div>
 

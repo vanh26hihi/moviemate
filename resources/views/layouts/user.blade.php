@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'MovieMate - Đặt vé xem phim thông minh cùng AI')</title>
     <meta name="description" content="@yield('meta_description', 'MovieMate - Nền tảng đặt vé xem phim trực tuyến tích hợp AI thông minh.')">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
+    @vite(['resources/css/app.css', 'resources/css/user.css', 'resources/js/app.js'])
     <script>
         (function() {
             var theme = localStorage.getItem('theme') || localStorage.getItem('moviemate_theme') || 'dark';
@@ -15,7 +13,7 @@
         })();
     </script>
 </head>
-<body class="app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden">
+<body class="user-app app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden">
     <header class="app-header fixed w-full top-0 z-50 backdrop-blur-xl border-b app-border transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16 md:h-20">
@@ -29,14 +27,14 @@
                 </a>
 
                 <nav class="hidden md:flex items-center gap-1 rounded-full app-card border app-border p-1">
-                    <a href="{{ route('home') }}" class="px-4 py-2 rounded-full app-text hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Trang chủ</a>
-                    <a href="{{ route('user.movies.index') }}" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Phim</a>
-                    <a href="{{ route('user.showtimes.index') }}" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Lịch chiếu</a>
-                    <a href="{{ route('foods.index') }}" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Đồ ăn</a>
-                    <a href="{{ route('user.ai.recommend') }}" class="px-4 py-2 rounded-full flex items-center gap-1.5 app-muted hover:text-ai-start hover:bg-ai-start/10 transition-colors font-medium text-sm">
+                    <a href="{{ route('home') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('home')]) @if(request()->routeIs('home')) aria-current="page" @endif>Trang chủ</a>
+                    <a href="{{ route('user.movies.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.movies.*')]) @if(request()->routeIs('user.movies.*')) aria-current="page" @endif>Phim</a>
+                    <a href="{{ route('home') }}#home-showtime-calendar" class="user-nav-link">Lịch chiếu</a>
+                    <a href="{{ route('foods.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('foods.*')]) @if(request()->routeIs('foods.*')) aria-current="page" @endif>Đồ ăn</a>
+                    <a href="{{ route('user.ai.recommend') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.ai.*')]) @if(request()->routeIs('user.ai.*')) aria-current="page" @endif>
                         <i class="ph-fill ph-sparkle text-ai-start"></i> AI Gợi ý
                     </a>
-                    <a href="{{ route('user.bookings.history') }}" class="px-4 py-2 rounded-full app-muted hover:text-brand-start hover:bg-white/5 transition-colors font-medium text-sm">Vé của tôi</a>
+                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket')) aria-current="page" @endif>Vé của tôi</a>
                 </nav>
 
                 <div class="hidden md:flex items-center gap-3">
@@ -48,13 +46,21 @@
                     </button>
 
                     @auth
-                        <a href="{{ route('user.bookings.history') }}" class="app-muted hover:app-text font-medium transition-colors text-sm">Tài khoản</a>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="bg-gradient-to-r from-brand-start to-brand-end text-white px-5 py-2.5 rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-brand-start/25 transition-all">
-                                Đăng xuất
-                            </button>
-                        </form>
+                        <details class="user-account-menu relative">
+                            <summary class="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border app-border app-card px-3 py-2 text-sm font-bold app-text">
+                                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-start to-brand-end text-xs font-black text-white">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr(auth()->user()->name, 0, 1)) }}</span>
+                                <span class="max-w-28 truncate">{{ auth()->user()->name }}</span>
+                                <i class="ph ph-caret-down text-xs app-muted"></i>
+                            </summary>
+                            <div class="user-account-dropdown absolute right-0 top-full mt-2 w-56 rounded-2xl border app-border app-card p-2 shadow-2xl">
+                                <a href="{{ route('user.profile') }}" class="user-dropdown-link"><i class="ph ph-user"></i> Hồ sơ</a>
+                                <a href="{{ route('user.bookings.history') }}" class="user-dropdown-link"><i class="ph ph-ticket"></i> Lịch sử đặt vé</a>
+                                <form action="{{ route('logout') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="user-dropdown-link w-full text-left"><i class="ph ph-sign-out"></i> Đăng xuất</button>
+                                </form>
+                            </div>
+                        </details>
                     @else
                         <a href="{{ route('login') }}" class="app-muted hover:app-text font-medium transition-colors text-sm">Đăng nhập</a>
                         <a href="{{ route('register') }}" class="bg-gradient-to-r from-brand-start to-brand-end text-white px-5 py-2.5 rounded-full font-semibold text-sm hover:shadow-lg hover:shadow-brand-start/25 transition-all">
@@ -78,19 +84,20 @@
 
         <div id="mobile-menu" class="hidden md:hidden app-secondary border-b app-border">
             <div class="px-4 pt-2 pb-4 space-y-1">
-                <a href="{{ route('home') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-text hover:bg-brand-start/10 hover:text-brand-start transition-colors">Trang chủ</a>
-                <a href="{{ route('user.movies.index') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Phim</a>
-                <a href="{{ route('user.showtimes.index') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Lịch chiếu</a>
-                <a href="{{ route('foods.index') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Đồ ăn</a>
+                <a href="{{ route('home') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('home')])>Trang chủ</a>
+                <a href="{{ route('user.movies.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.movies.*')])>Phim</a>
+                <a href="{{ route('home') }}#home-showtime-calendar" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Lịch chiếu</a>
+                <a href="{{ route('foods.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('foods.*')])>Đồ ăn</a>
                 <a href="{{ route('user.ai.recommend') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-ai-start hover:bg-ai-start/10 transition-colors">
                     <i class="ph-fill ph-sparkle"></i> AI Gợi ý
                 </a>
-                <a href="{{ route('user.bookings.history') }}" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Vé của tôi</a>
+                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket')])>Vé của tôi</a>
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
-                        <form method="POST" action="{{ route('logout') }}">
+                        <a href="{{ route('user.profile') }}" class="user-mobile-link"><i class="ph ph-user mr-2"></i>Hồ sơ</a>
+                        <form action="{{ route('logout') }}" method="POST">
                             @csrf
-                            <button type="submit" class="w-full block px-3 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-brand-start to-brand-end text-center rounded-lg">Đăng xuất</button>
+                            <button type="submit" class="user-mobile-link w-full text-left"><i class="ph ph-sign-out mr-2"></i>Đăng xuất</button>
                         </form>
                     @else
                         <a href="{{ route('login') }}" class="block px-3 py-2.5 text-sm font-medium app-muted hover:app-text text-center border app-border rounded-lg">Đăng nhập</a>
@@ -102,13 +109,19 @@
     </header>
 
     <main class="flex-grow pt-16 md:pt-20 min-w-0">
-        @if(session('success') || session('error'))
+        @if(session('success') || session('error') || session('warning') || $errors->any())
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
                 @if(session('success'))
                     <div class="rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-medium">{{ session('success') }}</div>
                 @endif
                 @if(session('error'))
                     <div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium">{{ session('error') }}</div>
+                @endif
+                @if(session('warning'))
+                    <div class="rounded-2xl border border-warning/30 bg-warning/10 text-warning px-4 py-3 text-sm font-medium">{{ session('warning') }}</div>
+                @endif
+                @if($errors->any())
+                    <div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium" role="alert">{{ $errors->first() }}</div>
                 @endif
             </div>
         @endif
@@ -128,46 +141,23 @@
                     <p class="app-muted text-sm leading-relaxed mb-5">
                         Nền tảng đặt vé xem phim tích hợp AI thông minh, mang đến trải nghiệm điện ảnh tiện lợi và cá nhân hóa.
                     </p>
-                    <div class="flex gap-3">
-                        <a href="#" class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted hover:text-brand-start hover:border-brand-start transition-all"><i class="ph-fill ph-facebook-logo text-lg"></i></a>
-                        <a href="#" class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted hover:text-brand-start hover:border-brand-start transition-all"><i class="ph-fill ph-instagram-logo text-lg"></i></a>
-                        <a href="#" class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center app-muted hover:text-brand-start hover:border-brand-start transition-all"><i class="ph-fill ph-youtube-logo text-lg"></i></a>
-                    </div>
+                    <div class="flex gap-3" aria-label="MovieMate"><span class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center text-brand-start"><i class="ph-fill ph-film-strip text-lg"></i></span><span class="app-muted text-sm self-center">Điện ảnh trong tầm tay</span></div>
                 </div>
 
                 <div>
                     <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Về MovieMate</h3>
-                    <ul class="space-y-2.5">
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Giới thiệu</a></li>
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Hệ thống rạp chiếu</a></li>
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Tuyển dụng</a></li>
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Liên hệ</a></li>
-                    </ul>
+                    <ul class="space-y-2.5"><li><a href="{{ route('user.movies.index') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Danh sách phim</a></li><li><a href="{{ route('home') }}#home-showtime-calendar" class="app-muted hover:text-brand-start transition-colors text-sm">Lịch chiếu hôm nay</a></li><li><a href="{{ route('foods.index') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Thực đơn tại rạp</a></li></ul>
                 </div>
 
                 <div>
                     <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Hỗ trợ</h3>
-                    <ul class="space-y-2.5">
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Câu hỏi thường gặp</a></li>
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Chính sách bảo mật</a></li>
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Điều khoản sử dụng</a></li>
-                        <li><a href="#" class="app-muted hover:text-brand-start transition-colors text-sm">Quy định đổi trả</a></li>
-                    </ul>
+                    <ul class="space-y-2.5"><li><a href="{{ route('user.ai.recommend') }}" class="app-muted hover:text-ai-start transition-colors text-sm">AI gợi ý phim</a></li><li><a href="{{ route('user.bookings.history') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Vé của tôi</a></li><li><a href="{{ route('user.profile') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Tài khoản</a></li></ul>
                 </div>
 
                 <div>
-                    <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Tải ứng dụng</h3>
-                    <p class="app-muted text-sm mb-4">Trải nghiệm đặt vé mượt mà trên ứng dụng MovieMate.</p>
-                    <div class="space-y-2.5">
-                        <a href="#" class="flex items-center gap-3 app-card border app-border rounded-xl px-4 py-2.5 hover:border-brand-start transition-colors">
-                            <i class="ph-fill ph-apple-logo text-2xl app-text"></i>
-                            <div><p class="text-xs app-muted">Download on the</p><p class="text-sm font-semibold app-text">App Store</p></div>
-                        </a>
-                        <a href="#" class="flex items-center gap-3 app-card border app-border rounded-xl px-4 py-2.5 hover:border-brand-start transition-colors">
-                            <i class="ph-fill ph-google-play-logo text-2xl text-brand-start"></i>
-                            <div><p class="text-xs app-muted">GET IT ON</p><p class="text-sm font-semibold app-text">Google Play</p></div>
-                        </a>
-                    </div>
+                    <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Trải nghiệm</h3>
+                    <p class="app-muted text-sm mb-4">Tìm phim, chọn suất chiếu, đặt ghế và nhận vé điện tử trong một luồng thống nhất.</p>
+                    <a href="{{ route('user.movies.index', ['status' => 'now_showing']) }}" class="btn-primary text-sm"><i class="ph-fill ph-ticket"></i>Đặt vé ngay</a>
                 </div>
             </div>
 
@@ -187,18 +177,6 @@
     <a href="{{ route('user.ai.chatbot') }}" class="fixed bottom-6 right-6 w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-ai-start to-ai-end rounded-full shadow-lg shadow-ai-start/30 flex items-center justify-center text-white hover:scale-110 transition-transform z-50" title="Chat với AI">
         <i class="ph-fill ph-robot text-2xl md:text-3xl"></i>
     </a>
-
-    <script>
-        const mobileMenuButton = document.getElementById('mobile-menu-btn');
-        const mobileMenu = document.getElementById('mobile-menu');
-
-        if (mobileMenuButton && mobileMenu) {
-            mobileMenuButton.addEventListener('click', function() {
-                const isHidden = mobileMenu.classList.toggle('hidden');
-                mobileMenuButton.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
-            });
-        }
-    </script>
 
     @stack('scripts')
 </body>

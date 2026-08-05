@@ -1,194 +1,140 @@
 @extends('layouts.user')
 
 @section('title', 'Chọn ghế - MovieMate')
+
 @section('content')
-<div class="container mx-auto py-8">
-    <!-- Progress Steps -->
-    <div class="mb-8">
-        <div class="flex items-center justify-center sm:justify-start gap-2 sm:gap-4 text-xs sm:text-sm">
-            <div class="flex items-center gap-2 text-brand-start font-medium">
-                <div class="w-7 h-7 rounded-full bg-brand-start text-white flex items-center justify-center font-bold text-xs">1</div>
-                <span class="hidden sm:inline">Chọn phim & Suất</span>
-            </div>
-            <div class="h-px w-8 sm:w-12 bg-brand-start"></div>
-            <div class="flex items-center gap-2 text-brand-start font-medium">
-                <div class="w-7 h-7 rounded-full bg-brand-start text-white flex items-center justify-center font-bold text-xs">2</div>
-                <span>Chọn ghế</span>
-            </div>
-            <div class="h-px w-8 sm:w-12 app-border border-t border-dashed"></div>
-            <div class="flex items-center gap-2 app-muted font-medium">
-                <div class="w-7 h-7 rounded-full app-card border app-border flex items-center justify-center font-bold text-xs">3</div>
-                <span class="hidden sm:inline">Thanh toán</span>
-            </div>
+@php
+    $cellMap = $layoutCells->keyBy(fn ($cell) => $cell->x_position.':'.$cell->y_position);
+    $bookedSeatLookup = array_fill_keys($bookedSeatIds, true);
+    $unavailablePairs = $seats
+        ->filter(fn ($seat) => $seat->type === 'couple' && ($seat->status !== 'active' || isset($bookedSeatLookup[$seat->id])))
+        ->pluck('pair_code')
+        ->filter()
+        ->unique();
+    $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
+@endphp
+
+<main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl">
+        <x-checkout-progress current="seat" class="mb-8" />
+
+        <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <a href="{{ $showtime->movie?->slug ? route('user.movies.show', $showtime->movie->slug).'#showtimes' : route('user.movies.index') }}" class="btn-secondary !px-4 !py-2 text-sm">
+                <i class="ph-bold ph-arrow-left" aria-hidden="true"></i>
+                Quay lại lịch chiếu
+            </a>
+            <p class="text-sm app-muted">Bước 1/4 · Chọn ghế phù hợp</p>
         </div>
-    </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <!-- Left: Seat Map -->
-        <div class="lg:col-span-2 app-card border app-border rounded-2xl p-6 overflow-hidden">
-            <!-- Show info -->
-            <div class="text-center mb-6">
-                <h2 class="text-lg md:text-xl font-bold app-text mb-1">
-                    {{ $showtime->cinema->name }} - {{ $showtime->room->name }}
-                </h2>
-                <p class="app-muted text-sm">
-                    {{ $showtime->show_date->format('d/m/Y') }} — {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}
-                </p>
+        @if(session('error'))
+            <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 px-4 py-3 text-sm font-bold text-error" role="alert" aria-live="assertive">
+                {{ session('error') }}
             </div>
+        @endif
 
-            <!-- Screen -->
-            <div class="relative mb-10 px-8 md:px-16">
-                <div class="h-2 w-full bg-brand-start/50 rounded-t-[100%] shadow-[0_10px_30px_rgba(255,61,87,0.25)]"></div>
-                <div class="absolute top-5 left-1/2 -translate-x-1/2 app-muted text-xs font-medium tracking-[0.3em] uppercase">Màn hình</div>
-            </div>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+            <section class="cinema-card overflow-hidden rounded-3xl p-4 sm:p-6 lg:col-span-2" aria-labelledby="seat-picker-title">
+                <header class="mb-6 text-center">
+                    <p class="mb-2 text-xs font-extrabold uppercase tracking-[0.22em] text-brand-start">{{ $showtime->movie->title }}</p>
+                    <h1 id="seat-picker-title" class="mb-1 text-lg font-bold app-text md:text-xl">Chọn ghế tại {{ $showtime->room->name }}</h1>
+                    <p class="text-sm app-muted">
+                        {{ $showtime->cinema->name }} · {{ $showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}
+                    </p>
+                </header>
 
-            <!-- Seats -->
-                <form id="seatForm" action="{{ route('user.bookings.checkout', $showtime) }}" method="GET">
-                @csrf
-                <input type="hidden" name="showtime_id" value="{{ $showtime->id }}">
-                <input type="hidden" name="selected_seats" id="selectedSeatsInput" value="">
-                <input type="hidden" name="total_amount" id="totalAmountInput" value="">
+                <form id="seatForm" action="{{ route('user.bookings.checkout', $showtime) }}" method="GET" data-seat-picker>
+                    <input type="hidden" name="selected_seats" id="selectedSeatsInput" value="">
 
-                <div class="overflow-x-auto hide-scrollbar pb-4">
-                    <div class="min-w-[560px] flex flex-col items-center gap-2.5">
-                        @foreach($seatsByRow as $row => $rowSeats)
-                            <div class="flex items-center gap-3">
-                                <div class="w-5 text-center app-muted text-xs font-bold">{{ $row }}</div>
-                                <div class="flex gap-1.5">
-                                    @foreach($rowSeats as $seat)
+                    <div class="overflow-x-auto overscroll-x-contain pb-4" tabindex="0" aria-label="Sơ đồ ghế, có thể cuộn ngang trên màn hình nhỏ">
+                        @if($layout->screen_position === 'top')
+                            <div class="mx-auto mb-8 h-2 min-w-[32rem] max-w-4xl rounded-t-[100%] bg-brand-start/50 shadow-[0_10px_30px_rgba(255,61,87,0.25)]" aria-hidden="true"></div>
+                            <p class="-mt-6 mb-6 min-w-[32rem] text-center text-[0.65rem] font-bold uppercase tracking-[0.3em] app-muted">Màn hình</p>
+                        @endif
+
+                        <div class="mx-auto grid w-max gap-1.5 sm:gap-2" style="grid-template-columns: repeat({{ $layout->columns }}, 2.5rem)" role="group" aria-label="Sơ đồ ghế động">
+                            @for($y = 1; $y <= $layout->rows; $y++)
+                                @for($x = 1; $x <= $layout->columns; $x++)
+                                    @php
+                                        $cell = $cellMap->get($x.':'.$y);
+                                        $seat = $cell?->seat;
+                                        $booked = $seat && isset($bookedSeatLookup[$seat->id]);
+                                        $pairUnavailable = $seat?->pair_code && $unavailablePairs->contains($seat->pair_code);
+                                        $maintenance = $seat && $seat->status !== 'active';
+                                        $disabled = $seat && ($booked || $maintenance || $pairUnavailable);
+                                    @endphp
+
+                                    @if(!$cell)
+                                        <span class="h-10 w-10" aria-hidden="true"></span>
+                                    @elseif($cell->cell_type === 'aisle')
+                                        <span class="flex h-10 w-10 items-center justify-center text-xs app-muted opacity-50" aria-label="Lối đi"><i class="ph ph-arrows-down-up" aria-hidden="true"></i></span>
+                                    @else
                                         @php
-                                            $isBooked = in_array($seat->id, $bookedSeatIds);
-                                            $isMaintenance = $seat->status !== 'active';
-                                            $isVip = $seat->type === 'vip';
-                                            $price = $isVip ? ($showtime->vip_price ?? $showtime->price) : $showtime->price;
-                                            $seatClass = $isBooked ? 'bg-dark-border border-dark-border text-dark-border/40 cursor-not-allowed opacity-40' :
-                                                          $isMaintenance ? 'bg-gray-300 border-gray-400 text-gray-600 cursor-not-allowed opacity-50' :
-                                                          $isVip ? 'bg-ai-start/10 border-ai-start/50 text-ai-start hover:bg-ai-start hover:text-white' :
-                                                          'app-input border-[var(--border-color)] app-muted hover:border-brand-start hover:text-brand-start';
+                                            $price = $showtime->priceForSeatType($seat->type);
+                                            $seatClass = match(true) {
+                                                $booked => 'border-slate-500 bg-slate-600/50 text-slate-300 cursor-not-allowed',
+                                                $maintenance => 'border-dashed border-warning/60 bg-warning/10 text-warning cursor-not-allowed',
+                                                $pairUnavailable => 'border-slate-500 bg-slate-600/50 text-slate-300 cursor-not-allowed',
+                                                $seat->type === 'vip' => 'border-ai-start/60 bg-ai-start/10 text-ai-start hover:bg-ai-start/20',
+                                                $seat->type === 'couple' => 'border-warning/60 bg-warning/10 text-warning hover:bg-warning/20',
+                                                default => 'app-input app-muted app-border hover:border-brand-start hover:text-brand-start',
+                                            };
+                                            $availability = match(true) {
+                                                $booked => 'đã có người giữ',
+                                                $maintenance => 'đang bảo trì',
+                                                $pairUnavailable => 'cặp ghế không khả dụng',
+                                                default => 'còn trống',
+                                            };
+                                            $typeLabel = $seatTypeLabels[$seat->type] ?? ucfirst($seat->type);
                                         @endphp
-                                        <button type="button"
-                                            class="w-8 h-8 rounded-t-lg border transition-all text-[10px] font-bold {{ $seatClass }} {{ $seat->number == 6 ? 'mr-4' : '' }}"
+                                        <button
+                                            type="button"
+                                            class="checkout-seat seat-button flex items-center justify-center rounded-lg border px-1 text-[10px] font-extrabold transition {{ $seatClass }}"
                                             data-seat-id="{{ $seat->id }}"
                                             data-seat-code="{{ $seat->seat_code }}"
                                             data-seat-type="{{ $seat->type }}"
+                                            data-pair-code="{{ $seat->pair_code }}"
                                             data-price="{{ $price }}"
-                                            {{ $isBooked || $isMaintenance ? 'disabled' : '' }}>
-                                            {{ $seat->number }}
-                                        </button>
-                                    @endforeach
-                                </div>
-                                <div class="w-5 text-center app-muted text-xs font-bold">{{ $row }}</div>
-                            </div>
-                        @endforeach
+                                            aria-label="Ghế {{ $seat->seat_code }}, loại {{ $typeLabel }}, {{ $availability }}, {{ number_format($price, 0, ',', '.') }} VND"
+                                            aria-pressed="false"
+                                            @disabled($disabled)
+                                        >{{ $seat->seat_code }}</button>
+                                    @endif
+                                @endfor
+                            @endfor
+                        </div>
+
+                        @if($layout->screen_position === 'bottom')
+                            <p class="mb-2 mt-6 min-w-[32rem] text-center text-[0.65rem] font-bold uppercase tracking-[0.3em] app-muted">Màn hình</p>
+                            <div class="mx-auto h-2 min-w-[32rem] max-w-4xl rounded-b-[100%] bg-brand-start/50" aria-hidden="true"></div>
+                        @endif
                     </div>
+                </form>
+
+                <div class="mt-5 grid grid-cols-2 gap-3 border-t pt-5 text-xs app-muted app-border sm:grid-cols-4 lg:grid-cols-7" aria-label="Chú thích loại ghế">
+                    <span class="flex items-center gap-2"><i class="h-4 w-4 rounded border app-border app-input" aria-hidden="true"></i>Thường</span>
+                    <span class="flex items-center gap-2 text-ai-start"><i class="h-4 w-4 rounded border border-ai-start/60 bg-ai-start/10" aria-hidden="true"></i>VIP</span>
+                    <span class="flex items-center gap-2 text-warning"><i class="h-4 w-4 rounded border border-warning/60 bg-warning/10" aria-hidden="true"></i>Ghế đôi</span>
+                    <span class="flex items-center gap-2 text-brand-start"><i class="h-4 w-4 rounded bg-brand-start" aria-hidden="true"></i>Đang chọn</span>
+                    <span class="flex items-center gap-2"><i class="h-4 w-4 rounded bg-slate-600/60" aria-hidden="true"></i>Đã giữ</span>
+                    <span class="flex items-center gap-2 text-warning"><i class="h-4 w-4 rounded border border-dashed border-warning/60" aria-hidden="true"></i>Bảo trì</span>
+                    <span class="flex items-center gap-2"><i class="ph ph-arrows-down-up" aria-hidden="true"></i>Lối đi</span>
                 </div>
+            </section>
 
-                <!-- Legend -->
-                <div class="flex flex-wrap justify-center gap-4 md:gap-6 mt-8 pt-6 border-t app-border text-xs">
-                    <div class="flex items-center gap-2 app-muted">
-                        <div class="w-6 h-6 rounded-t-lg app-input border app-border"></div> Ghế thường ({{ number_format($showtime->price,0,',','.') }}đ)
-                    </div>
-                    <div class="flex items-center gap-2 app-muted">
-                        <div class="w-6 h-6 rounded-t-lg bg-ai-start/10 border border-ai-start/50"></div> Ghế VIP ({{ number_format($showtime->vip_price ?? $showtime->price,0,',','.') }}đ)
-                    </div>
-                    <div class="flex items-center gap-2 app-muted">
-                        <div class="w-6 h-6 rounded-t-lg bg-brand-start border border-brand-start"></div> Đang chọn
-                    </div>
-                    <div class="flex items-center gap-2 app-muted">
-                        <div class="w-6 h-6 rounded-t-lg bg-dark-border border border-dark-border opacity-40"></div> Đã đặt
-                    </div>
+            <aside class="lg:col-span-1" aria-labelledby="booking-estimate-title">
+                <div class="cinema-card sticky top-24 overflow-hidden rounded-3xl p-5 sm:p-6">
+                    <p class="text-xs font-extrabold uppercase tracking-[0.2em] text-brand-start">Tóm tắt lựa chọn</p>
+                    <h2 id="booking-estimate-title" class="mt-2 text-lg font-bold app-text">Ghế của bạn</h2>
+                    <dl class="mt-5 space-y-3 text-sm">
+                        <div class="flex justify-between gap-4"><dt class="app-muted">Phòng</dt><dd class="font-bold app-text">{{ $showtime->room->name }}</dd></div>
+                        <div class="flex justify-between gap-4"><dt class="app-muted">Ghế</dt><dd id="selectedSeatsDisplay" class="text-right font-bold app-text" aria-live="polite">Chưa chọn</dd></div>
+                        <div class="flex justify-between gap-4 border-t pt-4 app-border"><dt class="app-muted">Tạm tính tiền ghế</dt><dd id="totalAmountDisplay" class="text-2xl font-extrabold text-brand-start" aria-live="polite">0 VND</dd></div>
+                    </dl>
+                    <button id="continueBookingButton" type="submit" form="seatForm" disabled class="btn-primary mt-5 w-full">Tiếp tục chọn đồ ăn</button>
+                    <p id="seatSelectionHint" class="mt-3 text-xs leading-relaxed app-muted">Ghế đôi sẽ được chọn hoặc bỏ chọn cả cặp. Giá và tình trạng ghế sẽ được máy chủ kiểm tra lại.</p>
                 </div>
-            </form>
-        </div>
-
-        <!-- Right: Summary Sticky -->
-        <div class="lg:col-span-1">
-            <div class="app-card border app-border rounded-2xl overflow-hidden sticky top-24 shadow-2xl shadow-black/20">
-                <div class="p-5">
-                    <h3 class="text-lg font-bold mb-3">Thông tin đặt vé</h3>
-                    <ul class="space-y-2 text-sm">
-                        <li class="flex justify-between"><span class="app-muted">Phim</span><span class="app-text font-medium">{{ $showtime->movie->title }}</span></li>
-                        <li class="flex justify-between"><span class="app-muted">Rạp</span><span class="app-text font-medium">{{ $showtime->cinema->name }}</span></li>
-                        <li class="flex justify-between"><span class="app-muted">Phòng</span><span class="app-text font-medium">{{ $showtime->room->name }}</span></li>
-                        <li class="flex justify-between"><span class="app-muted">Ngày & Giờ</span><span class="app-text font-medium">{{ $showtime->show_date->format('d/m/Y') }} {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}</span></li>
-                        <li class="flex justify-between border-t app-border pt-3 mt-3"><span class="app-muted">Ghế đã chọn</span><span id="selectedSeatsDisplay" class="app-text font-bold text-lg">-</span></li>
-                    </ul>
-
-                    <div class="flex justify-between items-center mb-5 pt-4 border-t app-border">
-                        <span class="app-muted text-sm font-medium">Tổng tiền:</span>
-                        <span id="totalAmountDisplay" class="text-3xl font-bold text-brand-start">0đ</span>
-                    </div>
-
-                    <button type="submit" form="seatForm" class="w-full py-3.5 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/30 transition-all">
-                        Tiếp tục thanh toán
-                    </button>
-                </div>
-            </div>
+            </aside>
         </div>
     </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const seatButtons = document.querySelectorAll('button[data-seat-id]');
-    const selectedSeats = new Map();
-    const selectedSeatsInput = document.getElementById('selectedSeatsInput');
-    const totalAmountInput = document.getElementById('totalAmountInput');
-    const selectedSeatsDisplay = document.getElementById('selectedSeatsDisplay');
-    const totalAmountDisplay = document.getElementById('totalAmountDisplay');
-
-    function restoreSeatStyle(button) {
-        button.classList.remove('bg-brand-start', 'border-brand-start', 'text-white', 'shadow-lg', 'shadow-brand-start/30');
-
-        if (button.dataset.seatType === 'vip') {
-            button.classList.add('bg-ai-start/10', 'border-ai-start/50', 'text-ai-start');
-        } else {
-            button.classList.add('app-input', 'border-[var(--border-color)]', 'app-muted');
-        }
-    }
-
-    function applySelectedStyle(button) {
-        button.classList.remove(
-            'app-input',
-            'border-[var(--border-color)]',
-            'app-muted',
-            'bg-ai-start/10',
-            'border-ai-start/50',
-            'text-ai-start'
-        );
-        button.classList.add('bg-brand-start', 'border-brand-start', 'text-white', 'shadow-lg', 'shadow-brand-start/30');
-    }
-
-    function refreshSummary() {
-        const selected = Array.from(selectedSeats.values());
-        const total = selected.reduce((sum, seat) => sum + seat.price, 0);
-
-        selectedSeatsInput.value = selected.map(seat => seat.id).join(',');
-        totalAmountInput.value = total.toFixed(2);
-        selectedSeatsDisplay.textContent = selected.length ? selected.map(seat => seat.code).join(', ') : '-';
-        totalAmountDisplay.textContent = total.toLocaleString('vi-VN') + 'đ';
-    }
-
-    seatButtons.forEach(button => {
-        button.addEventListener('click', function () {
-            const seatId = this.dataset.seatId;
-
-            if (selectedSeats.has(seatId)) {
-                selectedSeats.delete(seatId);
-                restoreSeatStyle(this);
-            } else {
-                selectedSeats.set(seatId, {
-                    id: seatId,
-                    code: this.dataset.seatCode,
-                    type: this.dataset.seatType,
-                    price: parseFloat(this.dataset.price)
-                });
-                applySelectedStyle(this);
-            }
-
-            refreshSummary();
-        });
-    });
-});
-</script>
+</main>
 @endsection

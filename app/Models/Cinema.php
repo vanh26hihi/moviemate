@@ -2,20 +2,65 @@
 
 namespace App\Models;
 
+use App\Services\CinemaContext;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cinema extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
+        'canonical_key',
         'name',
+        'school_name',
         'address',
         'city',
+        'country',
         'phone',
+        'latitude',
+        'longitude',
         'image',
         'description',
         'status',
+        'is_primary',
+        'archived_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'latitude' => 'decimal:14',
+            'longitude' => 'decimal:14',
+            'is_primary' => 'boolean',
+            'archived_at' => 'datetime',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Cinema $cinema): void {
+            if ($cinema->is_primary
+                || $cinema->canonical_key === CinemaContext::CANONICAL_KEY
+                || $cinema->rooms()->exists()
+                || $cinema->showtimes()->exists()
+                || $cinema->pickupOrders()->exists()) {
+                throw new \LogicException('The canonical or referenced cinema cannot be deleted.');
+            }
+        });
+    }
+
+    public function scopePrimary(Builder $query): Builder
+    {
+        return $query->where('is_primary', true);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active')->whereNull('archived_at');
+    }
 
     public function rooms(): HasMany
     {
@@ -26,91 +71,14 @@ class Cinema extends Model
     {
         return $this->hasMany(Showtime::class);
     }
-    <?php
 
-namespace App\Services;
-
-class MegaAuthService
-{
-    protected $users = [];
-
-    public function register($email, $password)
+    public function pickupOrders(): HasMany
     {
-        $this->users[$email] = password_hash($password, PASSWORD_BCRYPT);
-
-        return [
-            'email' => $email,
-            'status' => 'registered'
-        ];
+        return $this->hasMany(Order::class, 'pickup_cinema_id');
     }
 
-    public function login($email, $password)
+    public function getMapUrlAttribute(): string
     {
-        if (!isset($this->users[$email])) {
-            return ['error' => 'User not found'];
-        }
-
-        if (password_verify($password, $this->users[$email])) {
-            return [
-                'token' => base64_encode($email . '|' . time()),
-                'status' => 'login success'
-            ];
-        }
-
-        return ['error' => 'Invalid password'];
+        return 'https://www.google.com/maps/search/?api=1&query='.urlencode($this->latitude.','.$this->longitude);
     }
-}
-<?php
-
-namespace App\Services;
-
-class MegaSearchService
-{
-    public function search($dataset, $keyword)
-    {
-        return array_values(array_filter($dataset, function ($item) use ($keyword) {
-            return str_contains(strtolower(json_encode($item)), strtolower($keyword));
-        }));
-    }
-
-    public function fakeDataset($n = 500)
-    {
-        $data = [];
-
-        for ($i = 0; $i < $n; $i++) {
-            $data[] = [
-                'title' => "Item {$i}",
-                'description' => "Random desc " . rand(1, 9999)
-            ];
-        }
-
-        return $data;
-    }
-}
-<?php
-
-namespace App\Services;
-
-class MegaFileService
-{
-    public function generateFiles($n = 100)
-    {
-        $files = [];
-
-        for ($i = 0; $i < $n; $i++) {
-            $files[] = [
-                'name' => "file_{$i}.txt",
-                'size' => rand(100, 5000),
-                'path' => "/fake/path/file_{$i}.txt"
-            ];
-        }
-
-        return $files;
-    }
-
-    public function totalSize($files)
-    {
-        return array_sum(array_column($files, 'size'));
-    }
-}
 }

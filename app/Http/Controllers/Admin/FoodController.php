@@ -2,174 +2,79 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domain\Money\VndAmount;
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\BookingSeat;
-use App\Models\Cinema;
-use App\Models\Movie;
-use Carbon\Carbon;
+use App\Http\Requests\Admin\SaveFoodRequest;
+use App\Models\FoodItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
-class AnalyticsController extends Controller
+class FoodController extends Controller
 {
-    public function revenue(Request $request)
+    public function index(Request $request)
     {
-        [$startDate, $endDate] = $this->dateRange($request);
+        $search = $request->query('search');
 
-        $paidBookings = Booking::query()
-            ->where('payment_status', 'paid')
-            ->whereBetween('created_at', [$startDate, $endDate]);
+        $foods = FoodItem::orderBy('name')
+            ->when($search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            })
+            ->paginate(20)
+            ->withQueryString();
 
-        $totalRevenue = (float) (clone $paidBookings)->sum('total_amount');
-        $paidBookingIds = (clone $paidBookings)->pluck('id');
-        $ticketsSold = BookingSeat::whereIn('booking_id', $paidBookingIds)->count();
-        $averageTicketPrice = $ticketsSold > 0 ? $totalRevenue / $ticketsSold : 0;
-        $cancelledBookings = Booking::where('booking_status', 'cancelled')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->count();
-        $allBookings = Booking::whereBetween('created_at', [$startDate, $endDate])->count();
-        $cancelRate = $allBookings > 0 ? ($cancelledBookings / $allBookings) * 100 : 0;
-
-        $summary = compact('totalRevenue', 'ticketsSold', 'averageTicketPrice', 'cancelledBookings', 'cancelRate');
-
-        $revenueByDay = $this->revenueByDay($startDate, $endDate);
-        $revenueByCinema = $this->revenueByCinema($startDate, $endDate);
-        $paymentMethods = $this->paymentMethods($startDate, $endDate, $totalRevenue);
-
-        return view('admin.analytics.revenue', compact(
-            'startDate',
-            'endDate',
-            'summary',
-            'revenueByDay',
-            'revenueByCinema',
-            'paymentMethods'
-        ));
+        return view('admin.foods.index', compact('foods', 'search'));
     }
 
-    public function topMovies(Request $request)
+    public function create()
     {
-        [$startDate, $endDate] = $this->dateRange($request);
-        $cinemaId = $request->integer('cinema_id') ?: null;
-
-        $topMovies = $this->topMoviesQuery($startDate, $endDate, $cinemaId)->paginate(20)->withQueryString();
-        $cinemas = Cinema::orderBy('name')->get();
-
-        $totalTickets = $topMovies->getCollection()->sum('tickets_sold');
-        $totalRevenue = $topMovies->getCollection()->sum('revenue');
-
-        return view('admin.analytics.top-movies', compact(
-            'startDate',
-            'endDate',
-            'cinemaId',
-            'cinemas',
-            'topMovies',
-            'totalTickets',
-            'totalRevenue'
-        ));
+        return view('admin.foods.form', ['food' => new FoodItem]);
     }
 
-    private function dateRange(Request $request): array
+    public function store(SaveFoodRequest $request)
     {
-        $startDate = $request->filled('start_date')
-            ? Carbon::parse($request->start_date)->startOfDay()
-            : now('Asia/Ho_Chi_Minh')->startOfMonth();
+        $data = $request->validated();
+        $data['price'] = VndAmount::fromInput($data['price'], FoodItem::MAX_PRICE)->value();
 
-        $endDate = $request->filled('end_date')
-            ? Carbon::parse($request->end_date)->endOfDay()
-            : now('Asia/Ho_Chi_Minh')->endOfDay();
-
-        if ($startDate->gt($endDate)) {
-            [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('food_images', 'public');
         }
 
-        return [$startDate, $endDate];
+        $data['active'] = $request->has('active');
+
+        FoodItem::create($data);
+
+        return redirect()->route('admin.foods.index')->with('success', 'Food created');
     }
 
-    private function revenueByDay(Carbon $startDate, Carbon $endDate): array
+    public function edit(FoodItem $food)
     {
-        $rows = Booking::query()
-            ->selectRaw('DATE(created_at) as booking_date')
-            ->selectRaw('COALESCE(SUM(total_amount), 0) as revenue')
-            ->selectRaw('COUNT(*) as bookings_count')
-            ->where('payment_status', 'paid')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->groupBy('booking_date')
-            ->get()
-            ->keyBy('booking_date');
+        return view('admin.foods.form', compact('food'));
+    }
 
-        $days = [];
-        $maxRevenue = max((float) $rows->max('revenue'), 1);
+    public function update(SaveFoodRequest $request, FoodItem $food)
+    {
+        $data = $request->validated();
+        $data['price'] = VndAmount::fromInput($data['price'], FoodItem::MAX_PRICE)->value();
 
-        for ($date = $startDate->copy(); $date->lte($endDate); $date->addDay()) {
-            $key = $date->toDateString();
-            $row = $rows->get($key);
-            $revenue = (float) ($row->revenue ?? 0);
-
-            $days[] = [
-                'label' => $date->format('d/m'),
-                'date' => $key,
-                'revenue' => $revenue,
-                'bookings_count' => (int) ($row->bookings_count ?? 0),
-                'height' => max(4, round(($revenue / $maxRevenue) * 100)),
-            ];
+        if ($request->hasFile('image')) {
+            if ($food->image && Storage::disk('public')->exists($food->image)) {
+                Storage::disk('public')->delete($food->image);
+            }
+            $data['image'] = $request->file('image')->store('food_images', 'public');
         }
 
-        return $days;
+        $data['active'] = $request->has('active');
+
+        $food->update($data);
+
+        return redirect()->route('admin.foods.index')->with('success', 'Food updated');
     }
 
-    private function revenueByCinema(Carbon $startDate, Carbon $endDate)
+    public function destroy(FoodItem $food)
     {
-        return DB::table('cinemas')
-            ->join('showtimes', 'showtimes.cinema_id', '=', 'cinemas.id')
-            ->join('bookings', function ($join) use ($startDate, $endDate) {
-                $join->on('bookings.showtime_id', '=', 'showtimes.id')
-                    ->where('bookings.payment_status', '=', 'paid')
-                    ->whereBetween('bookings.created_at', [$startDate, $endDate]);
-            })
-            ->select('cinemas.id', 'cinemas.name')
-            ->selectRaw('COALESCE(SUM(bookings.total_amount), 0) as revenue')
-            ->selectRaw('COUNT(DISTINCT bookings.id) as bookings_count')
-            ->groupBy('cinemas.id', 'cinemas.name')
-            ->orderByDesc('revenue')
-            ->get();
-    }
+        $food->delete();
 
-    private function paymentMethods(Carbon $startDate, Carbon $endDate, float $totalRevenue)
-    {
-        return DB::table('payments')
-            ->join('bookings', 'bookings.id', '=', 'payments.booking_id')
-            ->where('bookings.payment_status', 'paid')
-            ->whereBetween('bookings.created_at', [$startDate, $endDate])
-            ->select('payments.payment_method')
-            ->selectRaw('COUNT(*) as transactions_count')
-            ->selectRaw('COALESCE(SUM(bookings.total_amount), 0) as revenue')
-            ->groupBy('payments.payment_method')
-            ->orderByDesc('revenue')
-            ->get()
-            ->map(function ($method) use ($totalRevenue) {
-                $method->percent = $totalRevenue > 0 ? ((float) $method->revenue / $totalRevenue) * 100 : 0;
-                return $method;
-            });
-    }
-
-    private function topMoviesQuery(Carbon $startDate, Carbon $endDate, ?int $cinemaId = null)
-    {
-        return DB::table('movies')
-            ->join('showtimes', 'showtimes.movie_id', '=', 'movies.id')
-            ->join('bookings', function ($join) use ($startDate, $endDate) {
-                $join->on('bookings.showtime_id', '=', 'showtimes.id')
-                    ->where('bookings.payment_status', '=', 'paid')
-                    ->whereBetween('bookings.created_at', [$startDate, $endDate]);
-            })
-            ->leftJoin('booking_seats', 'booking_seats.booking_id', '=', 'bookings.id')
-            ->when($cinemaId, fn ($query) => $query->where('showtimes.cinema_id', $cinemaId))
-            ->select('movies.id', 'movies.title', 'movies.slug', 'movies.poster', 'movies.status')
-            ->selectRaw('COUNT(booking_seats.id) as tickets_sold')
-            ->selectRaw('COUNT(DISTINCT bookings.id) as bookings_count')
-            ->selectRaw('COALESCE(SUM(booking_seats.price), 0) as revenue')
-            ->groupBy('movies.id', 'movies.title', 'movies.slug', 'movies.poster', 'movies.status')
-            ->orderByDesc('tickets_sold')
-            ->orderByDesc('revenue');
+        return redirect()->route('admin.foods.index')->with('success', 'Food deleted');
     }
 }

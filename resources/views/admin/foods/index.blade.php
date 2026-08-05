@@ -17,10 +17,10 @@
                 Tìm kiếm
             </button>
         </form>
-        <a href="{{ route('admin.foods.create') }}" class="admin-btn-primary whitespace-nowrap">
+        @can('foods.create')<a href="{{ route('admin.foods.create') }}" class="admin-btn-primary whitespace-nowrap">
             <i class="ph-bold ph-plus-circle"></i>
             Thêm món mới
-        </a>
+        </a>@endcan
     </div>
 </div>
 
@@ -55,18 +55,18 @@
                             </span>
                         </td>
                         <td class="px-5 py-4 text-right space-x-2">
-                            <a href="{{ route('admin.foods.edit', $food) }}" class="inline-flex items-center gap-2 rounded-xl border app-border app-muted px-3 py-2 text-sm hover:app-text hover:border-brand-start transition-colors">
+                            @can('foods.update')<a href="{{ route('admin.foods.edit', $food) }}" class="inline-flex items-center gap-2 rounded-xl border app-border app-muted px-3 py-2 text-sm hover:app-text hover:border-brand-start transition-colors">
                                 <i class="ph ph-pencil"></i>
                                 Sửa
-                            </a>
-                            <form action="{{ route('admin.foods.destroy', $food) }}" method="POST" class="inline-block">
+                            </a>@endcan
+                            @can('foods.delete')<form action="{{ route('admin.foods.destroy', $food) }}" method="POST" class="inline-block">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="inline-flex items-center gap-2 rounded-xl border app-border border-error/20 text-error px-3 py-2 text-sm hover:bg-error/10 transition-colors" onclick="return confirm('Xác nhận xóa món này?')">
                                     <i class="ph ph-trash"></i>
                                     Xóa
                                 </button>
-                            </form>
+                            </form>@endcan
                         </td>
                     </tr>
                 @empty

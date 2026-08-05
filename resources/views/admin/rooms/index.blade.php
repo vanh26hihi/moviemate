@@ -11,9 +11,9 @@
             <h1 class="text-3xl font-extrabold app-text">Phòng chiếu</h1>
             <p class="app-muted mt-2">Quản lý phòng, loại phòng và sơ đồ ghế theo từng rạp.</p>
         </div>
-        <a href="{{ route('admin.rooms.create') }}" class="btn-primary">
+        @can('rooms.create')<a href="{{ route('admin.rooms.create') }}" class="btn-primary">
             <i class="ph-bold ph-plus"></i> Thêm phòng
-        </a>
+        </a>@endcan
     </div>
 
     @if(session('success'))
@@ -43,7 +43,7 @@
                         <th>Rạp</th>
                         <th>Tên phòng</th>
                         <th>Loại</th>
-                        <th>Số ghế</th>
+                        <th>Layout published</th>
                         <th>Trạng thái</th>
                         <th class="text-right">Thao tác</th>
                     </tr>
@@ -58,7 +58,19 @@
                             </td>
                             <td class="font-extrabold">{{ $room->name }}</td>
                             <td>{{ $room->room_type }}</td>
-                            <td>{{ $room->total_seats }}</td>
+                            <td>
+                                @php
+                                    $published = $room->latestPublishedLayout;
+                                    $publishedSeats = $published?->cells->where('cell_type', 'seat')->pluck('seat')->filter() ?? collect();
+                                @endphp
+                                @if($published)
+                                    <p class="font-bold app-text">v{{ $published->version }} · {{ $published->rows }} × {{ $published->columns }}</p>
+                                    <p class="text-xs app-muted">{{ $publishedSeats->count() }} ghế · {{ $publishedSeats->where('type', 'vip')->count() }} VIP · {{ $publishedSeats->where('type', 'couple')->count() }} couple</p>
+                                @else
+                                    <span class="text-xs text-warning">Chưa publish</span>
+                                @endif
+                                @if($room->draftLayout)<span class="mt-1 inline-block status-badge bg-warning/10 text-warning">Có draft v{{ $room->draftLayout->version }}</span>@endif
+                            </td>
                             <td>
                                 @if($room->status === 'active')
                                     <span class="status-badge text-success bg-success/10">Hoạt động</span>
@@ -68,19 +80,20 @@
                             </td>
                             <td>
                                 <div class="flex items-center justify-end gap-2">
-                                    <a href="{{ route('admin.seats.manage', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
-                                        <i class="ph ph-armchair"></i> Ghế
-                                    </a>
-                                    <a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
+                                    @can('seats.manage')<a href="{{ route('admin.rooms.layout.show', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
+                                        <i class="ph ph-grid-four"></i> Layout
+                                    </a>@endcan
+                                    @can('seats.view') @if($published)<a href="{{ route('admin.rooms.layout.preview', ['room' => $room, 'version' => $published->version]) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">Preview</a>@endif @endcan
+                                    @can('rooms.update')<a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
                                         <i class="ph ph-pencil-simple"></i> Sửa
-                                    </a>
-                                    <form action="{{ route('admin.rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phòng này?');">
+                                    </a>@endcan
+                                    @can('rooms.delete')<form action="{{ route('admin.rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phòng này?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:bg-error hover:border-error hover:text-white transition-colors">
                                             <i class="ph ph-trash"></i>
                                         </button>
-                                    </form>
+                                    </form>@endcan
                                 </div>
                             </td>
                         </tr>

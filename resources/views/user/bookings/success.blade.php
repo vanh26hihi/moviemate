@@ -1,73 +1,190 @@
 @extends('layouts.user')
 
-@section('title', 'Đặt vé thành công - MovieMate')
+@php
+    $paymentState = $booking->payment?->status;
+    $isUsed = $booking->booking_status === 'used';
+    $isCancelled = $booking->booking_status === 'cancelled';
+    $isExpired = $booking->booking_status === 'expired' || $paymentState === \App\Models\Payment::STATUS_EXPIRED;
+    $isPaid = ! $isUsed && ! $isCancelled && ! $isExpired
+        && $booking->payment_status === 'paid' && $booking->booking_status === 'paid';
+    $isReview = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired
+        && $paymentState === \App\Models\Payment::STATUS_REVIEW;
+    $isFailed = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview
+        && $paymentState === \App\Models\Payment::STATUS_FAILED;
+    $isPending = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview && ! $isFailed
+        && $booking->booking_status === 'pending_payment';
+
+    $stateKey = match (true) {
+        $isPaid => 'paid',
+        $isUsed => 'used',
+        $isCancelled => 'cancelled',
+        $isExpired => 'expired',
+        $isReview => 'review',
+        $isFailed => 'failed',
+        default => 'pending',
+    };
+    $states = [
+        'paid' => [
+            'title' => 'Thanh toán đã được xác minh',
+            'message' => 'Vé điện tử đã sẵn sàng. Bạn có thể mở vé và lưu mã QR để sử dụng tại rạp.',
+            'icon' => 'ph-check-circle',
+            'colour' => 'text-success',
+            'badge' => 'Đã thanh toán',
+        ],
+        'pending' => [
+            'title' => 'Đang chờ xác minh thanh toán',
+            'message' => 'MovieMate chưa nhận được kết quả xác minh cuối cùng từ ZaloPay. Booking này chưa phải là vé điện tử.',
+            'icon' => 'ph-hourglass-medium',
+            'colour' => 'text-warning',
+            'badge' => 'Chờ xác minh',
+        ],
+        'review' => [
+            'title' => 'Giao dịch đang được đối soát',
+            'message' => 'Dữ liệu giao dịch cần được kiểm tra thêm. Đây chưa phải kết luận thanh toán thất bại và MovieMate chưa phát hành vé.',
+            'icon' => 'ph-magnifying-glass',
+            'colour' => 'text-warning',
+            'badge' => 'Cần đối soát',
+        ],
+        'failed' => [
+            'title' => 'Thanh toán không thành công',
+            'message' => 'ZaloPay đã trả về trạng thái không thành công. Booking này không có vé điện tử khả dụng.',
+            'icon' => 'ph-x-circle',
+            'colour' => 'text-error',
+            'badge' => 'Không thành công',
+        ],
+        'expired' => [
+            'title' => 'Booking đã hết hạn',
+            'message' => 'Thời gian giữ ghế đã kết thúc và ghế đã được giải phóng. Thanh toán đến muộn sẽ được chuyển sang đối soát, không tự phát hành vé.',
+            'icon' => 'ph-clock-countdown',
+            'colour' => 'text-slate-400',
+            'badge' => 'Hết hạn',
+        ],
+        'cancelled' => [
+            'title' => 'Booking đã bị hủy',
+            'message' => 'Booking này đã được hủy và không còn giữ ghế. Không có mã QR hoặc vé để tải xuống.',
+            'icon' => 'ph-prohibit',
+            'colour' => 'text-error',
+            'badge' => 'Đã hủy',
+        ],
+        'used' => [
+            'title' => 'Vé đã được sử dụng',
+            'message' => 'Vé đã được soát tại rạp và chỉ còn giá trị tra cứu lịch sử. Mã QR không còn khả dụng.',
+            'icon' => 'ph-checks',
+            'colour' => 'text-ai-start',
+            'badge' => 'Đã sử dụng',
+        ],
+    ];
+    $state = $states[$stateKey];
+    $currency = $booking->currency ?: 'VND';
+    $foodItems = $booking->foodOrder?->items ?? collect();
+    $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
+@endphp
+
+@section('title', $state['title'].' - MovieMate')
 
 @section('content')
-<div class="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center bg-no-repeat bg-fixed relative">
-    <div class="absolute inset-0 bg-dark-main/90 backdrop-blur-sm"></div>
+<main class="user-page-shell relative min-h-[80vh] overflow-hidden bg-[radial-gradient(circle_at_20%_15%,rgba(255,61,87,0.2),transparent_35%),radial-gradient(circle_at_80%_85%,rgba(108,43,217,0.18),transparent_40%)] px-4 py-8 sm:px-6 lg:px-8">
+    <div class="absolute inset-0 bg-dark-main/75 backdrop-blur-sm" aria-hidden="true"></div>
 
-    <div class="relative max-w-lg w-full bg-dark-card/90 border border-dark-border rounded-3xl p-8 sm:p-12 text-center shadow-2xl shadow-brand-start/20 backdrop-blur-md animate-[fade-in-up_0.5s_ease-out]">
+    <div class="relative mx-auto max-w-4xl">
+        <x-checkout-progress current="payment" class="mb-8" />
 
-        <div class="w-24 h-24 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-            <div class="absolute inset-0 rounded-full border-4 border-success animate-ping opacity-20"></div>
-            <i class="ph-bold ph-check text-5xl text-success animate-[fade-in_0.5s_ease-out_0.2s_both]"></i>
-        </div>
+        <section class="cinema-card animate-[fade-in-up_0.5s_ease-out] rounded-3xl p-5 shadow-2xl shadow-brand-start/20 backdrop-blur-md sm:p-8" data-booking-state="{{ $stateKey }}" aria-labelledby="booking-state-title">
+            <header class="text-center">
+                <span class="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-full bg-current/10 {{ $state['colour'] }}" aria-hidden="true">
+                    <i class="ph-bold {{ $state['icon'] }} text-5xl"></i>
+                </span>
+                <p class="mt-5 text-xs font-extrabold uppercase tracking-[0.2em] {{ $state['colour'] }}">{{ $state['badge'] }}</p>
+                <h1 id="booking-state-title" class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">{{ $state['title'] }}</h1>
+                <p class="mx-auto mt-3 max-w-2xl leading-relaxed app-muted">{{ $state['message'] }}</p>
+            </header>
 
-        <h1 class="text-3xl font-bold text-white mb-2">Đặt vé thành công!</h1>
-        <p class="text-text-sub mb-8">Cảm ơn bạn đã sử dụng dịch vụ của MovieMate.</p>
-
-        <div class="bg-dark-main border border-dark-border rounded-2xl p-6 mb-8 text-left relative overflow-hidden">
-            <!-- Ticket Notch Left/Right -->
-            <div class="absolute top-1/2 -left-3 -translate-y-1/2 w-6 h-6 bg-dark-card rounded-full border-r border-dark-border"></div>
-            <div class="absolute top-1/2 -right-3 -translate-y-1/2 w-6 h-6 bg-dark-card rounded-full border-l border-dark-border"></div>
-
-            <div class="border-b border-dashed border-dark-border pb-4 mb-4 flex justify-between items-center">
-                <div>
-                    <p class="text-xs text-text-sub mb-1">Mã đặt vé</p>
-                    <p class="text-xl font-bold text-brand-start font-mono">{{ $booking->booking_code }}</p>
+            @if(($isPending || $isReview) && $booking->expires_at)
+                <div class="mx-auto mt-6 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-center" data-countdown-wrapper>
+                    <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian giữ ghế còn lại</p>
+                    <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $booking->expires_at->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
+                    <p class="mt-2 text-xs leading-relaxed app-muted">Đừng tạo thêm booking hoặc yêu cầu thanh toán mới khi giao dịch hiện tại chưa có kết quả rõ ràng.</p>
                 </div>
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data={{ $booking->booking_code }}&color=FF3D57&bgcolor=080A12" alt="QR Code" class="w-12 h-12 rounded bg-white p-1">
+            @endif
+
+            <div class="mt-8 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+                <section class="rounded-2xl border app-border p-5 sm:p-6" aria-labelledby="booking-details-title">
+                    <div class="flex flex-wrap items-start justify-between gap-4 border-b pb-4 app-border">
+                        <div>
+                            <p class="text-xs app-muted">Mã booking</p>
+                            <h2 id="booking-details-title" class="mt-1 break-all font-mono text-xl font-bold text-brand-start">{{ $booking->booking_code }}</h2>
+                        </div>
+                        <span class="rounded-full border app-border px-3 py-1 text-xs font-bold {{ $state['colour'] }}">{{ $state['badge'] }}</span>
+                    </div>
+
+                    <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
+                        <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->movie->title }}</dd></div>
+                        <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime_label }}</dd></div>
+                        <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->cinema->name }}</dd></div>
+                        <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->room->name }}</dd></div>
+                    </dl>
+
+                    <div class="mt-5 border-t pt-4 app-border">
+                        <h3 class="text-sm font-bold app-text">Ghế</h3>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            @foreach($booking->bookingSeats as $bookingSeat)
+                                <span class="rounded-xl app-secondary px-3 py-2 text-sm font-bold app-text">
+                                    {{ $bookingSeat->seat?->seat_code }}
+                                    <span class="ml-1 font-normal app-muted">· {{ $seatTypeLabels[$bookingSeat->seat?->type] ?? ucfirst((string) $bookingSeat->seat?->type) }}</span>
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
+                </section>
+
+                <aside class="rounded-2xl app-secondary p-5 sm:p-6" aria-labelledby="order-total-title">
+                    <h2 id="order-total-title" class="font-bold app-text">Chi tiết đơn</h2>
+
+                    <div class="mt-4 space-y-3 text-sm">
+                        @forelse($foodItems as $item)
+                            <div class="flex items-start justify-between gap-3">
+                                <span class="app-text">{{ $item->snapshot_name }} × {{ $item->quantity }}</span>
+                                <strong class="whitespace-nowrap app-text">{{ number_format((int) $item->line_total, 0, ',', '.') }} {{ $currency }}</strong>
+                            </div>
+                        @empty
+                            <p class="app-muted">Không có đồ ăn trong đơn.</p>
+                        @endforelse
+                    </div>
+
+                    <dl class="mt-5 space-y-3 border-t pt-4 text-sm app-border">
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-semibold app-text">{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-semibold app-text">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
+                        <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng cộng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</dd></div>
+                    </dl>
+                    <div class="mt-5 rounded-xl border app-border px-4 py-3">
+                        <p class="text-xs app-muted">Email nhận vé</p>
+                        <p class="mt-1 break-all text-sm font-bold app-text">{{ $booking->recipient_email }}</p>
+                    </div>
+                </aside>
             </div>
 
-            <div class="space-y-3 text-sm">
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Phim</span>
-                    <span class="text-white font-medium text-right max-w-[60%]">{{ $booking->showtime->movie->title }}</span>
+            @if($isPending)
+                <div class="mt-6 rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-sm leading-relaxed text-warning" role="note">
+                    <strong>Không tạo lại thanh toán một cách mù:</strong> nếu bạn vừa thanh toán hoặc đã thấy ZaloPay trừ tiền, hãy chờ xác minh. Nút bên dưới chỉ tiếp tục hoặc đối soát lần thanh toán hiện tại theo dữ liệu máy chủ.
                 </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Rạp</span>
-                    <span class="text-white font-medium text-right">{{ $booking->showtime->cinema->name }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Thời gian</span>
-                    <span class="text-white font-medium text-right">{{ $booking->showtime->show_date->format('d/m/Y') }} {{ \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Ghế</span>
-                    <span class="text-white font-bold text-right">
-                        {{ $booking->bookingSeats->pluck('seat.seat_code')->join(', ') }}
-                    </span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-text-sub">Tổng tiền</span>
-                    <span class="text-white font-bold text-right">{{ number_format($booking->total_amount,0,',','.') }}đ</span>
-                </div>
+            @endif
+
+            <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+                @if($isPaid)
+                    <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary" data-paid-ticket-link>
+                        <i class="ph-fill ph-ticket" aria-hidden="true"></i>
+                        Mở vé điện tử
+                    </a>
+                @elseif($isPending)
+                    <form method="POST" action="{{ route('payments.zalopay.initiate', $booking) }}" data-submit-once>
+                        @csrf
+                        <button type="submit" class="btn-primary w-full" data-loading-label="Đang kiểm tra lần thanh toán…">Kiểm tra / tiếp tục lần hiện tại</button>
+                        <p class="mt-2 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>
+                    </form>
+                @endif
+                <a href="{{ route('home') }}" class="btn-secondary">Về trang chủ</a>
             </div>
-        </div>
-
-        <p class="text-sm text-text-sub mb-8">
-            <i class="ph-fill ph-envelope-simple text-brand-start"></i> Vé điện tử đã được gửi đến email <br>
-            <span class="text-white font-medium mt-1 inline-block">{{ $booking->user->email }}</span>
-        </p>
-
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="{{ route('user.bookings.ticket') }}" class="px-6 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl font-bold hover:shadow-lg hover:shadow-brand-start/20 transition-all transform hover:-translate-y-0.5">
-                Xem vé QR của tôi
-            </a>
-            <a href="{{ route('home') }}" class="px-6 py-3 bg-dark-main border border-dark-border text-white rounded-xl font-bold hover:bg-dark-border transition-colors">
-                Về trang chủ
-            </a>
-        </div>
+        </section>
     </div>
-</div>
+</main>
 @endsection

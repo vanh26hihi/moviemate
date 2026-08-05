@@ -1,87 +1,105 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>@yield('title', 'MovieMate Admin')</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+    <title>@yield('title', 'MovieMate Admin Panel')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-    <style>
-        body {
-            font-family: 'Be Vietnam Pro', sans-serif;
-        }
-    </style>
+    <script>
+        (function () {
+            var theme = localStorage.getItem('theme') || localStorage.getItem('moviemate_theme') || 'dark';
+            document.documentElement.classList.toggle('light', theme === 'light');
+        })();
+    </script>
 </head>
+<body class="app-page font-sans antialiased flex h-screen overflow-hidden">
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden hidden"></div>
 
-<body class="bg-[#080A12] text-white">
-
-<div class="flex min-h-screen">
-
-    <aside class="fixed left-0 top-0 hidden h-screen w-72 border-r border-white/10 bg-[#0B0F1A] p-6 lg:block">
-        <a href="/admin/dashboard" class="mb-10 flex items-center gap-3">
-            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#FF3D57] to-[#FF7A18]">ðŸŽ¬</div>
-            <div>
-                <h1 class="text-xl font-black">Movie<span class="text-[#FF7A18]">Mate</span></h1>
-                <p class="text-xs text-gray-400">Admin Panel</p>
-            </div>
-        </a>
-
-        <nav class="space-y-1 text-sm font-semibold text-gray-300">
-            <a href="/admin/dashboard" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Dashboard</a>
-            <a href="/admin/movies" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Quáº£n lÃ½ phim</a>
-            <a href="/admin/genres" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Thá»ƒ loáº¡i</a>
-            <a href="/admin/cinemas" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Ráº¡p chiáº¿u</a>
-            <a href="/admin/rooms" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">PhÃ²ng chiáº¿u</a>
-            <a href="/admin/seats" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Gháº¿</a>
-            <a href="/admin/showtimes" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Suáº¥t chiáº¿u</a>
-            <a href="/admin/bookings" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">VÃ© Ä‘áº·t</a>
-            <a href="/admin/users" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">NgÆ°á»i dÃ¹ng</a>
-            <a href="/admin/reviews" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">ÄÃ¡nh giÃ¡</a>
-            <a href="/admin/analytics/revenue" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Doanh thu</a>
-                <a href="{{ route('admin.foods.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.foods.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}">
-                <i class="{{ request()->routeIs('admin.foods.*') ? 'ph-fill' : 'ph' }} ph-burger text-lg"></i>
-                Món ăn
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 app-sidebar border-r app-border transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col h-full">
+        <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0">
+            <a href="{{ route('home') }}" class="flex items-center gap-2">
+                <i class="ph-fill ph-film-strip text-3xl text-brand-start"></i>
+                <div class="leading-tight">
+                    <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end">MovieMate</span>
+                    <span class="block text-[10px] uppercase tracking-widest app-muted font-bold">Admin Panel</span>
+                </div>
             </a>
-            <a href="{{ route('admin.food-orders.index') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl {{ request()->routeIs('admin.food-orders.*') ? 'bg-brand-start/10 text-brand-start font-bold' : 'app-muted hover:bg-brand-start/5 hover:text-brand-start transition-colors text-sm font-medium' }}">
-                <i class="{{ request()->routeIs('admin.food-orders.*') ? 'ph-fill' : 'ph' }} ph-shopping-bag text-lg"></i>
-                Đơn đồ ăn
-            </a>
-            <a href="/admin/analytics/top-movies" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Phim bÃ¡n cháº¡y</a>
-            <a href="/admin/ai/movie-content" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">AI Tools</a>
-            <a href="/" class="block rounded-2xl px-4 py-3 hover:bg-white/10 hover:text-white">Vá» website</a>
+        </div>
+
+        <nav class="flex-grow py-4 px-4 space-y-0.5 overflow-y-auto hide-scrollbar">
+            @can('dashboard.view')
+                <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-4 first:mt-0">Tổng quan</p>
+                <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Dashboard" icon="ph-squares-four" />
+            @endcan
+
+            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Vận hành &amp; phim</p>
+            @can('movies.view')<x-admin.nav-link route-name="admin.movies.index" active-pattern="admin.movies.*" label="Phim" icon="ph-film-slate" />@endcan
+            @can('genres.view')<x-admin.nav-link route-name="admin.genres.index" active-pattern="admin.genres.*" label="Thể loại" icon="ph-tag" />@endcan
+            @can('cinema.view')<x-admin.nav-link route-name="admin.cinema.show" active-pattern="admin.cinema.*" label="Thông tin rạp" icon="ph-buildings" />@endcan
+            @can('rooms.view')<x-admin.nav-link route-name="admin.rooms.index" active-pattern="admin.rooms.*" label="Phòng chiếu" icon="ph-projector-screen" />@endcan
+            @can('seats.view')<x-admin.nav-link route-name="admin.seats.index" active-pattern="admin.seats.*" label="Ghế" icon="ph-armchair" />@endcan
+            @can('showtimes.view')<x-admin.nav-link route-name="admin.showtimes.index" active-pattern="admin.showtimes.*" label="Suất chiếu" icon="ph-calendar-plus" />@endcan
+
+            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Kinh doanh</p>
+            @can('foods.view')<x-admin.nav-link route-name="admin.foods.index" active-pattern="admin.foods.*" label="Món ăn" icon="ph-burger" />@endcan
+            @can('food-orders.view')<x-admin.nav-link route-name="admin.food-orders.index" active-pattern="admin.food-orders.*" label="Đơn đồ ăn" icon="ph-shopping-bag" />@endcan
+
+            @canany(['users.view', 'roles.view'])
+                <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Bảo mật</p>
+                @can('users.view')<x-admin.nav-link route-name="admin.users.index" active-pattern="admin.users.*" label="Người dùng" icon="ph-users" />@endcan
+                @can('roles.view')<x-admin.nav-link route-name="admin.roles.index" active-pattern="admin.roles.*" label="Vai trò &amp; quyền" icon="ph-shield-check" />@endcan
+            @endcanany
         </nav>
+
+        <div class="p-4 border-t app-border shrink-0">
+            <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về website</a>
+            <form method="POST" action="{{ route('logout') }}" class="mt-2">@csrf
+                <button type="submit" class="flex items-center justify-center gap-2 w-full py-2.5 app-muted hover:text-error text-sm font-medium"><i class="ph ph-sign-out"></i> Đăng xuất</button>
+            </form>
+        </div>
     </aside>
 
-    <div class="min-h-screen flex-1 lg:ml-72">
-        <header class="sticky top-0 z-40 border-b border-white/10 bg-[#080A12]/80 px-6 py-4 backdrop-blur-xl">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-xl font-black">@yield('page-title', 'Admin Panel')</h2>
-                    <p class="text-sm text-gray-400">Quáº£n lÃ½ toÃ n bá»™ há»‡ thá»‘ng MovieMate</p>
+    <main class="admin-shell flex-grow flex flex-col min-w-0 app-bg relative h-full overflow-hidden">
+        <header class="h-16 lg:h-20 flex items-center justify-between px-4 sm:px-8 border-b app-border app-card backdrop-blur-md sticky top-0 z-30 shrink-0">
+            <div class="flex items-center gap-4">
+                <button id="mobile-menu-btn" type="button" class="lg:hidden app-muted hover:app-text" aria-label="Mở menu" aria-expanded="false" aria-controls="sidebar"><i class="ph ph-list text-2xl"></i></button>
+                <h1 class="text-lg font-bold app-text hidden sm:block">@yield('page-title')</h1>
+            </div>
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div class="relative hidden md:block w-56">
+                    <i class="ph ph-magnifying-glass app-muted text-sm absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"></i>
+                    <input type="text" class="app-input w-full pl-9 pr-3 py-2 rounded-lg border app-border focus:outline-none focus:border-brand-start transition-colors text-sm" placeholder="Tìm kiếm (Ctrl+K)">
                 </div>
-
-                <div class="flex items-center gap-4">
-                    <input type="text" placeholder="TÃ¬m kiáº¿m..." class="hidden h-11 rounded-2xl border border-white/10 bg-[#151A27] px-4 text-sm outline-none focus:border-[#FF7A18] md:block">
-                    <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-2">
-                        <div class="h-9 w-9 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#2563EB]"></div>
-                        <div>
-                            <p class="text-sm font-bold">Admin</p>
-                            <p class="text-xs text-gray-400">Quáº£n trá»‹ viÃªn</p>
-                        </div>
+                <button type="button" class="relative app-muted hover:app-text transition-colors p-2" aria-label="Thông báo"><i class="ph ph-bell text-lg"></i></button>
+                <button data-theme-toggle type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border app-muted hover:border-brand-start transition-all text-sm" aria-label="Đổi giao diện sáng/tối" aria-pressed="false"><span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span><span class="theme-text hidden lg:inline text-xs font-medium">Tối</span></button>
+                <div class="flex items-center gap-3 pl-3 border-l app-border">
+                    <div class="hidden sm:block text-right">
+                        <p class="text-sm font-bold app-text leading-tight">{{ auth()->user()?->name ?? 'Khu vực quản trị' }}</p>
+                        <p class="text-[10px] uppercase tracking-wider text-brand-start font-bold">{{ auth()->user()?->role?->name ?? 'Chưa có vai trò' }}</p>
                     </div>
+                    <span class="w-9 h-9 rounded-full app-bg border app-border flex items-center justify-center text-brand-start"><i class="ph-fill ph-user text-lg"></i></span>
                 </div>
             </div>
         </header>
-
-        <main class="p-6">
+        <div class="flex-grow overflow-y-auto"><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12">
+            <div class="sm:hidden mb-4"><h1 class="text-xl font-bold app-heading">@yield('page-title')</h1></div>
+            @if(session('success'))<div class="mb-5 rounded-xl border border-success/30 bg-success/10 text-success px-4 py-3">{{ session('success') }}</div>@endif
+            @if(isset($errors) && $errors->any())<div class="mb-5 rounded-xl border border-error/30 bg-error/10 text-error px-4 py-3">{{ $errors->first() }}</div>@endif
             @yield('content')
-        </main>
-    </div>
+        </div></div>
+    </main>
 
-</div>
-
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        const toggleBtn = document.getElementById('mobile-menu-btn');
+        function toggleSidebar() {
+            const isHidden = sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+            toggleBtn.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
+        }
+        if (toggleBtn && sidebar && backdrop) { toggleBtn.addEventListener('click', toggleSidebar); backdrop.addEventListener('click', toggleSidebar); }
+    </script>
+    @stack('scripts')
 </body>
 </html>
