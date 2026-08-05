@@ -4,18 +4,6 @@
 @section('page-title', 'Kiểm tra thanh toán')
 
 @section('content')
-    @if (session('payment_review_result'))
-        <div class="mb-4 rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm">
-            {{ session('payment_review_result') }}
-        </div>
-    @endif
-
-    @if (session('payment_review_error'))
-        <div class="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm">
-            {{ session('payment_review_error') }}
-        </div>
-    @endif
-
     <div class="app-card border app-border rounded-2xl overflow-hidden shadow-lg">
         <div class="p-5 border-b app-border">
             <h2 class="text-lg font-bold">Giao dịch cần nhân viên xác minh</h2>

@@ -1,11 +1,14 @@
 @extends('layouts.user')
 
 @section('title', 'Chọn đồ ăn - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
     $maxFoodQuantity = (int) config('booking.max_food_quantity', 20);
 @endphp
+
+<x-validation-summary class="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8" :errors="$errors" :except="['customer_email', 'food_items']" />
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-6xl">

@@ -32,17 +32,17 @@ class PaymentReviewController extends Controller
 
         if ($payment->status !== Payment::STATUS_REVIEW) {
             return redirect()->route('admin.payment-reviews.index')
-                ->with('payment_review_error', 'Only payments currently in review may be reconciled manually.');
+                ->with('error', 'Chỉ giao dịch đang chờ kiểm tra mới có thể được đối soát thủ công.');
         }
 
         try {
             $result = $reviews->resolve($payment, $request->user());
-        } catch (LogicException $exception) {
+        } catch (LogicException) {
             return redirect()->route('admin.payment-reviews.index')
-                ->with('payment_review_error', $exception->getMessage());
+                ->with('error', 'Không thể hoàn tất đối soát giao dịch hiện tại.');
         }
 
         return redirect()->route('admin.payment-reviews.index')
-            ->with('payment_review_result', $result->message);
+            ->with('success', $result->message);
     }
 }

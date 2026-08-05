@@ -24,12 +24,6 @@
     </div>
 </div>
 
-@if(session('success'))
-    <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm">
-        {{ session('success') }}
-    </div>
-@endif
-
 <div class="admin-card">
     <div class="overflow-x-auto rounded-3xl border app-border bg-app-card">
         <table class="w-full text-left border-collapse whitespace-nowrap">

@@ -2,6 +2,7 @@
 
 @section('title', 'Thêm phòng chiếu - MovieMate')
 @section('page-title', 'Thêm phòng chiếu')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="max-w-3xl">

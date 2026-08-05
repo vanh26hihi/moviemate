@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Đăng nhập nhân viên - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <section class="flex min-h-screen items-center justify-center px-6 py-16">

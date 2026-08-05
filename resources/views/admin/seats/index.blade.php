@@ -13,14 +13,6 @@
         </div>
     </div>
 
-    @if(session('success') || session('error') || $errors->any())
-        @php $seatMessage = session('success') ?? session('error') ?? $errors->first(); @endphp
-        <div class="flex items-start gap-3 rounded-2xl border {{ session('success') ? 'border-success/30 bg-success/10 text-success' : 'border-error/30 bg-error/10 text-error' }} px-4 py-3 text-sm font-bold" role="{{ session('success') ? 'status' : 'alert' }}">
-            <i class="ph-fill {{ session('success') ? 'ph-check-circle' : 'ph-warning-octagon' }} mt-0.5 text-lg" aria-hidden="true"></i>
-            <span>{{ $seatMessage }}</span>
-        </div>
-    @endif
-
     <div class="cinema-card overflow-hidden">
         <div class="p-5 border-b app-border">
             <form method="GET" action="{{ route('admin.seats.index') }}" class="flex flex-col sm:flex-row gap-3">

@@ -109,22 +109,7 @@
     </header>
 
     <main class="flex-grow pt-16 md:pt-20 min-w-0">
-        @if(session('success') || session('error') || session('warning') || $errors->any())
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
-                @if(session('success'))
-                    <div class="rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-medium">{{ session('success') }}</div>
-                @endif
-                @if(session('error'))
-                    <div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium">{{ session('error') }}</div>
-                @endif
-                @if(session('warning'))
-                    <div class="rounded-2xl border border-warning/30 bg-warning/10 text-warning px-4 py-3 text-sm font-medium">{{ session('warning') }}</div>
-                @endif
-                @if($errors->any())
-                    <div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium" role="alert">{{ $errors->first() }}</div>
-                @endif
-            </div>
-        @endif
+        <x-flash-messages class="mx-auto max-w-7xl px-4 pt-5 sm:px-6 lg:px-8" :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
         @yield('content')
     </main>
 

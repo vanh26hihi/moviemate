@@ -309,6 +309,14 @@ initializeSubmitGuards();
 initializeImagePreviews();
 initializeCountdowns();
 
+if (document.documentElement.dataset.flashDismissInitialized !== 'true') {
+    document.documentElement.dataset.flashDismissInitialized = 'true';
+    document.addEventListener('click', (event) => {
+        const dismissFlashButton = event.target.closest('[data-dismiss-flash]');
+        dismissFlashButton?.closest('[data-flash-banner]')?.remove();
+    });
+}
+
 document.addEventListener('click', (event) => {
     const mobileMenuButton = event.target.closest('#mobile-menu-btn');
 

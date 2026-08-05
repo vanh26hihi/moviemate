@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Đăng nhập - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
@@ -22,16 +23,6 @@
                     <h1 class="text-2xl md:text-3xl font-bold app-heading mb-2">Đăng nhập</h1>
                     <p class="app-text-muted text-sm">Chào mừng bạn quay lại với MovieMate.</p>
                 </div>
-                @if(session('success'))
-                    <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-semibold">
-                        {{ session('success') }}
-                    </div>
-                @endif
-                @if($errors->any())
-                    <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-semibold">
-                        {{ $errors->first() }}
-                    </div>
-                @endif
                 <form action="{{ route('login.store') }}" method="POST" class="space-y-5">
                     @csrf
 

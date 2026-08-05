@@ -28,12 +28,6 @@
             <p class="text-sm app-muted">Bước 1/4 · Chọn ghế phù hợp</p>
         </div>
 
-        @if(session('error'))
-            <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 px-4 py-3 text-sm font-bold text-error" role="alert" aria-live="assertive">
-                {{ session('error') }}
-            </div>
-        @endif
-
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
             <section class="cinema-card overflow-hidden rounded-3xl p-4 sm:p-6 lg:col-span-2" aria-labelledby="seat-picker-title">
                 <header class="mb-6 text-center">

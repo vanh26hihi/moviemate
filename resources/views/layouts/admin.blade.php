@@ -83,8 +83,7 @@
         </header>
         <div class="flex-grow overflow-y-auto"><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12">
             <div class="sm:hidden mb-4"><p class="text-xl font-bold app-heading">@yield('page-title')</p></div>
-            @if(session('success'))<div class="mb-5 rounded-xl border border-success/30 bg-success/10 text-success px-4 py-3">{{ session('success') }}</div>@endif
-            @if(isset($errors) && $errors->any())<div class="mb-5 rounded-xl border border-error/30 bg-error/10 text-error px-4 py-3">{{ $errors->first() }}</div>@endif
+            <x-flash-messages :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
             @yield('content')
         </div></div>
     </main>

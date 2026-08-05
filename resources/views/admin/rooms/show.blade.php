@@ -2,6 +2,7 @@
 
 @section('title', $room->name.' - MovieMate')
 @section('page-title', 'Chi tiết phòng chiếu')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
@@ -29,9 +30,7 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-bold text-success" role="status">{{ session('success') }}</div>
-    @endif
+    <x-validation-summary :errors="$errors" :except="['status']" />
 
     @error('status')
         <div class="rounded-2xl border border-error/30 bg-error/10 px-4 py-3 text-sm font-bold text-error" role="alert">{{ $message }}</div>
