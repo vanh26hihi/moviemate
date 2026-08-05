@@ -34,7 +34,7 @@ Duplicate callbacks never repair ticket delivery. For a historical `success` pay
 
 ## VNPAY Sandbox setup and operations
 
-Register a Sandbox merchant with VNPAY and obtain the merchant `TmnCode` and `HashSecret`. Never commit either credential or paste it into logs, tickets, screenshots, or diagnostic output. Set `PAYMENT_DRIVER=vnpay`, `VNPAY_ENVIRONMENT=sandbox`, `VNPAY_TMN_CODE`, and `VNPAY_HASH_SECRET` in the deployed environment. Keep the supplied Sandbox payment and QueryDr URLs unless VNPAY explicitly changes them. `VNPAY_BANK_CODE` may be blank to let the customer select a channel on VNPAY; the default `VNPAYQR` opens the QR flow.
+Register a Sandbox merchant with VNPAY and obtain the merchant `TmnCode` and `HashSecret`. Never commit either credential or paste it into logs, tickets, screenshots, or diagnostic output. Set `PAYMENT_DRIVER=vnpay`, `VNPAY_ENVIRONMENT=sandbox`, `VNPAY_TMN_CODE`, and `VNPAY_HASH_SECRET` in the deployed environment. Keep the supplied Sandbox payment and QueryDr URLs unless VNPAY explicitly changes them. `VNPAY_BANK_CODE` is blank by default, so VNPAY presents only the payment channels provisioned for the merchant. Configure `VNPAYQR`, `VNBANK`, or `INTCARD` only after the SIT portal confirms that product is enabled for this exact TmnCode.
 
 VNPAY must reach two public MovieMate endpoints:
 
@@ -56,6 +56,39 @@ The diagnostic command prints only environment labels, credential-presence boole
 Use only VNPAY's current Sandbox test cards from the merchant documentation. A commonly documented NCB Sandbox card is `9704198526191432198`, cardholder `NGUYEN VAN A`, expiry `07/15`, OTP `123456`; verify it remains current in the Sandbox portal before testing. Do not store test card data in MovieMate.
 
 The browser Return URL is display-only and cannot mark a booking paid. The unauthenticated IPN verifies the HMAC-SHA512 checksum before database access, and QueryDr verifies its response checksum before applying an outcome. Only a verified `00` response code plus `00` transaction status, matching merchant, reference, amount, and transaction identity can enter the shared locked fulfillment transition. Unknown, malformed, late, conflicting, or checksum-invalid outcomes never issue a ticket. Do not retry a booking while its existing attempt is `pending`, `processing`, `unresolved`, or `review`.
+
+### VNPAY code 99 request diagnostics and SIT portal checklist
+
+An immediate redirect to `/paymentv2/Payment/Error.html?code=99` occurs while VNPAY validates the merchant and PAY request (Stage 2), before payment-channel selection, customer authorization, IPN, or Return URL processing. A request rejected before VNPAY initializes a transaction may not appear in the SIT transaction list; an empty list alone does not identify the cause.
+
+Run these read-only checks against an existing attempt. The request diagnostic generates no payment, writes no database row, and never displays the HashSecret, checksum, signed URL, session, or guest token:
+
+```powershell
+php artisan optimize:clear
+php artisan payments:vnpay-config
+php artisan app:https-diagnostics
+php artisan payments:vnpay-request-diagnostics --latest
+```
+
+The PAY contract check covers the official 2.1.0 fields, RFC 1738/PHP `urlencode` ordering, HMAC-SHA512 input parity, amount ×100, GMT+7 dates, a single valid IP, an ASCII order description, an alphanumeric daily-unique TxnRef, the 255-byte Return URL limit, BankCode omission, SecureHashType omission, and the approved public HTTPS host. The actual browser IP is not persisted; use `--client-ip=ADDRESS` to validate a known sanitized address. IPv4-mapped IPv6 is emitted as IPv4. Native IPv6 remains a single valid IP under the official 7–45-character field contract; do not replace a production customer IP with loopback.
+
+In **VNPAYGW SIT Testing**, verify all of the following for the same MovieMate application:
+
+1. The merchant/application is active, the portal TmnCode matches the locally masked code, the HashSecret belongs to that same TmnCode, PAY 2.1.0 is enabled, Sandbox credentials are selected, and the merchant is not suspended or awaiting activation.
+2. At least one Sandbox payment method is assigned. Do not assume QR support. Keep MovieMate BankCode blank until the portal confirms `VNPAYQR`, `VNBANK`, or `INTCARD` for this merchant.
+3. Open **Cấu hình IPN URL**, set `https://CURRENT_NGROK_HOST/payments/vnpay/ipn`, save it, reload the portal, and verify the exact value remains. It must use HTTPS, the current hostname and exact path, with no query string, localhost, `moviemate.test`, trailing replacement path, or ngrok-warning path.
+4. MovieMate sends the browser Return URL per PAY request as `https://CURRENT_NGROK_HOST/payments/vnpay/return`. If the portal exposes a separate Return URL field, use this exact endpoint; never use an internal clean-result URL.
+5. A restarted free ngrok tunnel may change hostname. Update the uncommitted `APP_URL`, `PAYMENT_PUBLIC_HOSTS`, and `TRUSTED_HOSTS` only when explicitly required; update the portal IPN URL; run `php artisan optimize:clear`; restart Laravel/Apache as needed; then use a fresh, non-expired payment attempt.
+
+Probe the active IPN without payment parameters. A reachable MovieMate endpoint returns HTTP 200 JSON with `RspCode=97`, creates no session, and changes no business data:
+
+```powershell
+curl.exe -H "Accept: application/json" https://CURRENT_NGROK_HOST/payments/vnpay/ipn
+```
+
+Use `http://127.0.0.1:4040` only to inspect whether ngrok received an IPN call. Do not copy request cookies, full query strings, `vnp_SecureHash`, or signed URLs into tickets or logs.
+
+If the local contract and official PHP demo parity both pass but a fresh attempt still returns code 99, confirm portal provisioning with VNPAY. Send support only the masked TmnCode, Sandbox environment, code 99, transaction timestamp, lookup code shown on the VNPAY error page, and confirmation of PAY 2.1.0/HMAC-SHA512. Never send the HashSecret or checksum.
 
 ## HTTPS tunnel, reverse proxy, and browser smoke test
 

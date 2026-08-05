@@ -26,10 +26,11 @@ class PaymentInitiationController extends Controller
         PaymentInitiationService $payments,
     ): RedirectResponse {
         $this->authorizeBooking($request, $booking, $guestAccess);
+        $provider = (string) $request->route('payment_provider', config('payment.driver'));
         try {
             $result = $payments->initiate(
                 $booking,
-                (string) $request->route('payment_provider', config('payment.driver')),
+                $provider,
                 $request->ip(),
             );
         } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
@@ -45,7 +46,9 @@ class PaymentInitiationController extends Controller
 
             return redirect()
                 ->route($statusRoute, $booking)
-                ->with('warning', 'MovieMate đang đối soát lần thanh toán ZaloPay hiện tại.');
+                ->with('warning', $provider === 'vnpay'
+                    ? 'Không thể khởi tạo thanh toán VNPAY. Vui lòng thử lại hoặc liên hệ hỗ trợ.'
+                    : 'MovieMate đang đối soát lần thanh toán ZaloPay hiện tại.');
         }
 
         abort_unless(is_string($result->orderUrl) && $result->orderUrl !== '', 409);
