@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\CinemaController as AdminCinemaController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FoodController as AdminFoodController;
 use App\Http\Controllers\Admin\FoodOrderController as AdminFoodOrderController;
 use App\Http\Controllers\Admin\GenreController as AdminGenreController;
@@ -205,7 +206,7 @@ Route::get('/foods/success/{order}', [UserOrderController::class, 'retired'])
 Route::prefix('admin')->name('admin.')
     ->middleware(['auth', 'active', 'permission:admin.access'])
     ->group(function () {
-        Route::get('/', fn () => view('admin.dashboard'))
+        Route::get('/', AdminDashboardController::class)
             ->middleware('permission:dashboard.view')->name('dashboard');
 
         Route::resource('foods', AdminFoodController::class)->except(['show'])
