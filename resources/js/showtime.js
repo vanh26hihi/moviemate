@@ -29,3 +29,8 @@ function requestNearbyLocation(button) { ... }
 function setShowtimeLoading(section, isLoading) { ... }
 
 async function updateShowtimeSection(targetUrl) { ... }
+window.addEventListener('popstate', () => {
+    if (shouldPinShowtimeSection()) {
+        window.location.reload();
+    }
+});
