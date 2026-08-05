@@ -13,7 +13,7 @@
         })();
     </script>
 </head>
-<body class="user-app app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden">
+<body class="user-app app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden @yield('body_class')">
     <header class="app-header fixed w-full top-0 z-50 backdrop-blur-xl border-b app-border transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16 md:h-20">
@@ -34,7 +34,7 @@
                     <a href="{{ route('user.ai.recommend') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.ai.*')]) @if(request()->routeIs('user.ai.*')) aria-current="page" @endif>
                         <i class="ph-fill ph-sparkle text-ai-start"></i> AI Gợi ý
                     </a>
-                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket')) aria-current="page" @endif>Vé của tôi</a>
+                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Vé của tôi</a>
                 </nav>
 
                 <div class="hidden md:flex items-center gap-3">
@@ -91,7 +91,7 @@
                 <a href="{{ route('user.ai.recommend') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-ai-start hover:bg-ai-start/10 transition-colors">
                     <i class="ph-fill ph-sparkle"></i> AI Gợi ý
                 </a>
-                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket')])>Vé của tôi</a>
+                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')])>Vé của tôi</a>
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
                         <a href="{{ route('user.profile') }}" class="user-mobile-link"><i class="ph ph-user mr-2"></i>Hồ sơ</a>

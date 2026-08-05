@@ -24,7 +24,8 @@ class BookingTicketMail extends Mailable
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
-            'payment',
+            'payments',
+            'foodOrder.items',
         ]);
 
         return $this

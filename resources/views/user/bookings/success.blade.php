@@ -5,8 +5,7 @@
     $isUsed = $booking->booking_status === 'used';
     $isCancelled = $booking->booking_status === 'cancelled';
     $isExpired = $booking->booking_status === 'expired' || $paymentState === \App\Models\Payment::STATUS_EXPIRED;
-    $isPaid = ! $isUsed && ! $isCancelled && ! $isExpired
-        && $booking->payment_status === 'paid' && $booking->booking_status === 'paid';
+    $isPaid = $isUsable;
     $isReview = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired
         && $paymentState === \App\Models\Payment::STATUS_REVIEW;
     $isFailed = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview
@@ -78,6 +77,26 @@
     $currency = $booking->currency ?: 'VND';
     $foodItems = $booking->foodOrder?->items ?? collect();
     $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
+    $delivery = $booking->ticketDelivery;
+    $deliveryState = $delivery?->status ?? 'missing';
+    $deliveryLabels = [
+        'pending' => ['label' => 'Đang chờ gửi', 'message' => 'Yêu cầu đã nằm trong hàng đợi gửi vé.'],
+        'processing' => ['label' => 'Đang gửi', 'message' => 'Hệ thống đang chuyển vé tới mail transport.'],
+        'sent' => ['label' => 'Đã gửi', 'message' => 'Mail transport đã tiếp nhận thư. Vui lòng kiểm tra cả thư rác.'],
+        'failed' => ['label' => 'Sẽ thử lại', 'message' => 'Lần gửi gần nhất chưa thành công và được giữ lại để thử lại an toàn.'],
+        'missing' => ['label' => 'Chưa xếp hàng', 'message' => 'Chưa ghi nhận trạng thái gửi email vé.'],
+    ];
+    $deliveryCopy = $deliveryLabels[$deliveryState] ?? $deliveryLabels['missing'];
+    if ($deliveryState === 'sent' && ! $mailDeliveryReady) {
+        $deliveryCopy = [
+            'label' => 'Cấu hình gửi thư chưa sẵn sàng',
+            'message' => 'Hệ thống từng ghi nhận lần gửi, nhưng cấu hình hiện tại không thể giao thư thật. Hãy cấu hình mail rồi yêu cầu gửi lại.',
+        ];
+    }
+    $canRequestEmail = ! auth()->check() || $booking->user_id === auth()->id();
+    $myTicketsUrl = auth()->check()
+        ? route('user.bookings.history')
+        : route('user.bookings.ticket', $booking);
 @endphp
 
 @section('title', $state['title'].' - MovieMate')
@@ -98,6 +117,49 @@
                 <h1 id="booking-state-title" class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">{{ $state['title'] }}</h1>
                 <p class="mx-auto mt-3 max-w-2xl leading-relaxed app-muted">{{ $state['message'] }}</p>
             </header>
+
+            @if($isPaid)
+                <section class="mt-6 rounded-2xl border border-brand-start/25 bg-brand-start/5 p-4 sm:p-5" aria-labelledby="paid-ticket-actions-title">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h2 id="paid-ticket-actions-title" class="font-extrabold app-text">Vé của bạn đã sẵn sàng</h2>
+                            <p class="mt-1 text-sm app-muted">Mở vé, in trực tiếp hoặc lưu PDF ngay từ trình duyệt.</p>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary" data-paid-ticket-link>
+                                <i class="ph-fill ph-ticket" aria-hidden="true"></i> Xem vé
+                            </a>
+                            <a href="{{ route('user.bookings.ticket.print', $booking) }}" class="btn-secondary" data-paid-ticket-print-link>
+                                <i class="ph-bold ph-printer" aria-hidden="true"></i> In vé
+                            </a>
+                            <a href="{{ $myTicketsUrl }}" class="btn-secondary">
+                                <i class="ph-bold ph-ticket" aria-hidden="true"></i> Về vé của tôi
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid gap-3 border-t pt-4 app-border sm:grid-cols-[1fr_auto] sm:items-center">
+                        <div class="min-w-0 text-sm">
+                            <p class="font-bold app-text">Email vé: {{ $deliveryCopy['label'] }}</p>
+                            <p class="mt-1 break-all app-muted">{{ $booking->recipient_email }}</p>
+                            <p class="mt-1 app-muted">{{ $deliveryCopy['message'] }}</p>
+                            @if($delivery?->sent_at)
+                                <p class="mt-1 text-xs app-muted">Gửi lúc {{ $delivery->sent_at->format('d/m/Y H:i') }}</p>
+                            @endif
+                        </div>
+                        @if($canRequestEmail)
+                            <form method="POST" action="{{ route('user.bookings.ticket-email.resend', $booking) }}" data-submit-once>
+                                @csrf
+                                <button type="submit" class="btn-secondary w-full" data-loading-label="Đang ghi nhận…">
+                                    <i class="ph-bold ph-envelope-simple" aria-hidden="true"></i>
+                                    Gửi lại email vé
+                                </button>
+                                <p class="mt-1 text-center text-xs app-muted" data-submit-status aria-live="polite"></p>
+                            </form>
+                        @endif
+                    </div>
+                </section>
+            @endif
 
             @if(($isPending || $isReview) && $booking->expires_at)
                 <div class="mx-auto mt-6 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-center" data-countdown-wrapper>
@@ -173,7 +235,7 @@
                 @if($isPaid)
                     <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary" data-paid-ticket-link>
                         <i class="ph-fill ph-ticket" aria-hidden="true"></i>
-                        Mở vé điện tử
+                        Xem vé
                     </a>
                 @elseif($isPending)
                     <form method="POST" action="{{ route('payments.zalopay.initiate', $booking) }}" data-submit-once>

@@ -6,13 +6,15 @@ use App\Domain\Payments\PaymentVerificationResult;
 use App\Domain\Payments\VerifiedPaymentData;
 use App\Models\Booking;
 use App\Models\BookingSeat;
-use App\Models\BookingTicketDelivery;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\Tickets\TicketDeliveryOutbox;
 use Illuminate\Support\Facades\DB;
 
 class VerifiedPaymentService
 {
+    public function __construct(private readonly TicketDeliveryOutbox $ticketDeliveries) {}
+
     public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
     {
         return $this->verifyEligiblePayment($payment, $data, false);
@@ -155,22 +157,10 @@ class VerifiedPaymentService
                 ->lockForUpdate()
                 ->first();
             $foodOrder?->forceFill(['status' => 'paid'])->save();
-            $this->ensureTicketDelivery($booking);
+            $this->ticketDeliveries->enqueueVerifiedBooking($booking);
 
             return PaymentVerificationResult::transitioned();
         });
-    }
-
-    private function ensureTicketDelivery(Booking $booking): void
-    {
-        BookingTicketDelivery::query()->firstOrCreate(
-            ['booking_id' => $booking->getKey()],
-            [
-                'status' => BookingTicketDelivery::STATUS_PENDING,
-                'attempts' => 0,
-                'available_at' => now(),
-            ],
-        );
     }
 
     private function markReview(

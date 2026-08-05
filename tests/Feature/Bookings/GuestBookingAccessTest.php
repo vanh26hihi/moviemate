@@ -70,8 +70,8 @@ class GuestBookingAccessTest extends TestCase
         $this->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertDontSee('data-qr-value', false)
-            ->assertDontSee('data-ticket-download', false)
-            ->assertSee('không có vé QR khả dụng');
+            ->assertDontSee('data-print-ticket', false)
+            ->assertSee('không có mã QR sử dụng được');
     }
 
     public function test_used_booking_is_history_without_a_usable_qr_or_download(): void
@@ -88,8 +88,8 @@ class GuestBookingAccessTest extends TestCase
         $this->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertDontSee('data-qr-value', false)
-            ->assertDontSee('data-ticket-download', false)
-            ->assertSee('Đã sử dụng');
+            ->assertDontSee('data-print-ticket', false)
+            ->assertSee('KHÔNG KHẢ DỤNG');
     }
 
     public function test_token_for_one_guest_booking_cannot_open_another_booking(): void
