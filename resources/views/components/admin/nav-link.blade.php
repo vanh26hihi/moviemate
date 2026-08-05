@@ -19,7 +19,7 @@
         <span>{{ $label }}</span>
     </a>
 @else
-    <span aria-disabled="true" title="Backend TEAM chưa cung cấp route này"
+    <span aria-disabled="true" title="Hệ thống chưa cung cấp trang này"
           {{ $attributes->class('flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium app-muted opacity-45') }}>
         <i class="ph {{ $icon }} text-lg"></i>
         <span>{{ $label }}</span>

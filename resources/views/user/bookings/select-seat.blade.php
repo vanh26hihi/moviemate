@@ -84,7 +84,7 @@
                                                 $pairUnavailable => 'cặp ghế không khả dụng',
                                                 default => 'còn trống',
                                             };
-                                            $typeLabel = $seatTypeLabels[$seat->type] ?? ucfirst($seat->type);
+                                            $typeLabel = $seatTypeLabels[$seat->type] ?? \App\Support\StatusLabel::for('seat_type', $seat->type);
                                         @endphp
                                         <button
                                             type="button"
@@ -94,7 +94,7 @@
                                             data-seat-type="{{ $seat->type }}"
                                             data-pair-code="{{ $seat->pair_code }}"
                                             data-price="{{ $price }}"
-                                            aria-label="Ghế {{ $seat->seat_code }}, loại {{ $typeLabel }}, {{ $availability }}, {{ number_format($price, 0, ',', '.') }} VND"
+                                            aria-label="Ghế {{ $seat->seat_code }}, loại {{ $typeLabel }}, {{ $availability }}, {{ number_format($price, 0, ',', '.') }} VNĐ"
                                             aria-pressed="false"
                                             @disabled($disabled)
                                         >{{ $seat->seat_code }}</button>
@@ -128,7 +128,7 @@
                     <dl class="mt-5 space-y-3 text-sm">
                         <div class="flex justify-between gap-4"><dt class="app-muted">Phòng</dt><dd class="font-bold app-text">{{ $showtime->room->name }}</dd></div>
                         <div class="flex justify-between gap-4"><dt class="app-muted">Ghế</dt><dd id="selectedSeatsDisplay" class="text-right font-bold app-text" aria-live="polite">Chưa chọn</dd></div>
-                        <div class="flex justify-between gap-4 border-t pt-4 app-border"><dt class="app-muted">Tạm tính tiền ghế</dt><dd id="totalAmountDisplay" class="text-2xl font-extrabold text-brand-start" aria-live="polite">0 VND</dd></div>
+                        <div class="flex justify-between gap-4 border-t pt-4 app-border"><dt class="app-muted">Tạm tính tiền ghế</dt><dd id="totalAmountDisplay" class="text-2xl font-extrabold text-brand-start" aria-live="polite">0 VNĐ</dd></div>
                     </dl>
                     <button id="continueBookingButton" type="submit" form="seatForm" disabled class="btn-primary mt-5 w-full">Tiếp tục chọn đồ ăn</button>
                     <p id="seatSelectionHint" class="mt-3 text-xs leading-relaxed app-muted">Ghế đôi sẽ được chọn hoặc bỏ chọn cả cặp. Giá và tình trạng ghế sẽ được máy chủ kiểm tra lại.</p>

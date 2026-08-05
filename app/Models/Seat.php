@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -46,5 +47,15 @@ class Seat extends Model
     public function layoutCells(): HasMany
     {
         return $this->hasMany(RoomLayoutCell::class);
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('seat', $this->status);
+    }
+
+    public function getTypeLabelAttribute(): string
+    {
+        return StatusLabel::for('seat_type', $this->type);
     }
 }

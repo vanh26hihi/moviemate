@@ -17,11 +17,11 @@
     <section class="app-card border app-border rounded-2xl p-6 space-y-4">
         <h2 class="text-lg font-bold">Cấu hình cố định</h2>
         @foreach([
-            'Tên rạp' => $cinema->name, 'Canonical key' => $cinema->canonical_key, 'Trường' => $cinema->school_name,
+            'Tên rạp' => $cinema->name, 'Mã định danh hệ thống' => $cinema->canonical_key, 'Trường' => $cinema->school_name,
             'Địa chỉ' => $cinema->address, 'Thành phố' => $cinema->city, 'Quốc gia' => $cinema->country,
-            'Latitude' => $cinema->latitude, 'Longitude' => $cinema->longitude,
-            'Trạng thái' => $cinema->status, 'Primary' => $cinema->is_primary ? 'Có' : 'Không',
-            'Phòng active' => $cinema->active_rooms_count, 'Tổng số phòng' => $cinema->rooms_count,
+            'Vĩ độ' => $cinema->latitude, 'Kinh độ' => $cinema->longitude,
+            'Trạng thái' => \App\Support\StatusLabel::for('generic', $cinema->status), 'Cơ sở chính' => $cinema->is_primary ? 'Có' : 'Không',
+            'Phòng đang hoạt động' => $cinema->active_rooms_count, 'Tổng số phòng' => $cinema->rooms_count,
         ] as $label => $value)
             <div class="border-b app-border pb-3"><div class="text-xs uppercase app-muted">{{ $label }}</div><div class="font-semibold app-text mt-1">{{ $value ?: '—' }}</div></div>
         @endforeach

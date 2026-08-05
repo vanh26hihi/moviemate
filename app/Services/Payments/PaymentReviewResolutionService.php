@@ -31,11 +31,11 @@ class PaymentReviewResolutionService
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
 
             if ($lockedPayment->status !== Payment::STATUS_REVIEW) {
-                throw new LogicException('Only a payment in review can be manually reconciled.');
+                throw new LogicException('Chỉ giao dịch đang chờ kiểm tra mới có thể được đối soát thủ công.');
             }
 
             if ($lockedPayment->provider !== 'zalopay') {
-                throw new LogicException('This payment provider does not support manual order reconciliation.');
+                throw new LogicException('Nhà cung cấp thanh toán này không hỗ trợ đối soát đơn hàng thủ công.');
             }
 
             return PaymentReviewEvent::query()->create([

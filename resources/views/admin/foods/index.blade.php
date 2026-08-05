@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý món ăn - MovieMate Admin')
+@section('title', 'Quản lý món ăn - Quản trị MovieMate')
 @section('page-title', 'Quản lý món ăn')
 
 @section('content')
@@ -48,7 +48,7 @@
                             <div class="font-semibold">{{ $food->name }}</div>
                             <div class="text-xs app-muted">{{ Str::limit($food->description, 80) }}</div>
                         </td>
-                        <td class="px-5 py-4 font-semibold">{{ number_format($food->price,2) }}đ</td>
+                        <td class="px-5 py-4 font-semibold">{{ number_format((int) $food->price, 0, ',', '.') }} VNĐ</td>
                         <td class="px-5 py-4">
                             <span class="inline-flex items-center justify-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider {{ $food->active ? 'bg-success/10 text-success' : 'bg-error/10 text-error' }}">
                                 {{ $food->active ? 'Hoạt động' : 'Ẩn' }}

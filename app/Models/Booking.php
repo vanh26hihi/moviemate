@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -111,17 +112,16 @@ class Booking extends Model
 
     public function getStatusLabelAttribute(): string
     {
-        return match ($this->booking_status) {
-            'paid' => 'Chưa sử dụng',
-            'used' => 'Đã sử dụng',
-            'cancelled' => 'Đã hủy',
-            'expired' => 'Hết hạn',
-            default => 'Đang xử lý',
-        };
+        return StatusLabel::for('booking', $this->booking_status);
+    }
+
+    public function getPaymentStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('payment', $this->payment_status);
     }
 
     public function getFormattedTotalAttribute(): string
     {
-        return number_format((float) $this->total_amount, 0, ',', '.').'đ';
+        return number_format((int) $this->total_amount, 0, ',', '.').' VNĐ';
     }
 }

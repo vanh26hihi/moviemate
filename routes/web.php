@@ -234,8 +234,10 @@ Route::prefix('admin')->name('admin.')
         Route::get('/cinemas', fn () => redirect()->route('admin.cinema.show'))
             ->middleware('permission:cinema.view')->name('cinemas.index');
 
-        Route::resource('rooms', AdminRoomController::class)->except(['show'])
-            ->middlewareFor('index', 'permission:rooms.view')
+        Route::patch('/rooms/{room}/status', [AdminRoomController::class, 'updateStatus'])
+            ->middleware('permission:rooms.update')->name('rooms.status.update');
+        Route::resource('rooms', AdminRoomController::class)
+            ->middlewareFor(['index', 'show'], 'permission:rooms.view')
             ->middlewareFor(['create', 'store'], 'permission:rooms.create')
             ->middlewareFor(['edit', 'update'], 'permission:rooms.update')
             ->middlewareFor('destroy', 'permission:rooms.delete');

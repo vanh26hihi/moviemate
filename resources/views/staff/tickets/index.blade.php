@@ -7,13 +7,13 @@
 <div class="admin-page-header">
     <div>
         <h1 class="admin-page-title">Danh sách vé</h1>
-        <p class="admin-page-subtitle">Giao diện đồng bộ MovieMate và tuân theo dữ liệu backend TEAM.</p>
+        <p class="admin-page-subtitle">Giao diện MovieMate sử dụng dữ liệu từ hệ thống máy chủ.</p>
     </div>
 </div>
 
 <x-empty-state
     title="Chưa có dữ liệu vé"
-    description="Backend TEAM chưa truyền danh sách vé cho khu vực nhân viên."
+    description="Hệ thống chưa cung cấp danh sách vé cho khu vực nhân viên."
     icon="ph-ticket"
 />
 @endsection

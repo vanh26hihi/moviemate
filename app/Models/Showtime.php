@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domain\Money\VndAmount;
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -66,5 +67,10 @@ class Showtime extends Model
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('showtime', $this->status);
     }
 }

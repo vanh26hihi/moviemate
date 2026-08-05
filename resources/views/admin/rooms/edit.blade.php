@@ -1,59 +1,18 @@
 @extends('layouts.admin')
 
-@section('title', 'Sửa phòng chiếu - MovieMate Admin')
-@section('page-title', 'Sửa phòng chiếu')
+@section('title', 'Chỉnh sửa phòng chiếu - MovieMate')
+@section('page-title', 'Chỉnh sửa phòng chiếu')
 
 @section('content')
 <div class="max-w-3xl">
     <div class="cinema-card p-6 sm:p-8">
-        <h1 class="text-2xl font-extrabold app-text mb-2">{{ $room->name }}</h1>
-        <p class="app-muted mb-6">Cập nhật thông tin phòng chiếu và trạng thái sử dụng.</p>
+        <h1 class="mb-2 text-2xl font-extrabold app-text">{{ $room->name }}</h1>
+        <p class="mb-6 app-muted">Cập nhật thông tin và trạng thái phòng. Thao tác này không thay đổi sơ đồ ghế hiện có.</p>
 
-        @if ($errors->any())
-            <div class="mb-6 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-bold">
-                {{ $errors->first() }}
-            </div>
-        @endif
-
-        <form action="{{ route('admin.rooms.update', $room) }}" method="POST" class="space-y-5">
+        <form action="{{ route('admin.rooms.update', $room) }}" method="POST" class="space-y-5" novalidate>
             @csrf
             @method('PUT')
-
-            <div class="rounded-2xl app-card-soft border app-border p-4"><span class="app-muted text-sm">Cơ sở</span><strong class="block app-text">{{ $cinema->name }}</strong></div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                    <label class="cinema-label">Mã phòng *</label>
-                    <input type="text" name="code" value="{{ old('code', $room->code) }}" required class="cinema-input">
-                </div>
-                <div>
-                    <label class="cinema-label">Tên phòng *</label>
-                    <input type="text" name="name" value="{{ old('name', $room->name) }}" required class="cinema-input">
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                    <label class="cinema-label">Loại phòng *</label>
-                    <select name="room_type" required class="cinema-input">
-                        <option value="2D" {{ old('room_type', $room->room_type) === '2D' ? 'selected' : '' }}>2D</option>
-                        <option value="3D" {{ old('room_type', $room->room_type) === '3D' ? 'selected' : '' }}>3D</option>
-                        <option value="IMAX" {{ old('room_type', $room->room_type) === 'IMAX' ? 'selected' : '' }}>IMAX</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="cinema-label">Trạng thái *</label>
-                    <select name="status" required class="cinema-input">
-                        <option value="active" {{ old('status', $room->status) == 'active' ? 'selected' : '' }}>Hoạt động</option>
-                        <option value="inactive" {{ old('status', $room->status) == 'inactive' ? 'selected' : '' }}>Không hoạt động</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-3 pt-3">
-                <button type="submit" class="btn-primary">Cập nhật</button>
-                <a href="{{ route('admin.rooms.index') }}" class="btn-secondary">Hủy</a>
-            </div>
+            @include('admin.rooms._form')
         </form>
     </div>
 </div>

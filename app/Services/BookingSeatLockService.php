@@ -16,12 +16,12 @@ class BookingSeatLockService
             $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->getKey());
 
             if (! in_array($lockedBooking->booking_status, ['pending_payment', 'paid'], true)) {
-                throw new LogicException('Seat locks can only be acquired for an active booking.');
+                throw new LogicException('Chỉ có thể giữ ghế cho đơn đặt vé đang hoạt động.');
             }
 
             return $seats->sortBy('id')->map(function ($seat) use ($lockedBooking, $priceSnapshots) {
                 if (! array_key_exists($seat->id, $priceSnapshots)) {
-                    throw new LogicException('Missing seat price snapshot.');
+                    throw new LogicException('Thiếu giá ghế tại thời điểm đặt vé.');
                 }
 
                 return BookingSeat::query()->create([

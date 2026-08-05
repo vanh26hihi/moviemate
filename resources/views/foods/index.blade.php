@@ -8,7 +8,7 @@
         <div>
             <p class="text-sm font-semibold uppercase tracking-[0.3em] text-brand-start">Thực đơn rạp</p>
             <h1 class="mt-3 text-3xl sm:text-4xl font-bold app-text">Xem thực đơn MovieMate</h1>
-            <p class="mt-3 max-w-2xl text-sm app-muted">Đồ ăn được chọn tùy ý trong checkout vé: chọn phim, suất chiếu và ghế, sau đó thêm món trước khi thanh toán ZaloPay.</p>
+            <p class="mt-3 max-w-2xl text-sm app-muted">Đồ ăn là lựa chọn không bắt buộc trong quy trình đặt vé: chọn phim, suất chiếu và ghế, sau đó thêm món trước khi thanh toán ZaloPay.</p>
         </div>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -35,7 +35,7 @@
                 @endif
                 <div class="flex items-center justify-between gap-4 mb-3">
                     <h2 class="text-xl font-bold app-text">{{ $food->name }}</h2>
-                    <span class="rounded-full bg-brand-start/10 px-3 py-1 text-sm font-semibold text-brand-start">{{ number_format($food->price,0,',','.') }}đ</span>
+                    <span class="rounded-full bg-brand-start/10 px-3 py-1 text-sm font-semibold text-brand-start">{{ number_format((int) $food->price, 0, ',', '.') }} VNĐ</span>
                 </div>
                 <p class="text-sm app-muted mb-5 min-h-[72px]">{{ $food->description ?: 'Chưa có mô tả.' }}</p>
 

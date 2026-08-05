@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', $food->exists ? 'Sửa món ăn - MovieMate Admin' : 'Thêm món ăn - MovieMate Admin')
+@section('title', $food->exists ? 'Sửa món ăn - Quản trị MovieMate' : 'Thêm món ăn - Quản trị MovieMate')
 @section('page-title', $food->exists ? 'Sửa món ăn' : 'Thêm món ăn')
 
 @php

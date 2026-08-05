@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -64,5 +65,10 @@ class Room extends Model
     public function scopeOperational(Builder $query): Builder
     {
         return $query->where('status', 'active');
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('room', $this->status);
     }
 }

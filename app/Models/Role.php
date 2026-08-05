@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -48,7 +49,7 @@ class Role extends Model
     {
         static::deleting(function (Role $role): void {
             if ($role->is_system || $role->users()->exists()) {
-                throw new \LogicException('System roles and roles assigned to users cannot be deleted.');
+                throw new \LogicException('Không thể xóa vai trò hệ thống hoặc vai trò đang được gán cho người dùng.');
             }
         });
     }
@@ -71,5 +72,10 @@ class Role extends Model
     public function isEditable(): bool
     {
         return in_array($this->slug, self::EDITABLE_SLUGS, true);
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return StatusLabel::for('role', $this->slug);
     }
 }

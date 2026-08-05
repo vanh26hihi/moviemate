@@ -49,7 +49,7 @@
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>Poster</th>
+                    <th>Áp phích</th>
                     <th>Tiêu đề</th>
                     <th>Thể loại</th>
                     <th>Trạng thái</th>

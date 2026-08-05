@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -37,13 +38,13 @@ class RoomLayout extends Model
     {
         static::updating(function (RoomLayout $layout): void {
             if ($layout->getOriginal('status') === 'published') {
-                throw new LogicException('Published room layouts are immutable.');
+                throw new LogicException('Không thể chỉnh sửa sơ đồ ghế đã phát hành.');
             }
         });
 
         static::deleting(function (RoomLayout $layout): void {
             if ($layout->showtimes()->exists()) {
-                throw new LogicException('A room layout used by a showtime cannot be deleted.');
+                throw new LogicException('Không thể xóa sơ đồ ghế đang được một suất chiếu sử dụng.');
             }
         });
     }
@@ -76,5 +77,20 @@ class RoomLayout extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('status', 'published');
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('layout', $this->status);
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        $name = trim((string) $this->name);
+        if ($name === '') {
+            return 'Sơ đồ ghế phiên bản '.$this->version;
+        }
+
+        return (string) preg_replace('/\blayout\b/iu', 'sơ đồ', $name);
     }
 }
