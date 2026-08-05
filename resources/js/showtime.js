@@ -34,3 +34,28 @@ window.addEventListener('popstate', () => {
         window.location.reload();
     }
 });
+document.addEventListener('click', (event) => {
+    const nearbyButton = event.target.closest('#nearbyCinemaBtn');
+
+    if (nearbyButton) {
+        event.preventDefault();
+        requestNearbyLocation(nearbyButton);
+        return;
+    }
+
+    const link = event.target.closest('a[data-showtime-filter]');
+
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const targetUrl = new URL(link.href, window.location.origin);
+
+    if (targetUrl.hash !== '#home-showtime-calendar') {
+        targetUrl.hash = 'home-showtime-calendar';
+    }
+
+    updateShowtimeSection(targetUrl);
+});
