@@ -5,6 +5,7 @@
 
 @php
     $printMode = $printMode ?? false;
+    $isPrintable = $isPrintable ?? $isUsable;
     $foodItems = $booking->foodOrder?->items ?? collect();
     $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
     $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
@@ -14,9 +15,11 @@
         default => 'Đã xác minh',
     };
     $issuedAt = $booking->paid_at ?? $verifiedPayment?->verified_at ?? $booking->created_at;
-    $backUrl = auth()->check()
+    $backUrl = $backUrl ?? (auth()->check()
         ? route('user.bookings.history')
-        : route('user.bookings.success', $booking);
+        : route('user.bookings.success', $booking));
+    $backLabel = $backLabel ?? 'Về vé của tôi';
+    $ticketRecipient = $ticketRecipient ?? $booking->recipient_email;
 @endphp
 
 @section('content')
@@ -24,10 +27,10 @@
     <div class="ticket-toolbar print-hidden" aria-label="Thao tác vé">
         <a href="{{ $backUrl }}" class="ticket-toolbar-link">
             <i class="ph-bold ph-arrow-left" aria-hidden="true"></i>
-            Về vé của tôi
+            {{ $backLabel }}
         </a>
 
-        @if($isUsable)
+        @if($isPrintable)
             <div class="ticket-toolbar-actions">
                 <button type="button" class="btn-secondary" data-print-ticket>
                     <i class="ph-bold ph-printer" aria-hidden="true"></i>
@@ -91,7 +94,7 @@
                     <div><dt>Rạp</dt><dd>{{ $booking->showtime?->cinema?->name ?? 'Đang cập nhật' }}</dd></div>
                     <div><dt>Địa chỉ</dt><dd>{{ $booking->showtime?->cinema?->address ?? 'Đang cập nhật' }}</dd></div>
                     <div><dt>Khách hàng</dt><dd>{{ $booking->user?->name ?? 'Khách MovieMate' }}</dd></div>
-                    <div><dt>Email</dt><dd class="ticket-break">{{ $booking->recipient_email }}</dd></div>
+                    <div><dt>Email</dt><dd class="ticket-break">{{ $ticketRecipient }}</dd></div>
                     <div><dt>Thanh toán</dt><dd>{{ $paymentProvider }} · Đã xác minh</dd></div>
                     <div><dt>Xác nhận lúc</dt><dd>{{ ($booking->paid_at ?? $verifiedPayment?->paid_at)?->format('d/m/Y H:i') ?? 'Đang cập nhật' }}</dd></div>
                 </dl>

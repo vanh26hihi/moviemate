@@ -222,6 +222,11 @@ class BookingCancellationTest extends TestCase
             'status' => $status,
             'expires_at' => now()->addMinutes(10),
             'reconcile_until' => now()->addDay(),
+            ...($status === Payment::STATUS_SUCCESS ? [
+                'verified_at' => now(),
+                'paid_at' => now(),
+                'transaction_id' => (string) random_int(100000, 999999),
+            ] : []),
         ]);
     }
 

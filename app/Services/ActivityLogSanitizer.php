@@ -9,16 +9,19 @@ final class ActivityLogSanitizer
     private const ALLOWED_KEYS = [
         'active',
         'booking_id',
+        'booking_code',
         'changed_fields',
         'count',
         'layout_id',
         'layout_version',
         'movie_id',
         'payment_id',
+        'payment_status',
         'permission_slugs',
         'previous_status',
         'price',
         'provider',
+        'recipient_mask',
         'reason',
         'result',
         'role_slug',
@@ -34,6 +37,7 @@ final class ActivityLogSanitizer
         'showtime_id',
         'source',
         'status',
+        'delivery_status',
         'vip_price',
     ];
 

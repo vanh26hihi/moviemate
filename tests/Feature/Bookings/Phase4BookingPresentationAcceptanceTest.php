@@ -19,7 +19,12 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
             'payment_status' => 'paid',
             'paid_at' => now(),
         ])->save();
-        $this->pendingPayment($booking, ['status' => Payment::STATUS_SUCCESS]);
+        $this->pendingPayment($booking, [
+            'status' => Payment::STATUS_SUCCESS,
+            'verified_at' => now(),
+            'paid_at' => now(),
+            'zp_trans_id' => (string) random_int(100000, 999999),
+        ]);
 
         $this->actingAs($owner)
             ->get(route('user.bookings.ticket', $booking))

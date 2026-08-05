@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,5 +36,10 @@ class Order extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('food_order', $this->status);
     }
 }
