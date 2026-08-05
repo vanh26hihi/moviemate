@@ -27,13 +27,16 @@ class HomeController extends Controller
         });
         $scheduleShowtimes = Showtime::query()->with(['movie.genres', 'cinema', 'room'])
             ->where('cinema_id', $cinema->id)->whereHas('room', fn ($query) => $query->where('status', 'active'))
-            ->where('status', 'active')->whereDate('show_date', $selectedDate)->orderBy('show_time')->get();
-        $scheduleMovies = $scheduleShowtimes->groupBy('movie_id')->map(fn ($items) => [
-            'movie' => $items->first()->movie, 'showtimes' => $items->values(),
-        ])->values();
-        $showtimeDates = Showtime::query()->where('cinema_id', $cinema->id)->where('status', 'active')
+            ->where('status', 'active')
             ->whereBetween('show_date', [$today->toDateString(), $today->copy()->addDays(6)->toDateString()])
-            ->orderBy('show_date')->pluck('show_date')->map(fn ($date) => Carbon::parse($date)->toDateString())->unique()->values();
+            ->orderBy('show_date')->orderBy('show_time')->get();
+        $scheduleMoviesByDate = $scheduleShowtimes
+            ->groupBy(fn (Showtime $showtime) => $showtime->show_date->toDateString())
+            ->map(fn ($dateShowtimes) => $dateShowtimes->groupBy('movie_id')->map(fn ($items) => [
+                'movie' => $items->first()->movie, 'showtimes' => $items->values(),
+            ])->values());
+        $showtimeDates = $scheduleShowtimes->pluck('show_date')
+            ->map(fn ($date) => $date->toDateString())->unique()->values();
         $quickShowtimes = Showtime::query()->with(['movie.genres', 'cinema', 'room'])
             ->where('cinema_id', $cinema->id)->whereHas('room', fn ($query) => $query->where('status', 'active'))
             ->where('status', 'active')->whereDate('show_date', '>=', $today->toDateString())
@@ -41,7 +44,7 @@ class HomeController extends Controller
 
         return view('user.home', compact(
             'nowShowing', 'comingSoon', 'quickShowtimes', 'cinema', 'scheduleDates',
-            'selectedDate', 'scheduleMovies', 'showtimeDates'
+            'selectedDate', 'scheduleMoviesByDate', 'showtimeDates'
         ));
     }
 
@@ -56,7 +59,12 @@ class HomeController extends Controller
             return $fallback->toDateString();
         }
 
-        return $parsed && $parsed->format('Y-m-d') === $date ? $parsed->toDateString() : $fallback->toDateString();
+        if (! $parsed || $parsed->format('Y-m-d') !== $date
+            || $parsed->lt($fallback) || $parsed->gt($fallback->copy()->addDays(6))) {
+            return $fallback->toDateString();
+        }
+
+        return $parsed->toDateString();
     }
 
     private function vietnameseWeekday(Carbon $date): string
