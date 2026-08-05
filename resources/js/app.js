@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import html2canvas from 'html2canvas';
+import './showtime-calendar';
 
 const THEME_KEY = 'theme';
 const LEGACY_THEME_KEY = 'moviemate_theme';

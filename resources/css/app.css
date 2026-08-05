@@ -781,6 +781,12 @@ html.light .admin-detail-card {
     }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}
+
 html.light .app-header {
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
