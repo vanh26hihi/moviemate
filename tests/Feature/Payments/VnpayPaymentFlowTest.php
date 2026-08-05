@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\VnpaySigner;
+use App\Exceptions\PaymentInitiationException;
 use App\Models\BookingTicketDelivery;
 use App\Models\Payment;
 use App\Services\Payments\PaymentInitiationService;
 use App\Services\Payments\PaymentReturnTokenService;
+use App\Services\Vnpay\VnpayPaymentUrlBuilder;
 use Illuminate\Support\Facades\Log;
 
 class VnpayPaymentFlowTest extends VnpayPaymentTestCase
@@ -28,6 +31,11 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->assertMatchesRegularExpression('/^\d{14}$/', $parameters['vnp_CreateDate']);
         $this->assertMatchesRegularExpression('/^\d{14}$/', $parameters['vnp_ExpireDate']);
         $this->assertSame('VNPAYQR', $parameters['vnp_BankCode']);
+        $this->assertArrayNotHasKey('vnp_SecureHashType', $parameters);
+        $this->assertLessThanOrEqual(255, strlen($parameters['vnp_ReturnUrl']));
+        $rawQuery = (string) parse_url($result->orderUrl, PHP_URL_QUERY);
+        [$unsignedQuery] = explode('&vnp_SecureHash=', $rawQuery, 2);
+        $this->assertSame(app(VnpaySigner::class)->paymentCanonical($parameters), $unsignedQuery);
         $this->assertTrue(app(VnpaySigner::class)->verifyPayment(
             $parameters,
             $parameters['vnp_SecureHash'],
@@ -53,6 +61,141 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->assertSame(1, $booking->payments()->count());
     }
 
+    public function test_expired_rejected_attempt_gets_one_atomic_replacement_with_a_new_transaction_reference(): void
+    {
+        config(['payment.vnpay.bank_code' => '']);
+        $booking = $this->payableBooking();
+        $old = $this->vnpayPayment($booking, [
+            'expires_at' => now()->subMinute(),
+            'provider_transaction_created_at' => now()->subMinutes(16),
+        ]);
+        $bookingCount = $this->app['db']->table('bookings')->count();
+        $seatCount = $this->app['db']->table('booking_seats')->count();
+        $orderCount = $this->app['db']->table('orders')->count();
+
+        $result = app(PaymentInitiationService::class)->initiate($booking, 'vnpay', '203.0.113.7');
+
+        $this->assertFalse($result->replayed);
+        $this->assertNotSame($old->id, $result->payment->id);
+        $this->assertNotSame($old->order_code, $result->payment->order_code);
+        $this->assertSame(Payment::STATUS_EXPIRED, $old->fresh()->status);
+        $this->assertSame(Payment::STATUS_PENDING, $result->payment->status);
+        $this->assertSame(2, $booking->payments()->where('provider', 'vnpay')->count());
+        $this->assertSame($bookingCount, $this->app['db']->table('bookings')->count());
+        $this->assertSame($seatCount, $this->app['db']->table('booking_seats')->count());
+        $this->assertSame($orderCount, $this->app['db']->table('orders')->count());
+    }
+
+    public function test_successful_attempt_is_never_replaced(): void
+    {
+        $booking = $this->payableBooking();
+        $successful = $this->vnpayPayment($booking, ['status' => Payment::STATUS_SUCCESS]);
+        $booking->forceFill(['payment_status' => 'paid', 'booking_status' => 'paid'])->save();
+
+        try {
+            app(PaymentInitiationService::class)->initiate($booking, 'vnpay', '203.0.113.7');
+            $this->fail('A paid booking must never create a replacement attempt.');
+        } catch (PaymentInitiationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame(1, $booking->payments()->count());
+        $this->assertSame(Payment::STATUS_SUCCESS, $successful->fresh()->status);
+    }
+
+    public function test_compact_return_state_keeps_the_official_return_url_within_255_bytes(): void
+    {
+        $payment = $this->vnpayPayment();
+        $state = app(PaymentReturnTokenService::class)->issue($payment);
+        $url = app(VnpayConfig::class)->returnUrl($state);
+
+        $this->assertStringStartsWith('v2.', $state);
+        $this->assertLessThan(100, strlen($state));
+        $this->assertLessThanOrEqual(255, strlen($url));
+        $this->assertTrue(app(PaymentReturnTokenService::class)->verify($payment, $state));
+        $this->assertFalse(app(PaymentReturnTokenService::class)->verify(
+            $payment,
+            substr($state, 0, -1).($state[-1] === 'A' ? 'B' : 'A'),
+        ));
+    }
+
+    public function test_pay_request_normalizes_ipv4_mapped_ipv6_and_accepts_a_single_ipv6_address(): void
+    {
+        config(['payment.vnpay.bank_code' => '']);
+        $mapped = app(PaymentInitiationService::class)->initiate(
+            $this->payableBooking(),
+            'vnpay',
+            '::ffff:203.0.113.7',
+        );
+        parse_str((string) parse_url($mapped->orderUrl, PHP_URL_QUERY), $mappedParameters);
+        $this->assertSame('203.0.113.7', $mappedParameters['vnp_IpAddr']);
+
+        $ipv6 = app(PaymentInitiationService::class)->initiate(
+            $this->payableBooking(),
+            'vnpay',
+            '2001:db8:85a3::8a2e:370:7334',
+        );
+        parse_str((string) parse_url($ipv6->orderUrl, PHP_URL_QUERY), $ipv6Parameters);
+        $this->assertSame('2001:db8:85a3::8a2e:370:7334', $ipv6Parameters['vnp_IpAddr']);
+    }
+
+    public function test_invalid_or_oversized_return_url_is_blocked_before_redirect(): void
+    {
+        $payment = $this->vnpayPayment();
+        $this->expectException(PaymentInitiationException::class);
+
+        app(VnpayPaymentUrlBuilder::class)->build(
+            $payment,
+            'https://merchant.example.test/payments/vnpay/return?state='.str_repeat('x', 260),
+            '203.0.113.7',
+        );
+    }
+
+    public function test_amount_over_twelve_provider_digits_and_forwarded_ip_chain_are_rejected(): void
+    {
+        $oversized = $this->vnpayPayment(overrides: ['amount' => 10_000_000_001]);
+        $returnUrl = app(VnpayConfig::class)->returnUrl(
+            app(PaymentReturnTokenService::class)->issue($oversized),
+        );
+        try {
+            app(VnpayPaymentUrlBuilder::class)->build($oversized, $returnUrl, '203.0.113.7');
+            $this->fail('A provider amount over 12 digits must fail.');
+        } catch (PaymentInitiationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $payment = $this->vnpayPayment();
+        $returnUrl = app(VnpayConfig::class)->returnUrl(
+            app(PaymentReturnTokenService::class)->issue($payment),
+        );
+        foreach (['198.51.100.1, 203.0.113.7', 'unknown', 'proxy.internal'] as $ip) {
+            try {
+                app(VnpayPaymentUrlBuilder::class)->build($payment, $returnUrl, $ip);
+                $this->fail('A non-single client IP must fail.');
+            } catch (PaymentInitiationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+    }
+
+    public function test_invalid_configuration_is_blocked_before_redirect_with_a_safe_vietnamese_message(): void
+    {
+        $this->seedRbac();
+        $user = $this->userWithRole('user');
+        $booking = $this->payableBooking(['user_id' => $user->id]);
+        config(['payment.vnpay.hash_secret' => 'invalid-secret']);
+
+        $this->actingAs($user)
+            ->post(route('payments.vnpay.initiate', $booking))
+            ->assertRedirect(route('user.bookings.pending', $booking))
+            ->assertSessionHas(
+                'warning',
+                'Không thể khởi tạo thanh toán VNPAY. Vui lòng thử lại hoặc liên hệ hỗ trợ.',
+            );
+
+        $this->assertSame(0, $booking->payments()->count());
+    }
+
     public function test_valid_ipn_is_the_only_path_that_fulfils_and_duplicate_is_idempotent(): void
     {
         $payment = $this->vnpayPayment();
@@ -69,6 +212,32 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->getJson(route('payments.vnpay.ipn', $parameters))
             ->assertOk()->assertExactJson(['RspCode' => '02', 'Message' => 'Order already confirmed']);
         $this->assertSame(1, BookingTicketDelivery::query()->where('booking_id', $payment->booking_id)->count());
+    }
+
+    public function test_unsigned_ipn_probe_is_session_independent_and_never_mutates_business_data(): void
+    {
+        $payment = $this->vnpayPayment();
+        $before = [
+            'bookings' => $this->app['db']->table('bookings')->count(),
+            'booking_seats' => $this->app['db']->table('booking_seats')->count(),
+            'orders' => $this->app['db']->table('orders')->count(),
+            'order_items' => $this->app['db']->table('order_items')->count(),
+            'payments' => $this->app['db']->table('payments')->count(),
+        ];
+
+        $this->getJson(route('payments.vnpay.ipn'))
+            ->assertOk()
+            ->assertHeaderMissing('Set-Cookie')
+            ->assertExactJson(['RspCode' => '97', 'Message' => 'Invalid signature']);
+
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertSame($before, [
+            'bookings' => $this->app['db']->table('bookings')->count(),
+            'booking_seats' => $this->app['db']->table('booking_seats')->count(),
+            'orders' => $this->app['db']->table('orders')->count(),
+            'order_items' => $this->app['db']->table('order_items')->count(),
+            'payments' => $this->app['db']->table('payments')->count(),
+        ]);
     }
 
     public function test_invalid_signature_and_amount_mismatch_never_pay_or_issue_ticket(): void

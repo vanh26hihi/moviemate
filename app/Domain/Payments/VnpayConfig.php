@@ -50,10 +50,22 @@ final readonly class VnpayConfig
         if (! in_array($environment, ['sandbox', 'production'], true)) {
             throw new PaymentConfigurationException('VNPAY environment must be sandbox or production.');
         }
-        if (! is_string($tmnCode) || preg_match('/^[A-Za-z0-9]{8}$/D', $tmnCode) !== 1) {
+        if (! is_string($tmnCode)
+            || preg_match('/^[A-Za-z0-9]{8}$/D', $tmnCode) !== 1
+            || preg_match('/placeholder|example|your|changeme/i', $tmnCode) === 1) {
             throw new PaymentConfigurationException('A valid 8-character VNPAY TmnCode is required.');
         }
-        if (! is_string($hashSecret) || strlen($hashSecret) < 32) {
+        if (! is_string($hashSecret)
+            || strlen($hashSecret) < 32
+            || $hashSecret !== trim($hashSecret)
+            || preg_match('/^[\x21-\x7E]+$/D', $hashSecret) !== 1
+            || preg_match('/placeholder|example|your[-_ ]?secret|changeme/i', $hashSecret) === 1
+            || str_starts_with($hashSecret, '<')
+            || str_ends_with($hashSecret, '>')
+            || str_starts_with($hashSecret, '"')
+            || str_ends_with($hashSecret, '"')
+            || str_starts_with($hashSecret, "'")
+            || str_ends_with($hashSecret, "'")) {
             throw new PaymentConfigurationException('A strong VNPAY HashSecret is required.');
         }
         foreach (['payment' => $paymentUrl, 'query' => $queryUrl] as $name => $url) {
@@ -64,7 +76,8 @@ final readonly class VnpayConfig
                 throw new PaymentConfigurationException("Production VNPAY {$name} URL must use HTTPS.");
             }
         }
-        if (! is_string($bankCode) || ($bankCode !== '' && preg_match('/^[A-Za-z0-9]{2,20}$/D', $bankCode) !== 1)) {
+        $this->validateProviderEndpoints($environment, $paymentUrl, $queryUrl);
+        if (! is_string($bankCode) || ($bankCode !== '' && preg_match('/^[A-Za-z0-9]{3,20}$/D', $bankCode) !== 1)) {
             throw new PaymentConfigurationException('VNPAY bank code is invalid.');
         }
         if (! in_array($locale, ['vn', 'en'], true)) {
@@ -148,6 +161,32 @@ final readonly class VnpayConfig
             || $this->isLoopback($host)
             || ! in_array($host, $allowed, true)) {
             throw new PaymentConfigurationException('Production VNPAY merchant host is not allowed.');
+        }
+    }
+
+    private function validateProviderEndpoints(string $environment, string $paymentUrl, string $queryUrl): void
+    {
+        $expected = $environment === 'sandbox'
+            ? [
+                'payment' => ['sandbox.vnpayment.vn', '/paymentv2/vpcpay.html'],
+                'query' => ['sandbox.vnpayment.vn', '/merchant_webapi/api/transaction'],
+            ]
+            : [
+                'payment' => ['pay.vnpay.vn', '/vpcpay.html'],
+                'query' => ['merchant.vnpay.vn', '/api/transaction'],
+            ];
+
+        foreach (['payment' => $paymentUrl, 'query' => $queryUrl] as $name => $url) {
+            $parts = parse_url($url);
+            if (! is_array($parts)
+                || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+                || strtolower(rtrim((string) ($parts['host'] ?? ''), '.')) !== $expected[$name][0]
+                || ($parts['path'] ?? '') !== $expected[$name][1]
+                || isset($parts['user'], $parts['pass'], $parts['query'], $parts['fragment'])) {
+                throw new PaymentConfigurationException(
+                    "VNPAY {$name} endpoint does not match the configured environment.",
+                );
+            }
         }
     }
 

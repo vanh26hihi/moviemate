@@ -11,8 +11,11 @@ abstract class VnpayPaymentTestCase extends PaymentTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->app['url']->forceRootUrl('https://merchant.example.test');
+        $this->app['url']->forceScheme('https');
         config([
             'app.url' => 'https://merchant.example.test',
+            'payment.public_hosts' => ['merchant.example.test'],
             'payment.driver' => 'vnpay',
             'payment.vnpay.environment' => 'sandbox',
             'payment.vnpay.tmn_code' => 'MOVIE123',
