@@ -26,7 +26,9 @@ class HomeController extends Controller
             return ['date' => $date->toDateString(), 'day' => $date->format('d'), 'label' => $offset === 0 ? 'Hôm nay' : $this->vietnameseWeekday($date)];
         });
         $scheduleShowtimes = Showtime::query()->with(['movie.genres', 'cinema', 'room'])
-            ->where('cinema_id', $cinema->id)->whereHas('room', fn ($query) => $query->where('status', 'active'))
+            ->where('cinema_id', $cinema->id)
+            ->whereHas('movie', fn ($query) => $query->whereIn('status', ['now_showing', 'coming_soon']))
+            ->whereHas('room', fn ($query) => $query->where('status', 'active'))
             ->where('status', 'active')
             ->whereBetween('show_date', [$today->toDateString(), $today->copy()->addDays(6)->toDateString()])
             ->orderBy('show_date')->orderBy('show_time')->get();
@@ -38,7 +40,9 @@ class HomeController extends Controller
         $showtimeDates = $scheduleShowtimes->pluck('show_date')
             ->map(fn ($date) => $date->toDateString())->unique()->values();
         $quickShowtimes = Showtime::query()->with(['movie.genres', 'cinema', 'room'])
-            ->where('cinema_id', $cinema->id)->whereHas('room', fn ($query) => $query->where('status', 'active'))
+            ->where('cinema_id', $cinema->id)
+            ->whereHas('movie', fn ($query) => $query->whereIn('status', ['now_showing', 'coming_soon']))
+            ->whereHas('room', fn ($query) => $query->where('status', 'active'))
             ->where('status', 'active')->whereDate('show_date', '>=', $today->toDateString())
             ->orderBy('show_date')->orderBy('show_time')->limit(10)->get();
 
