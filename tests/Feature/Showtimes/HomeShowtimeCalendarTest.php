@@ -114,9 +114,18 @@ class HomeShowtimeCalendarTest extends TestCase
     public function test_calendar_javascript_has_no_navigation_or_vertical_scroll_side_effects(): void
     {
         $javascript = file_get_contents(resource_path('js/showtime-calendar.js'));
+        $applicationEntry = file_get_contents(resource_path('js/app.js'));
+        $partial = file_get_contents(resource_path('views/user/partials/showtime-section.blade.php'));
+        $viteConfiguration = file_get_contents(base_path('vite.config.js'));
 
         $this->assertIsString($javascript);
+        $this->assertIsString($applicationEntry);
+        $this->assertIsString($partial);
+        $this->assertIsString($viteConfiguration);
         $this->assertStringContainsString("button.setAttribute('aria-pressed'", $javascript);
+        $this->assertStringContainsString("document.querySelector('#home-showtime-calendar[data-showtime-calendar]')", $javascript);
+        $this->assertStringContainsString("document.addEventListener('DOMContentLoaded'", $javascript);
+        $this->assertStringContainsString("window.addEventListener('pageshow'", $javascript);
         $this->assertStringContainsString('window.history.pushState', $javascript);
         $this->assertStringContainsString("window.addEventListener('popstate'", $javascript);
         $this->assertStringContainsString('strip.scrollLeft', $javascript);
@@ -126,6 +135,53 @@ class HomeShowtimeCalendarTest extends TestCase
         $this->assertStringNotContainsString('location.hash', $javascript);
         $this->assertStringNotContainsString('.submit(', $javascript);
         $this->assertStringNotContainsString('fetch(', $javascript);
+        $this->assertSame(1, substr_count($applicationEntry, "import './showtime-calendar';"));
+        $this->assertStringNotContainsString("@vite('resources/js/showtime-calendar.js')", $partial);
+        $this->assertStringNotContainsString("'resources/js/showtime-calendar.js'", $viteConfiguration);
+    }
+
+    public function test_calendar_excludes_inactive_or_non_public_schedule_records(): void
+    {
+        $cinema = app(CinemaContext::class)->current();
+        $activeRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'active']);
+        $inactiveRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'inactive']);
+        $publicMovie = Movie::query()->create([
+            'title' => 'Public calendar movie',
+            'slug' => 'public-calendar-movie',
+            'status' => 'now_showing',
+        ]);
+        $stoppedMovie = Movie::query()->create([
+            'title' => 'Stopped calendar movie',
+            'slug' => 'stopped-calendar-movie',
+            'status' => 'stopped',
+        ]);
+
+        foreach ([
+            [$publicMovie, $activeRoom, 'active'],
+            [$publicMovie, $inactiveRoom, 'active'],
+            [$publicMovie, $activeRoom, 'cancelled'],
+            [$stoppedMovie, $activeRoom, 'active'],
+        ] as $index => [$movie, $room, $status]) {
+            Showtime::query()->create([
+                'movie_id' => $movie->id,
+                'cinema_id' => $cinema->id,
+                'room_id' => $room->id,
+                'show_date' => '2026-08-07',
+                'show_time' => sprintf('%02d:30:00', 16 + $index),
+                'price' => 90000,
+                'status' => $status,
+            ]);
+        }
+
+        $response = $this->get(route('home', ['date' => '2026-08-07']));
+
+        $response->assertOk()
+            ->assertSee('Public calendar movie')
+            ->assertDontSee('Stopped calendar movie');
+
+        $xpath = $this->xpathFor($response->getContent());
+        $links = $xpath->query('//*[@data-showtime-panel="2026-08-07"]//a[contains(@href, "/booking/select-seat/")]');
+        $this->assertCount(1, $links);
     }
 
     private function xpathFor(string $html): DOMXPath

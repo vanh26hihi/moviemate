@@ -60,33 +60,36 @@ function selectDate(calendar, date, updateHistory = true) {
 }
 
 export function initializeShowtimeCalendars() {
-    document.querySelectorAll('[data-showtime-calendar]').forEach((calendar) => {
-        if (calendar.dataset.showtimeCalendarInitialized === 'true') return;
-        calendar.dataset.showtimeCalendarInitialized = 'true';
-        calendar.dataset.initialShowtimeDate = calendar.dataset.selectedDate;
+    const calendar = document.querySelector('#home-showtime-calendar[data-showtime-calendar]');
+    if (!(calendar instanceof HTMLElement) || calendar.dataset.showtimeCalendarInitialized === 'true') return;
 
-        calendar.addEventListener('click', (event) => {
-            if (!(event.target instanceof Element)) return;
-            const button = event.target.closest('[data-showtime-date]');
-            if (!(button instanceof HTMLButtonElement) || !calendar.contains(button)) return;
+    calendar.dataset.showtimeCalendarInitialized = 'true';
+    calendar.dataset.initialShowtimeDate = calendar.dataset.selectedDate;
 
-            const date = button.dataset.showtimeDate;
-            if (!date || date === calendar.dataset.selectedDate) return;
+    calendar.addEventListener('click', (event) => {
+        if (!(event.target instanceof Element)) return;
+        const button = event.target.closest('[data-showtime-date]');
+        if (!(button instanceof HTMLButtonElement) || !calendar.contains(button)) return;
 
-            selectDate(calendar, date);
-        });
+        const date = button.dataset.showtimeDate;
+        if (!date || date === calendar.dataset.selectedDate) return;
+
+        selectDate(calendar, date);
     });
 
     if (document.documentElement.dataset.showtimePopstateInitialized === 'true') return;
     document.documentElement.dataset.showtimePopstateInitialized = 'true';
     window.addEventListener('popstate', () => {
         const requestedDate = new URL(window.location.href).searchParams.get('date');
-
-        document.querySelectorAll('[data-showtime-calendar]').forEach((calendar) => {
-            const date = requestedDate || calendar.dataset.initialShowtimeDate;
-            if (date) selectDate(calendar, date, false);
-        });
+        const date = requestedDate || calendar.dataset.initialShowtimeDate;
+        if (date) selectDate(calendar, date, false);
     });
 }
 
-initializeShowtimeCalendars();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeShowtimeCalendars, { once: true });
+} else {
+    initializeShowtimeCalendars();
+}
+
+window.addEventListener('pageshow', initializeShowtimeCalendars);
