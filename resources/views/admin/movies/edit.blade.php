@@ -31,7 +31,7 @@
     </div>
 @endif
 
-<form action="{{ route('admin.movies.update', $movie) }}" method="POST" enctype="multipart/form-data" class="admin-form-card">
+<form action="{{ route('admin.movies.update', $movie) }}" method="POST" enctype="multipart/form-data" class="admin-form-card" data-submit-once>
     @csrf
     @method('PUT')
 
@@ -98,24 +98,32 @@
                     <label class="admin-label">Poster hiện tại</label>
                     <div class="mb-3 aspect-[2/3] overflow-hidden rounded-xl bg-slate-950">
                         @if($movie->poster_url)
-                            <img src="{{ $movie->poster_url }}" alt="Poster" class="h-full w-full object-cover" loading="lazy">
+                            <img id="poster-preview" src="{{ $movie->poster_url }}" alt="Poster của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
+                            <div data-image-fallback class="admin-media-fallback hidden h-full w-full">MM</div>
                         @else
+                            <img id="poster-preview" alt="Xem trước poster" class="hidden h-full w-full object-cover">
                             <div class="admin-media-fallback h-full w-full">MM</div>
                         @endif
                     </div>
-                    <input type="file" name="poster" accept="image/*" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <input type="file" name="poster" accept="image/jpeg,image/png,image/webp" data-image-preview="poster-preview" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <p class="admin-help">Để trống để giữ ảnh hiện tại. Tối đa 4 MB, tỷ lệ 2:3.</p>
+                    @error('poster')<p class="mt-1 text-sm text-error">{{ $message }}</p>@enderror
                 </div>
 
                 <div class="rounded-2xl app-card-soft border app-border p-4">
-                    <label class="admin-label">Cover hiện tại</label>
-                    <div class="mb-3 aspect-[16/10] overflow-hidden rounded-xl bg-slate-950">
+                    <label class="admin-label">Banner hiện tại</label>
+                    <div class="mb-3 aspect-video overflow-hidden rounded-xl bg-slate-950">
                         @if($movie->cover_url)
-                            <img src="{{ $movie->cover_url }}" alt="Cover" class="h-full w-full object-cover" loading="lazy">
+                            <img id="banner-preview" src="{{ $movie->cover_url }}" alt="Banner của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
+                            <div data-image-fallback class="admin-media-fallback hidden h-full w-full">Banner</div>
                         @else
-                            <div class="admin-media-fallback h-full w-full">Cover</div>
+                            <img id="banner-preview" alt="Xem trước banner" class="hidden h-full w-full object-cover">
+                            <div class="admin-media-fallback h-full w-full">Banner</div>
                         @endif
                     </div>
-                    <input type="file" name="cover_image" accept="image/*" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp" data-image-preview="banner-preview" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <p class="admin-help">Để trống để giữ ảnh hiện tại. Tối đa 8 MB, tỷ lệ 16:9.</p>
+                    @error('cover_image')<p class="mt-1 text-sm text-error">{{ $message }}</p>@enderror
                 </div>
             </div>
 
@@ -135,7 +143,7 @@
 
     <div class="mt-8 flex flex-col sm:flex-row justify-end gap-3 border-t app-border pt-5">
         <a href="{{ route('admin.movies.index') }}" class="admin-btn-secondary">Hủy</a>
-        <button type="submit" class="admin-btn-primary">
+        <button type="submit" class="admin-btn-primary" data-loading-label="Đang cập nhật…">
             <i class="ph-bold ph-floppy-disk"></i>
             Cập nhật
         </button>

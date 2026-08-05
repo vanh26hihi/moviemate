@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Movie;
+use App\Http\Requests\Admin\SaveMovieRequest;
 use App\Models\Genre;
+use App\Models\Movie;
+use App\Services\MovieImageService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class MovieController extends Controller
 {
@@ -34,57 +38,36 @@ class MovieController extends Controller
     public function create()
     {
         $genres = Genre::all();
+
         return view('admin.movies.create', compact('genres'));
     }
 
     /**
      * Store a newly created movie in storage.
      */
-    public function store(Request $request)
+    public function store(SaveMovieRequest $request, MovieImageService $images): RedirectResponse
     {
-        $validated = $request->validate([
-            'title'         => 'required|string|max:255',
-            'slug'          => 'nullable|string|max:255|unique:movies,slug',
-            'description'   => 'nullable|string',
-            'poster'        => 'nullable|image|max:2048',
-            'cover_image'   => 'nullable|image|max:4096',
-            'trailer_url'   => 'nullable|url',
-            'country'       => 'nullable|string|max:100',
-            'duration'      => 'nullable|integer|min:1',
-            'age_rating'    => 'nullable|string|max:10',
-            'release_date'  => 'nullable|date',
-            'status'        => 'required|in:now_showing,coming_soon,stopped',
-            'genres'        => 'nullable|array',
-            'genres.*'      => 'exists:genres,id',
-        ]);
+        $validated = $request->validated();
+        $genres = $validated['genres'] ?? [];
+        unset($validated['genres'], $validated['poster'], $validated['cover_image']);
+        $validated['slug'] = $this->uniqueSlug($validated['slug'] ?? null, $validated['title']);
+        $stored = [];
 
-        // Generate slug if not provided
-        if (empty($validated['slug'])) {
-            $validated['slug'] = Str::slug($validated['title']);
-            // Ensure uniqueness
-            $original = $validated['slug'];
-            $counter = 1;
-            while (Movie::where('slug', $validated['slug'])->exists()) {
-                $validated['slug'] = $original . '-' . $counter++;
+        try {
+            if ($request->hasFile('poster')) {
+                $validated['poster'] = $stored[] = $images->store($request->file('poster'), MovieImageService::POSTER);
             }
-        }
+            if ($request->hasFile('cover_image')) {
+                $validated['cover_image'] = $stored[] = $images->store($request->file('cover_image'), MovieImageService::BANNER);
+            }
 
-        // Handle file uploads
-        if ($request->hasFile('poster')) {
-            $validated['poster'] = $request->file('poster')
-                ->store('movies/posters', 'public');
-        }
-
-        if ($request->hasFile('cover_image')) {
-            $validated['cover_image'] = $request->file('cover_image')
-                ->store('movies/covers', 'public');
-        }
-
-        $movie = Movie::create($validated);
-
-        // Sync genres
-        if (!empty($validated['genres'])) {
-            $movie->genres()->sync($validated['genres']);
+            DB::transaction(function () use ($validated, $genres): void {
+                $movie = Movie::create($validated);
+                $movie->genres()->sync($genres);
+            });
+        } catch (Throwable $exception) {
+            $images->deleteStored($stored);
+            throw $exception;
         }
 
         return redirect()
@@ -98,6 +81,7 @@ class MovieController extends Controller
     public function show(Movie $movie)
     {
         $movie->load('genres');
+
         return view('admin.movies.show', compact('movie'));
     }
 
@@ -108,71 +92,45 @@ class MovieController extends Controller
     {
         $genres = Genre::all();
         $movie->load('genres');
+
         return view('admin.movies.edit', compact('movie', 'genres'));
     }
 
     /**
      * Update the specified movie in storage.
      */
-    public function update(Request $request, Movie $movie)
+    public function update(SaveMovieRequest $request, Movie $movie, MovieImageService $images): RedirectResponse
     {
-        $validated = $request->validate([
-            'title'         => 'required|string|max:255',
-            'slug'          => 'nullable|string|max:255|unique:movies,slug,' . $movie->id,
-            'description'   => 'nullable|string',
-            'poster'        => 'nullable|image|max:2048',
-            'cover_image'   => 'nullable|image|max:4096',
-            'trailer_url'   => 'nullable|url',
-            'country'       => 'nullable|string|max:100',
-            'duration'      => 'nullable|integer|min:1',
-            'age_rating'    => 'nullable|string|max:10',
-            'release_date'  => 'nullable|date',
-            'status'        => 'required|in:now_showing,coming_soon,stopped',
-            'genres'        => 'nullable|array',
-            'genres.*'      => 'exists:genres,id',
-        ]);
+        $validated = $request->validated();
+        $genres = $validated['genres'] ?? [];
+        unset($validated['genres'], $validated['poster'], $validated['cover_image']);
+        $validated['slug'] = $this->uniqueSlug($validated['slug'] ?? null, $validated['title'], $movie->id);
+        $oldPoster = $movie->poster;
+        $oldCover = $movie->cover_image;
+        $stored = [];
 
-        // Generate slug if not provided
-        if (empty($validated['slug'])) {
-            $validated['slug'] = Str::slug($validated['title']);
-            $original = $validated['slug'];
-            $counter = 1;
-            while (Movie::where('slug', $validated['slug'])->where('id', '!=', $movie->id)->exists()) {
-                $validated['slug'] = $original . '-' . $counter++;
+        try {
+            if ($request->hasFile('poster')) {
+                $validated['poster'] = $stored[] = $images->store($request->file('poster'), MovieImageService::POSTER);
             }
+            if ($request->hasFile('cover_image')) {
+                $validated['cover_image'] = $stored[] = $images->store($request->file('cover_image'), MovieImageService::BANNER);
+            }
+
+            DB::transaction(function () use ($movie, $validated, $genres): void {
+                $movie->update($validated);
+                $movie->genres()->sync($genres);
+            });
+        } catch (Throwable $exception) {
+            $images->deleteStored($stored);
+            throw $exception;
         }
 
-        // Handle poster replacement
         if ($request->hasFile('poster')) {
-            $oldPoster = Movie::storageDiskPath($movie->poster);
-
-            if ($oldPoster && Storage::disk('public')->exists($oldPoster)) {
-                Storage::disk('public')->delete($oldPoster);
-            }
-
-            $validated['poster'] = $request->file('poster')
-                ->store('movies/posters', 'public');
+            $images->deleteIfUnreferenced($oldPoster);
         }
-
-        // Handle cover image replacement
         if ($request->hasFile('cover_image')) {
-            $oldCover = Movie::storageDiskPath($movie->cover_image);
-
-            if ($oldCover && Storage::disk('public')->exists($oldCover)) {
-                Storage::disk('public')->delete($oldCover);
-            }
-
-            $validated['cover_image'] = $request->file('cover_image')
-                ->store('movies/covers', 'public');
-        }
-
-        $movie->update($validated);
-
-        // Sync genres
-        if (isset($validated['genres'])) {
-            $movie->genres()->sync($validated['genres']);
-        } else {
-            $movie->genres()->detach();
+            $images->deleteIfUnreferenced($oldCover);
         }
 
         return redirect()
@@ -183,26 +141,41 @@ class MovieController extends Controller
     /**
      * Remove the specified movie from storage.
      */
-    public function destroy(Movie $movie)
+    public function destroy(Movie $movie, MovieImageService $images): RedirectResponse
     {
-        // Detach genres first
-        $movie->genres()->detach();
+        $poster = $movie->poster;
+        $cover = $movie->cover_image;
 
-        // Delete associated files
-        $posterPath = Movie::storageDiskPath($movie->poster);
-        $coverPath = Movie::storageDiskPath($movie->cover_image);
+        DB::transaction(function () use ($movie): void {
+            $movie->genres()->detach();
+            $movie->delete();
+        });
 
-        if ($posterPath && Storage::disk('public')->exists($posterPath)) {
-            Storage::disk('public')->delete($posterPath);
-        }
-        if ($coverPath && Storage::disk('public')->exists($coverPath)) {
-            Storage::disk('public')->delete($coverPath);
-        }
-
-        $movie->delete();
+        $images->deleteIfUnreferenced($poster);
+        $images->deleteIfUnreferenced($cover);
 
         return redirect()
             ->route('admin.movies.index')
             ->with('success', 'Movie deleted successfully.');
+    }
+
+    private function uniqueSlug(?string $requested, string $title, ?int $excludingMovieId = null): string
+    {
+        if (filled($requested)) {
+            return $requested;
+        }
+
+        $base = Str::slug($title) ?: 'movie';
+        $slug = $base;
+        $counter = 1;
+
+        while (Movie::query()
+            ->when($excludingMovieId, fn ($query) => $query->whereKeyNot($excludingMovieId))
+            ->where('slug', $slug)
+            ->exists()) {
+            $slug = $base.'-'.$counter++;
+        }
+
+        return $slug;
     }
 }
