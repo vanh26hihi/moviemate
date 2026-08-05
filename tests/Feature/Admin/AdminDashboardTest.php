@@ -5,12 +5,14 @@ namespace Tests\Feature\Admin;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Models\Showtime;
 use App\Services\AdminDashboardService;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Tests\Support\CreatesBookingFixtures;
 use Tests\TestCase;
 
@@ -44,6 +46,9 @@ class AdminDashboardTest extends TestCase
         $this->assertContains('active', $route->gatherMiddleware());
         $this->assertContains('permission:admin.access', $route->gatherMiddleware());
         $this->assertContains('permission:dashboard.view', $route->gatherMiddleware());
+        $this->assertCount(0, collect(Route::getRoutes())->filter(
+            fn ($registeredRoute): bool => $registeredRoute->uri() === 'admin/dashboard',
+        ));
     }
 
     public function test_dashboard_access_follows_guest_customer_staff_manager_admin_and_inactive_rules(): void
@@ -64,24 +69,34 @@ class AdminDashboardTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_empty_dashboard_restores_the_last_working_sections_and_sidebar_link(): void
+    public function test_empty_dashboard_renders_the_complete_reference_structure_in_vietnamese(): void
     {
         $admin = $this->userWithRole('admin');
 
-        $this->actingAs($admin)->get(route('admin.dashboard'))
+        $response = $this->actingAs($admin)->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('<h1 class="admin-page-title">Tổng quan</h1>', false)
+            ->assertSee('Tổng quan hệ thống')
             ->assertSee('href="'.route('admin.dashboard').'"', false)
             ->assertSee('Tổng doanh thu')
-            ->assertSee('Vé đã bán')
+            ->assertSee('Tổng vé đã bán')
             ->assertSee('Người dùng')
             ->assertSee('Phim đang chiếu')
-            ->assertSee('Doanh thu 7 ngày gần nhất')
-            ->assertSee('Phim bán chạy')
+            ->assertSee('Suất chiếu hôm nay')
+            ->assertSee('Doanh thu 7 ngày qua')
+            ->assertSee('Phân tích nhanh MovieMate')
+            ->assertSee('Top phim bán chạy')
             ->assertSee('Đơn đặt vé gần đây')
-            ->assertSee('Chưa có doanh thu trong 7 ngày gần đây')
-            ->assertSee('Chưa có phim bán chạy')
-            ->assertSee('Chưa có đơn đặt vé');
+            ->assertSee('Chưa có doanh thu được xác minh trong 7 ngày qua.')
+            ->assertSee('Chưa có dữ liệu bán vé để xếp hạng phim.')
+            ->assertSee('Chưa có đơn đặt vé.')
+            ->assertDontSee('Dashboard')
+            ->assertDontSee('Admin Panel')
+            ->assertDontSee('MovieMate AI Insights')
+            ->assertDontSee('payment_status paid')
+            ->assertDontSee('Ã')
+            ->assertDontSee('Â');
+
+        $this->assertSame(1, substr_count($response->getContent(), '<h1'));
     }
 
     public function test_revenue_and_ticket_metrics_only_count_each_verified_paid_booking_once(): void
@@ -111,6 +126,50 @@ class AdminDashboardTest extends TestCase
         $this->assertSame(100_000, collect($data['revenueChart'])->sum('revenue'));
         $this->assertCount(2, $data['topMovies']);
         $this->assertSame(1, (int) $data['topMovies']->first()->tickets_sold);
+        $this->assertSame(100_000, $data['topMovies']->sum(fn ($movie): int => (int) $movie->revenue));
+        $this->assertSame(2, $data['topMovies']->sum(fn ($movie): int => (int) $movie->booking_count));
+    }
+
+    public function test_couple_pair_counts_two_admission_seats_but_revenue_and_booking_once(): void
+    {
+        $owner = $this->userWithRole('user');
+        $scenario = $this->bookingScenario();
+        $coupleSeatIds = $scenario['seats']->where('type', 'couple')->pluck('id')->all();
+        $booking = $this->reserve($scenario, $coupleSeatIds, $owner->id)->booking;
+        $booking->forceFill([
+            'payment_status' => 'paid',
+            'booking_status' => 'paid',
+            'paid_at' => now(),
+        ])->save();
+        $this->successfulPayment($booking, now());
+
+        $data = app(AdminDashboardService::class)->overview();
+
+        $this->assertSame(2, $data['metrics']['ticketsSold']);
+        $this->assertSame(100_000, $data['metrics']['totalRevenue']);
+        $this->assertSame(2, (int) $data['topMovies']->first()->tickets_sold);
+        $this->assertSame(1, (int) $data['topMovies']->first()->booking_count);
+        $this->assertSame(100_000, (int) $data['topMovies']->first()->revenue);
+    }
+
+    public function test_today_showtime_metric_only_counts_active_single_cinema_operations(): void
+    {
+        $active = $this->bookingScenario(false);
+        $active['showtime']->update(['show_date' => now()->toDateString()]);
+
+        Showtime::query()->create([
+            ...$active['showtime']->only([
+                'movie_id', 'cinema_id', 'room_id', 'room_layout_id', 'show_date', 'show_time', 'price', 'vip_price',
+            ]),
+            'show_time' => '21:30:00',
+            'status' => 'cancelled',
+        ]);
+
+        $inactive = $this->bookingScenario(false);
+        $inactive['room']->update(['status' => 'inactive']);
+        $inactive['showtime']->update(['show_date' => now()->toDateString()]);
+
+        $this->assertSame(1, app(AdminDashboardService::class)->overview()['metrics']['showtimesToday']);
     }
 
     public function test_revenue_chart_uses_configured_timezone_boundaries(): void
@@ -170,15 +229,48 @@ class AdminDashboardTest extends TestCase
             $data['recentBookings']->pluck('id')->all(),
         );
         $this->assertSame($queriesBeforeRelations, count(DB::getQueryLog()));
+        $this->assertLessThanOrEqual(15, $queriesBeforeRelations);
 
         $response = $this->actingAs($admin)->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('Khách vãng lai')
+            ->assertSee('Khách đặt vé')
             ->assertSee('DASH-08')
             ->assertDontSee('DASH-01');
         foreach (range(1, 8) as $index) {
             $response->assertDontSee("private-{$index}@example.test");
         }
+    }
+
+    public function test_top_movies_are_limited_ordered_and_use_local_poster_accessor_with_fallback(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('movies/posters/dashboard.jpg', 'poster');
+        $owner = $this->userWithRole('user');
+        $expectedMovieId = null;
+
+        foreach (range(1, 6) as $index) {
+            $booking = $this->paidBooking($owner->id, 'paid');
+            $booking->showtime->movie->update([
+                'title' => "Phim dashboard {$index}",
+                'poster' => $index === 1 ? 'movies/posters/dashboard.jpg' : null,
+            ]);
+            $this->successfulPayment($booking, now()->subMinutes($index));
+            $expectedMovieId ??= $booking->showtime->movie_id;
+        }
+
+        $data = app(AdminDashboardService::class)->overview();
+
+        $this->assertCount(5, $data['topMovies']);
+        $this->assertSame($expectedMovieId, $data['topMovies']->first()->id);
+        $this->assertSame('/storage/movies/posters/dashboard.jpg', $data['topMovies']->first()->poster_url);
+
+        $response = $this->actingAs($this->userWithRole('admin'))->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertSee('/storage/movies/posters/dashboard.jpg', false)
+            ->assertSee('admin-media-fallback', false)
+            ->assertSee('Đã thanh toán')
+            ->assertDontSee('pending_payment');
+        $response->assertDontSee('https://images.unsplash.com', false);
     }
 
     private function pendingBooking(int $userId): Booking

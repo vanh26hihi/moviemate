@@ -15,6 +15,15 @@ final class StatusLabel
             'expired' => 'Đã hết hạn',
             'review' => 'Cần kiểm tra',
         ],
+        'booking_admin' => [
+            'pending' => 'Chờ xử lý',
+            'pending_payment' => 'Chờ thanh toán',
+            'paid' => 'Đã thanh toán',
+            'used' => 'Đã sử dụng',
+            'cancelled' => 'Đã hủy',
+            'expired' => 'Đã hết hạn',
+            'review' => 'Chờ đối soát',
+        ],
         'payment' => [
             'pending' => 'Chờ thanh toán',
             'processing' => 'Đang xử lý',

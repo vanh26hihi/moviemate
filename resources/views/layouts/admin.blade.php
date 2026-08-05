@@ -63,7 +63,7 @@
         <header class="h-16 lg:h-20 flex items-center justify-between px-4 sm:px-8 border-b app-border app-card backdrop-blur-md sticky top-0 z-30 shrink-0">
             <div class="flex items-center gap-4">
                 <button id="mobile-menu-btn" type="button" class="lg:hidden app-muted hover:app-text" aria-label="Mở menu" aria-expanded="false" aria-controls="sidebar"><i class="ph ph-list text-2xl"></i></button>
-                <h1 class="text-lg font-bold app-text hidden sm:block">@yield('page-title')</h1>
+                <p class="text-lg font-bold app-text hidden sm:block">@yield('page-title')</p>
             </div>
             <div class="flex items-center gap-2 sm:gap-3 min-w-0">
                 <div class="relative hidden md:block w-56">
@@ -82,7 +82,7 @@
             </div>
         </header>
         <div class="flex-grow overflow-y-auto"><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12">
-            <div class="sm:hidden mb-4"><h1 class="text-xl font-bold app-heading">@yield('page-title')</h1></div>
+            <div class="sm:hidden mb-4"><p class="text-xl font-bold app-heading">@yield('page-title')</p></div>
             @if(session('success'))<div class="mb-5 rounded-xl border border-success/30 bg-success/10 text-success px-4 py-3">{{ session('success') }}</div>@endif
             @if(isset($errors) && $errors->any())<div class="mb-5 rounded-xl border border-error/30 bg-error/10 text-error px-4 py-3">{{ $errors->first() }}</div>@endif
             @yield('content')
