@@ -26,3 +26,6 @@ function redirectToNearby(latitude, longitude) { ... }
 function handleNearbyError(error) { ... }
 
 function requestNearbyLocation(button) { ... }
+function setShowtimeLoading(section, isLoading) { ... }
+
+async function updateShowtimeSection(targetUrl) { ... }
