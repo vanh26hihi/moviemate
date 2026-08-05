@@ -9,6 +9,8 @@ use App\Http\Controllers\Admin\FoodController as AdminFoodController;
 use App\Http\Controllers\Admin\FoodOrderController as AdminFoodOrderController;
 use App\Http\Controllers\Admin\GenreController as AdminGenreController;
 use App\Http\Controllers\Admin\MovieController as AdminMovieController;
+use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentReconciliationController;
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
@@ -297,6 +299,22 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:food-orders.view')->name('food-orders.index');
         Route::get('/food-orders/{order}', [AdminFoodOrderController::class, 'show'])
             ->middleware('permission:food-orders.view')->name('food-orders.show');
+
+        Route::get('/payments', [AdminPaymentController::class, 'index'])
+            ->middleware('permission:payments.view')->name('payments.index');
+        Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])
+            ->whereNumber('payment')
+            ->middleware('permission:payments.view')->name('payments.show');
+        Route::get('/payment-reconciliation', [AdminPaymentReconciliationController::class, 'index'])
+            ->middleware('permission:payments.reconcile')->name('payment-reconciliation.index');
+        Route::post('/payments/{payment}/query-provider', [AdminPaymentReconciliationController::class, 'queryProvider'])
+            ->whereNumber('payment')
+            ->middleware(['permission:payments.reconcile', 'throttle:12,1'])
+            ->name('payments.query-provider');
+        Route::post('/payments/{payment}/reconcile', [AdminPaymentReconciliationController::class, 'reconcile'])
+            ->whereNumber('payment')
+            ->middleware(['permission:payments.reconcile', 'throttle:12,1'])
+            ->name('payments.reconcile');
 
         Route::get('/payment-reviews', [AdminPaymentReviewController::class, 'index'])
             ->middleware('permission:payments.reconcile')->name('payment-reviews.index');

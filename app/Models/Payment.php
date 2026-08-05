@@ -24,6 +24,16 @@ class Payment extends Model
 
     public const STATUS_REVIEW = 'review';
 
+    public const STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_PROCESSING,
+        self::STATUS_UNRESOLVED,
+        self::STATUS_SUCCESS,
+        self::STATUS_FAILED,
+        self::STATUS_EXPIRED,
+        self::STATUS_REVIEW,
+    ];
+
     public const RECONCILABLE_STATUSES = [
         self::STATUS_PENDING,
         self::STATUS_PROCESSING,

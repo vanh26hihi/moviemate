@@ -41,7 +41,7 @@
                 ['label' => 'Kinh doanh', 'items' => [
                     ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],
                     ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
-                    ['route' => 'admin.payment-reviews.index', 'active' => 'admin.payment-reviews.*', 'permission' => 'payments.reconcile', 'label' => 'Đối soát giao dịch', 'icon' => 'ph-arrows-clockwise'],
+                    ['route' => 'admin.payment-reconciliation.index', 'active' => ['admin.payment-reconciliation.*', 'admin.payment-reviews.*'], 'permission' => 'payments.reconcile', 'label' => 'Đối soát giao dịch', 'icon' => 'ph-arrows-clockwise', 'badge' => $paymentReconciliationBadge ?? null],
                     ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Mã giảm giá', 'icon' => 'ph-ticket-percent'],
                     ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
                     ['route' => 'admin.food-orders.index', 'active' => 'admin.food-orders.*', 'permission' => 'food-orders.view', 'label' => 'Đơn đồ ăn', 'icon' => 'ph-shopping-bag'],
@@ -75,7 +75,7 @@
                         <h2 id="admin-nav-group-{{ $loop->index }}" class="mb-1 px-3 text-[10px] font-bold uppercase tracking-wider app-muted">{{ $group['label'] }}</h2>
                         <div class="space-y-0.5">
                             @foreach($visibleItems as $item)
-                                <x-admin.nav-link :route-name="$item['route']" :active-pattern="$item['active']" :label="$item['label']" :icon="$item['icon']" />
+                                <x-admin.nav-link :route-name="$item['route']" :active-pattern="$item['active']" :label="$item['label']" :icon="$item['icon']" :badge="$item['badge'] ?? null" />
                             @endforeach
                         </div>
                     </section>
