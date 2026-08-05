@@ -107,7 +107,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
                 ->assertSee($message)
                 ->assertDontSee('data-paid-ticket-link', false)
                 ->assertDontSee('data-qr-value', false)
-                ->assertDontSee('data-ticket-download', false);
+                ->assertDontSee('data-print-ticket', false);
         }
     }
 
@@ -166,7 +166,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertOk()
             ->assertSee('data-ticket-state="usable"', false)
             ->assertSee('data-qr-value="'.$booking->booking_code.'"', false)
-            ->assertSee('data-ticket-download', false)
+            ->assertSee('data-print-ticket', false)
             ->assertSee('A1')
             ->assertSee('Bắp rang caramel')
             ->assertSee('90.000 VND')

@@ -213,6 +213,25 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         Mail::assertSent(BookingTicketMail::class, 1);
     }
 
+    public function test_old_processing_claim_without_a_lease_is_reclaimed(): void
+    {
+        Mail::fake();
+        $this->verifiedPayment();
+        BookingTicketDelivery::query()->update([
+            'status' => BookingTicketDelivery::STATUS_PROCESSING,
+            'attempts' => 1,
+            'processing_started_at' => now()->subMinutes(10),
+            'lease_expires_at' => null,
+        ]);
+
+        $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
+
+        $delivery = BookingTicketDelivery::query()->sole();
+        $this->assertSame(BookingTicketDelivery::STATUS_SENT, $delivery->status);
+        $this->assertSame(2, $delivery->attempts);
+        Mail::assertSent(BookingTicketMail::class, 1);
+    }
+
     public function test_missing_outbox_requires_explicit_authorized_recovery_command(): void
     {
         $this->seedRbac();
@@ -346,6 +365,13 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
 
     private function configureProductionMailer(string $default, array $mailers): void
     {
+        foreach ($mailers as &$mailer) {
+            if (is_array($mailer) && ($mailer['transport'] ?? null) === 'smtp') {
+                $mailer += ['host' => 'smtp.example.test', 'port' => 2525];
+            }
+        }
+        unset($mailer);
+
         $this->app->detectEnvironment(static fn (): string => 'production');
         config([
             'mail.default' => $default,

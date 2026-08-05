@@ -8,11 +8,14 @@ use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
 use App\Services\BookingTokenService;
 use App\Services\Mail\ProductionMailTransportGuard;
+use App\Services\Mail\TicketMailConfigurationInspector;
+use App\Services\Tickets\BookingTicketEligibility;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Throwable;
 
 class SendPendingBookingTickets extends Command
@@ -24,11 +27,19 @@ class SendPendingBookingTickets extends Command
     public function handle(
         BookingTokenService $tokens,
         ProductionMailTransportGuard $mailGuard,
+        TicketMailConfigurationInspector $mailConfiguration,
     ): int {
         try {
             $mailGuard->assertSafeForProduction();
         } catch (UnsafeProductionMailConfiguration $exception) {
             $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
+        $configuration = $mailConfiguration->inspect();
+        if (! $configuration['ready']) {
+            $this->error('Ticket mail delivery is blocked: '.$configuration['category'].'.');
 
             return self::FAILURE;
         }
@@ -64,9 +75,11 @@ class SendPendingBookingTickets extends Command
     {
         return DB::transaction(function (): ?BookingTicketDelivery {
             $now = now()->startOfSecond();
+            $leaseSeconds = max(30, (int) config('payment.ticket_delivery.lease_seconds', 300));
+            $staleStartedAt = $now->copy()->subSeconds($leaseSeconds);
             $delivery = BookingTicketDelivery::query()
                 ->whereNull('sent_at')
-                ->where(function ($query) use ($now): void {
+                ->where(function ($query) use ($now, $staleStartedAt): void {
                     $query->where(function ($ready) use ($now): void {
                         $ready->whereIn('status', [
                             BookingTicketDelivery::STATUS_PENDING,
@@ -74,10 +87,18 @@ class SendPendingBookingTickets extends Command
                         ])->where(function ($available) use ($now): void {
                             $available->whereNull('available_at')->orWhere('available_at', '<=', $now);
                         });
-                    })->orWhere(function ($expiredLease) use ($now): void {
+                    })->orWhere(function ($expiredLease) use ($now, $staleStartedAt): void {
                         $expiredLease->where('status', BookingTicketDelivery::STATUS_PROCESSING)
-                            ->whereNotNull('lease_expires_at')
-                            ->where('lease_expires_at', '<=', $now);
+                            ->where(function ($stale) use ($now, $staleStartedAt): void {
+                                $stale->where('lease_expires_at', '<=', $now)
+                                    ->orWhere(function ($missingLease) use ($staleStartedAt): void {
+                                        $missingLease->whereNull('lease_expires_at')
+                                            ->where(function ($missingClaimTime) use ($staleStartedAt): void {
+                                                $missingClaimTime->whereNull('processing_started_at')
+                                                    ->orWhere('processing_started_at', '<=', $staleStartedAt);
+                                            });
+                                    });
+                            });
                     });
                 })
                 ->orderBy('available_at')
@@ -89,7 +110,6 @@ class SendPendingBookingTickets extends Command
                 return null;
             }
 
-            $leaseSeconds = max(30, (int) config('payment.ticket_delivery.lease_seconds', 300));
             $delivery->forceFill([
                 'status' => BookingTicketDelivery::STATUS_PROCESSING,
                 'attempts' => $delivery->attempts + 1,
@@ -172,8 +192,7 @@ class SendPendingBookingTickets extends Command
                 ->lockForUpdate()
                 ->first();
             if (! $booking
-                || $booking->payment_status !== 'paid'
-                || $booking->booking_status !== 'paid') {
+                || ! app(BookingTicketEligibility::class)->isUsable($booking)) {
                 throw new RuntimeException('booking_not_paid');
             }
 
@@ -243,6 +262,14 @@ class SendPendingBookingTickets extends Command
     private function errorCode(Throwable $exception): string
     {
         $message = $exception->getMessage();
+        if ($exception instanceof TransportExceptionInterface) {
+            $normalized = strtolower($message);
+
+            return str_contains($normalized, 'authenticat') || str_contains($normalized, '535')
+                ? 'smtp_authentication_failed'
+                : 'smtp_connection_failed';
+        }
+
         if ($exception instanceof RuntimeException
             && preg_match('/^[a-z0-9_]{1,100}$/D', $message) === 1) {
             return $message;

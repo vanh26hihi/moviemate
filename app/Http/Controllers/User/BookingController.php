@@ -12,7 +12,9 @@ use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
 use App\Services\CinemaContext;
 use App\Services\GuestBookingAccessService;
+use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\RoomLayoutService;
+use App\Services\Tickets\BookingTicketEligibility;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,6 +28,8 @@ class BookingController extends Controller
         private readonly GuestBookingAccessService $guestAccess,
         private readonly BookingCheckoutDraftService $drafts,
         private readonly BookingCheckoutPreviewService $previews,
+        private readonly BookingTicketEligibility $ticketEligibility,
+        private readonly TicketMailConfigurationInspector $mailConfiguration,
     ) {}
 
     /**
@@ -136,6 +140,8 @@ class BookingController extends Controller
         $booking->load([
             'user',
             'payment',
+            'payments',
+            'ticketDelivery',
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
@@ -143,7 +149,16 @@ class BookingController extends Controller
             'foodOrder.items',
         ]);
 
-        return view('user.bookings.success', compact('booking'));
+        $isUsable = $this->ticketEligibility->isUsable($booking);
+        $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
+        $mailDeliveryReady = $this->mailConfiguration->inspect()['ready'];
+
+        return view('user.bookings.success', compact(
+            'booking',
+            'isUsable',
+            'verifiedPayment',
+            'mailDeliveryReady',
+        ));
     }
 
     public function ticket(Request $request, Booking $booking)
@@ -153,6 +168,7 @@ class BookingController extends Controller
         $booking->load([
             'user',
             'payment',
+            'payments',
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
@@ -160,7 +176,38 @@ class BookingController extends Controller
             'foodOrder.items',
         ]);
 
-        return view('user.bookings.ticket', compact('booking'));
+        $isUsable = $this->ticketEligibility->isUsable($booking);
+        $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
+
+        return view('user.bookings.ticket', compact('booking', 'isUsable', 'verifiedPayment'));
+    }
+
+    public function printTicket(Request $request, Booking $booking)
+    {
+        $this->authorizeBookingView($request, $booking);
+
+        $booking->load([
+            'user',
+            'payments',
+            'showtime.movie',
+            'showtime.cinema',
+            'showtime.room',
+            'bookingSeats.seat',
+            'foodOrder.items',
+        ]);
+
+        abort_unless($this->ticketEligibility->isUsable($booking), 404);
+
+        $isUsable = true;
+        $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
+        $printMode = true;
+
+        return view('user.bookings.ticket', compact(
+            'booking',
+            'isUsable',
+            'verifiedPayment',
+            'printMode',
+        ));
     }
 
     private function authorizeBookingView(Request $request, Booking $booking): void

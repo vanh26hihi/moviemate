@@ -112,7 +112,7 @@ class ZaloPayReturnTest extends PaymentTestCase
             ->assertOk()
             ->assertDontSee('data-paid-ticket-link', false)
             ->assertDontSee('data-qr-value', false)
-            ->assertDontSee('data-ticket-download', false);
+            ->assertDontSee('data-print-ticket', false);
     }
 
     public function test_return_state_expires_after_short_ttl(): void

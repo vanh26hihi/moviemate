@@ -152,6 +152,58 @@ For a local-only manual check, use the non-persistent `array` cache and restart 
 
 ## Production ticket email transport
 
+### Printable ticket and local email-delivery runbook
+
+The paid success page links to the dedicated ticket preview and print page. Both pages require the authenticated owner, an authorized Manager/Staff booking-view capability, or the exact guest booking session capability. Only a booking whose booking/payment state is paid and whose payment attempt is `success` renders the local check-in QR or print controls. Browser printing is the supported PDF path; select **Save as PDF / Lưu dưới dạng PDF** in the print dialog. No PDF package or external QR service is required.
+
+Run local delivery in separate terminals:
+
+**Terminal A — web application**
+
+Use Laragon Apache, or:
+
+```powershell
+php artisan serve
+```
+
+**Terminal B — required ticket outbox scheduler**
+
+```powershell
+php artisan schedule:work
+```
+
+The scheduled `bookings:send-pending-tickets` command claims and sends mail synchronously from the durable outbox. Therefore, the current ticket-email path does **not** require a queue worker. If other application jobs use an asynchronous queue connection, run a separate worker:
+
+**Terminal C — only for asynchronous queued jobs**
+
+```powershell
+php artisan queue:work --tries=3 --timeout=120 -v
+```
+
+A queued job remains in its queue until a worker processes it. Independently, a ticket outbox row remains pending until the scheduler invokes its processor. A `sync` queue requires no queue worker. Restart scheduler and workers after code or configuration changes. After changing local mail configuration, run:
+
+```powershell
+php artisan optimize:clear
+php artisan tickets:mail-diagnostics --booking=BOOKING_ID
+```
+
+The diagnostics command is read-only, masks the recipient, reports only safe transport and outbox metadata, and exits non-zero when configuration cannot deliver real mail. `MAIL_MAILER=log` writes the message to the configured application log instead of delivering it to Gmail or another inbox; it is now rejected by the ticket processor before a row is claimed or marked sent. Do not configure a failover branch to `log` and do not describe a logged message as delivered.
+
+For local SMTP, set the uncommitted `.env` to a provisioned SMTP mailer, host, port, scheme, optional account credentials, and a valid From address. Never commit `.env` or paste credentials into diagnostics. Then clear optimized state and restart the long-running scheduler. Check spam/junk only after the application reports transport success. Production requires persistent process supervision for the scheduler and for every queue worker used by asynchronous jobs.
+
+Manual browser verification:
+
+1. Complete a new VNPAY Sandbox payment and confirm the success page shows **Xem vé**, **In vé**, and **Gửi lại email vé**.
+2. Open the ticket and verify movie, room, showtime, seats, server total, and QR.
+3. Click **In vé**. Confirm the preview has a white background, no navbar/footer/chatbot, no clipped ticket, and a visible QR; save it as PDF.
+4. Start the scheduler. Start a queue worker only if diagnostics identifies asynchronous queued work outside the synchronous ticket processor.
+5. Click **Gửi lại email vé** once and confirm one logical outbox row and one new attempt after the scheduler processes it.
+6. Confirm the email arrives, then open its secure ticket link. The credential remains in the URL fragment and cannot open another booking.
+7. Scan the QR on the Staff ticket-check screen and retain existing duplicate-scan behavior.
+8. Refresh payment success and verify no duplicate payment, QR credential, or automatic email delivery is created.
+
+The manual resend endpoint is POST-only, CSRF protected, rate limited, owner/guest-capability scoped, and never accepts a recipient address from the client. It requeues the locked logical outbox row; it never sends mail inside the web request.
+
 MovieMate provisions `smtp` as the only production leaf transport by default. Set `MAIL_PRODUCTION_ALLOWED_TRANSPORTS=smtp`; add another Laravel delivery leaf only after its required package and delivery mechanism have been explicitly provisioned and its named mailer exists in `config/mail.php`. Values are comma-separated transport identities, not mailer names. Every mailer name must be a simple, non-dotted identifier containing only letters, numbers, hyphens, and underscores. Unknown/custom resolvers cannot be approved by this allow-list because their behavior cannot be inspected from configuration. `log` and `array` are forbidden in every production delivery branch; `null`, `failover`, and `roundrobin` can never be allowed as leaves.
 
 The application recursively validates the selected named mailer at production boot and again before the ticket outbox command queries or claims a row. A `failover` or `roundrobin` mailer is accepted only when every reachable branch ends at an approved leaf. Never configure a `log` or `array` fallback: besides not delivering a message, those transports can expose the guest ticket access fragment in process memory or logs.

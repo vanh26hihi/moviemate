@@ -28,6 +28,7 @@ use App\Http\Controllers\User\HomeController;
 use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
 use App\Http\Controllers\User\RetiredBookingStoreController;
+use App\Http\Controllers\User\TicketEmailResendController;
 use App\Http\Middleware\ProtectBookingResponses;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -142,9 +143,21 @@ Route::get('/booking/payment/expired/{booking}', [BookingController::class, 'suc
     ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.expired');
 
-Route::get('/my-ticket/{booking}', [BookingController::class, 'ticket'])
+Route::get('/bookings/{booking}/ticket', [BookingController::class, 'ticket'])
     ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.ticket');
+
+Route::get('/my-ticket/{booking}', [BookingController::class, 'ticket'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.ticket.legacy');
+
+Route::get('/bookings/{booking}/ticket/print', [BookingController::class, 'printTicket'])
+    ->middleware(ProtectBookingResponses::class)
+    ->name('user.bookings.ticket.print');
+
+Route::post('/bookings/{booking}/ticket-email/resend', TicketEmailResendController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:3,1'])
+    ->name('user.bookings.ticket-email.resend');
 
 Route::get('/booking/access/{booking}', [GuestBookingAccessController::class, 'show'])
     ->middleware(ProtectBookingResponses::class)

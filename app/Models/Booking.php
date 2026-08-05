@@ -76,6 +76,11 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function ticketDelivery(): HasOne
+    {
+        return $this->hasOne(BookingTicketDelivery::class);
+    }
+
     public function foodOrder(): HasOne
     {
         return $this->hasOne(Order::class);

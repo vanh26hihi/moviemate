@@ -420,6 +420,13 @@ async function renderTicketQrCodes() {
 }
 
 document.addEventListener('click', async (event) => {
+    const printButton = event.target.closest('[data-print-ticket]');
+    if (printButton) {
+        window.print();
+
+        return;
+    }
+
     const button = event.target.closest('[data-ticket-download]');
     if (!button) return;
 
