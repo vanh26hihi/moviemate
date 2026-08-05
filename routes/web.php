@@ -18,9 +18,11 @@ use App\Http\Controllers\Payments\VnpayIpnController;
 use App\Http\Controllers\Payments\VnpayReturnController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
+use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
 use App\Http\Controllers\User\BookingFoodSelectionController;
+use App\Http\Controllers\User\BookingHistoryController;
 use App\Http\Controllers\User\BookingReviewController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\GuestBookingAccessController;
@@ -33,7 +35,6 @@ use App\Http\Middleware\ProtectBookingResponses;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
-use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
@@ -168,19 +169,12 @@ Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, '
     ->name('user.bookings.access.exchange');
 
 Route::middleware(['auth', 'active'])->group(function () {
-    Route::get('/booking-history', function (Request $request) {
-        $status = $request->string('status')->toString();
-        $bookings = $request->user()->bookings()
-            ->with(['showtime.movie', 'showtime.cinema', 'showtime.room', 'bookingSeats.seat', 'payment'])
-            ->when(
-                in_array($status, ['pending', 'paid', 'used', 'cancelled', 'expired'], true),
-                fn ($query) => $query->where('booking_status', $status)
-            )
-            ->latest()
-            ->paginate(10);
+    Route::get('/booking-history', BookingHistoryController::class)
+        ->name('user.bookings.history');
 
-        return view('user.bookings.history', compact('bookings'));
-    })->name('user.bookings.history');
+    Route::delete('/bookings/{booking}', BookingCancellationController::class)
+        ->middleware('throttle:10,1')
+        ->name('user.bookings.cancel');
 
     Route::get('/profile', function () {
         return view('user.profile.index');

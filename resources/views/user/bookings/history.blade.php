@@ -68,14 +68,16 @@
                 @forelse($bookings as $booking)
                     @php
                         $statusMap = [
-                            'pending' => ['label' => 'Chờ thanh toán', 'class' => 'bg-yellow-100 text-yellow-700'],
+                            'pending_payment' => ['label' => 'Chờ thanh toán', 'class' => 'bg-yellow-100 text-yellow-700'],
                             'paid' => ['label' => 'Chưa sử dụng', 'class' => 'bg-brand-start text-white'],
                             'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700'],
                             'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-red-100 text-red-700'],
                             'expired' => ['label' => 'Hết hạn', 'class' => 'bg-gray-100 text-gray-700'],
                         ];
-                        $status = $statusMap[$booking->booking_status] ?? $statusMap['pending'];
+                        $status = $statusMap[$booking->booking_status] ?? ['label' => 'Không xác định', 'class' => 'bg-gray-100 text-gray-700'];
                         $poster = $booking->showtime->movie->poster_url;
+                        $canCancel = in_array($booking->id, $cancellableBookingIds, true);
+                        $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
                     @endphp
 
                     <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
@@ -116,22 +118,34 @@
                                             <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
                                         @endif
                                     </div>
-                                    <div class="flex gap-2">
-                                        @if($booking->booking_status === 'pending' && $booking->payment?->checkout_url)
-                                            <a href="{{ $booking->payment->checkout_url }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
+                                    <div class="flex flex-wrap gap-2">
+                                        @if($booking->booking_status === 'pending_payment')
+                                            <a href="{{ route('user.bookings.pending', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
                                                 Thanh toán tiếp
                                             </a>
-                                        @else
+                                        @endif
+
+                                        @if($canUseTicket)
                                             <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
                                                 Xem vé QR
                                             </a>
+                                            <a href="{{ route('user.bookings.ticket.print', $booking) }}" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors">
+                                                In vé
+                                            </a>
+                                            <form method="POST" action="{{ route('user.bookings.ticket-email.resend', $booking) }}" class="inline" data-submit-once>
+                                                @csrf
+                                                <button type="submit" data-loading-label="Đang gửi…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors">
+                                                    Gửi lại email vé
+                                                </button>
+                                            </form>
                                         @endif
-                                        @if(in_array($booking->booking_status, ['pending', 'paid'], true))
-                                            <form method="POST" action="{{ route('user.bookings.cancel', $booking) }}" class="inline">
+
+                                        @if($canCancel)
+                                            <form method="POST" action="{{ route('user.bookings.cancel', $booking) }}" class="inline" data-submit-once>
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('{{ $booking->booking_status === 'pending' ? 'Bạn chắc chắn muốn hủy thanh toán này?' : 'Bạn chắc chắn muốn hủy vé này?' }}')">
-                                                    {{ $booking->booking_status === 'pending' ? 'Hủy thanh toán' : 'Hủy vé' }}
+                                                <button type="submit" data-loading-label="Đang hủy…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('Bạn chắc chắn muốn hủy đơn đặt vé này?')">
+                                                    Hủy đơn
                                                 </button>
                                             </form>
                                         @endif
