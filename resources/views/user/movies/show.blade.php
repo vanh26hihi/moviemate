@@ -63,7 +63,7 @@
                 <div class="flex flex-wrap gap-3">
                     <a href="#showtimes" class="btn-primary"><i class="ph-fill ph-ticket"></i> Xem lịch chiếu</a>
                     @if($movie->trailer_url)
-                        <a href="{{ $movie->trailer_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary"><i class="ph-fill ph-play-circle text-xl"></i> Xem trailer</a>
+                        <a href="{{ $movie->trailer_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary"><i class="ph-fill ph-play-circle text-xl"></i> Xem video giới thiệu</a>
                     @endif
                 </div>
             </div>

@@ -15,7 +15,7 @@
 
         <div class="mx-auto mt-10 grid max-w-4xl gap-6 lg:grid-cols-2">
             <div class="cinema-card rounded-3xl p-6 sm:p-8">
-                <div class="mb-6 flex items-center gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-ai-start/10 text-ai-start"><i class="ph-fill ph-sparkle text-xl"></i></span><div><h2 class="font-extrabold app-text">Prompt của bạn</h2><p class="text-sm app-muted">Chọn sở thích để bắt đầu.</p></div></div>
+                <div class="mb-6 flex items-center gap-3"><span class="flex h-11 w-11 items-center justify-center rounded-2xl bg-ai-start/10 text-ai-start"><i class="ph-fill ph-sparkle text-xl"></i></span><div><h2 class="font-extrabold app-text">Yêu cầu của bạn</h2><p class="text-sm app-muted">Chọn sở thích để bắt đầu.</p></div></div>
                 @if(\Illuminate\Support\Facades\Route::has('user.ai.recommend.submit'))
                     @include('components.home-ai-search')
                 @else

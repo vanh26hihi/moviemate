@@ -56,7 +56,7 @@ class BookingPresentationTest extends TestCase
         ]);
 
         $this->assertSame('Chưa sử dụng', $booking->status_label);
-        $this->assertSame('180.000đ', $booking->formatted_total);
+        $this->assertSame('180.000 VNĐ', $booking->formatted_total);
     }
 
     private function bookingSeatWithCode(string $code): BookingSeat

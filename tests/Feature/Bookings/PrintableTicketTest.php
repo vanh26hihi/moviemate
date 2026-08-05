@@ -28,7 +28,7 @@ class PrintableTicketTest extends PaymentTestCase
             ->assertSee('Booking Foundation Movie')
             ->assertSee('Test booking room')
             ->assertSee('A1')
-            ->assertSee('50.000 VND')
+            ->assertSee('50.000 VNĐ')
             ->assertSee('data-qr-value="'.$booking->booking_code.'"', false)
             ->assertSee('data-print-ticket', false)
             ->assertDontSee('api.qrserver.com', false);

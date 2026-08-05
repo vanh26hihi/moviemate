@@ -32,7 +32,7 @@
         ],
         'pending' => [
             'title' => 'Đang chờ xác minh thanh toán',
-            'message' => 'MovieMate chưa nhận được kết quả xác minh cuối cùng từ ZaloPay. Booking này chưa phải là vé điện tử.',
+            'message' => 'MovieMate chưa nhận được kết quả xác minh cuối cùng từ ZaloPay. Đơn đặt vé này chưa phải là vé điện tử.',
             'icon' => 'ph-hourglass-medium',
             'colour' => 'text-warning',
             'badge' => 'Chờ xác minh',
@@ -46,21 +46,21 @@
         ],
         'failed' => [
             'title' => 'Thanh toán không thành công',
-            'message' => 'ZaloPay đã trả về trạng thái không thành công. Booking này không có vé điện tử khả dụng.',
+            'message' => 'ZaloPay đã trả về trạng thái không thành công. Đơn đặt vé này không có vé điện tử khả dụng.',
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
             'badge' => 'Không thành công',
         ],
         'expired' => [
-            'title' => 'Booking đã hết hạn',
+            'title' => 'Đơn đặt vé đã hết hạn',
             'message' => 'Thời gian giữ ghế đã kết thúc và ghế đã được giải phóng. Thanh toán đến muộn sẽ được chuyển sang đối soát, không tự phát hành vé.',
             'icon' => 'ph-clock-countdown',
             'colour' => 'text-slate-400',
             'badge' => 'Hết hạn',
         ],
         'cancelled' => [
-            'title' => 'Booking đã bị hủy',
-            'message' => 'Booking này đã được hủy và không còn giữ ghế. Không có mã QR hoặc vé để tải xuống.',
+            'title' => 'Đơn đặt vé đã bị hủy',
+            'message' => 'Đơn đặt vé này đã được hủy và không còn giữ ghế. Không có mã QR hoặc vé để tải xuống.',
             'icon' => 'ph-prohibit',
             'colour' => 'text-error',
             'badge' => 'Đã hủy',
@@ -74,7 +74,7 @@
         ],
     ];
     $state = $states[$stateKey];
-    $currency = $booking->currency ?: 'VND';
+    $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
     $foodItems = $booking->foodOrder?->items ?? collect();
     $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
     $delivery = $booking->ticketDelivery;
@@ -165,7 +165,7 @@
                 <div class="mx-auto mt-6 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-center" data-countdown-wrapper>
                     <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian giữ ghế còn lại</p>
                     <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $booking->expires_at->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
-                    <p class="mt-2 text-xs leading-relaxed app-muted">Đừng tạo thêm booking hoặc yêu cầu thanh toán mới khi giao dịch hiện tại chưa có kết quả rõ ràng.</p>
+                    <p class="mt-2 text-xs leading-relaxed app-muted">Đừng tạo thêm đơn đặt vé hoặc yêu cầu thanh toán mới khi giao dịch hiện tại chưa có kết quả rõ ràng.</p>
                 </div>
             @endif
 
@@ -173,7 +173,7 @@
                 <section class="rounded-2xl border app-border p-5 sm:p-6" aria-labelledby="booking-details-title">
                     <div class="flex flex-wrap items-start justify-between gap-4 border-b pb-4 app-border">
                         <div>
-                            <p class="text-xs app-muted">Mã booking</p>
+                            <p class="text-xs app-muted">Mã đặt vé</p>
                             <h2 id="booking-details-title" class="mt-1 break-all font-mono text-xl font-bold text-brand-start">{{ $booking->booking_code }}</h2>
                         </div>
                         <span class="rounded-full border app-border px-3 py-1 text-xs font-bold {{ $state['colour'] }}">{{ $state['badge'] }}</span>
@@ -192,7 +192,7 @@
                             @foreach($booking->bookingSeats as $bookingSeat)
                                 <span class="rounded-xl app-secondary px-3 py-2 text-sm font-bold app-text">
                                     {{ $bookingSeat->seat?->seat_code }}
-                                    <span class="ml-1 font-normal app-muted">· {{ $seatTypeLabels[$bookingSeat->seat?->type] ?? ucfirst((string) $bookingSeat->seat?->type) }}</span>
+                                    <span class="ml-1 font-normal app-muted">· {{ $seatTypeLabels[$bookingSeat->seat?->type] ?? \App\Support\StatusLabel::for('seat_type', $bookingSeat->seat?->type) }}</span>
                                 </span>
                             @endforeach
                         </div>

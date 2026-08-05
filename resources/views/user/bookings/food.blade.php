@@ -52,7 +52,7 @@
                                 <div class="flex min-h-16 items-start justify-between gap-3">
                                     <div>
                                         <h2 class="font-bold app-text">{{ $food->name }}</h2>
-                                        <p class="mt-1 text-sm font-semibold text-brand-start">{{ number_format((int) $food->price, 0, ',', '.') }} VND</p>
+                                        <p class="mt-1 text-sm font-semibold text-brand-start">{{ number_format((int) $food->price, 0, ',', '.') }} VNĐ</p>
                                     </div>
                                     <span class="rounded-full bg-brand-start/10 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-brand-start">Đang bán</span>
                                 </div>
@@ -81,7 +81,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <p class="mt-3 text-right text-xs app-muted">Tạm tính: <strong class="app-text" data-food-line-total>{{ number_format((int) $food->price * $quantity, 0, ',', '.') }} VND</strong></p>
+                                <p class="mt-3 text-right text-xs app-muted">Tạm tính: <strong class="app-text" data-food-line-total>{{ number_format((int) $food->price * $quantity, 0, ',', '.') }} VNĐ</strong></p>
                             </article>
                         @empty
                             <div class="rounded-2xl border border-dashed app-border p-6 text-center sm:col-span-2" data-food-empty>
@@ -116,15 +116,15 @@
                     @foreach($preview->seatSummaries() as $seat)
                         <div class="flex justify-between gap-3 text-sm">
                             <span class="app-text">Ghế {{ $seat['seat_code'] }}</span>
-                            <strong class="app-text">{{ number_format($seat['price'], 0, ',', '.') }} VND</strong>
+                            <strong class="app-text">{{ number_format($seat['price'], 0, ',', '.') }} VNĐ</strong>
                         </div>
                     @endforeach
                 </div>
 
                 <dl class="mt-5 space-y-3 border-t pt-4 app-border">
-                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VND</dd></div>
-                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Đồ ăn tạm tính</dt><dd class="font-bold app-text" data-food-subtotal aria-live="polite">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VND</dd></div>
-                    <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng tạm tính</dt><dd class="text-xl font-extrabold text-brand-start" data-food-grand-total data-seat-subtotal="{{ $preview->prices->seatSubtotal }}">{{ number_format($preview->prices->grandTotal, 0, ',', '.') }} VND</dd></div>
+                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VNĐ</dd></div>
+                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Đồ ăn tạm tính</dt><dd class="font-bold app-text" data-food-subtotal aria-live="polite">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VNĐ</dd></div>
+                    <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng tạm tính</dt><dd class="text-xl font-extrabold text-brand-start" data-food-grand-total data-seat-subtotal="{{ $preview->prices->seatSubtotal }}">{{ number_format($preview->prices->grandTotal, 0, ',', '.') }} VNĐ</dd></div>
                 </dl>
                 <p class="mt-4 text-xs leading-relaxed app-muted"><i class="ph-fill ph-shield-check mr-1 text-success" aria-hidden="true"></i>Đây chỉ là tạm tính trên giao diện. Máy chủ sẽ xác nhận lại món, số lượng và tổng tiền.</p>
             </aside>

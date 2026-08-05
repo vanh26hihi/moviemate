@@ -43,7 +43,7 @@
             </div>
 
             <div>
-                <label class="admin-label">Slug</label>
+                <label class="admin-label">Đường dẫn rút gọn</label>
                 <input type="text" name="slug" value="{{ old('slug', $movie->slug) }}" class="admin-input">
                 <p class="admin-help">Để trống nếu muốn hệ thống tự tạo slug từ tiêu đề.</p>
             </div>
@@ -54,7 +54,7 @@
             </div>
 
             <div>
-                <label class="admin-label">Trailer URL</label>
+                <label class="admin-label">Đường dẫn video giới thiệu</label>
                 <input type="url" name="trailer_url" value="{{ old('trailer_url', $movie->trailer_url) }}" class="admin-input">
             </div>
         </div>
@@ -95,10 +95,10 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="rounded-2xl app-card-soft border app-border p-4">
-                    <label class="admin-label">Poster hiện tại</label>
+                    <label class="admin-label">Ảnh áp phích hiện tại</label>
                     <div class="mb-3 aspect-[2/3] overflow-hidden rounded-xl bg-slate-950">
                         @if($movie->poster_url)
-                            <img id="poster-preview" src="{{ $movie->poster_url }}" alt="Poster của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
+                            <img id="poster-preview" src="{{ $movie->poster_url }}" alt="Ảnh áp phích của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
                             <div data-image-fallback class="admin-media-fallback hidden h-full w-full">MM</div>
                         @else
                             <img id="poster-preview" alt="Xem trước poster" class="hidden h-full w-full object-cover">
@@ -111,14 +111,14 @@
                 </div>
 
                 <div class="rounded-2xl app-card-soft border app-border p-4">
-                    <label class="admin-label">Banner hiện tại</label>
+                    <label class="admin-label">Ảnh bìa hiện tại</label>
                     <div class="mb-3 aspect-video overflow-hidden rounded-xl bg-slate-950">
                         @if($movie->cover_url)
-                            <img id="banner-preview" src="{{ $movie->cover_url }}" alt="Banner của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
-                            <div data-image-fallback class="admin-media-fallback hidden h-full w-full">Banner</div>
+                            <img id="banner-preview" src="{{ $movie->cover_url }}" alt="Ảnh bìa của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
+                            <div data-image-fallback class="admin-media-fallback hidden h-full w-full">Ảnh bìa</div>
                         @else
                             <img id="banner-preview" alt="Xem trước banner" class="hidden h-full w-full object-cover">
-                            <div class="admin-media-fallback h-full w-full">Banner</div>
+                            <div class="admin-media-fallback h-full w-full">Ảnh bìa</div>
                         @endif
                     </div>
                     <input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp" data-image-preview="banner-preview" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">

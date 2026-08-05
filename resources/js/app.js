@@ -44,7 +44,7 @@ applyTheme(readTheme());
 const vndFormatter = new Intl.NumberFormat('vi-VN');
 
 function formatVnd(amount) {
-    return `${vndFormatter.format(Math.max(0, Number(amount) || 0))} VND`;
+    return `${vndFormatter.format(Math.max(0, Number(amount) || 0))} VNĐ`;
 }
 
 function initializeSeatPickers() {

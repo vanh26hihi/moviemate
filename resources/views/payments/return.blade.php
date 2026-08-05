@@ -8,7 +8,7 @@
     $states = [
         \App\Models\Payment::STATUS_PENDING => [
             'title' => 'Đang chờ xác minh thanh toán',
-            'message' => "MovieMate chưa nhận được kết quả cuối cùng từ {$providerLabel}. Booking chưa phải là vé điện tử.",
+            'message' => "MovieMate chưa nhận được kết quả cuối cùng từ {$providerLabel}. Đơn đặt vé này chưa phải là vé điện tử.",
             'icon' => 'ph-hourglass-medium',
             'colour' => 'text-warning',
         ],
@@ -20,7 +20,7 @@
         ],
         \App\Models\Payment::STATUS_FAILED => [
             'title' => 'Thanh toán không thành công',
-            'message' => "{$providerLabel} đã trả về trạng thái không thành công. Booking này chưa có vé điện tử.",
+            'message' => "{$providerLabel} đã trả về trạng thái không thành công. Đơn đặt vé này chưa có vé điện tử.",
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
         ],
@@ -70,12 +70,12 @@
 
             <dl class="mx-auto mt-7 max-w-xl rounded-2xl app-secondary p-5 text-left text-sm">
                 @if($canViewBooking)
-                    <div class="flex justify-between gap-4"><dt class="app-muted">Mã booking</dt><dd class="break-all text-right font-mono font-bold text-brand-start">{{ $booking->booking_code }}</dd></div>
+                    <div class="flex justify-between gap-4"><dt class="app-muted">Mã đặt vé</dt><dd class="break-all text-right font-mono font-bold text-brand-start">{{ $booking->booking_code }}</dd></div>
                 @else
                     <div class="flex justify-between gap-4"><dt class="app-muted">Lần thanh toán</dt><dd class="text-right font-mono font-bold text-brand-start">#{{ $payment->id }}</dd></div>
                 @endif
                 <div class="mt-3 flex justify-between gap-4"><dt class="app-muted">Kênh thanh toán</dt><dd class="font-bold app-text">{{ $providerLabel }}</dd></div>
-                <div class="mt-3 flex justify-between gap-4 border-t pt-3 app-border"><dt class="font-bold app-text">Số tiền</dt><dd class="font-extrabold text-brand-start">{{ number_format((int) $payment->amount, 0, ',', '.') }} {{ $payment->currency ?: 'VND' }}</dd></div>
+                <div class="mt-3 flex justify-between gap-4 border-t pt-3 app-border"><dt class="font-bold app-text">Số tiền</dt><dd class="font-extrabold text-brand-start">{{ number_format((int) $payment->amount, 0, ',', '.') }} {{ ($payment->currency ?: 'VND') === 'VND' ? 'VNĐ' : $payment->currency }}</dd></div>
             </dl>
 
             <p class="mx-auto mt-5 max-w-xl text-xs leading-relaxed app-muted">
@@ -86,7 +86,7 @@
 
             @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_REVIEW], true))
                 <div class="mx-auto mt-5 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-left text-sm leading-relaxed text-warning" role="note">
-                    <strong>Không tạo lại thanh toán một cách mù.</strong> Nếu {{ $providerLabel }} đã trừ tiền, hãy giữ mã booking và chờ MovieMate xác minh hoặc đối soát lần hiện tại.
+                    <strong>Không tạo lại thanh toán khi chưa rõ kết quả.</strong> Nếu {{ $providerLabel }} đã trừ tiền, hãy giữ mã đặt vé và chờ MovieMate xác minh hoặc đối soát giao dịch hiện tại.
                 </div>
             @endif
 
@@ -100,7 +100,7 @@
                     <p class="app-muted">Liên kết mở vé an toàn được gửi riêng qua email và không được cấp bởi trang quay lại thanh toán.</p>
                 @endif
                 @if($canViewBooking)
-                    <a href="{{ route('user.bookings.success', $booking) }}" class="btn-secondary">Xem chi tiết booking</a>
+                    <a href="{{ route('user.bookings.success', $booking) }}" class="btn-secondary">Xem chi tiết đơn đặt vé</a>
                 @endif
             </div>
         </section>

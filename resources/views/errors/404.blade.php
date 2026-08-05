@@ -7,7 +7,7 @@
     <div class="mx-auto w-full max-w-3xl px-4 sm:px-6">
         <x-empty-state
             title="Không tìm thấy trang"
-            description="Đường dẫn bạn truy cập không tồn tại hoặc chưa được backend TEAM cung cấp."
+            description="Đường dẫn bạn truy cập không tồn tại hoặc chưa được hệ thống cung cấp."
             icon="ph-map-pin-line"
         >
             <a href="{{ route('home') }}" class="btn-primary"><i class="ph ph-house"></i> Về trang chủ</a>

@@ -1,13 +1,13 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý ghế - MovieMate Admin')
+@section('title', 'Quản lý ghế - Quản trị MovieMate')
 @section('page-title', 'Quản lý ghế')
 
 @section('content')
 <div class="space-y-6">
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Seat map</p>
+            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Sơ đồ ghế</p>
             <h1 class="text-3xl font-extrabold app-text">Ghế phòng chiếu</h1>
             <p class="app-muted mt-2">Lọc theo phòng, đổi loại ghế và trạng thái bảo trì.</p>
         </div>
@@ -60,14 +60,14 @@
                             <td>{{ $seat->number }}</td>
                             <td>
                                 <span class="status-badge {{ $seat->type === 'vip' ? 'text-warning bg-warning/10' : 'text-ai-start bg-ai-start/10' }}">
-                                    {{ strtoupper($seat->type) }}
+                                    {{ $seat->type_label }}
                                 </span>
                             </td>
                             <td>
                                 @if($seat->status === 'active')
-                                    <span class="status-badge text-success bg-success/10">Hoạt động</span>
+                                    <span class="status-badge text-success bg-success/10">{{ $seat->status_label }}</span>
                                 @else
-                                    <span class="status-badge text-error bg-error/10">Bảo trì</span>
+                                    <span class="status-badge text-error bg-error/10">{{ $seat->status_label }}</span>
                                 @endif
                             </td>
                             <td>
@@ -75,13 +75,13 @@
                                     @csrf
                                     @method('PATCH')
                                     <select name="type" class="cinema-input !py-2 !text-xs lg:w-28">
-                                        <option value="normal" {{ $seat->type == 'normal' ? 'selected' : '' }}>Normal</option>
+                                        <option value="normal" {{ $seat->type == 'normal' ? 'selected' : '' }}>Ghế thường</option>
                                         <option value="vip" {{ $seat->type == 'vip' ? 'selected' : '' }}>VIP</option>
-                                        <option value="couple" {{ $seat->type == 'couple' ? 'selected' : '' }}>Couple</option>
+                                        <option value="couple" {{ $seat->type == 'couple' ? 'selected' : '' }}>Ghế đôi</option>
                                     </select>
                                     <select name="status" class="cinema-input !py-2 !text-xs lg:w-36">
-                                        <option value="active" {{ $seat->status == 'active' ? 'selected' : '' }}>Active</option>
-                                        <option value="maintenance" {{ $seat->status == 'maintenance' ? 'selected' : '' }}>Maintenance</option>
+                                        <option value="active" {{ $seat->status == 'active' ? 'selected' : '' }}>Đang sử dụng</option>
+                                        <option value="maintenance" {{ $seat->status == 'maintenance' ? 'selected' : '' }}>Đang bảo trì</option>
                                     </select>
                                     <button type="submit" class="btn-primary !rounded-xl !px-3 !py-2 text-xs">Lưu</button>
                                 </form>@else<span class="text-xs app-muted">Chỉ xem</span>@endcan

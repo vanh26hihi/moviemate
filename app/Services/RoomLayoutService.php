@@ -33,7 +33,7 @@ class RoomLayoutService
         return DB::transaction(function () use ($room, $userId, $rows, $columns, $screenPosition): RoomLayout {
             Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
             if (RoomLayout::query()->where('room_id', $room->id)->where('status', 'draft')->exists()) {
-                throw ValidationException::withMessages(['layout' => 'Phòng này đã có một layout nháp.']);
+                throw ValidationException::withMessages(['layout' => 'Phòng này đã có một bản nháp sơ đồ ghế.']);
             }
 
             $version = ((int) RoomLayout::query()->where('room_id', $room->id)->max('version')) + 1;
@@ -41,7 +41,7 @@ class RoomLayoutService
             return RoomLayout::query()->create([
                 'room_id' => $room->id,
                 'version' => $version,
-                'name' => "Layout v{$version}",
+                'name' => "Sơ đồ phiên bản {$version}",
                 'rows' => $rows,
                 'columns' => $columns,
                 'screen_position' => $screenPosition,
@@ -85,7 +85,7 @@ class RoomLayoutService
         return DB::transaction(function () use ($layout, $normalized, $userId): RoomLayout {
             $locked = RoomLayout::query()->whereKey($layout->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'draft') {
-                throw ValidationException::withMessages(['layout' => 'Chỉ layout nháp mới được chỉnh sửa.']);
+                throw ValidationException::withMessages(['layout' => 'Chỉ bản nháp sơ đồ ghế mới được chỉnh sửa.']);
             }
 
             $locked->cells()->delete();
@@ -149,7 +149,7 @@ class RoomLayoutService
     public function validateDraft(RoomLayout $layout, array $payload): array
     {
         if ($layout->status !== 'draft') {
-            throw ValidationException::withMessages(['layout' => 'Published layout là bất biến.']);
+            throw ValidationException::withMessages(['layout' => 'Sơ đồ ghế đã phát hành không thể chỉnh sửa.']);
         }
 
         $rows = filter_var($payload['rows'] ?? null, FILTER_VALIDATE_INT);
@@ -158,7 +158,7 @@ class RoomLayoutService
         $this->validateDimensions($rows ?: 0, $columns ?: 0, (string) $screen);
 
         if (! is_array($payload['cells'] ?? null) || count($payload['cells']) > self::MAX_CELLS) {
-            throw ValidationException::withMessages(['cells' => 'Payload layout không hợp lệ hoặc vượt quá 1200 ô.']);
+            throw ValidationException::withMessages(['cells' => 'Dữ liệu sơ đồ ghế không hợp lệ hoặc vượt quá 1.200 ô.']);
         }
 
         $coordinates = [];
@@ -168,7 +168,7 @@ class RoomLayoutService
 
         foreach ($payload['cells'] as $index => $input) {
             if (! is_array($input)) {
-                throw ValidationException::withMessages(["cells.{$index}" => 'Ô layout phải là object.']);
+                throw ValidationException::withMessages(["cells.{$index}" => 'Mỗi ô trong sơ đồ phải là một đối tượng dữ liệu hợp lệ.']);
             }
 
             $kind = strtolower(trim((string) ($input['kind'] ?? $input['cell_type'] ?? '')));
@@ -179,7 +179,7 @@ class RoomLayoutService
             $x = filter_var($input['x_position'] ?? $input['x'] ?? null, FILTER_VALIDATE_INT);
             $y = filter_var($input['y_position'] ?? $input['y'] ?? null, FILTER_VALIDATE_INT);
             if (! $x || ! $y || $x > $columns || $y > $rows) {
-                throw ValidationException::withMessages(["cells.{$index}" => 'Tọa độ ô nằm ngoài giới hạn layout.']);
+                throw ValidationException::withMessages(["cells.{$index}" => 'Tọa độ ô nằm ngoài giới hạn sơ đồ ghế.']);
             }
             $coordinate = "{$x}:{$y}";
             if (isset($coordinates[$coordinate])) {
@@ -223,7 +223,7 @@ class RoomLayoutService
             $pairPosition = $type === 'couple' ? strtolower(trim((string) ($input['pair_position'] ?? ''))) : null;
             if ($type === 'couple') {
                 if ($pairCode === '' || ! in_array($pairPosition, ['left', 'right'], true)) {
-                    throw ValidationException::withMessages(["cells.{$index}.pair_code" => 'Ghế đôi phải có pair_code và vị trí left/right.']);
+                    throw ValidationException::withMessages(["cells.{$index}.pair_code" => 'Ghế đôi phải có mã cặp và vị trí trái/phải.']);
                 }
                 $pairs[$pairCode][] = compact('row', 'number', 'x', 'y', 'pairPosition');
             }
@@ -250,7 +250,7 @@ class RoomLayoutService
                 && abs($pair[0]['x'] - $pair[1]['x']) === 1
                 && collect($pair)->pluck('pairPosition')->sort()->values()->all() === ['left', 'right'];
             if (! $valid) {
-                throw ValidationException::withMessages(['cells' => "Cặp {$pairCode} phải có đúng hai ghế liền nhau, cùng hàng và đủ left/right."]);
+                throw ValidationException::withMessages(['cells' => "Cặp {$pairCode} phải có đúng hai ghế liền nhau, cùng hàng và đủ vị trí trái/phải."]);
             }
         }
 
@@ -268,10 +268,10 @@ class RoomLayoutService
         return DB::transaction(function () use ($layout, $userId): RoomLayout {
             $locked = RoomLayout::query()->with('cells.seat')->whereKey($layout->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'draft') {
-                throw ValidationException::withMessages(['layout' => 'Chỉ layout nháp mới được publish.']);
+                throw ValidationException::withMessages(['layout' => 'Chỉ bản nháp sơ đồ ghế mới được phát hành.']);
             }
             if ($locked->cells->where('cell_type', 'seat')->isEmpty()) {
-                throw ValidationException::withMessages(['layout' => 'Layout phải có ít nhất một ghế.']);
+                throw ValidationException::withMessages(['layout' => 'Sơ đồ phải có ít nhất một ghế.']);
             }
 
             $this->validateDraft($locked, $this->payloadFromLayout($locked));
@@ -296,7 +296,7 @@ class RoomLayoutService
     {
         $layout = $showtime->roomLayout()->with('cells.seat')->first();
         if (! $layout || $layout->status !== 'published' || $layout->room_id !== $showtime->room_id) {
-            throw ValidationException::withMessages(['showtime' => 'Suất chiếu không có layout published hợp lệ.']);
+            throw ValidationException::withMessages(['showtime' => 'Suất chiếu không có sơ đồ ghế đã phát hành hợp lệ.']);
         }
 
         return $layout;
@@ -334,14 +334,14 @@ class RoomLayoutService
     {
         if ($rows < 1 || $rows > self::MAX_ROWS || $columns < 1 || $columns > self::MAX_COLUMNS
             || $rows * $columns > self::MAX_CELLS || ! in_array($screenPosition, ['top', 'bottom'], true)) {
-            throw ValidationException::withMessages(['layout' => 'Layout phải trong giới hạn 30 × 40, tối đa 1200 ô và screen top/bottom.']);
+            throw ValidationException::withMessages(['layout' => 'Sơ đồ phải trong giới hạn 30 × 40, tối đa 1.200 ô và màn hình ở phía trên hoặc phía dưới.']);
         }
     }
 
     private function assertOperationalRoom(Room $room): void
     {
         if ($room->status !== 'active') {
-            throw ValidationException::withMessages(['room' => 'Không thể quản lý layout của phòng ngừng hoạt động.']);
+            throw ValidationException::withMessages(['room' => 'Không thể chỉnh sửa sơ đồ ghế của phòng ngừng hoạt động.']);
         }
     }
 
@@ -399,7 +399,7 @@ class RoomLayoutService
 
     private function wideLayoutDefinition(): array
     {
-        return $this->rectangularDefinition('P01 Layout rộng', 11, 13, [7], function (int $row): string {
+        return $this->rectangularDefinition('P01 Sơ đồ rộng', 11, 13, [7], function (int $row): string {
             return $row <= 3 ? 'normal' : ($row <= 10 ? 'vip' : 'couple');
         });
     }

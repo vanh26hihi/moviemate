@@ -18,7 +18,7 @@ class SaveRoomLayoutRequest extends FormRequest
             try {
                 $this->merge(['layout' => json_decode($this->input('layout'), true, flags: JSON_THROW_ON_ERROR)]);
             } catch (\JsonException) {
-                throw ValidationException::withMessages(['layout' => 'JSON layout không hợp lệ.']);
+                throw ValidationException::withMessages(['layout' => 'Dữ liệu sơ đồ ghế không hợp lệ.']);
             }
         }
     }

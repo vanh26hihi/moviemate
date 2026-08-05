@@ -6,7 +6,7 @@
 @php
     $printMode = $printMode ?? false;
     $foodItems = $booking->foodOrder?->items ?? collect();
-    $currency = $booking->currency ?: 'VND';
+    $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
     $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
     $paymentProvider = match ($verifiedPayment?->provider) {
         'vnpay' => 'VNPAY',
@@ -62,7 +62,7 @@
         <div class="cinema-ticket-body">
             <section class="cinema-ticket-main" aria-labelledby="ticket-movie-title">
                 <div class="cinema-ticket-code-block">
-                    <p>Mã booking / check-in</p>
+                    <p>Mã đặt vé / soát vé</p>
                     <strong>{{ $booking->booking_code }}</strong>
                 </div>
 
@@ -102,7 +102,7 @@
                         @foreach($booking->bookingSeats as $bookingSeat)
                             <span>
                                 Ghế {{ $bookingSeat->seat?->seat_code }}
-                                · {{ $seatTypeLabels[$bookingSeat->seat?->type] ?? ucfirst((string) $bookingSeat->seat?->type) }}
+                                · {{ $seatTypeLabels[$bookingSeat->seat?->type] ?? \App\Support\StatusLabel::for('seat_type', $bookingSeat->seat?->type) }}
                             </span>
                         @endforeach
                     </div>
@@ -124,17 +124,17 @@
             </section>
 
             <aside class="cinema-ticket-stub" aria-label="Cuống vé check-in">
-                <p class="cinema-ticket-stub-label">CHECK-IN</p>
+                <p class="cinema-ticket-stub-label">SOÁT VÉ</p>
                 @if($isUsable)
                     <div class="cinema-ticket-qr">
-                        <canvas data-qr-value="{{ $booking->booking_code }}" data-qr-size="240" width="240" height="240" aria-label="Mã QR check-in MovieMate"></canvas>
+                        <canvas data-qr-value="{{ $booking->booking_code }}" data-qr-size="240" width="240" height="240" aria-label="Mã QR soát vé MovieMate"></canvas>
                         <span data-qr-fallback class="hidden">QR chưa tải</span>
                     </div>
                     <p class="cinema-ticket-instruction">Đưa mã QR cho nhân viên soát vé. Vui lòng đến trước giờ chiếu 15 phút.</p>
                 @else
                     <div class="cinema-ticket-inactive">
                         <i class="ph-bold ph-qr-code" aria-hidden="true"></i>
-                        <p>Booking này không có mã QR sử dụng được.</p>
+                        <p>Đơn đặt vé này không có mã QR sử dụng được.</p>
                     </div>
                 @endif
 
@@ -165,7 +165,7 @@
                     <div class="seat-admission-seat">
                         <span>GHẾ</span>
                         <strong>{{ $bookingSeat->seat?->seat_code }}</strong>
-                        <small>{{ $seatTypeLabels[$bookingSeat->seat?->type] ?? ucfirst((string) $bookingSeat->seat?->type) }}</small>
+                        <small>{{ $seatTypeLabels[$bookingSeat->seat?->type] ?? \App\Support\StatusLabel::for('seat_type', $bookingSeat->seat?->type) }}</small>
                     </div>
                 </article>
             @endforeach

@@ -49,9 +49,9 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
         $this->get(route('user.bookings.review'))
             ->assertOk()
             ->assertViewIs('user.bookings.review')
-            ->assertSee('50.000 VND')
-            ->assertSee('70.000 VND')
-            ->assertSee('120.000 VND')
+            ->assertSee('50.000 VNĐ')
+            ->assertSee('70.000 VNĐ')
+            ->assertSee('120.000 VNĐ')
             ->assertDontSee('name="total_amount"', false);
 
         $this->post(route('user.bookings.confirm'))

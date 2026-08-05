@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'MovieMate Admin Panel')</title>
+    <title>@yield('title', 'Khu vực quản trị MovieMate')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>
         (function () {
@@ -21,7 +21,7 @@
                 <i class="ph-fill ph-film-strip text-3xl text-brand-start"></i>
                 <div class="leading-tight">
                     <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end">MovieMate</span>
-                    <span class="block text-[10px] uppercase tracking-widest app-muted font-bold">Admin Panel</span>
+                    <span class="block text-[10px] uppercase tracking-widest app-muted font-bold">Khu vực quản trị</span>
                 </div>
             </a>
         </div>
@@ -47,12 +47,12 @@
             @canany(['users.view', 'roles.view'])
                 <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Bảo mật</p>
                 @can('users.view')<x-admin.nav-link route-name="admin.users.index" active-pattern="admin.users.*" label="Người dùng" icon="ph-users" />@endcan
-                @can('roles.view')<x-admin.nav-link route-name="admin.roles.index" active-pattern="admin.roles.*" label="Vai trò &amp; quyền" icon="ph-shield-check" />@endcan
+                @can('roles.view')<x-admin.nav-link route-name="admin.roles.index" active-pattern="admin.roles.*" label="Vai trò và quyền" icon="ph-shield-check" />@endcan
             @endcanany
         </nav>
 
         <div class="p-4 border-t app-border shrink-0">
-            <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về website</a>
+            <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về trang chính</a>
             <form method="POST" action="{{ route('logout') }}" class="mt-2">@csrf
                 <button type="submit" class="flex items-center justify-center gap-2 w-full py-2.5 app-muted hover:text-error text-sm font-medium"><i class="ph ph-sign-out"></i> Đăng xuất</button>
             </form>
@@ -75,7 +75,7 @@
                 <div class="flex items-center gap-3 pl-3 border-l app-border">
                     <div class="hidden sm:block text-right">
                         <p class="text-sm font-bold app-text leading-tight">{{ auth()->user()?->name ?? 'Khu vực quản trị' }}</p>
-                        <p class="text-[10px] uppercase tracking-wider text-brand-start font-bold">{{ auth()->user()?->role?->name ?? 'Chưa có vai trò' }}</p>
+                        <p class="text-[10px] uppercase tracking-wider text-brand-start font-bold">{{ auth()->user()?->role?->display_name ?? 'Chưa có vai trò' }}</p>
                     </div>
                     <span class="w-9 h-9 rounded-full app-bg border app-border flex items-center justify-center text-brand-start"><i class="ph-fill ph-user text-lg"></i></span>
                 </div>

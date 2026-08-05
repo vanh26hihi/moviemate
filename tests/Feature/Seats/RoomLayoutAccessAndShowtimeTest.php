@@ -54,7 +54,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $room = $this->rooms['P01'];
         $staff = $this->userWithRole('staff');
         $this->actingAs($staff)->get(route('staff.rooms.layout.preview', $room))
-            ->assertOk()->assertSee('P01')->assertSee('v1');
+            ->assertOk()->assertSee('P01')->assertSee('phiên bản 1');
         $this->actingAs($staff)->post(route('admin.rooms.layout.draft', $room))->assertForbidden();
         $this->actingAs($staff)->post(route('admin.rooms.layout.publish', $room))->assertForbidden();
     }
@@ -81,7 +81,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $p03 = $this->actingAs($staff)->get(route('staff.rooms.layout.preview', $this->rooms['P03']))->assertOk();
 
         $p01->assertSee('repeat(13', false)->assertSee('K12');
-        $p02->assertSee('repeat(14', false)->assertSee('F6')->assertSee('maintenance');
+        $p02->assertSee('repeat(14', false)->assertSee('F6')->assertSee('Đang bảo trì');
         $p03->assertSee('repeat(13', false)->assertSee('104');
         $this->assertSame(113, $this->rooms['P03']->latestPublishedLayout()->first()->cells()->count());
     }

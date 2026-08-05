@@ -1,5 +1,5 @@
 @extends('layouts.admin')
-@section('title', 'Chỉnh sửa suất chiếu - MovieMate Admin')
+@section('title', 'Chỉnh sửa suất chiếu - Quản trị MovieMate')
 @section('page-title', 'Chỉnh sửa suất chiếu')
 
 @section('content')
@@ -7,7 +7,7 @@
     <div class="cinema-card p-6 sm:p-8">
         <h1 class="text-2xl font-extrabold app-text mb-2">Cập nhật suất chiếu</h1>
         <p class="app-muted mb-6">
-            Cơ sở cố định: {{ $cinema->name }} · Layout hiện tại: v{{ $showtime->roomLayout->version }}
+            Cơ sở cố định: {{ $cinema->name }} · Sơ đồ hiện tại: phiên bản {{ $showtime->roomLayout->version }}
         </p>
 
         <form method="POST" action="{{ route('admin.showtimes.update', $showtime) }}" class="space-y-6">

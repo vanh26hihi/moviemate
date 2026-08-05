@@ -42,7 +42,7 @@
                 <tr>
                     <th>#</th>
                     <th>Tên</th>
-                    <th>Slug</th>
+                    <th>Đường dẫn rút gọn</th>
                     <th class="text-right">Hành động</th>
                 </tr>
             </thead>

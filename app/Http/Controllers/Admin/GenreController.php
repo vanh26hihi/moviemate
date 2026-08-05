@@ -39,8 +39,8 @@ class GenreController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'slug'        => 'nullable|string|max:255|unique:genres,slug',
+            'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:genres,slug',
             'description' => 'nullable|string',
         ]);
 
@@ -50,7 +50,7 @@ class GenreController extends Controller
             $original = $validated['slug'];
             $counter = 1;
             while (Genre::where('slug', $validated['slug'])->exists()) {
-                $validated['slug'] = $original . '-' . $counter++;
+                $validated['slug'] = $original.'-'.$counter++;
             }
         }
 
@@ -58,7 +58,7 @@ class GenreController extends Controller
 
         return redirect()
             ->route('admin.genres.index')
-            ->with('success', 'Genre created successfully.');
+            ->with('success', 'Đã tạo thể loại thành công.');
     }
 
     /**
@@ -67,6 +67,7 @@ class GenreController extends Controller
     public function show(Genre $genre)
     {
         $genre->load('movies');
+
         return view('admin.genres.show', compact('genre'));
     }
 
@@ -84,8 +85,8 @@ class GenreController extends Controller
     public function update(Request $request, Genre $genre)
     {
         $validated = $request->validate([
-            'name'        => 'required|string|max:255',
-            'slug'        => 'nullable|string|max:255|unique:genres,slug,' . $genre->id,
+            'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:genres,slug,'.$genre->id,
             'description' => 'nullable|string',
         ]);
 
@@ -95,7 +96,7 @@ class GenreController extends Controller
             $original = $validated['slug'];
             $counter = 1;
             while (Genre::where('slug', $validated['slug'])->where('id', '!=', $genre->id)->exists()) {
-                $validated['slug'] = $original . '-' . $counter++;
+                $validated['slug'] = $original.'-'.$counter++;
             }
         }
 
@@ -103,7 +104,7 @@ class GenreController extends Controller
 
         return redirect()
             ->route('admin.genres.index')
-            ->with('success', 'Genre updated successfully.');
+            ->with('success', 'Đã cập nhật thể loại thành công.');
     }
 
     /**
@@ -121,6 +122,6 @@ class GenreController extends Controller
 
         return redirect()
             ->route('admin.genres.index')
-            ->with('success', 'Genre deleted successfully.');
+            ->with('success', 'Đã xóa thể loại thành công.');
     }
 }

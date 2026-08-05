@@ -69,11 +69,11 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee($scenario['movie']->title)
             ->assertSee($scenario['room']->name)
             ->assertSee('Ghế <strong>A1</strong> · Thường', false)
-            ->assertSee('50.000 VND')
+            ->assertSee('50.000 VNĐ')
             ->assertSee('Không chọn đồ ăn')
             ->assertSee('ZaloPay')
             ->assertSee('mobile@example.test')
-            ->assertSee('Thời gian phiên checkout còn lại')
+            ->assertSee('Thời gian phiên đặt vé còn lại')
             ->assertDontSee('name="total_amount"', false)
             ->assertDontSee('name="payment_status"', false);
     }
@@ -86,8 +86,8 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ['pending', Payment::STATUS_PENDING, 'pending_payment', 'unpaid', 'Đang chờ xác minh thanh toán', 'user.bookings.pending'],
             ['review', Payment::STATUS_REVIEW, 'pending_payment', 'unpaid', 'Giao dịch đang được đối soát', 'user.bookings.payment-review'],
             ['failed', Payment::STATUS_FAILED, 'pending_payment', 'unpaid', 'Thanh toán không thành công', 'user.bookings.failed'],
-            ['expired', Payment::STATUS_EXPIRED, 'expired', 'unpaid', 'Booking đã hết hạn', 'user.bookings.expired'],
-            ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Booking đã bị hủy', 'user.bookings.success'],
+            ['expired', Payment::STATUS_EXPIRED, 'expired', 'unpaid', 'Đơn đặt vé đã hết hạn', 'user.bookings.expired'],
+            ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Đơn đặt vé đã bị hủy', 'user.bookings.success'],
             ['used', Payment::STATUS_SUCCESS, 'used', 'paid', 'Vé đã được sử dụng', 'user.bookings.success'],
         ];
 
@@ -159,7 +159,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee('data-paid-ticket-link', false)
             ->assertSee($booking->booking_code)
             ->assertSee('Bắp rang caramel')
-            ->assertSee('90.000 VND')
+            ->assertSee('90.000 VNĐ')
             ->assertDontSee('api.qrserver.com', false);
 
         $this->actingAs($user)->get(route('user.bookings.ticket', $booking))
@@ -169,7 +169,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee('data-print-ticket', false)
             ->assertSee('A1')
             ->assertSee('Bắp rang caramel')
-            ->assertSee('90.000 VND')
+            ->assertSee('90.000 VNĐ')
             ->assertDontSee('api.qrserver.com', false);
     }
 

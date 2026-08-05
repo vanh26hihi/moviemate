@@ -28,7 +28,7 @@
     </div>
 
     <div>
-        <label class="cinema-label" for="room_id">Phòng active *</label>
+        <label class="cinema-label" for="room_id">Phòng đang hoạt động *</label>
         <select id="room_id" name="room_id" class="cinema-input">
             <option value="">-- Chọn phòng --</option>
             @foreach($rooms as $room)
@@ -38,7 +38,7 @@
                         : $room->latestPublishedLayout;
                 @endphp
                 <option value="{{ $room->id }}" data-layout-version="{{ $layout->version }}" @selected($roomValue == $room->id)>
-                    {{ $room->code }} — {{ $room->name }} (layout v{{ $layout->version }})
+                    {{ $room->code }} — {{ $room->name }} (sơ đồ phiên bản {{ $layout->version }})
                 </option>
             @endforeach
         </select>
@@ -58,13 +58,13 @@
     </div>
 
     <div>
-        <label class="cinema-label" for="price">Giá thường (VND) *</label>
+        <label class="cinema-label" for="price">Giá thường (VNĐ) *</label>
         <input id="price" type="number" name="price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ $priceValue }}" class="cinema-input">
         @error('price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label class="cinema-label" for="vip_price">Giá VIP (VND)</label>
+        <label class="cinema-label" for="vip_price">Giá VIP (VNĐ)</label>
         <input id="vip_price" type="number" name="vip_price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ $vipPriceValue }}" class="cinema-input">
         @error('vip_price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
@@ -91,7 +91,7 @@
         <div><span class="app-muted block">Vệ sinh phòng</span><strong class="app-text">{{ $cleaningBufferMinutes }} phút</strong></div>
         <div><span class="app-muted block">Phòng sẵn sàng</span><strong id="preview-room-ready" class="text-brand-start">--</strong></div>
     </div>
-    <p class="text-xs app-muted mt-4">Thời gian kết thúc được backend tính lại từ runtime phim và cấu hình vệ sinh; dữ liệu từ trình duyệt không được dùng để xếp lịch.</p>
+    <p class="text-xs app-muted mt-4">Thời gian kết thúc được máy chủ tính lại từ thời lượng phim và cấu hình vệ sinh; dữ liệu từ trình duyệt không được dùng để xếp lịch.</p>
 </section>
 
 @push('scripts')

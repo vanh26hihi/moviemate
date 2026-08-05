@@ -16,7 +16,7 @@
         default => 'Cổng thanh toán',
     };
     $foodItems = $booking->foodOrder?->items ?? collect();
-    $currency = $booking->currency ?: 'VND';
+    $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
 @endphp
 <body style="margin:0;background:#f3f4f6;font-family:Arial,sans-serif;color:#111827">
 <div style="max-width:640px;margin:0 auto;padding:28px 16px">
@@ -29,7 +29,7 @@
 
         <div style="padding:24px">
             <div style="margin-bottom:22px;padding:16px;border:1px dashed #fb7185;border-radius:12px;text-align:center">
-                <p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase">Mã booking / check-in</p>
+                <p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase">Mã đặt vé / soát vé</p>
                 <p style="margin:10px 0 0;color:#e91e3d;font-family:monospace;font-size:21px;font-weight:bold;letter-spacing:1px">{{ $booking->booking_code }}</p>
             </div>
 

@@ -72,7 +72,7 @@ class MovieController extends Controller
 
         return redirect()
             ->route('admin.movies.index')
-            ->with('success', 'Movie created successfully.');
+            ->with('success', 'Đã tạo phim thành công.');
     }
 
     /**
@@ -135,7 +135,7 @@ class MovieController extends Controller
 
         return redirect()
             ->route('admin.movies.index')
-            ->with('success', 'Movie updated successfully.');
+            ->with('success', 'Đã cập nhật phim thành công.');
     }
 
     /**
@@ -156,7 +156,7 @@ class MovieController extends Controller
 
         return redirect()
             ->route('admin.movies.index')
-            ->with('success', 'Movie deleted successfully.');
+            ->with('success', 'Đã xóa phim thành công.');
     }
 
     private function uniqueSlug(?string $requested, string $title, ?int $excludingMovieId = null): string

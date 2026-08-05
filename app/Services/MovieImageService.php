@@ -18,7 +18,7 @@ class MovieImageService
         $directory = match ($kind) {
             self::POSTER => 'movies/posters',
             self::BANNER => 'movies/banners',
-            default => throw new RuntimeException('Unsupported movie image type.'),
+            default => throw new RuntimeException('Loại ảnh phim không được hỗ trợ.'),
         };
 
         $stored = $file->store($directory, 'public');
@@ -29,7 +29,7 @@ class MovieImageService
                 Storage::disk('public')->delete($stored);
             }
 
-            throw new RuntimeException('The movie image could not be stored safely.');
+            throw new RuntimeException('Không thể lưu ảnh phim an toàn.');
         }
 
         return $path;

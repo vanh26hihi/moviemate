@@ -190,7 +190,7 @@ class TicketEmailOperationsTest extends PaymentTestCase
             return str_contains($html, $payment->booking->booking_code)
                 && str_contains($html, 'Booking Foundation Movie')
                 && str_contains($html, 'Test booking room')
-                && str_contains($html, '50.000 VND')
+                && str_contains($html, '50.000 VNĐ')
                 && str_contains($html, 'Xem / In vé an toàn')
                 && ! str_contains($html, 'tracking')
                 && ! str_contains($html, 'VNPAY_HASH_SECRET')

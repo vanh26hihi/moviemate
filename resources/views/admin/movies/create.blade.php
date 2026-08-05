@@ -36,7 +36,7 @@
             </div>
 
             <div>
-                <label class="admin-label">Slug</label>
+                <label class="admin-label">Đường dẫn rút gọn</label>
                 <input type="text" name="slug" value="{{ old('slug') }}" class="admin-input" placeholder="Để trống để tự tạo">
                 <p class="admin-help">Để trống nếu muốn hệ thống tự tạo slug từ tiêu đề.</p>
             </div>
@@ -47,7 +47,7 @@
             </div>
 
             <div>
-                <label class="admin-label">Trailer URL</label>
+                <label class="admin-label">Đường dẫn video giới thiệu</label>
                 <input type="url" name="trailer_url" value="{{ old('trailer_url') }}" class="admin-input" placeholder="https://youtube.com/...">
             </div>
         </div>
@@ -87,10 +87,10 @@
             </div>
 
             <div>
-                <label class="admin-label">Poster</label>
+                <label class="admin-label">Ảnh áp phích</label>
                 <div class="mb-3 aspect-[2/3] max-w-48 overflow-hidden rounded-xl bg-slate-950">
                     <img id="poster-preview" alt="Xem trước poster" class="hidden h-full w-full object-cover">
-                    <div data-image-fallback class="admin-media-fallback h-full w-full">Poster</div>
+                    <div data-image-fallback class="admin-media-fallback h-full w-full">Ảnh áp phích</div>
                 </div>
                 <input type="file" name="poster" accept="image/jpeg,image/png,image/webp" data-image-preview="poster-preview" class="admin-input file:mr-4 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
                 <p class="admin-help">JPG, PNG hoặc WebP; tối đa 4 MB. Tỷ lệ đề xuất 2:3.</p>
@@ -98,10 +98,10 @@
             </div>
 
             <div>
-                <label class="admin-label">Banner</label>
+                <label class="admin-label">Ảnh bìa</label>
                 <div class="mb-3 aspect-video overflow-hidden rounded-xl bg-slate-950">
                     <img id="banner-preview" alt="Xem trước banner" class="hidden h-full w-full object-cover">
-                    <div data-image-fallback class="admin-media-fallback h-full w-full">Banner</div>
+                    <div data-image-fallback class="admin-media-fallback h-full w-full">Ảnh bìa</div>
                 </div>
                 <input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp" data-image-preview="banner-preview" class="admin-input file:mr-4 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
                 <p class="admin-help">JPG, PNG hoặc WebP; tối đa 8 MB. Tỷ lệ đề xuất 16:9.</p>

@@ -36,7 +36,7 @@
         </div>
 
         <div>
-            <label class="admin-label">Slug</label>
+            <label class="admin-label">Đường dẫn rút gọn</label>
             <input type="text" name="slug" value="{{ old('slug', $genre->slug) }}" class="admin-input">
             <p class="admin-help">Để trống nếu muốn hệ thống tự tạo slug từ tên.</p>
         </div>

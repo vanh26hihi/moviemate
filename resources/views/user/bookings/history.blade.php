@@ -11,7 +11,7 @@
                     <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=FF3D57&color=fff&size=128" alt="Avatar" class="w-full h-full object-cover">
                 </div>
                 <h2 class="font-bold app-text mb-1">{{ Auth::user()->name }}</h2>
-                <p class="text-xs text-ai-start font-bold mb-5">Hạng {{ Auth::user()->role->name ?? 'Khách' }}</p>
+                <p class="text-xs text-ai-start font-bold mb-5">Hạng {{ Auth::user()->role?->display_name ?? 'Khách hàng' }}</p>
 
                 <div class="w-full rounded-2xl border border-ai-start/30 bg-ai-start/10 px-4 py-3 mb-4 text-left">
                     <p class="text-xs app-muted">Thành viên {{ Auth::user()->membership_tier }}</p>
@@ -67,22 +67,21 @@
             <div class="space-y-5">
                 @forelse($bookings as $booking)
                     @php
-                        $statusMap = [
-                            'pending_payment' => ['label' => 'Chờ thanh toán', 'class' => 'bg-yellow-100 text-yellow-700'],
-                            'paid' => ['label' => 'Chưa sử dụng', 'class' => 'bg-brand-start text-white'],
-                            'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700'],
-                            'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-red-100 text-red-700'],
-                            'expired' => ['label' => 'Hết hạn', 'class' => 'bg-gray-100 text-gray-700'],
-                        ];
-                        $status = $statusMap[$booking->booking_status] ?? ['label' => 'Không xác định', 'class' => 'bg-gray-100 text-gray-700'];
+                        $statusClass = match($booking->booking_status) {
+                            'pending_payment' => 'bg-yellow-100 text-yellow-700',
+                            'paid' => 'bg-brand-start text-white',
+                            'used' => 'bg-blue-100 text-blue-700',
+                            'cancelled' => 'bg-red-100 text-red-700',
+                            default => 'bg-gray-100 text-gray-700',
+                        };
                         $poster = $booking->showtime->movie->poster_url;
                         $canCancel = in_array($booking->id, $cancellableBookingIds, true);
                         $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
                     @endphp
 
                     <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
-                        <div class="absolute top-0 right-0 {{ $status['class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
-                            {{ $status['label'] }}
+                        <div class="absolute top-0 right-0 {{ $statusClass }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
+                            {{ $booking->status_label }}
                         </div>
 
                         <div class="flex flex-col sm:flex-row gap-5">
@@ -113,7 +112,7 @@
                                 <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
                                     <div>
                                         <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
-                                        <p class="app-text font-bold text-lg">{{ number_format($booking->total_amount,0,',','.') }}đ</p>
+                                        <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
                                         @if($booking->loyalty_points_earned > 0)
                                             <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
                                         @endif

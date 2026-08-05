@@ -35,7 +35,7 @@
         </div>
 
         <div>
-            <label class="admin-label">Slug</label>
+            <label class="admin-label">Đường dẫn rút gọn</label>
             <input type="text" name="slug" value="{{ old('slug') }}" class="admin-input" placeholder="Để trống để tự tạo">
             <p class="admin-help">Slug dùng cho URL và lọc dữ liệu.</p>
         </div>

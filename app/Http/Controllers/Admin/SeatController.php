@@ -73,7 +73,7 @@ class SeatController extends Controller
             );
         }
 
-        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã tạo layout nháp.');
+        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã tạo bản nháp sơ đồ ghế.');
     }
 
     public function saveDraft(SaveRoomLayoutRequest $request, Room $room)
@@ -82,7 +82,7 @@ class SeatController extends Controller
         $draft = $room->draftLayout()->firstOrFail();
         $this->layouts->saveDraft($draft, $request->validated('layout'), Auth::id());
 
-        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã lưu layout nháp.');
+        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã lưu bản nháp sơ đồ ghế.');
     }
 
     public function publish(Room $room)
@@ -92,12 +92,12 @@ class SeatController extends Controller
         $published = $this->layouts->publish($draft, Auth::id());
 
         return redirect()->route('admin.rooms.layout.show', $room)
-            ->with('success', "Đã publish layout v{$published->version}.");
+            ->with('success', "Đã phát hành sơ đồ ghế phiên bản {$published->version}.");
     }
 
     public function preview(Request $request, Room $room)
     {
-        $this->assertOperationalRoom($room);
+        $this->assertManagedRoom($room);
         $layout = RoomLayout::query()->with('cells.seat')
             ->where('room_id', $room->id)
             ->when($request->integer('version'), fn ($query, $version) => $query->where('version', $version))
@@ -113,7 +113,7 @@ class SeatController extends Controller
         $this->assertOperationalRoom($room);
 
         return redirect()->route('admin.rooms.layout.show', $room)
-            ->with('warning', 'Trình tạo ma trận ghế cũ đã ngừng sử dụng. Hãy dùng Dynamic Layout Editor.');
+            ->with('warning', 'Trình tạo ma trận ghế cũ đã ngừng sử dụng. Hãy dùng trình thiết kế sơ đồ ghế mới.');
     }
 
     public function update(Request $request, Seat $seat)
@@ -138,5 +138,10 @@ class SeatController extends Controller
     private function assertOperationalRoom(Room $room): void
     {
         abort_unless($room->cinema_id === $this->cinemaContext->id() && $room->status === 'active', 404);
+    }
+
+    private function assertManagedRoom(Room $room): void
+    {
+        abort_unless($room->cinema_id === $this->cinemaContext->id(), 404);
     }
 }

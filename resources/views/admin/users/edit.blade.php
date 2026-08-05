@@ -15,7 +15,7 @@
         <h2 class="font-bold text-lg mb-4">Vai trò</h2>
         <label class="block text-sm app-muted mb-2" for="role">Vai trò hệ thống</label>
         <select id="role" name="role" class="app-input border app-border rounded-xl px-4 py-3 w-full" required>
-            @foreach($roles as $role)<option value="{{ $role->slug }}" @selected(old('role', $managedUser->role?->slug) === $role->slug)>{{ $role->name }}</option>@endforeach
+            @foreach($roles as $role)<option value="{{ $role->slug }}" @selected(old('role', $managedUser->role?->slug) === $role->slug)>{{ $role->display_name }}</option>@endforeach
         </select>
         <button class="admin-btn-primary mt-5" type="submit">Cập nhật vai trò</button>
     </form>
@@ -26,10 +26,10 @@
         <h2 class="font-bold text-lg mb-4">Trạng thái</h2>
         <label class="block text-sm app-muted mb-2" for="status">Trạng thái tài khoản</label>
         <select id="status" name="status" class="app-input border app-border rounded-xl px-4 py-3 w-full" required>
-            <option value="active" @selected(old('status', $managedUser->status) === 'active')>Đang hoạt động</option>
-            <option value="inactive" @selected(old('status', $managedUser->status) === 'inactive')>Vô hiệu hóa</option>
+            <option value="active" @selected(old('status', $managedUser->status) === 'active')>{{ \App\Support\StatusLabel::for('user', 'active') }}</option>
+            <option value="inactive" @selected(old('status', $managedUser->status) === 'inactive')>{{ \App\Support\StatusLabel::for('user', 'inactive') }}</option>
         </select>
-        <p class="text-xs app-muted mt-3">Admin hoạt động cuối cùng không thể bị vô hiệu hóa.</p>
+        <p class="text-xs app-muted mt-3">Không thể ngừng hoạt động tài khoản quản trị viên cuối cùng.</p>
         <button class="admin-btn-primary mt-5" type="submit">Cập nhật trạng thái</button>
     </form>
     @endcan

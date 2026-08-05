@@ -171,7 +171,7 @@ class BookingCheckoutService
             );
         }
 
-        throw new LogicException('Booking code generation attempts were exhausted.');
+        throw new LogicException('Không thể tạo mã đặt vé sau nhiều lần thử.');
     }
 
     private function result(

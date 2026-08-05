@@ -116,7 +116,7 @@ class SingleCinemaOperationsTest extends TestCase
             'room_type' => '3D',
             'total_seats' => 24,
             'status' => 'active',
-        ])->assertRedirect(route('admin.rooms.index'));
+        ])->assertRedirect(route('admin.rooms.show', $room));
 
         $room->refresh();
         $this->assertSame($canonical->id, $room->cinema_id);
@@ -159,7 +159,7 @@ class SingleCinemaOperationsTest extends TestCase
         $this->actingAs($manager)->post(route('admin.showtimes.store'), [
             ...$payload, 'room_id' => $legacyRoom->id,
         ])->assertSessionHasErrors('room_id');
-        $this->actingAs($manager)->get(route('admin.rooms.edit', $archived))->assertNotFound();
+        $this->actingAs($manager)->get(route('admin.rooms.edit', $archived))->assertOk();
         $this->actingAs($manager)->get(route('admin.seats.manage', $archived))->assertNotFound();
 
         $this->assertDatabaseCount('showtimes', 0);

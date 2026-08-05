@@ -1,5 +1,5 @@
 @extends('layouts.admin')
-@section('title', 'Thêm suất chiếu - MovieMate Admin')
+@section('title', 'Thêm suất chiếu - Quản trị MovieMate')
 @section('page-title', 'Thêm suất chiếu')
 
 @section('content')
