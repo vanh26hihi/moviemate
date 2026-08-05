@@ -22,3 +22,25 @@
         <span class="block app-muted text-sm leading-relaxed line-clamp-2 mt-1">
             {{ $cinema->address ?? 'Địa chỉ đang cập nhật' }}
         </span>
+            <span class="mt-3 flex flex-wrap items-center gap-2">
+            <span class="inline-flex px-3 py-1 rounded-full text-xs font-extrabold {{ $isActiveCinema ? 'bg-brand-start text-white' : 'bg-brand-start/10 text-brand-start' }}">
+                {{ $showtimeCount }} suất
+            </span>
+
+            @if($isNearby && ! is_null($distance))
+                <span class="inline-flex px-3 py-1 rounded-full text-xs font-extrabold app-secondary border app-border app-text">
+                    {{ number_format($distance, 1) }} km
+                </span>
+            @endif
+
+            @if($isNearestCinema)
+                <span class="inline-flex px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                    Gần nhất
+                </span>
+            @endif
+        </span>
+    </span>
+
+    <i class="ph ph-caret-right app-muted mt-3"></i>
+</div>
+</a>
