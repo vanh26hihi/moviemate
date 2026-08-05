@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Movie;
 use App\Models\Payment;
+use App\Models\Showtime;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,23 +21,48 @@ final class AdminDashboardService
     public function overview(): array
     {
         $timezone = (string) config('app.timezone', 'UTC');
-        $today = CarbonImmutable::now($timezone)->startOfDay();
+        $generatedAt = CarbonImmutable::now($timezone);
+        $today = $generatedAt->startOfDay();
         $chartDays = collect(range(6, 0))
             ->map(fn (int $daysAgo): CarbonImmutable => $today->subDays($daysAgo));
         $revenueChart = $this->revenueChart($chartDays->all());
+        $topMovies = $this->topMovies(
+            $today->subDays(6)->utc(),
+            $today->addDay()->utc(),
+        );
 
         return [
+            'generatedAt' => $generatedAt,
             'metrics' => [
                 'totalRevenue' => $this->vnd($this->recognizedBookings()->sum('bookings.total_amount')),
                 'ticketsSold' => $this->ticketsSold(),
                 'users' => User::query()->count(),
                 'nowShowingMovies' => Movie::query()->where('status', 'now_showing')->count(),
+                'showtimesToday' => Showtime::query()
+                    ->whereDate('show_date', $today->toDateString())
+                    ->where('status', 'active')
+                    ->whereHas('cinema', fn (Builder $query): Builder => $query
+                        ->active()
+                        ->primary()
+                        ->where('canonical_key', CinemaContext::CANONICAL_KEY))
+                    ->whereHas('room', fn (Builder $query): Builder => $query->operational())
+                    ->count(),
+            ],
+            'operations' => [
+                'pendingBookings' => Booking::query()
+                    ->where('booking_status', 'pending_payment')
+                    ->where('payment_status', 'unpaid')
+                    ->where(function (Builder $query) use ($generatedAt): void {
+                        $query->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', $generatedAt->utc());
+                    })
+                    ->count(),
             ],
             'revenueChart' => $revenueChart,
             'hasRevenueChartData' => collect($revenueChart)->contains(
                 fn (array $day): bool => $day['revenue'] > 0,
             ),
-            'topMovies' => $this->topMovies(),
+            'topMovies' => $topMovies,
             'recentBookings' => $this->recentBookings(),
         ];
     }
@@ -64,21 +90,19 @@ final class AdminDashboardService
     private function ticketsSold(): int
     {
         return BookingSeat::query()
-            ->whereHas('booking', function (Builder $query): void {
-                $query->where('payment_status', 'paid')
-                    ->whereIn('booking_status', self::REVENUE_BOOKING_STATUSES)
-                    ->whereHas('payments', function (Builder $payments): void {
-                        $payments->where('status', Payment::STATUS_SUCCESS)
-                            ->whereNotNull('verified_at')
-                            ->whereNotNull('paid_at');
-                    });
-            })
-            ->count();
+            ->joinSub(
+                $this->recognizedBookings()->select('bookings.id'),
+                'recognized_bookings',
+                function ($join): void {
+                    $join->on('recognized_bookings.id', '=', 'booking_seats.booking_id');
+                },
+            )
+            ->count('booking_seats.id');
     }
 
     /**
      * @param  array<int, CarbonImmutable>  $days
-     * @return array<int, array{label: string, date: string, revenue: int, heightPercent: int}>
+     * @return array<int, array{label: string, date: string, revenue: int, heightPercent: int, isToday: bool}>
      */
     private function revenueChart(array $days): array
     {
@@ -111,26 +135,41 @@ final class AdminDashboardService
                 'heightPercent' => $maximum > 0 && $revenue > 0
                     ? max(4, (int) round(($revenue / $maximum) * 100))
                     : 0,
+                'isToday' => $day->isToday(),
             ];
         })->all();
     }
 
-    private function topMovies(): EloquentCollection
+    private function topMovies(CarbonImmutable $periodStart, CarbonImmutable $periodEnd): EloquentCollection
     {
+        $recognizedBookings = $this->recognizedBookings()
+            ->where('first_successful_payments.recognized_at', '>=', $periodStart->toDateTimeString())
+            ->where('first_successful_payments.recognized_at', '<', $periodEnd->toDateTimeString())
+            ->select([
+                'bookings.id',
+                'bookings.showtime_id',
+                'bookings.total_amount',
+            ]);
+        $bookingTicketCounts = BookingSeat::query()
+            ->selectRaw('booking_id, COUNT(id) as tickets_sold')
+            ->groupBy('booking_id');
+
         return Movie::query()
-            ->select(['movies.id', 'movies.title'])
-            ->selectRaw('COUNT(booking_seats.id) as tickets_sold')
+            ->select(['movies.id', 'movies.title', 'movies.poster'])
+            ->selectRaw('SUM(paid_booking_tickets.tickets_sold) as tickets_sold')
+            ->selectRaw('SUM(recognized_bookings.total_amount) as revenue')
+            ->selectRaw('COUNT(recognized_bookings.id) as booking_count')
             ->join('showtimes', 'showtimes.movie_id', '=', 'movies.id')
-            ->join('bookings', 'bookings.showtime_id', '=', 'showtimes.id')
-            ->joinSub($this->firstSuccessfulPayments(), 'first_successful_payments', function ($join): void {
-                $join->on('first_successful_payments.booking_id', '=', 'bookings.id');
+            ->joinSub($recognizedBookings, 'recognized_bookings', function ($join): void {
+                $join->on('recognized_bookings.showtime_id', '=', 'showtimes.id');
             })
-            ->join('booking_seats', 'booking_seats.booking_id', '=', 'bookings.id')
-            ->where('bookings.payment_status', 'paid')
-            ->whereIn('bookings.booking_status', self::REVENUE_BOOKING_STATUSES)
-            ->groupBy('movies.id', 'movies.title')
+            ->joinSub($bookingTicketCounts, 'paid_booking_tickets', function ($join): void {
+                $join->on('paid_booking_tickets.booking_id', '=', 'recognized_bookings.id');
+            })
+            ->groupBy('movies.id', 'movies.title', 'movies.poster')
             ->orderByDesc('tickets_sold')
-            ->orderBy('movies.title')
+            ->orderByDesc('revenue')
+            ->orderBy('movies.id')
             ->limit(5)
             ->get();
     }
