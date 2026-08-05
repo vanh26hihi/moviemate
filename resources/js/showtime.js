@@ -19,3 +19,10 @@ window.addEventListener('load', () => {
         scrollToShowtimeSection();
     }
 });
+function setNearbyButtonLoading(button, isLoading) { ... }
+
+function redirectToNearby(latitude, longitude) { ... }
+
+function handleNearbyError(error) { ... }
+
+function requestNearbyLocation(button) { ... }
