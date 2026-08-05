@@ -1,6 +1,7 @@
 @extends('layouts.admin')
 @section('title', 'Thiết kế sơ đồ ghế - MovieMate')
 @section('page-title', 'Thiết kế sơ đồ ghế')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
@@ -76,21 +77,8 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="flex items-start gap-3 rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-bold text-success" role="status">
-            <i class="ph-fill ph-check-circle mt-0.5 text-lg" aria-hidden="true"></i><span>{{ session('success') }}</span>
-        </div>
-    @endif
-    @if(session('warning'))
-        <div class="flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-bold text-warning" role="alert">
-            <i class="ph-fill ph-warning-circle mt-0.5 text-lg" aria-hidden="true"></i><span>{{ session('warning') }}</span>
-        </div>
-    @endif
     @if($errors->any())
-        <div id="layoutServerErrors" class="flex items-start gap-3 rounded-2xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error" role="alert" aria-live="assertive" tabindex="-1">
-            <i class="ph-fill ph-warning-octagon mt-0.5 text-xl" aria-hidden="true"></i>
-            <div><p class="font-extrabold">Không thể hoàn tất thao tác với sơ đồ ghế.</p><ul class="mt-1 list-disc pl-5">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
-        </div>
+        <x-validation-summary id="layoutServerErrors" :errors="$errors" heading="Không thể hoàn tất thao tác với sơ đồ ghế." />
     @endif
 
     @if(!$layout || !$isDraft)
@@ -218,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialCells = {{ Illuminate\Support\Js::from($initialCells) }};
     const roomSeatCodes = {{ Illuminate\Support\Js::from($roomSeatCodes) }};
     const expectedUpdatedAt = @json($layout->updated_at?->format('Y-m-d H:i:s.u'));
-    const serverErrors = {{ Illuminate\Support\Js::from($errors->getMessages()) }};
+    const serverErrorKeys = {{ Illuminate\Support\Js::from(array_keys($errors->getMessages())) }};
     const typeLabels = @json(\App\Support\StatusLabel::options('seat_type'));
     const statusLabels = @json(\App\Support\StatusLabel::options('seat'));
     const cells = new Map(initialCells.filter(cell => cell.x > 0 && cell.y > 0).map(cell => [`${cell.x}:${cell.y}`, cell]));
@@ -233,10 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const undoStack = [];
     let dirty = false;
 
-    Object.entries(serverErrors).forEach(([key, messages]) => {
+    serverErrorKeys.forEach(key => {
         const match = key.match(/(?:layout\.)?cells\.(\d+)/);
         const cell = match ? initialCells[Number(match[1])] : null;
-        if (cell) serverCellErrors.set(`${cell.x}:${cell.y}`, Array.isArray(messages) ? messages[0] : String(messages));
+        if (cell) serverCellErrors.set(`${cell.x}:${cell.y}`, true);
     });
 
     const rowLabel = index => index <= 26 ? String.fromCharCode(64 + index) : `A${String.fromCharCode(64 + index - 26)}`;
@@ -834,7 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('offline', () => showEditorError('Kết nối mạng đã bị gián đoạn. Bản nháp vẫn còn trên màn hình và chưa được gửi đi.'));
     render();
     if (serverCellErrors.size) requestAnimationFrame(() => grid.querySelector('[aria-invalid="true"]')?.focus());
-    else if (Object.keys(serverErrors).length) document.getElementById('layoutServerErrors')?.focus();
+    else if (serverErrorKeys.length) document.getElementById('layoutServerErrors')?.focus();
 });
 </script>
 @endif

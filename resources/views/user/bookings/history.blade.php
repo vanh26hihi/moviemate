@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Lịch sử đặt vé - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -58,11 +59,7 @@
                 </form>
             </div>
 
-            @if($errors->any())
-                <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-semibold">
-                    {{ $errors->first() }}
-                </div>
-            @endif
+            <x-validation-summary class="mb-5" :errors="$errors" />
 
             <div class="space-y-5">
                 @forelse($bookings as $booking)

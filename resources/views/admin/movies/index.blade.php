@@ -23,12 +23,6 @@
     </a>@endcan
 </div>
 
-@if(session('success'))
-    <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-semibold">
-        {{ session('success') }}
-    </div>
-@endif
-
 <div class="admin-toolbar">
     <form method="GET" action="{{ route('admin.movies.index') }}" class="flex w-full flex-col sm:flex-row gap-3">
         <label class="relative flex-1">

@@ -114,6 +114,54 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
             ->assertSee('ph-warning-octagon', false);
     }
 
+    public function test_stable_seat_code_validation_message_is_rendered_once_without_error_flash(): void
+    {
+        $manager = $this->userWithRole('manager');
+        $room = $this->rooms['P01'];
+        $this->actingAs($manager)->post(route('admin.rooms.layout.draft', $room))->assertRedirect();
+        $draft = $room->draftLayout()->with('cells.seat')->firstOrFail();
+        $cells = $draft->cells->map(function ($cell): array {
+            if ($cell->cell_type === 'aisle') {
+                return ['kind' => 'aisle', 'x' => $cell->x_position, 'y' => $cell->y_position];
+            }
+
+            $seat = $cell->seat;
+
+            return [
+                'kind' => $seat->type, 'type' => $seat->type, 'seat_id' => $seat->id,
+                'x' => $cell->x_position, 'y' => $cell->y_position,
+                'row' => $seat->row, 'number' => $seat->seat_code === 'A1' ? 24 : $seat->number,
+                'seat_code' => $seat->seat_code === 'A1' ? 'A24' : $seat->seat_code,
+                'status' => $seat->status, 'pair_code' => $seat->pair_code,
+                'pair_position' => $seat->pair_position,
+            ];
+        })->all();
+        $payload = [
+            'schema_version' => 3, 'name' => 'Bản nháp giữ nguyên khi lỗi',
+            'rows' => $draft->rows, 'columns' => 24, 'screen_position' => $draft->screen_position,
+            'cells' => $cells,
+        ];
+        $message = 'Không thể đổi mã ghế A1 thành A24. Mã ghế đã tạo phải được giữ ổn định.';
+
+        $response = $this->actingAs($manager)
+            ->from(route('admin.rooms.layout.show', $room))
+            ->followingRedirects()
+            ->patch(route('admin.rooms.layout.update', $room), ['layout' => json_encode($payload)])
+            ->assertOk()
+            ->assertSessionMissing('error')
+            ->assertSee('Không thể hoàn tất thao tác với sơ đồ ghế.')
+            ->assertSee('layoutServerErrors', false)
+            ->assertSee('aria-invalid', false)
+            ->assertSee('Bản nháp giữ nguyên khi lỗi')
+            ->assertSee('A24');
+
+        $text = preg_replace('/\s+/u', ' ', strip_tags($response->getContent())) ?? '';
+        $this->assertSame(1, substr_count($text, $message));
+        $this->assertSame(1, substr_count($text, 'Không thể hoàn tất thao tác với sơ đồ ghế.'));
+        $this->assertDatabaseHas('seats', ['room_id' => $room->id, 'seat_code' => 'A1']);
+        $this->assertDatabaseMissing('seats', ['room_id' => $room->id, 'seat_code' => 'A24']);
+    }
+
     public function test_editor_exposes_freeform_canvas_row_modes_and_server_summary(): void
     {
         $manager = $this->userWithRole('manager');

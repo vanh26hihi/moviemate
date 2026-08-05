@@ -43,7 +43,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.payment-reviews.resolve', ['paymentId' => $payment->id]))
             ->assertRedirect(route('admin.payment-reviews.index'))
-            ->assertSessionHas('payment_review_error');
+            ->assertSessionHas('error')
+            ->assertSessionMissing('payment_review_error');
 
         Http::assertNothingSent();
         $this->assertDatabaseCount('payment_review_events', 0);
@@ -58,7 +59,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.payment-reviews.resolve', ['paymentId' => $payment->id]))
             ->assertRedirect(route('admin.payment-reviews.index'))
-            ->assertSessionHas('payment_review_result');
+            ->assertSessionHas('success')
+            ->assertSessionMissing('payment_review_result');
 
         Http::assertSentCount(1);
         Http::assertSent(function (Request $request) use ($payment): bool {
@@ -78,7 +80,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
 
         $this->actingAs($actor = $this->userWithRole('manager'))
             ->post(route('admin.payment-reviews.resolve', ['paymentId' => $payment->id]))
-            ->assertSessionHas('payment_review_result');
+            ->assertSessionHas('success')
+            ->assertSessionMissing('payment_review_result');
 
         $this->assertSame(Payment::STATUS_SUCCESS, $payment->fresh()->status);
         $this->assertSame('paid', $payment->booking->fresh()->booking_status);

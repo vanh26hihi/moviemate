@@ -2,6 +2,7 @@
 
 @section('title', 'Thêm phim mới')
 @section('page-title', 'Thêm phim mới')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="admin-page-header">
@@ -15,15 +16,7 @@
     </a>
 </div>
 
-@if ($errors->any())
-    <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm">
-        <ul class="list-disc list-inside">
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+<x-validation-summary class="mb-5" :errors="$errors" :except="['poster', 'cover_image']" />
 
 <form action="{{ route('admin.movies.store') }}" method="POST" enctype="multipart/form-data" class="admin-form-card" data-submit-once>
     @csrf

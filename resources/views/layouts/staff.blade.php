@@ -38,13 +38,7 @@
             <div class="flex items-center gap-2 sm:gap-3 min-w-0"><button data-theme-toggle type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border app-muted hover:border-brand-start transition-all text-sm" aria-label="Đổi giao diện sáng/tối" aria-pressed="false"><span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span><span class="theme-text hidden sm:inline text-xs font-medium">Tối</span></button><div class="flex items-center gap-3 pl-3 border-l app-border"><div class="hidden sm:block text-right"><p class="text-sm font-bold app-text leading-tight">{{ auth()->user()?->name ?? 'Nhân viên rạp' }}</p><p class="text-xs text-ai-start font-medium">{{ auth()->user()?->role?->display_name ?? 'Chưa có vai trò' }}</p></div><span class="w-9 h-9 rounded-full app-bg border app-border flex items-center justify-center text-ai-start"><i class="ph-fill ph-user text-lg"></i></span></div></div>
         </header>
         <div class="flex-grow p-4 sm:p-8 overflow-y-auto"><div class="max-w-7xl mx-auto pb-10">
-            @if(session('success') || session('error') || (isset($errors) && $errors->any()))
-                <div class="space-y-3 mb-6">
-                    @if(session('success'))<div class="rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-medium">{{ session('success') }}</div>@endif
-                    @if(session('error'))<div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium">{{ session('error') }}</div>@endif
-                    @if(isset($errors) && $errors->any())<div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium">{{ $errors->first() }}</div>@endif
-                </div>
-            @endif
+            <x-flash-messages :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
             @yield('content')
         </div></div>
     </main>

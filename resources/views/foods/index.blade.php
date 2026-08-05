@@ -19,10 +19,6 @@
         </div>
     </div>
 
-    @if(session('success'))
-        <div class="rounded-3xl border border-success/20 bg-success/10 p-4 text-sm text-success mb-6">{{ session('success') }}</div>
-    @endif
-
     <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         @forelse($foods as $food)
             <article class="cinema-card rounded-[2rem] p-5 transition hover:-translate-y-1 hover:border-brand-start/40">

@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Quên mật khẩu - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
@@ -13,12 +14,6 @@
         <h1 class="text-3xl font-extrabold app-text">Quên mật khẩu?</h1>
         <p class="mt-2 mb-7 app-muted">Nhập email tài khoản để nhận hướng dẫn đặt lại mật khẩu.</p>
 
-        @if (session('status'))
-            <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-semibold text-success">{{ session('status') }}</div>
-        @endif
-        @if ($errors->any())
-            <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 px-4 py-3 text-sm font-semibold text-error">{{ $errors->first() }}</div>
-        @endif
 
         <div class="space-y-5" aria-disabled="true">
             <div>

@@ -1,6 +1,7 @@
 @extends('layouts.admin')
 @section('title', 'Thêm suất chiếu - Quản trị MovieMate')
 @section('page-title', 'Thêm suất chiếu')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="max-w-5xl">

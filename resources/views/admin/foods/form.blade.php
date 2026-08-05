@@ -2,6 +2,7 @@
 
 @section('title', $food->exists ? 'Sửa món ăn - Quản trị MovieMate' : 'Thêm món ăn - Quản trị MovieMate')
 @section('page-title', $food->exists ? 'Sửa món ăn' : 'Thêm món ăn')
+@section('suppress-global-validation-summary', '1')
 
 @php
     $priceValue = session()->hasOldInput('price')
@@ -21,15 +22,7 @@
     </a>
 </div>
 
-@if ($errors->any())
-    <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm">
-        <ul class="list-disc list-inside">
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+<x-validation-summary class="mb-5" :errors="$errors" :except="['price']" />
 
 <form action="{{ $food->exists ? route('admin.foods.update', $food) : route('admin.foods.store') }}" method="POST" enctype="multipart/form-data" class="admin-form-card">
     @csrf

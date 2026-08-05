@@ -18,12 +18,6 @@
         @endcan
     </div>
 
-    @if(session('success'))
-        <div class="rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-bold text-success" role="status">
-            {{ session('success') }}
-        </div>
-    @endif
-
     <div class="cinema-card overflow-hidden">
         <div class="border-b app-border p-5">
             <form method="GET" action="{{ route('admin.rooms.index') }}" class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(240px,1fr)_220px_180px_auto_auto]">

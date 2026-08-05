@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Xác nhận đơn - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
@@ -10,6 +11,8 @@
     $pendingMinutes = (int) config('booking.pending_ttl_minutes', 15);
     $defaultProvider = ($paymentProviders['vnpay'] ?? false) ? 'vnpay' : 'zalopay';
 @endphp
+
+<x-validation-summary class="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8" :errors="$errors" :except="['payment_method']" />
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-5xl">
