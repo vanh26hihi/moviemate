@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\Booking;
 use App\Models\Role;
 use App\Models\Room;
 use App\Models\RoomLayout;
@@ -120,6 +121,7 @@ final class ActivityLogger
     private function subjectLabel(Model $subject): string
     {
         return match (true) {
+            $subject instanceof Booking => 'Đơn đặt vé '.$subject->booking_code,
             $subject instanceof Room => 'Phòng '.$subject->code,
             $subject instanceof RoomLayout => 'Sơ đồ #'.$subject->getKey().' / phòng #'.$subject->room_id,
             $subject instanceof Showtime => 'Suất chiếu #'.$subject->getKey(),

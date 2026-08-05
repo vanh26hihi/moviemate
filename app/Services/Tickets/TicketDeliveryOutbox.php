@@ -14,7 +14,7 @@ final class TicketDeliveryOutbox
 
     public function enqueueVerifiedBooking(Booking $booking): BookingTicketDelivery
     {
-        if (! $this->eligibility->isUsable($booking)) {
+        if (! $this->eligibility->isDeliverable($booking)) {
             throw new RuntimeException('ticket_booking_not_eligible');
         }
 
@@ -32,7 +32,7 @@ final class TicketDeliveryOutbox
     {
         return DB::transaction(function () use ($booking, $actorUserId): BookingTicketDelivery {
             $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->getKey());
-            if (! $this->eligibility->isUsable($lockedBooking)) {
+            if (! $this->eligibility->isDeliverable($lockedBooking)) {
                 throw new RuntimeException('ticket_booking_not_eligible');
             }
 

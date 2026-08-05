@@ -13,6 +13,10 @@ use Illuminate\Support\Collection;
 
 class Booking extends Model
 {
+    public const STATUSES = ['pending_payment', 'paid', 'used', 'cancelled', 'expired'];
+
+    public const PAYMENT_STATUSES = ['unpaid', 'paid', 'failed', 'refunded'];
+
     protected $fillable = [
         'user_id',
         'customer_email',
@@ -79,6 +83,14 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function authoritativePayment(): HasOne
+    {
+        return $this->hasOne(Payment::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->where('status', Payment::STATUS_SUCCESS)->whereNotNull('verified_at'),
+        );
+    }
+
     public function ticketDelivery(): HasOne
     {
         return $this->hasOne(BookingTicketDelivery::class);
@@ -121,7 +133,7 @@ class Booking extends Model
 
     public function getPaymentStatusLabelAttribute(): string
     {
-        return StatusLabel::for('payment', $this->payment_status);
+        return StatusLabel::for('booking_payment', $this->payment_status);
     }
 
     public function getFormattedTotalAttribute(): string

@@ -24,6 +24,12 @@ final class StatusLabel
             'expired' => 'Đã hết hạn',
             'review' => 'Chờ đối soát',
         ],
+        'booking_payment' => [
+            'unpaid' => 'Chưa thanh toán',
+            'paid' => 'Đã thanh toán',
+            'failed' => 'Thanh toán thất bại',
+            'refunded' => 'Đã hoàn tiền',
+        ],
         'payment' => [
             'pending' => 'Chờ thanh toán',
             'processing' => 'Đang xử lý',
@@ -90,6 +96,7 @@ final class StatusLabel
             'paid' => 'Đã thanh toán',
             'cancelled' => 'Đã hủy',
             'completed' => 'Đã hoàn thành',
+            'expired' => 'Đã hết hạn',
         ],
         'role' => [
             'admin' => 'Quản trị viên',

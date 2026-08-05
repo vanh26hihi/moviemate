@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
+use App\Http\Controllers\Admin\BookingController as AdminBookingController;
+use App\Http\Controllers\Admin\BookingOperationController as AdminBookingOperationController;
 use App\Http\Controllers\Admin\CinemaController as AdminCinemaController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FoodController as AdminFoodController;
@@ -215,6 +217,24 @@ Route::prefix('admin')->name('admin.')
         Route::get('/activity-logs/{activityLog}', [AdminActivityLogController::class, 'show'])
             ->whereNumber('activityLog')
             ->middleware('permission:activity_logs.view')->name('activity-logs.show');
+
+        Route::get('/bookings', [AdminBookingController::class, 'index'])
+            ->middleware('permission:bookings.view')->name('bookings.index');
+        Route::get('/bookings/{booking}', [AdminBookingController::class, 'show'])
+            ->whereNumber('booking')
+            ->middleware('permission:bookings.view')->name('bookings.show');
+        Route::post('/bookings/{booking}/ticket-email/resend', [AdminBookingOperationController::class, 'resendTicket'])
+            ->whereNumber('booking')
+            ->middleware('permission:ticket_deliveries.retry')->name('bookings.ticket-email.resend');
+        Route::post('/bookings/{booking}/payment-query', [AdminBookingOperationController::class, 'queryPayment'])
+            ->whereNumber('booking')
+            ->middleware('permission:payments.reconcile')->name('bookings.payment-query');
+        Route::post('/bookings/{booking}/cancel', [AdminBookingOperationController::class, 'cancel'])
+            ->whereNumber('booking')
+            ->middleware('permission:bookings.operate')->name('bookings.cancel');
+        Route::get('/bookings/{booking}/ticket/print', [AdminBookingOperationController::class, 'print'])
+            ->whereNumber('booking')
+            ->middleware('permission:tickets.print')->name('bookings.ticket.print');
 
         Route::resource('foods', AdminFoodController::class)->except(['show'])
             ->middlewareFor('index', 'permission:foods.view')
