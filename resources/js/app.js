@@ -48,6 +48,9 @@ function formatVnd(amount) {
 
 function initializeSeatPickers() {
     document.querySelectorAll('[data-seat-picker]').forEach((form) => {
+        if (form.dataset.seatPickerInitialized === 'true') return;
+        form.dataset.seatPickerInitialized = 'true';
+
         const buttons = Array.from(form.querySelectorAll('.seat-button:not(:disabled)'));
         const selected = new Map();
         const input = form.querySelector('#selectedSeatsInput');
@@ -121,6 +124,9 @@ function initializeSeatPickers() {
 
 function initializeFoodPickers() {
     document.querySelectorAll('[data-food-picker]').forEach((form) => {
+        if (form.dataset.foodPickerInitialized === 'true') return;
+        form.dataset.foodPickerInitialized = 'true';
+
         const cards = Array.from(form.querySelectorAll('[data-food-card]'));
         const subtotalDisplay = document.querySelector('[data-food-subtotal]');
         const grandTotalDisplay = document.querySelector('[data-food-grand-total]');
@@ -185,8 +191,32 @@ function initializeFoodPickers() {
     });
 }
 
+function resetSubmitGuard(form) {
+    delete form.dataset.submitting;
+    form.querySelectorAll('[data-submitter-copy]').forEach((input) => input.remove());
+    form.querySelectorAll('button[type="submit"]').forEach((button) => {
+        button.disabled = button.dataset.submitInitiallyDisabled === 'true';
+        button.removeAttribute('aria-disabled');
+
+        if (button.dataset.submitIdleMarkup) {
+            button.innerHTML = button.dataset.submitIdleMarkup;
+            delete button.dataset.submitIdleMarkup;
+        }
+    });
+
+    const status = form.querySelector('[data-submit-status]');
+    if (status) status.textContent = '';
+}
+
 function initializeSubmitGuards() {
     document.querySelectorAll('form[data-submit-once]').forEach((form) => {
+        if (form.dataset.submitGuardInitialized === 'true') return;
+        form.dataset.submitGuardInitialized = 'true';
+
+        form.querySelectorAll('button[type="submit"]').forEach((button) => {
+            button.dataset.submitInitiallyDisabled = String(button.disabled);
+        });
+
         form.addEventListener('submit', (event) => {
             if (form.dataset.submitting === 'true') {
                 event.preventDefault();
@@ -201,6 +231,7 @@ function initializeSubmitGuards() {
                 submittedValue.type = 'hidden';
                 submittedValue.name = submitter.name;
                 submittedValue.value = submitter.value;
+                submittedValue.dataset.submitterCopy = 'true';
                 form.appendChild(submittedValue);
             }
 
@@ -211,7 +242,11 @@ function initializeSubmitGuards() {
             });
 
             if (submitter instanceof HTMLButtonElement) {
-                submitter.innerHTML = `<i class="ph-bold ph-spinner-gap animate-spin" aria-hidden="true"></i>${loadingLabel}`;
+                submitter.dataset.submitIdleMarkup = submitter.innerHTML;
+                const spinner = document.createElement('i');
+                spinner.className = 'ph-bold ph-spinner-gap animate-spin';
+                spinner.setAttribute('aria-hidden', 'true');
+                submitter.replaceChildren(spinner, document.createTextNode(loadingLabel));
             }
 
             const status = form.querySelector('[data-submit-status]');
@@ -220,8 +255,18 @@ function initializeSubmitGuards() {
     });
 }
 
+if (document.documentElement.dataset.submitGuardPageShowInitialized !== 'true') {
+    document.documentElement.dataset.submitGuardPageShowInitialized = 'true';
+    window.addEventListener('pageshow', () => {
+        document.querySelectorAll('form[data-submit-once]').forEach(resetSubmitGuard);
+    });
+}
+
 function initializeCountdowns() {
     document.querySelectorAll('[data-countdown]').forEach((element) => {
+        if (element.dataset.countdownInitialized === 'true') return;
+        element.dataset.countdownInitialized = 'true';
+
         const deadline = Date.parse(element.dataset.countdown || '');
         if (!Number.isFinite(deadline)) return;
 

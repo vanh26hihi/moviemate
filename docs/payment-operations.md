@@ -104,6 +104,19 @@ The `app:https-diagnostics` command is read-only. It reports the public URL, gen
 
 Password reset, email verification, profile update/password update, booking cancellation, and dedicated admin/staff login POST routes are not currently implemented in the active route set. Add HTTPS contract coverage when those features are introduced; do not treat inactive UI-demo templates as production endpoints.
 
+### Food selection submission and throttle smoke test
+
+`POST /booking/food` uses the named `booking-food-mutation` limiter. Its default allowance is six mutations per minute, configured by `BOOKING_FOOD_MUTATION_MAX_ATTEMPTS`. The key is a one-way hash of authenticated/guest checkout identity plus the checkout token; it never contains a raw session ID, guest capability, or checkout token. GET rendering, other users, other checkout drafts, and payment initiation do not consume this bucket.
+
+For a local-only manual check, use the non-persistent `array` cache and restart Laravel to begin with empty limiter state. Never clear production caches for this test.
+
+1. Open `/booking/food`, then open Chrome DevTools **Network**.
+2. Click **Bỏ qua đồ ăn** once and confirm exactly one `POST /booking/food` followed by a 302/303 to `/booking/review`.
+3. Return to the food page, select a valid item, click the normal confirmation once, and confirm the same one-POST navigation contract.
+4. Rapidly double-click either control. The controls must disable immediately, display a processing state, and create no duplicate booking, order, order item, or payment.
+5. To exercise the genuine limiter locally, repeat the POST beyond the configured allowance. The browser must return to the food page with `Retry-After` and the message `Bạn thao tác quá nhanh. Vui lòng chờ vài giây rồi thử lại.` Selected seats and the server-side draft must remain intact.
+6. Navigate Back/Forward and confirm the controls are enabled again. Correct invalid input and confirm validation can be resubmitted normally.
+
 ## Production ticket email transport
 
 MovieMate provisions `smtp` as the only production leaf transport by default. Set `MAIL_PRODUCTION_ALLOWED_TRANSPORTS=smtp`; add another Laravel delivery leaf only after its required package and delivery mechanism have been explicitly provisioned and its named mailer exists in `config/mail.php`. Values are comma-separated transport identities, not mailer names. Every mailer name must be a simple, non-dotted identifier containing only letters, numbers, hyphens, and underscores. Unknown/custom resolvers cannot be approved by this allow-list because their behavior cannot be inspected from configuration. `log` and `array` are forbidden in every production delivery branch; `null`, `failover`, and `roundrobin` can never be allowed as leaves.

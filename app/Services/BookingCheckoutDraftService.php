@@ -76,6 +76,31 @@ class BookingCheckoutDraftService
         return $draft;
     }
 
+    public function hasCurrent(Request $request): bool
+    {
+        $draft = $request->session()->get(self::SESSION_KEY);
+
+        return is_array($draft)
+            && is_string($draft['checkout_token'] ?? null)
+            && $this->tokens->isValidCheckoutToken($draft['checkout_token']);
+    }
+
+    public function foodMutationRateLimitKey(Request $request): string
+    {
+        $draft = $request->session()->get(self::SESSION_KEY);
+        $actor = $request->user()?->getAuthIdentifier();
+        $actorScope = $actor !== null
+            ? 'user:'.$actor
+            : (is_array($draft) && is_string($draft['actor_identity'] ?? null)
+                ? $draft['actor_identity']
+                : 'guest-session:'.$request->session()->getId());
+        $checkoutScope = is_array($draft) && is_string($draft['checkout_token'] ?? null)
+            ? $draft['checkout_token']
+            : 'no-checkout-draft';
+
+        return hash('sha256', $actorScope.'|checkout:'.$checkoutScope);
+    }
+
     private function actorIdentity(Request $request): string
     {
         $userId = $request->user()?->getAuthIdentifier();

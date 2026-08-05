@@ -94,11 +94,11 @@
                 </fieldset>
 
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-                    <button type="submit" class="btn-primary flex-1" data-loading-label="Đang lưu lựa chọn…">
+                    <button type="submit" name="checkout_action" value="confirm_food" class="btn-primary flex-1" data-loading-label="Đang lưu lựa chọn…">
                         Tiếp tục xác nhận
                         <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>
                     </button>
-                    <button type="submit" name="skip_food" value="1" class="btn-secondary flex-1" data-loading-label="Đang bỏ qua…">
+                    <button type="submit" name="checkout_action" value="skip_food" class="btn-secondary flex-1" data-loading-label="Đang bỏ qua…">
                         <i class="ph ph-fast-forward" aria-hidden="true"></i>
                         Bỏ qua đồ ăn
                     </button>

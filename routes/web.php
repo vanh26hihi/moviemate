@@ -107,7 +107,7 @@ Route::get('/booking/food', [BookingFoodSelectionController::class, 'show'])
     ->name('user.bookings.food');
 
 Route::post('/booking/food', [BookingFoodSelectionController::class, 'store'])
-    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:booking-food-mutation'])
     ->name('user.bookings.food.store');
 
 Route::get('/booking/review', BookingReviewController::class)

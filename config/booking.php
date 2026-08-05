@@ -7,6 +7,7 @@ return [
     'guest_access_ttl_minutes' => (int) env('BOOKING_GUEST_ACCESS_TTL_MINUTES', 1440),
     'guest_session_ttl_minutes' => (int) env('BOOKING_GUEST_SESSION_TTL_MINUTES', 60),
     'ticket_email_access_ttl_minutes' => (int) env('BOOKING_TICKET_EMAIL_ACCESS_TTL_MINUTES', 10080),
+    'food_mutation_max_attempts' => (int) env('BOOKING_FOOD_MUTATION_MAX_ATTEMPTS', 6),
     'couple_price_multiplier' => 2,
     'max_food_quantity' => 20,
     'currency' => 'VND',
