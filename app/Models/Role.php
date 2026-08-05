@@ -22,7 +22,12 @@ class Role extends Model
         'foods.view', 'foods.create', 'foods.update', 'foods.delete',
         'food-orders.view', 'food-orders.update-status',
         'bookings.view', 'bookings.operate',
-        'payments.view', 'reports.view', 'tickets.print', 'tickets.checkin',
+        'payments.view', 'payments.reconcile',
+        'ticket_deliveries.view', 'ticket_deliveries.retry', 'ticket_checkins.view',
+        'seats.maintenance.view', 'seats.maintenance.update',
+        'discounts.view', 'discounts.manage',
+        'reviews.view', 'reviews.moderate',
+        'reports.view', 'tickets.print', 'tickets.checkin',
     ];
 
     public const STAFF_PERMISSION_SLUGS = [
@@ -34,6 +39,7 @@ class Role extends Model
         'food-orders.update-status',
         'bookings.view',
         'bookings.operate',
+        'ticket_checkins.view',
         'tickets.print',
         'tickets.checkin',
     ];

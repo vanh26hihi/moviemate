@@ -15,8 +15,8 @@
 <body class="app-page font-sans antialiased flex h-screen overflow-hidden">
     <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden hidden"></div>
 
-    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 app-sidebar border-r app-border transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col h-full">
-        <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0">
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 app-sidebar border-r app-border transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col h-full overflow-hidden">
+        <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0" data-admin-sidebar-logo>
             <a href="{{ route('home') }}" class="flex items-center gap-2">
                 <i class="ph-fill ph-film-strip text-3xl text-brand-start"></i>
                 <div class="leading-tight">
@@ -26,32 +26,64 @@
             </a>
         </div>
 
-        <nav class="flex-grow py-4 px-4 space-y-0.5 overflow-y-auto hide-scrollbar">
-            @can('dashboard.view')
-                <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-4 first:mt-0">Tổng quan</p>
-                <x-admin.nav-link route-name="admin.dashboard" active-pattern="admin.dashboard" label="Tổng quan" icon="ph-squares-four" />
-            @endcan
+        @php
+            $adminNavigation = [
+                ['label' => 'Tổng quan', 'items' => [
+                    ['route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'permission' => 'dashboard.view', 'label' => 'Tổng quan', 'icon' => 'ph-squares-four'],
+                ]],
+                ['label' => 'Vận hành & phim', 'items' => [
+                    ['route' => 'admin.movies.index', 'active' => 'admin.movies.*', 'permission' => 'movies.view', 'label' => 'Phim', 'icon' => 'ph-film-slate'],
+                    ['route' => 'admin.genres.index', 'active' => 'admin.genres.*', 'permission' => 'genres.view', 'label' => 'Thể loại', 'icon' => 'ph-tag'],
+                    ['route' => 'admin.cinema.show', 'active' => 'admin.cinema.*', 'permission' => 'cinema.view', 'label' => 'Thông tin rạp', 'icon' => 'ph-buildings'],
+                    ['route' => 'admin.rooms.index', 'active' => ['admin.rooms.*', 'admin.seats.*'], 'permission' => 'rooms.view', 'label' => 'Phòng chiếu', 'icon' => 'ph-projector-screen'],
+                    ['route' => 'admin.showtimes.index', 'active' => 'admin.showtimes.*', 'permission' => 'showtimes.view', 'label' => 'Suất chiếu', 'icon' => 'ph-calendar-plus'],
+                ]],
+                ['label' => 'Kinh doanh', 'items' => [
+                    ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],
+                    ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
+                    ['route' => 'admin.payment-reviews.index', 'active' => 'admin.payment-reviews.*', 'permission' => 'payments.reconcile', 'label' => 'Đối soát giao dịch', 'icon' => 'ph-arrows-clockwise'],
+                    ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Mã giảm giá', 'icon' => 'ph-ticket-percent'],
+                    ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
+                    ['route' => 'admin.food-orders.index', 'active' => 'admin.food-orders.*', 'permission' => 'food-orders.view', 'label' => 'Đơn đồ ăn', 'icon' => 'ph-shopping-bag'],
+                    ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
+                ]],
+                ['label' => 'Vé điện tử', 'items' => [
+                    ['route' => 'admin.ticket-deliveries.index', 'active' => 'admin.ticket-deliveries.*', 'permission' => 'ticket_deliveries.view', 'label' => 'Gửi vé điện tử', 'icon' => 'ph-envelope-simple'],
+                    ['route' => 'admin.ticket-checkins.index', 'active' => 'admin.ticket-checkins.*', 'permission' => 'ticket_checkins.view', 'label' => 'Lịch sử soát vé', 'icon' => 'ph-qr-code'],
+                ]],
+                ['label' => 'Nội dung khách hàng', 'items' => [
+                    ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
+                ]],
+                ['label' => 'Bảo mật', 'items' => [
+                    ['route' => 'admin.users.index', 'active' => 'admin.users.*', 'permission' => 'users.view', 'label' => 'Người dùng', 'icon' => 'ph-users'],
+                    ['route' => 'admin.roles.index', 'active' => 'admin.roles.*', 'permission' => 'roles.view', 'label' => 'Vai trò và quyền', 'icon' => 'ph-shield-check'],
+                    ['route' => 'admin.activity-logs.index', 'active' => 'admin.activity-logs.*', 'permission' => 'activity_logs.view', 'label' => 'Nhật ký hoạt động', 'icon' => 'ph-list-magnifying-glass'],
+                ]],
+            ];
+        @endphp
 
-            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Vận hành &amp; phim</p>
-            @can('movies.view')<x-admin.nav-link route-name="admin.movies.index" active-pattern="admin.movies.*" label="Phim" icon="ph-film-slate" />@endcan
-            @can('genres.view')<x-admin.nav-link route-name="admin.genres.index" active-pattern="admin.genres.*" label="Thể loại" icon="ph-tag" />@endcan
-            @can('cinema.view')<x-admin.nav-link route-name="admin.cinema.show" active-pattern="admin.cinema.*" label="Thông tin rạp" icon="ph-buildings" />@endcan
-            @can('rooms.view')<x-admin.nav-link route-name="admin.rooms.index" active-pattern="admin.rooms.*" label="Phòng chiếu" icon="ph-projector-screen" />@endcan
-            @can('seats.view')<x-admin.nav-link route-name="admin.seats.index" active-pattern="admin.seats.*" label="Ghế" icon="ph-armchair" />@endcan
-            @can('showtimes.view')<x-admin.nav-link route-name="admin.showtimes.index" active-pattern="admin.showtimes.*" label="Suất chiếu" icon="ph-calendar-plus" />@endcan
-
-            <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Kinh doanh</p>
-            @can('foods.view')<x-admin.nav-link route-name="admin.foods.index" active-pattern="admin.foods.*" label="Món ăn" icon="ph-burger" />@endcan
-            @can('food-orders.view')<x-admin.nav-link route-name="admin.food-orders.index" active-pattern="admin.food-orders.*" label="Đơn đồ ăn" icon="ph-shopping-bag" />@endcan
-
-            @canany(['users.view', 'roles.view'])
-                <p class="px-3 text-[10px] font-bold app-muted uppercase tracking-wider mb-1 mt-5">Bảo mật</p>
-                @can('users.view')<x-admin.nav-link route-name="admin.users.index" active-pattern="admin.users.*" label="Người dùng" icon="ph-users" />@endcan
-                @can('roles.view')<x-admin.nav-link route-name="admin.roles.index" active-pattern="admin.roles.*" label="Vai trò và quyền" icon="ph-shield-check" />@endcan
-            @endcanany
+        <nav class="admin-sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4" data-admin-sidebar-scroll aria-label="Điều hướng quản trị">
+            @foreach($adminNavigation as $group)
+                @php
+                    $visibleItems = collect($group['items'])->filter(fn (array $item): bool =>
+                        \Illuminate\Support\Facades\Route::has($item['route'])
+                        && \Illuminate\Support\Facades\Gate::allows($item['permission'])
+                    );
+                @endphp
+                @if($visibleItems->isNotEmpty())
+                    <section class="mt-5 first:mt-0" aria-labelledby="admin-nav-group-{{ $loop->index }}">
+                        <h2 id="admin-nav-group-{{ $loop->index }}" class="mb-1 px-3 text-[10px] font-bold uppercase tracking-wider app-muted">{{ $group['label'] }}</h2>
+                        <div class="space-y-0.5">
+                            @foreach($visibleItems as $item)
+                                <x-admin.nav-link :route-name="$item['route']" :active-pattern="$item['active']" :label="$item['label']" :icon="$item['icon']" />
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+            @endforeach
         </nav>
 
-        <div class="p-4 border-t app-border shrink-0">
+        <div class="p-4 border-t app-border shrink-0" data-admin-sidebar-footer>
             <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về trang chính</a>
             <form method="POST" action="{{ route('logout') }}" class="mt-2">@csrf
                 <button type="submit" class="flex items-center justify-center gap-2 w-full py-2.5 app-muted hover:text-error text-sm font-medium"><i class="ph ph-sign-out"></i> Đăng xuất</button>

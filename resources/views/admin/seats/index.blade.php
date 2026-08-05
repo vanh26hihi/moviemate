@@ -1,15 +1,15 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý ghế - Quản trị MovieMate')
-@section('page-title', 'Quản lý ghế')
+@section('title', 'Bảo trì ghế - Quản trị MovieMate')
+@section('page-title', 'Bảo trì ghế')
 
 @section('content')
 <div class="space-y-6">
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Sơ đồ ghế</p>
-            <h1 class="text-3xl font-extrabold app-text">Ghế phòng chiếu</h1>
-            <p class="app-muted mt-2">Lọc theo phòng, đổi loại ghế và trạng thái bảo trì.</p>
+            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Phòng chiếu</p>
+            <h1 class="text-3xl font-extrabold app-text">Bảo trì ghế</h1>
+            <p class="app-muted mt-2">Lọc theo phòng, đổi loại ghế và trạng thái vận hành.</p>
         </div>
     </div>
 
@@ -65,7 +65,7 @@
                                 @endif
                             </td>
                             <td>
-                                @can('seats.manage')<form action="{{ route('admin.seats.update', $seat) }}" method="POST" class="flex flex-col lg:flex-row justify-end gap-2">
+                                @can('seats.maintenance.update')<form action="{{ route('admin.seats.update', $seat) }}" method="POST" class="flex flex-col lg:flex-row justify-end gap-2">
                                     @csrf
                                     @method('PATCH')
                                     <select name="type" class="cinema-input !py-2 !text-xs lg:w-28">

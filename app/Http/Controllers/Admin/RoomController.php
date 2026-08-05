@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveRoomRequest;
 use App\Models\Room;
+use App\Services\ActivityLogger;
 use App\Services\CinemaContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -16,7 +17,10 @@ use Illuminate\View\View;
 
 class RoomController extends Controller
 {
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
+    public function __construct(
+        private readonly CinemaContext $cinemaContext,
+        private readonly ActivityLogger $activityLogger,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -102,7 +106,13 @@ class RoomController extends Controller
         $this->ensureStatusTransitionIsSafe($room, $validated['status']);
         $this->ensureOperationalNameIsUnique($validated, $room->id);
 
-        $room->update([...$validated, 'cinema_id' => $this->cinemaContext->id()]);
+        $beforeStatus = $room->status;
+        DB::transaction(function () use ($room, $validated, $beforeStatus): void {
+            $room->update([...$validated, 'cinema_id' => $this->cinemaContext->id()]);
+            if ($beforeStatus !== $room->status) {
+                $this->logStatusChange($room, $beforeStatus);
+            }
+        });
 
         return redirect()->route('admin.rooms.show', $room)
             ->with('success', 'Đã cập nhật phòng chiếu. Sơ đồ ghế và lịch sử đặt vé được giữ nguyên.');
@@ -120,7 +130,13 @@ class RoomController extends Controller
             'status' => $validated['status'],
         ], $room->id);
 
-        $room->update(['status' => $validated['status']]);
+        $beforeStatus = $room->status;
+        DB::transaction(function () use ($room, $validated, $beforeStatus): void {
+            $room->update(['status' => $validated['status']]);
+            if ($beforeStatus !== $room->status) {
+                $this->logStatusChange($room, $beforeStatus);
+            }
+        });
 
         $message = $validated['status'] === 'active'
             ? 'Đã kích hoạt phòng chiếu.'
@@ -150,6 +166,17 @@ class RoomController extends Controller
     private function assertManagedRoom(Room $room): void
     {
         abort_unless($room->cinema_id === $this->cinemaContext->id(), 404);
+    }
+
+    private function logStatusChange(Room $room, string $beforeStatus): void
+    {
+        $this->activityLogger->log(
+            'room.status_changed',
+            $room,
+            ['status' => $beforeStatus],
+            ['status' => $room->status],
+            ['room_id' => $room->id, 'room_code' => $room->code],
+        );
     }
 
     private function ensureStatusTransitionIsSafe(Room $room, string $newStatus): void

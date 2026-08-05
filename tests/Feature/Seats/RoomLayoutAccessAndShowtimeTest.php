@@ -67,6 +67,8 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $this->actingAs($manager)->post(route('admin.rooms.layout.draft', $room))->assertRedirect();
         $this->actingAs($manager)->post(route('admin.rooms.layout.publish', $room))->assertRedirect();
         $this->assertDatabaseHas('room_layouts', ['room_id' => $room->id, 'version' => 2, 'status' => 'published']);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'room_layout.published', 'actor_user_id' => $manager->id]);
+        $this->assertSame(1, DB::table('activity_logs')->where('action', 'room_layout.published')->count());
 
         $admin = $this->userWithRole('admin');
         $this->actingAs($admin)->post(route('admin.rooms.layout.draft', $this->rooms['P02']))->assertRedirect();
@@ -196,6 +198,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
             'room_id' => $room->id,
             'room_layout_id' => $expectedLayout->id,
         ]);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'showtime.created', 'actor_user_id' => $admin->id]);
     }
 
     public function test_room_without_published_layout_cannot_create_showtime_and_is_not_in_selector(): void
@@ -209,6 +212,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $this->actingAs($admin)->post(route('admin.showtimes.store'), $this->showtimePayload($room))
             ->assertSessionHasErrors('room_id');
         $this->assertDatabaseMissing('showtimes', ['room_id' => $room->id]);
+        $this->assertDatabaseMissing('activity_logs', ['action' => 'showtime.created']);
     }
 
     public function test_showtime_update_keeps_layout_for_same_room_and_switches_when_room_changes(): void

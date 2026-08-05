@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\SaveRoomLayoutRequest;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
+use App\Services\ActivityLogger;
 use App\Services\CinemaContext;
 use App\Services\RoomLayoutService;
 use App\Support\SeatPresentation;
@@ -19,7 +20,8 @@ class SeatController extends Controller
 {
     public function __construct(
         private readonly CinemaContext $cinemaContext,
-        private readonly RoomLayoutService $layouts
+        private readonly RoomLayoutService $layouts,
+        private readonly ActivityLogger $activityLogger,
     ) {}
 
     public function index(Request $request)
@@ -95,7 +97,22 @@ class SeatController extends Controller
     {
         $this->assertOperationalRoom($room);
         $draft = $room->draftLayout()->firstOrFail();
-        $published = $this->layouts->publish($draft, Auth::id());
+        $published = DB::transaction(function () use ($draft): RoomLayout {
+            $published = $this->layouts->publish($draft, Auth::id());
+            $this->activityLogger->log(
+                'room_layout.published',
+                $published,
+                ['status' => 'draft', 'layout_version' => $draft->version],
+                ['status' => $published->status, 'layout_version' => $published->version],
+                [
+                    'room_id' => $published->room_id,
+                    'layout_id' => $published->id,
+                    'seat_count' => $published->cells()->where('cell_type', 'seat')->count(),
+                ],
+            );
+
+            return $published;
+        });
 
         return redirect()->route('admin.rooms.layout.show', $room)
             ->with('success', "Đã phát hành sơ đồ ghế phiên bản {$published->version}.");
@@ -132,6 +149,8 @@ class SeatController extends Controller
         ]);
         DB::transaction(function () use ($seat, $validated): void {
             $locked = Seat::query()->whereKey($seat->id)->lockForUpdate()->firstOrFail();
+            $before = ['status' => $locked->status, 'seat_type' => $locked->type];
+            $affectedCount = 1;
             if ($locked->type !== 'couple' && $validated['type'] === 'couple') {
                 throw ValidationException::withMessages([
                     'seat' => 'Hãy tạo ghế đôi trong trình thiết kế để hệ thống ghép đủ hai vị trí liền nhau.',
@@ -163,11 +182,25 @@ class SeatController extends Controller
                         'pair_position' => $validated['type'] === 'couple' ? $member->pair_position : null,
                     ]);
                 }
-
-                return;
+                $affectedCount = $pair->count();
+            } else {
+                $locked->update($validated);
             }
 
-            $locked->update($validated);
+            if ($before !== ['status' => $validated['status'], 'seat_type' => $validated['type']]) {
+                $this->activityLogger->log(
+                    'seat.maintenance_updated',
+                    $locked,
+                    $before,
+                    ['status' => $validated['status'], 'seat_type' => $validated['type']],
+                    [
+                        'room_id' => $locked->room_id,
+                        'seat_id' => $locked->id,
+                        'seat_code' => $locked->seat_code,
+                        'count' => $affectedCount,
+                    ],
+                );
+            }
         });
 
         return back()->with('success', 'Cập nhật ghế thành công.');
