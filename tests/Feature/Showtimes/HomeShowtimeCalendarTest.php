@@ -11,10 +11,12 @@ use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\CreatesPublicDiscoveryFixtures;
 use Tests\TestCase;
 
 class HomeShowtimeCalendarTest extends TestCase
 {
+    use CreatesPublicDiscoveryFixtures;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -72,6 +74,7 @@ class HomeShowtimeCalendarTest extends TestCase
     {
         $cinema = app(CinemaContext::class)->current();
         $room = Room::factory()->create(['cinema_id' => $cinema->id]);
+        $layout = $this->publishRoomForDiscovery($room);
         $movie = Movie::query()->create([
             'title' => 'Calendar Regression Movie',
             'slug' => 'calendar-regression-movie',
@@ -81,9 +84,11 @@ class HomeShowtimeCalendarTest extends TestCase
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
             'show_date' => '2026-08-07',
             'show_time' => '19:30:00',
             'price' => 90000,
+            'pricing_version' => 'cinema-pricing-v1',
             'status' => 'active',
         ]);
 
@@ -144,6 +149,7 @@ class HomeShowtimeCalendarTest extends TestCase
     {
         $cinema = app(CinemaContext::class)->current();
         $activeRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'active']);
+        $layout = $this->publishRoomForDiscovery($activeRoom);
         $inactiveRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'inactive']);
         $publicMovie = Movie::query()->create([
             'title' => 'Public calendar movie',
@@ -166,9 +172,11 @@ class HomeShowtimeCalendarTest extends TestCase
                 'movie_id' => $movie->id,
                 'cinema_id' => $cinema->id,
                 'room_id' => $room->id,
+                'room_layout_id' => $room->is($activeRoom) ? $layout->id : null,
                 'show_date' => '2026-08-07',
                 'show_time' => sprintf('%02d:30:00', 16 + $index),
                 'price' => 90000,
+                'pricing_version' => 'cinema-pricing-v1',
                 'status' => $status,
             ]);
         }

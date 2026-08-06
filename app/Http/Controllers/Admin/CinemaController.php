@@ -115,6 +115,7 @@ final class CinemaController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'address' => ['required', 'string', 'max:500'],
             'city' => ['required', 'string', 'max:120'],
+            'district' => ['nullable', 'string', 'max:120'],
             'country' => ['nullable', 'string', 'max:120'],
             'phone' => ['nullable', 'string', 'max:30'],
             'timezone' => ['required', 'timezone:all'],
@@ -125,6 +126,6 @@ final class CinemaController extends Controller
 
     private function auditData(Cinema $cinema): array
     {
-        return $cinema->only(['id', 'code', 'name', 'address', 'city', 'phone', 'timezone', 'status']);
+        return $cinema->only(['id', 'code', 'name', 'address', 'city', 'district', 'phone', 'timezone', 'status']);
     }
 }

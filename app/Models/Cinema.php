@@ -19,6 +19,7 @@ class Cinema extends Model
         'school_name',
         'address',
         'city',
+        'district',
         'country',
         'timezone',
         'default_cleaning_buffer_minutes',

@@ -40,6 +40,7 @@
                             <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->movie->title }}</dd></div>
                             <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($preview->showtime->show_time)->format('H:i') }}</dd></div>
                             <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->cinema->name }}</dd></div>
+                            <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->cinema->address }}</dd></div>
                             <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->room->name }}</dd></div>
                         </dl>
                     </section>

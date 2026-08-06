@@ -41,12 +41,14 @@ use App\Http\Controllers\User\BookingController;
 use App\Http\Controllers\User\BookingFoodSelectionController;
 use App\Http\Controllers\User\BookingHistoryController;
 use App\Http\Controllers\User\BookingReviewController;
+use App\Http\Controllers\User\CinemaController as UserCinemaController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\GuestBookingAccessController;
 use App\Http\Controllers\User\HomeController;
 use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
 use App\Http\Controllers\User\RetiredBookingStoreController;
+use App\Http\Controllers\User\ShowtimeFilterController;
 use App\Http\Controllers\User\TicketEmailResendController;
 use App\Http\Middleware\ProtectBookingResponses;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -58,6 +60,10 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::post('/cinema-context', CinemaContextController::class)->name('cinema-context.update');
+Route::get('/cinemas', [UserCinemaController::class, 'index'])->middleware('throttle:60,1')->name('cinemas.index');
+Route::get('/cinemas/{cinema:code}', [UserCinemaController::class, 'show'])
+    ->where('cinema', '[A-Za-z0-9-]+')->name('cinemas.show');
+Route::get('/showtimes/filter', ShowtimeFilterController::class)->middleware('throttle:60,1')->name('showtimes.filter');
 
 Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
     ->middleware('throttle:120,1')

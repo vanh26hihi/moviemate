@@ -4,6 +4,7 @@ namespace Tests\Support;
 
 use App\Models\Booking;
 use App\Models\Cinema;
+use App\Models\CinemaPricingRule;
 use App\Models\Movie;
 use App\Models\Room;
 use App\Models\RoomLayout;
@@ -79,6 +80,24 @@ trait CreatesBookingFixtures
         }
         $layout->update(['status' => 'published', 'published_at' => now()]);
 
+        foreach ([
+            ['name' => 'Booking fixture base', 'rule_type' => 'base', 'seat_type' => null, 'amount_vnd' => 50000],
+            ['name' => 'Booking fixture VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000],
+            ['name' => 'Booking fixture couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000],
+        ] as $rule) {
+            CinemaPricingRule::query()->updateOrCreate(
+                ['name' => $rule['name'], 'cinema_id' => $cinema->id],
+                [
+                    'rule_type' => $rule['rule_type'],
+                    'room_id' => null,
+                    'seat_type' => $rule['seat_type'],
+                    'amount_vnd' => $rule['amount_vnd'],
+                    'priority' => 1000,
+                    'status' => 'active',
+                ],
+            );
+        }
+
         $showtime = Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
@@ -88,6 +107,7 @@ trait CreatesBookingFixtures
             'show_time' => '19:00:00',
             'price' => 50000,
             'vip_price' => 70000,
+            'pricing_version' => 'cinema-pricing-v1',
             'status' => 'active',
         ]);
 

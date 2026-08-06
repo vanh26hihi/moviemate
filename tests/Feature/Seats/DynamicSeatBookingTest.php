@@ -5,6 +5,7 @@ namespace Tests\Feature\Seats;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Cinema;
+use App\Models\CinemaPricingRule;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
@@ -32,6 +33,15 @@ class DynamicSeatBookingTest extends TestCase
     {
         parent::setUp();
         $this->cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
+        foreach ([
+            ['name' => 'Dynamic seat base', 'rule_type' => 'base', 'seat_type' => null, 'amount_vnd' => 50000],
+            ['name' => 'Dynamic seat VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000],
+            ['name' => 'Dynamic seat couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000],
+        ] as $rule) {
+            CinemaPricingRule::query()->create([
+                ...$rule, 'cinema_id' => $this->cinema->id, 'priority' => 1000, 'status' => 'active',
+            ]);
+        }
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([
                 'cinema_id' => $this->cinema->id, 'code' => $code, 'name' => 'Phòng '.($index + 1),

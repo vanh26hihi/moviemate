@@ -10,8 +10,8 @@
 <section id="home-showtime-calendar" data-showtime-calendar data-selected-date="{{ $selectedDate }}" class="showtime-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <div class="cinema-card rounded-[24px] border app-border shadow-2xl shadow-black/10 overflow-hidden">
         <div class="p-5 lg:p-6 border-b app-border flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div><p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em]">Cơ sở duy nhất</p><h2 class="text-2xl sm:text-3xl font-extrabold app-text mt-2">{{ $cinema->name }}</h2><p class="app-muted text-sm mt-2">{{ $cinema->address }}</p></div>
-            <a href="{{ $cinema->map_url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-brand-start font-bold"><i class="ph-fill ph-map-trifold"></i> Bản đồ</a>
+            <div><p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em]">Lịch chiếu MovieMate</p><h2 class="text-2xl sm:text-3xl font-extrabold app-text mt-2">{{ $cinema?->name ?? 'Tất cả rạp' }}</h2><p class="app-muted text-sm mt-2">{{ $cinema?->address ?? 'Chọn rạp ưu tiên ở thanh điều hướng hoặc xem lịch toàn hệ thống.' }}</p></div>
+            @if($cinema)<a href="{{ route('cinemas.show', $cinema->code) }}" class="inline-flex items-center gap-2 text-brand-start font-bold"><i class="ph-fill ph-map-trifold"></i> Xem rạp</a>@else<a href="{{ route('cinemas.index') }}" class="inline-flex items-center gap-2 text-brand-start font-bold"><i class="ph-fill ph-buildings"></i> Chọn rạp</a>@endif
         </div>
         <div class="p-5 lg:p-6">
             <div data-showtime-date-strip class="flex gap-2 overflow-x-auto hide-scrollbar pb-4 mb-5 border-b app-border">
@@ -41,7 +41,7 @@
                             <article class="rounded-3xl border app-border app-secondary p-5"><h3 class="text-lg font-extrabold app-text">{{ $movie->title }}</h3><p class="app-muted text-sm mt-1">{{ $movie->genres->pluck('name')->join(', ') }}</p>
                                 <div class="mt-4 flex flex-wrap gap-2">@foreach($row['showtimes'] as $showtime)
                                     @if($isPast($showtime))<span class="px-4 py-3 rounded-xl border app-border app-muted opacity-60">{{ $safeTime($showtime->show_time) }} · Đã qua</span>
-                                    @else<a href="{{ route('user.bookings.selectSeat', ['showtime' => $showtime, 'cinema_id' => $showtime->cinema_id]) }}" class="px-4 py-3 rounded-xl border border-brand-start/35 text-brand-start font-extrabold hover:bg-brand-start hover:text-white">{{ $safeTime($showtime->show_time) }} · {{ $showtime->room->name }} · {{ $showtime->cinema->name }}</a>@endif
+                                    @else<a href="{{ route('user.bookings.selectSeat', ['showtime' => $showtime, 'cinema' => $showtime->cinema->code]) }}" class="px-4 py-3 rounded-xl border border-brand-start/35 text-brand-start font-extrabold hover:bg-brand-start hover:text-white">{{ $safeTime($showtime->show_time) }} · {{ $showtime->room->name }} · {{ $showtime->cinema->name }}</a>@endif
                                 @endforeach</div>
                             </article>
                         @endforeach

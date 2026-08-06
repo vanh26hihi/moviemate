@@ -13,12 +13,11 @@ use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
 use App\Services\GuestBookingAccessService;
 use App\Services\Mail\TicketMailConfigurationInspector;
+use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
-use App\Services\TicketPricingService;
 use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\TicketCheckinCapability;
 use App\Support\SeatPresentation;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -33,7 +32,7 @@ class BookingController extends Controller
         private readonly BookingTicketEligibility $ticketEligibility,
         private readonly TicketCheckinCapability $checkinCapabilities,
         private readonly TicketMailConfigurationInspector $mailConfiguration,
-        private readonly TicketPricingService $pricing,
+        private readonly PublicShowtimeCatalog $showtimeCatalog,
     ) {}
 
     /**
@@ -54,7 +53,7 @@ class BookingController extends Controller
         $layoutCells = $layout->cells->sortBy(fn ($cell) => sprintf('%03d:%03d', $cell->y_position, $cell->x_position))->values();
         $seats = $layoutCells->where('cell_type', 'seat')->pluck('seat')->filter()->values();
         try {
-            $seatPrices = $this->pricing->calculateSeatTypes($showtime);
+            $seatPrices = $this->showtimeCatalog->pricesFor($showtime);
         } catch (PricingConfigurationException $exception) {
             return redirect()->route('user.movies.show', $showtime->movie->slug)
                 ->with('error', $exception->getMessage());
@@ -257,26 +256,17 @@ class BookingController extends Controller
      */
     protected function isShowtimeAvailable(Showtime $showtime): bool
     {
-        if ($showtime->status !== 'active'
-            || $showtime->cinema?->status !== 'active'
-            || $showtime->cinema?->archived_at !== null
-            || $showtime->room?->status !== 'active'
-            || $showtime->room?->cinema_id !== $showtime->cinema_id
-            || ! $showtime->roomLayout
-            || $showtime->roomLayout->status !== 'published'
-            || $showtime->roomLayout->room_id !== $showtime->room_id) {
-            return false;
-        }
-
-        $showDateTime = Carbon::parse(
-            $showtime->show_date->format('Y-m-d').' '.$showtime->show_time
-        );
-
-        return $showDateTime->isFuture();
+        return $this->showtimeCatalog->isSellable($showtime);
     }
 
     private function assertExpectedCinema(Request $request, Showtime $showtime): void
     {
+        if ($request->query->has('cinema')) {
+            abort_unless(
+                hash_equals((string) $showtime->cinema->code, mb_strtoupper((string) $request->query('cinema'))),
+                404,
+            );
+        }
         if ($request->query->has('cinema_id')) {
             abort_unless($request->integer('cinema_id') === (int) $showtime->cinema_id, 404);
         }

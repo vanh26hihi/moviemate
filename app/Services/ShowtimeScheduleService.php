@@ -278,7 +278,7 @@ class ShowtimeScheduleService
         return $layout;
     }
 
-    private function assertWithinOperatingHours(Room $room, ShowtimeWindow $window): void
+    public function assertWithinOperatingHours(Room $room, ShowtimeWindow $window): void
     {
         $room->loadMissing('cinema.operatingHours');
         $hours = $room->cinema?->operatingHours->firstWhere('day_of_week', $window->start->dayOfWeekIso);

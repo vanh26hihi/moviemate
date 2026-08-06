@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cinema;
 use App\Models\Genre;
 use App\Models\Movie;
 use App\Services\CinemaContext;
-use Carbon\Carbon;
+use App\Services\PublicShowtimeCatalog;
 use Illuminate\Http\Request;
 
 class MovieController extends Controller
 {
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
+    public function __construct(
+        private readonly CinemaContext $cinemaContext,
+        private readonly PublicShowtimeCatalog $catalog,
+    ) {}
 
     /**
      * Hiển thị danh sách phim cho người dùng.
@@ -23,6 +27,22 @@ class MovieController extends Controller
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->whereIn('status', ['now_showing', 'coming_soon']);
+
+        $selectedCinema = null;
+        if ($request->filled('cinema')) {
+            $selectedCinema = Cinema::query()->active()->where('code', mb_strtoupper((string) $request->query('cinema')))->firstOrFail();
+        }
+        $selectedDate = $this->catalog->date($request->query('date'), $selectedCinema);
+        if ($selectedCinema || $request->filled('date')) {
+            $availableMovieIds = $this->catalog->forDate($selectedDate, $selectedCinema)->pluck('movie_id')->unique();
+            $query->whereIn('id', $availableMovieIds);
+        }
+        $preferredCinema = $this->cinemaContext->preference();
+        if (! $selectedCinema && $preferredCinema) {
+            $query->withExists(['showtimes as preferred_branch_available' => fn ($showtimes) => $showtimes
+                ->where('cinema_id', $preferredCinema->id)->where('status', 'active')->whereDate('show_date', $selectedDate)])
+                ->orderByDesc('preferred_branch_available');
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -159,72 +179,50 @@ class MovieController extends Controller
             'genres',
             'countries',
             'pageTitle',
-            'search'
-        ));
+            'search',
+            'selectedCinema',
+            'selectedDate'
+        ) + [
+            'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name']),
+            'dates' => $this->catalog->dates($selectedCinema),
+            'preferredCinema' => $preferredCinema,
+        ]);
     }
 
     /**
      * Hiển thị chi tiết phim theo slug.
      */
-    public function show(string $slug)
+    public function show(Request $request, string $slug)
     {
-        $today = now()
-            ->timezone('Asia/Ho_Chi_Minh')
-            ->toDateString();
-
         $movie = Movie::query()
             ->where('slug', $slug)
+            ->whereIn('status', PublicShowtimeCatalog::MOVIE_STATUSES)
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
-            ->with([
-                'genres',
-                'showtimes' => function ($query) use ($today) {
-                    // Merge repair: the multi-cinema detail view renders the branch name,
-                    // address and room per showtime, so both relations must be eager loaded
-                    // or the page N+1s. Inactive/archived branches and non-active rooms are
-                    // excluded so a deactivated branch never offers new bookings.
-                    $query->where('status', 'active')
-                        ->whereDate('show_date', '>=', $today)
-                        ->with(['cinema', 'room'])
-                        ->whereHas('cinema', fn ($cinema) => $cinema->active())
-                        ->whereHas('room', fn ($room) => $room->where('status', 'active'))
-                        ->orderBy('show_date')
-                        ->orderBy('show_time');
-                },
-            ])
+            ->with('genres')
             ->firstOrFail();
+        $selectedCinema = $request->filled('cinema')
+            ? Cinema::query()->active()->where('code', mb_strtoupper((string) $request->query('cinema')))->firstOrFail()
+            : null;
+        $selectedDate = $this->catalog->date($request->query('date'), $selectedCinema);
+        $showtimes = $this->catalog->forDate($selectedDate, $selectedCinema, $movie);
+        $preferredCinema = $this->cinemaContext->preference();
+        if (! $selectedCinema && $preferredCinema) {
+            $showtimes = $showtimes->sortBy(fn ($showtime): array => [
+                (int) $showtime->cinema_id === (int) $preferredCinema->id ? 0 : 1,
+                $showtime->cinema->name,
+                $showtime->show_time,
+            ])->values();
+        }
 
-        $now = now()->timezone('Asia/Ho_Chi_Minh');
-
-        /*
-        |--------------------------------------------------------------------------
-        | Loại bỏ suất chiếu đã qua
-        |--------------------------------------------------------------------------
-        */
-        $showtimes = $movie->showtimes
-            ->filter(function ($showtime) use ($now) {
-                if (! $showtime->show_date || ! $showtime->show_time) {
-                    return false;
-                }
-
-                $showDate = Carbon::parse($showtime->show_date)
-                    ->timezone('Asia/Ho_Chi_Minh');
-
-                if ($showDate->isAfter($now->copy()->startOfDay())) {
-                    return true;
-                }
-
-                if ($showDate->isSameDay($now)) {
-                    return $showtime->show_time >= $now->format('H:i:s');
-                }
-
-                return false;
-            })
-            ->values();
-
-        return view('user.movies.show', compact(
-            'movie',
-            'showtimes'
-        ));
+        return view('user.movies.show', [
+            'movie' => $movie,
+            'showtimes' => $showtimes,
+            'selectedCinema' => $selectedCinema,
+            'selectedDate' => $selectedDate,
+            'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name', 'address']),
+            'dates' => $this->catalog->dates($selectedCinema),
+            'preferredCinema' => $preferredCinema,
+        ]);
     }
 }

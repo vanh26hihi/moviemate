@@ -101,7 +101,7 @@ class AppServiceProvider extends ServiceProvider
             $context = app(CinemaContext::class);
             $view->with([
                 'customerCinemas' => $context->activeCinemas(),
-                'customerCurrentCinema' => $context->current(),
+                'customerPreferredCinema' => $context->preference(),
             ]);
         });
     }

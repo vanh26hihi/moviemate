@@ -1,103 +1,134 @@
-// MERGE REPAIR - the incoming branch committed this module with placeholder bodies written
-// literally as "{ ... }", which is not valid JavaScript and fails the production build.
-// origin/main was therefore already unbuildable before this merge.
-//
-// The placeholders are replaced with safe no-ops so the bundle compiles and existing
-// server-rendered links keep working via normal navigation. The intended behaviour
-// (Ajax showtime filtering) is NOT implemented here, because inventing it would go beyond
-// reconciling the two histories. The owning branch should finish these.
-const SHOWTIME_QUERY_KEYS = ['cinema_id', 'date', 'city', 'brand', 'nearby', 'lat', 'lng'];
+let activeRequest = null;
+let requestSequence = 0;
 
-function shouldPinShowtimeSection() {
-    const params = new URLSearchParams(window.location.search);
-
-    return window.location.hash === '#home-showtime-calendar'
-        || SHOWTIME_QUERY_KEYS.some((key) => params.has(key));
+function nearbyStatus(message) {
+    const status = document.getElementById('nearbyCinemaStatus');
+    if (status) status.textContent = message;
 }
 
-function scrollToShowtimeSection() {
-    document.getElementById('home-showtime-calendar')?.scrollIntoView({ block: 'start' });
-}
-
-if (shouldPinShowtimeSection()) {
-    document.documentElement.style.scrollBehavior = 'auto';
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    if (shouldPinShowtimeSection()) {
-        requestAnimationFrame(scrollToShowtimeSection);
+function requestNearbyCinema(button) {
+    if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        nearbyStatus('Tính năng vị trí cần HTTPS hoặc localhost. Bạn vẫn có thể chọn rạp thủ công.');
+        return;
     }
-});
-
-window.addEventListener('load', () => {
-    if (shouldPinShowtimeSection()) {
-        scrollToShowtimeSection();
-    }
-});
-function setNearbyButtonLoading(button, isLoading) {
-    if (!button) return;
-    button.disabled = isLoading;
-    button.setAttribute('aria-busy', String(isLoading));
-}
-
-function redirectToNearby(latitude, longitude) {
-    const target = new URL(window.location.href);
-    target.searchParams.set('nearby', '1');
-    target.searchParams.set('lat', String(latitude));
-    target.searchParams.set('lng', String(longitude));
-    target.hash = 'home-showtime-calendar';
-    window.location.assign(target.toString());
-}
-
-function handleNearbyError(button) {
-    setNearbyButtonLoading(button, false);
-}
-
-function requestNearbyLocation(button) {
     if (!navigator.geolocation) {
-        handleNearbyError(button);
-
+        nearbyStatus('Không thể truy cập vị trí của bạn. Vui lòng chọn rạp thủ công.');
         return;
     }
-
-    setNearbyButtonLoading(button, true);
-    navigator.geolocation.getCurrentPosition(
-        (position) => redirectToNearby(position.coords.latitude, position.coords.longitude),
-        () => handleNearbyError(button),
-    );
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    nearbyStatus('Đang xác định vị trí gần đúng của bạn…');
+    navigator.geolocation.getCurrentPosition((position) => {
+        const url = new URL(button.dataset.nearbyUrl || window.location.href, window.location.origin);
+        url.searchParams.set('nearby', '1');
+        url.searchParams.set('sort', 'nearby');
+        url.searchParams.set('lat', String(position.coords.latitude));
+        url.searchParams.set('lng', String(position.coords.longitude));
+        window.location.assign(url.toString());
+    }, () => {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        nearbyStatus('Không thể truy cập vị trí của bạn. Vui lòng chọn rạp thủ công.');
+    }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 });
 }
 
-// Full-page navigation is the safe fallback until Ajax filtering is implemented.
-function updateShowtimeSection(targetUrl) {
-    window.location.assign(targetUrl.toString());
-}
-window.addEventListener('popstate', () => {
-    if (shouldPinShowtimeSection()) {
-        window.location.reload();
+function fullPageUrl(form, submitter = null) {
+    const url = new URL(form.action, window.location.origin);
+    const data = new FormData(form);
+    if (submitter?.name) data.set(submitter.name, submitter.value);
+    for (const [key, value] of data.entries()) {
+        if (String(value) !== '') url.searchParams.set(key, String(value));
     }
-});
-document.addEventListener('click', (event) => {
-    const nearbyButton = event.target.closest('#nearbyCinemaBtn');
+    return url;
+}
 
-    if (nearbyButton) {
+function partialUrl(form, pageUrl) {
+    const url = new URL(form.dataset.filterEndpoint, window.location.origin);
+    url.searchParams.set('context', form.dataset.filterContext);
+    if (form.dataset.cinemaCode) url.searchParams.set('cinema', form.dataset.cinemaCode);
+    if (form.dataset.movieSlug) url.searchParams.set('movie', form.dataset.movieSlug);
+    const cinema = pageUrl.searchParams.get('cinema');
+    const date = pageUrl.searchParams.get('date');
+    if (cinema) url.searchParams.set('cinema', cinema);
+    if (date) url.searchParams.set('date', date);
+    return url;
+}
+
+function syncForm(form, pageUrl) {
+    for (const name of ['cinema', 'date']) {
+        const value = pageUrl.searchParams.get(name) || '';
+        form.querySelectorAll(`[name="${name}"]`).forEach((control) => {
+            if (control instanceof HTMLSelectElement) control.value = value;
+        });
+    }
+    const selectedDate = pageUrl.searchParams.get('date') || '';
+    form.querySelectorAll('button[name="date"]').forEach((button) => {
+        const selected = button.value === selectedDate;
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        button.classList.toggle('border-brand-start', selected);
+        button.classList.toggle('bg-brand-start', selected);
+        button.classList.toggle('text-white', selected);
+        button.classList.toggle('app-border', !selected);
+        button.classList.toggle('app-secondary', !selected);
+        button.classList.toggle('app-text', !selected);
+    });
+}
+
+async function updateShowtimes(form, pageUrl, pushHistory) {
+    const target = document.querySelector('[data-showtime-results]');
+    const status = document.querySelector('[data-showtime-filter-status]');
+    if (!(target instanceof HTMLElement) || !form.dataset.filterEndpoint) {
+        window.location.assign(pageUrl.toString());
+        return;
+    }
+    activeRequest?.abort();
+    activeRequest = new AbortController();
+    const sequence = ++requestSequence;
+    form.setAttribute('aria-busy', 'true');
+    if (status) status.textContent = 'Đang tải lịch chiếu…';
+    try {
+        const response = await fetch(partialUrl(form, pageUrl), {
+            headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+            signal: activeRequest.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const html = await response.text();
+        if (sequence !== requestSequence) return;
+        target.innerHTML = html;
+        syncForm(form, pageUrl);
+        if (pushHistory) window.history.pushState({ showtimeFilters: true }, '', pageUrl);
+        if (status) status.textContent = 'Đã cập nhật lịch chiếu.';
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+        if (status) status.textContent = 'Không thể tải lịch chiếu. Đang chuyển sang trang đầy đủ.';
+        window.location.assign(pageUrl.toString());
+    } finally {
+        if (sequence === requestSequence) form.removeAttribute('aria-busy');
+    }
+}
+
+function initializeDiscovery() {
+    if (document.documentElement.dataset.cinemaDiscoveryInitialized === 'true') return;
+    document.documentElement.dataset.cinemaDiscoveryInitialized = 'true';
+
+    document.addEventListener('click', (event) => {
+        const nearby = event.target.closest('#nearbyCinemaBtn');
+        if (nearby instanceof HTMLButtonElement) {
+            event.preventDefault();
+            requestNearbyCinema(nearby);
+        }
+    });
+    document.addEventListener('submit', (event) => {
+        const form = event.target.closest('[data-showtime-filter-form]');
+        if (!(form instanceof HTMLFormElement)) return;
         event.preventDefault();
-        requestNearbyLocation(nearbyButton);
-        return;
-    }
+        updateShowtimes(form, fullPageUrl(form, event.submitter), true);
+    });
+    window.addEventListener('popstate', () => {
+        const form = document.querySelector('[data-showtime-filter-form]');
+        if (form instanceof HTMLFormElement) updateShowtimes(form, new URL(window.location.href), false);
+    });
+}
 
-    const link = event.target.closest('a[data-showtime-filter]');
-
-    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        return;
-    }
-
-    event.preventDefault();
-
-    const targetUrl = new URL(link.href, window.location.origin);
-
-    if (targetUrl.hash !== '#home-showtime-calendar') {
-        targetUrl.hash = 'home-showtime-calendar';
-    }
-
-    updateShowtimeSection(targetUrl);
-});
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initializeDiscovery, { once: true });
+else initializeDiscovery();

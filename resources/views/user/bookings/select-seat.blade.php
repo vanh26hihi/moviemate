@@ -38,6 +38,7 @@
                     <p class="text-sm app-muted">
                         {{ $showtime->cinema->name }} · {{ $showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}
                     </p>
+                    <p class="mt-1 text-sm app-muted">{{ $showtime->cinema->address }}</p>
                 </header>
 
                 <form id="seatForm" action="{{ route('user.bookings.checkout', $showtime) }}" method="GET" data-seat-picker>

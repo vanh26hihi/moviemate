@@ -180,6 +180,7 @@
                         <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->movie->title }}</dd></div>
                         <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime_label }}</dd></div>
                         <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->cinema->name }}</dd></div>
+                        <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->cinema->address }}</dd></div>
                         <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->room->name }}</dd></div>
                     </dl>
 
