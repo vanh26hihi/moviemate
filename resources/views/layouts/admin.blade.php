@@ -48,7 +48,7 @@
                     ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
                 ]],
                 ['label' => 'Vé điện tử', 'items' => [
-                    ['route' => 'admin.ticket-deliveries.index', 'active' => 'admin.ticket-deliveries.*', 'permission' => 'ticket_deliveries.view', 'label' => 'Gửi vé điện tử', 'icon' => 'ph-envelope-simple'],
+                    ['route' => 'admin.ticket-deliveries.index', 'active' => 'admin.ticket-deliveries.*', 'permission' => 'ticket_deliveries.view', 'label' => 'Gửi vé điện tử', 'icon' => 'ph-envelope-simple', 'badge' => $ticketDeliveryBadge ?? null],
                     ['route' => 'admin.ticket-checkins.index', 'active' => 'admin.ticket-checkins.*', 'permission' => 'ticket_checkins.view', 'label' => 'Lịch sử soát vé', 'icon' => 'ph-qr-code'],
                 ]],
                 ['label' => 'Nội dung khách hàng', 'items' => [

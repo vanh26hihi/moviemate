@@ -29,7 +29,8 @@ class PrintableTicketTest extends PaymentTestCase
             ->assertSee('Test booking room')
             ->assertSee('A1')
             ->assertSee('50.000 VNĐ')
-            ->assertSee('data-qr-value="'.$booking->booking_code.'"', false)
+            ->assertSee('data-qr-value="v1.', false)
+            ->assertDontSee('data-qr-value="'.$booking->booking_code.'"', false)
             ->assertSee('data-print-ticket', false)
             ->assertDontSee('api.qrserver.com', false);
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
@@ -78,7 +79,7 @@ class PrintableTicketTest extends PaymentTestCase
         ])->assertOk();
         $this->get(route('user.bookings.ticket.print', $booking))
             ->assertOk()
-            ->assertSee('data-qr-value="'.$booking->booking_code.'"', false);
+            ->assertSee('data-qr-value="v1.', false);
     }
 
     public function test_non_paid_and_non_success_payment_states_have_no_usable_print_ticket(): void

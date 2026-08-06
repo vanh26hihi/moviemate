@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Policies\BookingPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
+use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\Admin\PaymentReconciliationQuery;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\CinemaContext;
@@ -15,6 +16,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -72,7 +74,15 @@ class AppServiceProvider extends ServiceProvider
             $badge = auth()->check() && auth()->user()->can('payments.reconcile')
                 ? app(PaymentReconciliationQuery::class)->badgeLabel()
                 : null;
-            $view->with('paymentReconciliationBadge', $badge);
+            $ticketDeliveryBadge = auth()->check()
+                && auth()->user()->can('ticket_deliveries.view')
+                && Schema::hasTable('booking_ticket_deliveries')
+                ? app(AdminTicketDeliveryQuery::class)->badgeLabel()
+                : null;
+            $view->with([
+                'paymentReconciliationBadge' => $badge,
+                'ticketDeliveryBadge' => $ticketDeliveryBadge,
+            ]);
         });
     }
 }

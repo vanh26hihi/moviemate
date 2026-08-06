@@ -29,7 +29,7 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
         $this->actingAs($owner)
             ->get(route('user.bookings.ticket', $booking))
             ->assertOk()
-            ->assertSee('data-qr-value="'.$booking->booking_code.'"', false)
+            ->assertSee('data-qr-value="v1.', false)
             ->assertSee('data-print-ticket', false);
     }
 

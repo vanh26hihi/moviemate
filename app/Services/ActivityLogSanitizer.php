@@ -39,6 +39,11 @@ final class ActivityLogSanitizer
         'source',
         'status',
         'delivery_status',
+        'delivery_id',
+        'attempt_number',
+        'error_category',
+        'checkin_event_id',
+        'checkin_result',
         'vip_price',
     ];
 

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ActivityLog;
 use App\Models\Booking;
+use App\Models\BookingTicketDelivery;
 use App\Models\Payment;
 use App\Models\Role;
 use App\Models\Room;
@@ -123,6 +124,7 @@ final class ActivityLogger
     {
         return match (true) {
             $subject instanceof Booking => 'Đơn đặt vé '.$subject->booking_code,
+            $subject instanceof BookingTicketDelivery => 'Gửi vé điện tử #'.$subject->getKey().' / đơn #'.$subject->booking_id,
             $subject instanceof Payment => 'Giao dịch #'.$subject->getKey().' / '.$subject->provider,
             $subject instanceof Room => 'Phòng '.$subject->code,
             $subject instanceof RoomLayout => 'Sơ đồ #'.$subject->getKey().' / phòng #'.$subject->room_id,
