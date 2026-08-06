@@ -50,6 +50,15 @@ final class StatusLabel
             'sent' => 'Đã gửi',
             'missing' => 'Thiếu thông tin',
         ],
+        'ticket_checkin' => [
+            'accepted' => 'Chấp nhận',
+            'already_used' => 'Quét trùng',
+            'unpaid' => 'Chưa thanh toán',
+            'cancelled' => 'Đơn đã hủy',
+            'expired' => 'Đã hết hạn',
+            'invalid_token' => 'Mã vé không hợp lệ',
+            'rejected' => 'Bị từ chối',
+        ],
         'movie' => [
             'now_showing' => 'Đang chiếu',
             'coming_soon' => 'Sắp chiếu',

@@ -6,6 +6,8 @@ use App\Exceptions\UnsafeProductionMailConfiguration;
 use App\Mail\BookingTicketMail;
 use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
+use App\Services\ActivityLogger;
+use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\BookingTokenService;
 use App\Services\Mail\ProductionMailTransportGuard;
 use App\Services\Mail\TicketMailConfigurationInspector;
@@ -28,6 +30,8 @@ class SendPendingBookingTickets extends Command
         BookingTokenService $tokens,
         ProductionMailTransportGuard $mailGuard,
         TicketMailConfigurationInspector $mailConfiguration,
+        ActivityLogger $activities,
+        AdminTicketDeliveryQuery $deliveryQuery,
     ): int {
         try {
             $mailGuard->assertSafeForProduction();
@@ -59,11 +63,40 @@ class SendPendingBookingTickets extends Command
 
             try {
                 $this->send($claim, $tokens);
-                $counts['sent']++;
             } catch (Throwable $exception) {
                 $this->failDelivery($claim, $exception);
+                $failed = $claim->fresh();
+                $deliveryQuery->forgetBadge();
+
+                if ($failed?->status === BookingTicketDelivery::STATUS_FAILED) {
+                    $activities->log('ticket_delivery.send_failed', $failed, [
+                        'delivery_status' => BookingTicketDelivery::STATUS_PROCESSING,
+                    ], [
+                        'delivery_status' => $failed->status,
+                    ], [
+                        'booking_id' => $failed->booking_id,
+                        'delivery_id' => $failed->id,
+                        'attempt_number' => $failed->attempts,
+                        'error_category' => $failed->last_error_code,
+                    ]);
+                }
                 $counts['failed']++;
+
+                continue;
             }
+
+            $sent = $claim->fresh();
+            $deliveryQuery->forgetBadge();
+            $activities->log('ticket_delivery.send_succeeded', $sent, [
+                'delivery_status' => BookingTicketDelivery::STATUS_PROCESSING,
+            ], [
+                'delivery_status' => $sent->status,
+            ], [
+                'booking_id' => $sent->booking_id,
+                'delivery_id' => $sent->id,
+                'attempt_number' => $sent->attempts,
+            ]);
+            $counts['sent']++;
         }
 
         $this->info("Sent: {$counts['sent']}; failed: {$counts['failed']}");
@@ -192,7 +225,7 @@ class SendPendingBookingTickets extends Command
                 ->lockForUpdate()
                 ->first();
             if (! $booking
-                || ! app(BookingTicketEligibility::class)->isUsable($booking)) {
+                || ! app(BookingTicketEligibility::class)->isDeliverable($booking)) {
                 throw new RuntimeException('booking_not_paid');
             }
 
@@ -255,7 +288,6 @@ class SendPendingBookingTickets extends Command
         Log::warning('Ticket delivery attempt failed and remains retryable.', [
             'delivery_id' => $delivery->getKey(),
             'error_code' => $code,
-            'exception' => $exception::class,
         ]);
     }
 

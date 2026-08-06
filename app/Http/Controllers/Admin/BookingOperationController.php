@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\ActivityLogger;
+use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\BookingCancellationService;
 use App\Services\Payments\PaymentReconciliationService;
 use App\Services\Tickets\BookingTicketEligibility;
+use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketDeliveryOutbox;
 use App\Support\PrivacyMask;
 use App\Support\StatusLabel;
@@ -27,6 +29,7 @@ final class BookingOperationController extends Controller
         BookingTicketEligibility $eligibility,
         TicketDeliveryOutbox $deliveries,
         ActivityLogger $activities,
+        AdminTicketDeliveryQuery $deliveryQuery,
     ): RedirectResponse {
         $booking->load('payments');
         abort_unless($eligibility->isDeliverable($booking), 404);
@@ -45,6 +48,7 @@ final class BookingOperationController extends Controller
                 'recipient_mask' => PrivacyMask::email($booking->recipient_email),
             ]);
         });
+        $deliveryQuery->forgetBadge();
 
         return back()->with('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
     }
@@ -128,6 +132,7 @@ final class BookingOperationController extends Controller
     public function print(
         Booking $booking,
         BookingTicketEligibility $eligibility,
+        TicketCheckinCapability $checkinCapabilities,
     ): View {
         $booking->load([
             'user', 'payments', 'showtime.movie', 'showtime.cinema', 'showtime.room',
@@ -144,6 +149,7 @@ final class BookingOperationController extends Controller
             'backUrl' => route('admin.bookings.show', $booking),
             'backLabel' => 'Về chi tiết đơn',
             'ticketRecipient' => PrivacyMask::email($booking->recipient_email),
+            'checkinCapability' => $eligibility->isUsable($booking) ? $checkinCapabilities->issue($booking) : null,
         ]);
     }
 

@@ -15,6 +15,7 @@ use App\Services\GuestBookingAccessService;
 use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\RoomLayoutService;
 use App\Services\Tickets\BookingTicketEligibility;
+use App\Services\Tickets\TicketCheckinCapability;
 use App\Support\SeatPresentation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ class BookingController extends Controller
         private readonly BookingCheckoutDraftService $drafts,
         private readonly BookingCheckoutPreviewService $previews,
         private readonly BookingTicketEligibility $ticketEligibility,
+        private readonly TicketCheckinCapability $checkinCapabilities,
         private readonly TicketMailConfigurationInspector $mailConfiguration,
     ) {}
 
@@ -179,8 +181,9 @@ class BookingController extends Controller
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
+        $checkinCapability = $isUsable ? $this->checkinCapabilities->issue($booking) : null;
 
-        return view('user.bookings.ticket', compact('booking', 'isUsable', 'verifiedPayment'));
+        return view('user.bookings.ticket', compact('booking', 'isUsable', 'verifiedPayment', 'checkinCapability'));
     }
 
     public function printTicket(Request $request, Booking $booking)
@@ -201,12 +204,14 @@ class BookingController extends Controller
 
         $isUsable = true;
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
+        $checkinCapability = $this->checkinCapabilities->issue($booking);
         $printMode = true;
 
         return view('user.bookings.ticket', compact(
             'booking',
             'isUsable',
             'verifiedPayment',
+            'checkinCapability',
             'printMode',
         ));
     }

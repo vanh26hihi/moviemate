@@ -132,7 +132,7 @@
                 <p class="cinema-ticket-stub-label">SOÁT VÉ</p>
                 @if($isUsable)
                     <div class="cinema-ticket-qr">
-                        <canvas data-qr-value="{{ $booking->booking_code }}" data-qr-size="240" width="240" height="240" aria-label="Mã QR soát vé MovieMate"></canvas>
+                        <canvas data-qr-value="{{ $checkinCapability }}" data-qr-size="240" width="240" height="240" aria-label="Mã QR soát vé MovieMate"></canvas>
                         <span data-qr-fallback class="hidden">QR chưa tải</span>
                     </div>
                     <p class="cinema-ticket-instruction">Đưa mã QR cho nhân viên soát vé. Vui lòng đến trước giờ chiếu 15 phút.</p>

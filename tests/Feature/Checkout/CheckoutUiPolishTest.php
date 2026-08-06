@@ -165,7 +165,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
         $this->actingAs($user)->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertSee('data-ticket-state="usable"', false)
-            ->assertSee('data-qr-value="'.$booking->booking_code.'"', false)
+            ->assertSee('data-qr-value="v1.', false)
             ->assertSee('data-print-ticket', false)
             ->assertSee('A1')
             ->assertSee('Bắp rang caramel')

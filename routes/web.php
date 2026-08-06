@@ -16,6 +16,8 @@ use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
+use App\Http\Controllers\Admin\TicketCheckinController as AdminTicketCheckinController;
+use App\Http\Controllers\Admin\TicketDeliveryController as AdminTicketDeliveryController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -24,6 +26,7 @@ use App\Http\Controllers\Payments\VnpayIpnController;
 use App\Http\Controllers\Payments\VnpayReturnController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
+use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
 use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
@@ -323,6 +326,21 @@ Route::prefix('admin')->name('admin.')
             ->middleware(['permission:payments.reconcile', 'throttle:6,1'])
             ->name('payment-reviews.resolve');
 
+        Route::get('/ticket-deliveries', [AdminTicketDeliveryController::class, 'index'])
+            ->middleware('permission:ticket_deliveries.view')->name('ticket-deliveries.index');
+        Route::get('/ticket-deliveries/{ticketDelivery}', [AdminTicketDeliveryController::class, 'show'])
+            ->whereNumber('ticketDelivery')
+            ->middleware('permission:ticket_deliveries.view')->name('ticket-deliveries.show');
+        Route::post('/ticket-deliveries/{ticketDelivery}/retry', [AdminTicketDeliveryController::class, 'retry'])
+            ->whereNumber('ticketDelivery')
+            ->middleware(['permission:ticket_deliveries.retry', 'throttle:12,1'])->name('ticket-deliveries.retry');
+
+        Route::get('/ticket-checkins', [AdminTicketCheckinController::class, 'index'])
+            ->middleware('permission:ticket_checkins.view')->name('ticket-checkins.index');
+        Route::get('/ticket-checkins/{ticketCheckinEvent}', [AdminTicketCheckinController::class, 'show'])
+            ->whereNumber('ticketCheckinEvent')
+            ->middleware('permission:ticket_checkins.view')->name('ticket-checkins.show');
+
         Route::get('/users', [AdminUserController::class, 'index'])
             ->middleware('permission:users.view')->name('users.index');
         Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])
@@ -353,8 +371,10 @@ Route::prefix('staff')->name('staff.')
             ->middleware('permission:dashboard.view')->name('dashboard');
         Route::get('/tickets', fn () => view('staff.tickets.index'))
             ->middleware('permission:bookings.view')->name('tickets.index');
-        Route::get('/tickets/check', fn () => view('staff.tickets.check'))
+        Route::get('/tickets/check', [StaffTicketCheckinController::class, 'show'])
             ->middleware('permission:tickets.checkin')->name('tickets.check');
+        Route::post('/tickets/check', [StaffTicketCheckinController::class, 'store'])
+            ->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume');
         Route::get('/sales/counter', fn () => view('staff.sales.counter'))
             ->middleware('permission:bookings.operate')->name('sales.counter');
     });

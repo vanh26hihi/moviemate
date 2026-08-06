@@ -96,6 +96,18 @@ class Booking extends Model
         return $this->hasOne(BookingTicketDelivery::class);
     }
 
+    public function ticketCheckinEvents(): HasMany
+    {
+        return $this->hasMany(TicketCheckinEvent::class);
+    }
+
+    public function acceptedTicketCheckin(): HasOne
+    {
+        return $this->hasOne(TicketCheckinEvent::class)
+            ->where('result', TicketCheckinEvent::RESULT_ACCEPTED)
+            ->oldestOfMany('id');
+    }
+
     public function foodOrder(): HasOne
     {
         return $this->hasOne(Order::class);

@@ -152,10 +152,13 @@
             <h2 class="text-xl font-extrabold app-heading">Soát vé</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Kết quả</dt><dd class="font-bold app-text">{{ $booking->booking_status === 'used' ? 'Đã soát vé' : 'Chưa soát vé' }}</dd></div>
-                <div><dt class="text-sm app-muted">Thời gian</dt><dd class="font-bold app-text">{{ $booking->used_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Nhân viên thực hiện</dt><dd class="font-bold app-text">Chưa được lưu trong dữ liệu hiện tại</dd></div>
-                <div><dt class="text-sm app-muted">Lần quét trùng</dt><dd class="font-bold app-text">Chưa có lịch sử lần quét riêng</dd></div>
+                <div><dt class="text-sm app-muted">Thời gian chấp nhận</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->scanned_at?->format('d/m/Y H:i:s') ?? $booking->used_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Nhân viên chấp nhận</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->actor?->name ?? ($booking->booking_status === 'used' ? 'Không có dữ liệu lịch sử' : '—') }}</dd></div>
+                <div><dt class="text-sm app-muted">Lần quét trùng</dt><dd class="font-bold app-text">{{ $duplicateCheckinCount }}</dd></div>
+                <div><dt class="text-sm app-muted">Lần bị từ chối</dt><dd class="font-bold app-text">{{ $rejectedCheckinCount }}</dd></div>
             </dl>
+            @can('ticket_checkins.view')<a class="mt-4 inline-flex font-bold text-brand-start" href="{{ route('admin.ticket-checkins.index', ['booking_code' => $booking->booking_code]) }}">Xem toàn bộ lịch sử soát vé</a>@endcan
+            @if($checkins->isNotEmpty())<div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Kết quả</th><th>Nhân viên</th></tr></thead><tbody>@foreach($checkins as $checkin)<tr><td>{{ $checkin->scanned_at?->format('d/m/Y H:i:s') }}</td><td>{{ \App\Support\StatusLabel::for('ticket_checkin', $checkin->result) }}</td><td>{{ $checkin->actor?->name ?? 'Tài khoản không còn khả dụng' }}</td></tr>@endforeach</tbody></table></div>@endif
         </section>
     </div>
 
