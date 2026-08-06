@@ -20,7 +20,7 @@
                 <header>
                     <p class="text-xs font-bold uppercase tracking-[0.24em] text-brand-start">Bước 2/4 · Tùy chọn</p>
                     <h1 class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">Thêm đồ ăn</h1>
-                    <p class="mt-2 leading-relaxed app-muted">Chọn trước để nhận tại {{ $preview->showtime->cinema->name }}, hoặc bỏ qua nếu bạn chỉ cần vé xem phim.</p>
+                    <p class="mt-2 leading-relaxed app-muted">Chọn trước để nhận tại {{ $preview->showtime->cinema->name }}. Bước này là tuỳ chọn — bạn có thể để trống và tiếp tục thanh toán.</p>
                 </header>
 
                 <div class="mt-7">
@@ -97,13 +97,15 @@
                 </fieldset>
 
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                    {{-- Đồ ăn là tuỳ chọn: khách có thể để trống và bấm "Tiếp tục thanh toán". --}}
+                    <a href="{{ route('user.bookings.selectSeat', ['showtime' => $preview->showtime->id, 'cinema_id' => $preview->showtime->cinema_id]) }}"
+                       class="btn-secondary flex-1 justify-center">
+                        <i class="ph-bold ph-arrow-left" aria-hidden="true"></i>
+                        Quay lại chọn ghế
+                    </a>
                     <button type="submit" name="checkout_action" value="confirm_food" class="btn-primary flex-1" data-loading-label="Đang lưu lựa chọn…">
-                        Tiếp tục xác nhận
+                        Tiếp tục thanh toán
                         <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>
-                    </button>
-                    <button type="submit" name="checkout_action" value="skip_food" class="btn-secondary flex-1" data-loading-label="Đang bỏ qua…">
-                        <i class="ph ph-fast-forward" aria-hidden="true"></i>
-                        Bỏ qua đồ ăn
                     </button>
                 </div>
                 <p class="mt-3 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>

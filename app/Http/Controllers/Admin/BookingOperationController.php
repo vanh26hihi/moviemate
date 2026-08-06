@@ -99,26 +99,8 @@ final class BookingOperationController extends Controller
         Request $request,
         Booking $booking,
         BookingCancellationService $cancellations,
-        ActivityLogger $activities,
     ): RedirectResponse {
-        $result = DB::transaction(function () use ($booking, $cancellations, $activities) {
-            $before = $booking->booking_status;
-            $result = $cancellations->cancel($booking->id);
-
-            if ($result->cancelled) {
-                $activities->log('booking.cancelled', $booking, [
-                    'status' => $before,
-                ], [
-                    'status' => 'cancelled',
-                ], [
-                    'booking_id' => $booking->id,
-                    'booking_code' => $booking->booking_code,
-                    'source' => 'admin_booking_operations',
-                ]);
-            }
-
-            return $result;
-        });
+        $result = $cancellations->cancel($booking->id);
 
         if ($result->cancelled) {
             return back()->with('success', 'Đơn đặt vé đã được hủy an toàn.');

@@ -88,12 +88,88 @@ class AdminBookingOperationsTest extends PaymentTestCase
 
         DB::flushQueryLog();
         DB::enableQueryLog();
-        $response = $this->actingAs($manager)->get(route('admin.bookings.index', ['per_page' => 15]));
+        $response = $this->actingAs($manager)->get(route('admin.bookings.index', [
+            'per_page' => 15,
+            'include_drafts' => 1,
+        ]));
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
         $response->assertOk()->assertSee('PAGE-026')->assertSee('page=2', false);
         $this->assertLessThanOrEqual(20, $queryCount, 'Danh sách booking có dấu hiệu N+1.');
+    }
+
+    public function test_default_index_hides_technical_drafts_and_keeps_operational_attention_rows(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        $draft = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-DRAFT']);
+        $expired = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-EXPIRED',
+            'booking_status' => 'expired',
+            'expires_at' => now()->subMinute(),
+        ]);
+        $paid = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-PAID',
+            'booking_status' => 'paid',
+            'payment_status' => 'paid',
+        ]);
+        $used = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-USED',
+            'booking_status' => 'used',
+            'payment_status' => 'paid',
+        ]);
+        $refunded = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-REFUNDED',
+            'booking_status' => 'cancelled',
+            'payment_status' => 'refunded',
+        ]);
+        $unresolved = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-UNRESOLVED']);
+        $review = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-REVIEW']);
+        $processing = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-PROCESSING']);
+        $meaningfulCancelled = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-CANCELLED-EVIDENCE',
+            'booking_status' => 'cancelled',
+        ]);
+        $technicalCancelled = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-CANCELLED-TECHNICAL',
+            'booking_status' => 'cancelled',
+        ]);
+
+        $this->pendingPayment($unresolved, ['status' => Payment::STATUS_UNRESOLVED]);
+        $this->pendingPayment($review, ['status' => Payment::STATUS_REVIEW]);
+        $this->pendingPayment($processing, ['status' => Payment::STATUS_PROCESSING]);
+        $this->pendingPayment($meaningfulCancelled, [
+            'status' => Payment::STATUS_FAILED,
+            'callback_received_at' => now(),
+        ]);
+        $this->pendingPayment($technicalCancelled, ['status' => Payment::STATUS_FAILED]);
+
+        $response = $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.bookings.index'))
+            ->assertOk()
+            ->assertSee('Trạng thái đơn')
+            ->assertSee('Trạng thái thanh toán')
+            ->assertSee('Trạng thái vé');
+
+        foreach ([$paid, $used, $refunded, $unresolved, $review, $processing, $meaningfulCancelled] as $visible) {
+            $response->assertSee($visible->booking_code);
+        }
+        foreach ([$draft, $expired, $technicalCancelled] as $hidden) {
+            $response->assertDontSee($hidden->booking_code);
+        }
+
+        $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.bookings.index', ['include_drafts' => 1]))
+            ->assertOk()
+            ->assertSee($draft->booking_code)
+            ->assertSee($expired->booking_code)
+            ->assertSee($technicalCancelled->booking_code);
+
+        $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.bookings.index', ['booking_status' => 'expired']))
+            ->assertOk()
+            ->assertSee($expired->booking_code)
+            ->assertDontSee($paid->booking_code);
     }
 
     public function test_detail_renders_authoritative_sections_and_hides_secrets_and_activity_by_permission(): void

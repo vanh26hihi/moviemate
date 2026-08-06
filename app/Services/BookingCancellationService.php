@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Domain\Bookings\BookingCancellationResult;
 use App\Models\Booking;
+use App\Models\BookingSeat;
 use App\Models\Payment;
+use App\Support\SeatPresentation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +20,7 @@ final class BookingCancellationService
     public function __construct(
         private readonly BookingSeatLockService $seatLocks,
         private readonly BookingFoodService $food,
+        private readonly ActivityLogger $activities,
     ) {}
 
     public function isCancellable(Booking $booking): bool
@@ -53,12 +56,48 @@ final class BookingCancellationService
                 return BookingCancellationResult::notCancellable();
             }
 
+            $lockedSeatRows = BookingSeat::query()
+                ->where('booking_id', $booking->id)
+                ->where('active_lock_key', BookingSeat::ACTIVE_LOCK_KEY)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->with('seat:id,seat_code,type,pair_code,pair_position,row,number,x_position,y_position')
+                ->get();
+            $releasedSeatLabels = $this->activeSeatLabels($lockedSeatRows);
+
             $booking->forceFill(['booking_status' => 'cancelled'])->save();
-            $this->seatLocks->release($booking);
+            $released = $this->seatLocks->release($booking);
             $this->food->transitionForBooking($booking, 'cancelled');
+
+            // One audit event per successful cancellation. Seat labels are logical and safe;
+            // no capability, token or provider payload is ever recorded here.
+            $this->activities->log(
+                'booking.cancelled',
+                $booking,
+                ['status' => 'pending_payment'],
+                ['status' => 'cancelled'],
+                [
+                    'booking_code' => $booking->booking_code,
+                    'showtime_id' => $booking->showtime_id,
+                    'seat_units' => $releasedSeatLabels,
+                    'seat_count' => $released,
+                    'reason' => 'customer_cancelled_unpaid',
+                ],
+            );
 
             return BookingCancellationResult::cancelled();
         });
+    }
+
+    /** @return list<string> */
+    private function activeSeatLabels(Collection $bookingSeats): array
+    {
+        return SeatPresentation::groups($bookingSeats->pluck('seat')->filter()->values())
+            ->pluck('label')
+            ->filter(fn ($label): bool => is_string($label) && $label !== '')
+            ->take(50)
+            ->values()
+            ->all();
     }
 
     private function hasCancellableBookingState(Booking $booking): bool

@@ -55,7 +55,9 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee('max="20"', false)
             ->assertSee('data-quantity-decrease', false)
             ->assertSee('data-quantity-increase', false)
-            ->assertSee('Bỏ qua đồ ăn')
+            ->assertDontSee('Bỏ qua đồ ăn')
+            ->assertSee('Tiếp tục thanh toán')
+            ->assertSee('Quay lại chọn ghế')
             ->assertDontSee('name="total_amount"', false);
 
         $this->post(route('user.bookings.food.store'), [
@@ -83,8 +85,8 @@ class CheckoutUiPolishTest extends PaymentTestCase
         $this->seedRbac();
         $user = $this->userWithRole('user');
         $cases = [
-            ['pending', Payment::STATUS_PENDING, 'pending_payment', 'unpaid', 'Đang chờ xác minh thanh toán', 'user.bookings.pending'],
-            ['review', Payment::STATUS_REVIEW, 'pending_payment', 'unpaid', 'Giao dịch đang được đối soát', 'user.bookings.payment-review'],
+            ['pending', Payment::STATUS_PENDING, 'pending_payment', 'unpaid', 'Đang xác minh kết quả thanh toán', 'user.bookings.pending'],
+            ['review', Payment::STATUS_REVIEW, 'pending_payment', 'unpaid', 'Giao dịch cần được hỗ trợ', 'user.bookings.payment-review'],
             ['failed', Payment::STATUS_FAILED, 'pending_payment', 'unpaid', 'Thanh toán không thành công', 'user.bookings.failed'],
             ['expired', Payment::STATUS_EXPIRED, 'expired', 'unpaid', 'Đơn đặt vé đã hết hạn', 'user.bookings.expired'],
             ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Đơn đặt vé đã bị hủy', 'user.bookings.success'],

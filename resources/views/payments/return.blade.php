@@ -5,16 +5,23 @@
 @section('content')
 @php
     $providerLabel = $payment->provider === 'vnpay' ? 'VNPAY' : 'ZaloPay';
+    $isVerifiedPaid = $payment->status === \App\Models\Payment::STATUS_SUCCESS
+        && $payment->verified_at !== null
+        && $booking->payment_status === 'paid'
+        && in_array($booking->booking_status, ['paid', 'used'], true);
+    $stateStatus = $payment->status === \App\Models\Payment::STATUS_SUCCESS && ! $isVerifiedPaid
+        ? \App\Models\Payment::STATUS_REVIEW
+        : $payment->status;
     $states = [
         \App\Models\Payment::STATUS_PENDING => [
-            'title' => 'Đang chờ xác minh thanh toán',
-            'message' => "MovieMate chưa nhận được kết quả cuối cùng từ {$providerLabel}. Đơn đặt vé này chưa phải là vé điện tử.",
+            'title' => 'Đang xác minh kết quả thanh toán',
+            'message' => "MovieMate chưa nhận được kết quả cuối cùng từ {$providerLabel}. Hệ thống sẽ cập nhật đơn khi có kết quả chính thức.",
             'icon' => 'ph-hourglass-medium',
             'colour' => 'text-warning',
         ],
         \App\Models\Payment::STATUS_SUCCESS => [
-            'title' => 'Thanh toán đã được xác minh',
-            'message' => 'Giao dịch đã được MovieMate xác minh và vé điện tử đã sẵn sàng.',
+            'title' => 'Đặt vé thành công',
+            'message' => 'Thanh toán đã được xác minh và vé điện tử đã sẵn sàng.',
             'icon' => 'ph-check-circle',
             'colour' => 'text-success',
         ],
@@ -25,8 +32,8 @@
             'colour' => 'text-error',
         ],
         \App\Models\Payment::STATUS_REVIEW => [
-            'title' => 'Giao dịch đang được đối soát',
-            'message' => 'Dữ liệu cần được kiểm tra thêm. Đây chưa phải kết luận thanh toán thất bại và MovieMate chưa phát hành vé.',
+            'title' => 'Giao dịch cần được hỗ trợ',
+            'message' => 'Dữ liệu giao dịch cần bộ phận hỗ trợ kiểm tra thêm trước khi có kết luận chính thức.',
             'icon' => 'ph-magnifying-glass',
             'colour' => 'text-warning',
         ],
@@ -38,15 +45,13 @@
         ],
     ];
     $states[\App\Models\Payment::STATUS_UNRESOLVED] = $states[\App\Models\Payment::STATUS_PENDING];
-    $state = $states[$payment->status] ?? [
+    $states[\App\Models\Payment::STATUS_PROCESSING] = $states[\App\Models\Payment::STATUS_PENDING];
+    $state = $states[$stateStatus] ?? [
         'title' => 'Đang xử lý trạng thái',
         'message' => 'MovieMate đang kiểm tra dữ liệu giao dịch hiện tại.',
         'icon' => 'ph-spinner-gap',
         'colour' => 'text-slate-500',
     ];
-    $isVerifiedPaid = $payment->status === \App\Models\Payment::STATUS_SUCCESS
-        && $booking->payment_status === 'paid'
-        && $booking->booking_status === 'paid';
 @endphp
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">

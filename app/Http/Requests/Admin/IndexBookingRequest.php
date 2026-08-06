@@ -36,6 +36,7 @@ class IndexBookingRequest extends FormRequest
             'payment_status' => ['nullable', Rule::in(Booking::PAYMENT_STATUSES)],
             'ticket_status' => ['nullable', Rule::in(BookingTicketDelivery::STATUSES)],
             'checkin_status' => ['nullable', Rule::in(['used', 'not_used'])],
+            'include_drafts' => ['nullable', 'boolean'],
             'sort' => ['nullable', Rule::in(['created_at', 'booking_code', 'total_amount', 'show_date'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', Rule::in([15, 25, 50])],

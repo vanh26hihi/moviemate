@@ -79,7 +79,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
         $pages = [
             route('admin.rooms.index'),
             route('admin.showtimes.index'),
-            route('admin.bookings.index'),
+            route('admin.bookings.index', ['include_drafts' => 1]),
             route('admin.payments.index'),
             route('admin.payment-reconciliation.index'),
             route('admin.ticket-deliveries.index'),
@@ -96,7 +96,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             );
         }
 
-        $this->actingAs($manager)->get(route('admin.bookings.index'))
+        $this->actingAs($manager)->get(route('admin.bookings.index', ['include_drafts' => 1]))
             ->assertOk()->assertSee($own['booking']->booking_code);
     }
 

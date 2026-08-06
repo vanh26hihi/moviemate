@@ -24,36 +24,36 @@
     };
     $states = [
         'paid' => [
-            'title' => 'Thanh toán đã được xác minh',
-            'message' => 'Vé điện tử đã sẵn sàng. Bạn có thể mở vé và lưu mã QR để sử dụng tại rạp.',
+            'title' => 'Đặt vé thành công',
+            'message' => 'Thanh toán đã được xác minh và vé điện tử đã sẵn sàng. Bạn có thể mở vé và lưu mã QR để sử dụng tại rạp.',
             'icon' => 'ph-check-circle',
             'colour' => 'text-success',
             'badge' => 'Đã thanh toán',
         ],
         'pending' => [
-            'title' => 'Đang chờ xác minh thanh toán',
-            'message' => 'MovieMate chưa nhận được kết quả xác minh cuối cùng từ ZaloPay. Đơn đặt vé này chưa phải là vé điện tử.',
+            'title' => 'Đang xác minh kết quả thanh toán',
+            'message' => 'Kết quả thanh toán đang được xác minh. Ghế sẽ được xử lý sau khi hệ thống nhận được kết quả chính thức.',
             'icon' => 'ph-hourglass-medium',
             'colour' => 'text-warning',
-            'badge' => 'Chờ xác minh',
+            'badge' => 'Đang xác minh',
         ],
         'review' => [
-            'title' => 'Giao dịch đang được đối soát',
-            'message' => 'Dữ liệu giao dịch cần được kiểm tra thêm. Đây chưa phải kết luận thanh toán thất bại và MovieMate chưa phát hành vé.',
+            'title' => 'Giao dịch cần được hỗ trợ',
+            'message' => 'Giao dịch này cần bộ phận hỗ trợ kiểm tra thêm trước khi phát hành vé. Bạn không cần thao tác gì thêm; MovieMate sẽ cập nhật khi có kết quả chính thức.',
             'icon' => 'ph-magnifying-glass',
             'colour' => 'text-warning',
-            'badge' => 'Cần đối soát',
+            'badge' => 'Cần hỗ trợ',
         ],
         'failed' => [
             'title' => 'Thanh toán không thành công',
-            'message' => 'ZaloPay đã trả về trạng thái không thành công. Đơn đặt vé này không có vé điện tử khả dụng.',
+            'message' => 'Giao dịch không thành công nên đơn đặt vé này không có vé điện tử. Bạn có thể chọn lại ghế và thanh toán lần khác.',
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
             'badge' => 'Không thành công',
         ],
         'expired' => [
             'title' => 'Đơn đặt vé đã hết hạn',
-            'message' => 'Thời gian giữ ghế đã kết thúc và ghế đã được giải phóng. Thanh toán đến muộn sẽ được chuyển sang đối soát, không tự phát hành vé.',
+            'message' => 'Thời gian giữ ghế đã kết thúc và ghế đã được giải phóng. Nếu bạn vừa thanh toán, hệ thống sẽ kiểm tra và liên hệ hỗ trợ thay vì tự phát hành vé.',
             'icon' => 'ph-clock-countdown',
             'colour' => 'text-slate-400',
             'badge' => 'Hết hạn',
@@ -229,7 +229,7 @@
 
             @if($isPending)
                 <div class="mt-6 rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-sm leading-relaxed text-warning" role="note">
-                    <strong>Không tạo lại thanh toán một cách mù:</strong> nếu bạn vừa thanh toán hoặc đã thấy ZaloPay trừ tiền, hãy chờ xác minh. Nút bên dưới chỉ tiếp tục hoặc đối soát lần thanh toán hiện tại theo dữ liệu máy chủ.
+                    <strong>Vui lòng không thanh toán lại:</strong> nếu bạn vừa thanh toán hoặc đã bị trừ tiền, hãy chờ hệ thống xác minh. Nút bên dưới chỉ kiểm tra lại lần thanh toán hiện tại theo dữ liệu máy chủ, không tạo giao dịch mới.
                 </div>
             @endif
 

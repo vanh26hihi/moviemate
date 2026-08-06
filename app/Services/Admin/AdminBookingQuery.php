@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\Booking;
 use App\Models\Movie;
+use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\CinemaAccessService;
@@ -12,6 +13,14 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class AdminBookingQuery
 {
+    /**
+     * Booking states that always represent real business activity and therefore stay in the
+     * default operational list.
+     *
+     * @var list<string>
+     */
+    private const OPERATIONAL_BOOKING_STATUSES = ['paid', 'used'];
+
     public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
 
     public function paginate(array $filters): LengthAwarePaginator
@@ -65,6 +74,8 @@ final class AdminBookingQuery
             ->when(($filters['checkin_status'] ?? null) === 'used', fn (Builder $query) => $query->where('booking_status', 'used'))
             ->when(($filters['checkin_status'] ?? null) === 'not_used', fn (Builder $query) => $query->where('booking_status', '!=', 'used'));
 
+        $this->applyDraftVisibility($query, $filters);
+
         if ($sort === 'show_date') {
             $query->orderBy(
                 Showtime::query()->select('show_date')->whereColumn('showtimes.id', 'bookings.showtime_id')->limit(1),
@@ -91,5 +102,49 @@ final class AdminBookingQuery
     private function escapeLike(string $value): string
     {
         return addcslashes($value, '%_\\');
+    }
+
+    /**
+     * Hide purely technical checkout drafts from the default operational list.
+     *
+     * Nothing is deleted: the rows remain for concurrency and payment idempotency and can be
+     * shown again with the explicit "Hiển thị đơn tạm và đơn hết hạn" filter. A draft is only
+     * hidden when it never reached a meaningful payment state, so unresolved/review cases that
+     * need action are always visible.
+     */
+    private function applyDraftVisibility(Builder $query, array $filters): void
+    {
+        if (filter_var($filters['include_drafts'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        // An explicit status filter is an intentional operator choice; do not override it.
+        if (($filters['booking_status'] ?? null) !== null || ($filters['payment_status'] ?? null) !== null) {
+            return;
+        }
+
+        $query->where(function (Builder $query): void {
+            $query->whereIn('booking_status', self::OPERATIONAL_BOOKING_STATUSES)
+                ->orWhereIn('payment_status', ['paid', 'refunded'])
+                ->orWhereHas('payments', fn (Builder $payments) => $payments->whereIn('status', [
+                    Payment::STATUS_SUCCESS,
+                    Payment::STATUS_REVIEW,
+                    Payment::STATUS_UNRESOLVED,
+                    Payment::STATUS_PROCESSING,
+                ]))
+                ->orWhere(function (Builder $cancelled): void {
+                    $cancelled->where('booking_status', 'cancelled')
+                        ->whereHas('payments', function (Builder $payments): void {
+                            $payments->where(function (Builder $evidence): void {
+                                $evidence->whereNotNull('verified_at')
+                                    ->orWhereNotNull('callback_received_at')
+                                    ->orWhereNotNull('transaction_id')
+                                    ->orWhereNotNull('zp_trans_id')
+                                    ->orWhereNotNull('provider_return_code')
+                                    ->orWhereNotNull('query_response_hash');
+                            });
+                        });
+                });
+        });
     }
 }

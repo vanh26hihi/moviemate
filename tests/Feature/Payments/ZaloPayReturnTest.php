@@ -67,7 +67,7 @@ class ZaloPayReturnTest extends PaymentTestCase
         $this->visitReturn($payment, $params)
             ->assertOk()
             ->assertSee('data-payment-state="review"', false)
-            ->assertSee('Giao dịch đang được đối soát');
+            ->assertSee('Giao dịch cần được hỗ trợ');
 
         $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
     }

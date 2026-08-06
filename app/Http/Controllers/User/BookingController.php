@@ -57,12 +57,26 @@ class BookingController extends Controller
             ->pluck('seat_id')
             ->all();
 
+        $selectedSeatIds = [];
+        if ($this->drafts->hasCurrent($request)) {
+            $draft = $this->drafts->current($request);
+            if ((int) $draft['showtime_id'] === (int) $showtime->id) {
+                $selectedSeatIds = collect($draft['seat_ids'])
+                    ->map(fn ($seatId): int => (int) $seatId)
+                    ->filter(fn (int $seatId): bool => $seatId > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+        }
+
         return view('user.bookings.select-seat', compact(
             'showtime',
             'layout',
             'layoutCells',
             'seats',
-            'bookedSeatIds'
+            'bookedSeatIds',
+            'selectedSeatIds',
         ));
     }
 
