@@ -20,11 +20,13 @@ class Room extends Model
         'name',
         'room_type',
         'total_seats',
+        'cleaning_buffer_minutes',
         'status',
     ];
 
     protected $casts = [
         'total_seats' => 'integer',
+        'cleaning_buffer_minutes' => 'integer',
     ];
 
     public function cinema(): BelongsTo
@@ -40,6 +42,11 @@ class Room extends Model
     public function showtimes(): HasMany
     {
         return $this->hasMany(Showtime::class);
+    }
+
+    public function pricingRules(): HasMany
+    {
+        return $this->hasMany(CinemaPricingRule::class);
     }
 
     public function layouts(): HasMany

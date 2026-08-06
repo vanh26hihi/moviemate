@@ -59,6 +59,7 @@ class SaveRoomRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'room_type' => ['required', Rule::in(['2D', '3D', 'IMAX'])],
             'status' => ['required', Rule::in(['active', 'inactive'])],
+            'cleaning_buffer_minutes' => ['nullable', 'integer', 'between:0,180'],
         ];
     }
 
@@ -70,6 +71,7 @@ class SaveRoomRequest extends FormRequest
             'name' => 'tên phòng',
             'room_type' => 'loại phòng',
             'status' => 'trạng thái',
+            'cleaning_buffer_minutes' => 'thời gian vệ sinh phòng',
         ];
     }
 }

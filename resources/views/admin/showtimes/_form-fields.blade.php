@@ -4,13 +4,6 @@
     $roomValue = old('room_id', $editing ? $showtime->room_id : '');
     $dateValue = old('show_date', $editing ? $showtime->show_date?->format('Y-m-d') : '');
     $timeValue = old('show_time', $editing ? substr((string) $showtime->show_time, 0, 5) : '');
-    $priceValue = session()->hasOldInput('price')
-        ? old('price')
-        : ($editing ? (string) \App\Domain\Money\VndAmount::fromDatabase($showtime->getRawOriginal('price')) : '');
-    $storedVipPrice = $editing ? $showtime->getRawOriginal('vip_price') : null;
-    $vipPriceValue = session()->hasOldInput('vip_price')
-        ? old('vip_price')
-        : ($storedVipPrice === null ? '' : (string) \App\Domain\Money\VndAmount::fromDatabase($storedVipPrice));
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -37,7 +30,7 @@
                         ? $showtime->roomLayout
                         : $room->latestPublishedLayout;
                 @endphp
-                <option value="{{ $room->id }}" data-layout-version="{{ $layout->version }}" @selected($roomValue == $room->id)>
+                <option value="{{ $room->id }}" data-cinema-id="{{ $room->cinema_id }}" data-layout-version="{{ $layout->version }}" data-cleaning-buffer="{{ $room->cleaning_buffer_minutes ?? $room->cinema->default_cleaning_buffer_minutes ?? $cleaningBufferMinutes }}" @selected($roomValue == $room->id)>
                     {{ $room->code }} — {{ $room->name }} (sơ đồ phiên bản {{ $layout->version }})
                 </option>
             @endforeach
@@ -57,16 +50,11 @@
         @error('show_time')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
 
-    <div>
-        <label class="cinema-label" for="price">Giá thường (VNĐ) *</label>
-        <input id="price" type="number" name="price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ $priceValue }}" class="cinema-input">
-        @error('price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
-    </div>
-
-    <div>
-        <label class="cinema-label" for="vip_price">Giá VIP (VNĐ)</label>
-        <input id="vip_price" type="number" name="vip_price" min="0" max="{{ \App\Models\Showtime::MAX_PRICE }}" step="1" value="{{ $vipPriceValue }}" class="cinema-input">
-        @error('vip_price')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
+    <div class="rounded-2xl border app-border p-4 md:col-span-2">
+        <p class="font-bold app-text">Giá vé được tính từ Bảng giá vé</p>
+        <p class="mt-1 text-sm app-muted">Máy chủ áp dụng giá cơ bản và các phụ thu theo chi nhánh, phòng, loại ghế, khung giờ và ngày chiếu. Giá không thể nhập thủ công tại suất chiếu.</p>
+        @if($editing)<p class="mt-2 text-sm text-brand-start">Giá tham chiếu hiện tại: thường {{ number_format((int) $showtime->price, 0, ',', '.') }} VNĐ · VIP {{ number_format((int) $showtime->vip_price, 0, ',', '.') }} VNĐ</p>@endif
+        <p id="showtime-price-preview" class="mt-2 text-sm font-bold text-brand-start" aria-live="polite">Chọn phòng và thời gian để xem giá theo loại ghế.</p>
     </div>
 
     <div>
@@ -88,7 +76,7 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
         <div><span class="app-muted block">Thời lượng phim</span><strong id="preview-runtime" class="app-text">-- phút</strong></div>
         <div><span class="app-muted block">Phim kết thúc</span><strong id="preview-movie-end" class="app-text">--</strong></div>
-        <div><span class="app-muted block">Vệ sinh phòng</span><strong class="app-text">{{ $cleaningBufferMinutes }} phút</strong></div>
+        <div><span class="app-muted block">Vệ sinh phòng</span><strong id="preview-cleaning-buffer" class="app-text">{{ $cleaningBufferMinutes }} phút</strong></div>
         <div><span class="app-muted block">Phòng sẵn sàng</span><strong id="preview-room-ready" class="text-brand-start">--</strong></div>
     </div>
     <p class="text-xs app-muted mt-4">Thời gian kết thúc được máy chủ tính lại từ thời lượng phim và cấu hình vệ sinh; dữ liệu từ trình duyệt không được dùng để xếp lịch.</p>
@@ -98,19 +86,22 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const movie = document.getElementById('movie_id');
+    const room = document.getElementById('room_id');
     const date = document.getElementById('show_date');
     const time = document.getElementById('show_time');
     const preview = document.getElementById('schedule-preview');
     const runtimeOutput = document.getElementById('preview-runtime');
     const movieEndOutput = document.getElementById('preview-movie-end');
     const roomReadyOutput = document.getElementById('preview-room-ready');
+    const cleaningOutput = document.getElementById('preview-cleaning-buffer');
 
     const pad = value => String(value).padStart(2, '0');
     const formatWallClock = value => `${pad(value.getUTCDate())}/${pad(value.getUTCMonth() + 1)}/${value.getUTCFullYear()} ${pad(value.getUTCHours())}:${pad(value.getUTCMinutes())}`;
 
     function refreshSchedulePreview() {
         const runtime = Number(movie.selectedOptions[0]?.dataset.runtime);
-        const buffer = Number(preview.dataset.cleaningBuffer);
+        const buffer = Number(room.selectedOptions[0]?.dataset.cleaningBuffer ?? preview.dataset.cleaningBuffer);
+        cleaningOutput.textContent = Number.isInteger(buffer) ? `${buffer} phút` : '-- phút';
         runtimeOutput.textContent = Number.isInteger(runtime) && runtime > 0 ? `${runtime} phút` : '-- phút';
 
         if (!date.value || !time.value || !Number.isInteger(runtime) || runtime <= 0 || !Number.isInteger(buffer)) {
@@ -129,8 +120,33 @@ document.addEventListener('DOMContentLoaded', () => {
         roomReadyOutput.textContent = formatWallClock(roomReady) + readyNextDay;
     }
 
-    [movie, date, time].forEach(input => input.addEventListener('change', refreshSchedulePreview));
+    let pricingRequest = 0;
+    async function refreshPricePreview() {
+        const option = room.selectedOptions[0];
+        const output = document.getElementById('showtime-price-preview');
+        if (!option?.value || !date.value || !time.value) { output.textContent = 'Chọn phòng và thời gian để xem giá theo loại ghế.'; return; }
+        const requestId = ++pricingRequest;
+        output.textContent = 'Đang tính giá từ máy chủ…';
+        const prices = [];
+        for (const type of ['normal','vip','couple']) {
+            const csrfToken = document.querySelector('input[name="_token"]')?.value
+                ?? document.querySelector('meta[name="csrf-token"]')?.content;
+            if (!csrfToken) { output.textContent = 'Không thể xác thực yêu cầu xem trước giá.'; return; }
+            const body = new FormData(); body.append('_token', csrfToken);
+            body.append('cinema_id', option.dataset.cinemaId); body.append('room_id', option.value);
+            body.append('show_date', date.value); body.append('show_time', time.value); body.append('seat_type', type);
+            const response = await fetch(@json(route('admin.pricing-rules.preview')), {method:'POST',headers:{Accept:'application/json'},body});
+            const data = await response.json();
+            if (requestId !== pricingRequest) return;
+            if (!response.ok) { output.textContent = Object.values(data.errors || {}).flat()[0] || 'Chưa có cấu hình giá phù hợp.'; return; }
+            prices.push(`${type}: ${Number(data.final_amount).toLocaleString('vi-VN')} VNĐ`);
+        }
+        output.textContent = prices.join(' · ');
+    }
+
+    [movie, room, date, time].forEach(input => input.addEventListener('change', () => { refreshSchedulePreview(); refreshPricePreview(); }));
     refreshSchedulePreview();
+    refreshPricePreview();
 });
 </script>
 @endpush

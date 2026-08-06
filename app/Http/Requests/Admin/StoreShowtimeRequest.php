@@ -2,13 +2,8 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Domain\Money\VndAmount;
-use App\Models\Showtime;
-use App\Rules\WholeVndAmount;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use InvalidArgumentException;
-use OverflowException;
 
 class StoreShowtimeRequest extends FormRequest
 {
@@ -24,8 +19,6 @@ class StoreShowtimeRequest extends FormRequest
             'room_id' => ['required', 'integer', 'exists:rooms,id'],
             'show_date' => ['required', 'date_format:Y-m-d'],
             'show_time' => ['required', 'date_format:H:i'],
-            'price' => ['required', new WholeVndAmount('Giá vé thường', Showtime::MAX_PRICE)],
-            'vip_price' => ['nullable', new WholeVndAmount('Giá vé VIP', Showtime::MAX_PRICE)],
             'status' => ['required', Rule::in(['active', 'cancelled', 'finished'])],
         ];
     }
@@ -43,26 +36,8 @@ class StoreShowtimeRequest extends FormRequest
             'show_date.date_format' => 'Ngày chiếu phải đúng định dạng năm-tháng-ngày.',
             'show_time.required' => 'Vui lòng chọn giờ bắt đầu.',
             'show_time.date_format' => 'Giờ bắt đầu phải đúng định dạng giờ:phút.',
-            'price.required' => 'Vui lòng nhập giá vé thường.',
             'status.required' => 'Vui lòng chọn trạng thái suất chiếu.',
             'status.in' => 'Trạng thái suất chiếu không hợp lệ.',
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        foreach (['price', 'vip_price'] as $field) {
-            if (! $this->exists($field) || $this->input($field) === null) {
-                continue;
-            }
-
-            try {
-                $this->merge([
-                    $field => VndAmount::fromInput($this->input($field), Showtime::MAX_PRICE)->value(),
-                ]);
-            } catch (InvalidArgumentException|OverflowException) {
-                // Keep invalid input unchanged so WholeVndAmount returns the field-specific error.
-            }
-        }
     }
 }

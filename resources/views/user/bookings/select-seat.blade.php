@@ -82,7 +82,8 @@
                                             $invalidPair = (bool) ($seatGroup['is_couple'] ?? false)
                                                 && (! (bool) ($seatGroup['is_valid'] ?? false) || ! $isLayoutCoupleValid);
                                             $disabled = $booked || $maintenance || $invalidPair;
-                                            $price = $showtime->priceForSeatType($seatGroup['type'] ?? $seat->type);
+                                            $priceCalculation = $seatPrices[$seatGroup['type'] ?? $seat->type];
+                                            $price = $priceCalculation->finalAmount;
                                             $seatClass = match(true) {
                                                 $booked => 'border-slate-500 bg-slate-600/50 text-slate-300 cursor-not-allowed',
                                                 $maintenance => 'border-dashed border-warning/60 bg-warning/10 text-warning cursor-not-allowed',
@@ -146,6 +147,9 @@
                     <span class="flex items-center gap-2 text-warning"><i class="h-4 w-4 rounded border border-dashed border-warning/60" aria-hidden="true"></i>Bảo trì</span>
                     <span class="flex items-center gap-2"><i class="ph ph-arrows-down-up" aria-hidden="true"></i>Lối đi</span>
                 </div>
+                <details class="mt-4 rounded-xl border app-border p-4 text-sm app-muted"><summary class="cursor-pointer font-bold app-text">Giải thích giá vé</summary>
+                    @foreach($seatPrices as $type => $calculation)<div class="mt-3"><strong class="app-text">{{ $seatTypeLabels[$type] ?? $type }}: {{ number_format($calculation->finalAmount,0,',','.') }} VNĐ</strong><div>Giá cơ bản {{ number_format($calculation->baseAmount,0,',','.') }} VNĐ @foreach($calculation->surcharges as $item) · {{ $item['label'] }} {{ number_format($item['amount'],0,',','.') }} VNĐ @endforeach</div></div>@endforeach
+                </details>
             </section>
 
             <aside class="lg:col-span-1" aria-labelledby="booking-estimate-title">

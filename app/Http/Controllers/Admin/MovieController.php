@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\ShowtimeScheduleException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveMovieRequest;
 use App\Models\Genre;
 use App\Models\Movie;
 use App\Services\MovieImageService;
+use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class MovieController extends Controller
@@ -99,7 +102,7 @@ class MovieController extends Controller
     /**
      * Update the specified movie in storage.
      */
-    public function update(SaveMovieRequest $request, Movie $movie, MovieImageService $images): RedirectResponse
+    public function update(SaveMovieRequest $request, Movie $movie, MovieImageService $images, ShowtimeScheduleService $schedule): RedirectResponse
     {
         $validated = $request->validated();
         $genres = $validated['genres'] ?? [];
@@ -108,6 +111,14 @@ class MovieController extends Controller
         $oldPoster = $movie->poster;
         $oldCover = $movie->cover_image;
         $stored = [];
+
+        if (isset($validated['duration'])) {
+            try {
+                $schedule->assertMovieDurationChangeSafe($movie, (int) $validated['duration']);
+            } catch (ShowtimeScheduleException $exception) {
+                throw ValidationException::withMessages(['duration' => $exception->getMessage()]);
+            }
+        }
 
         try {
             if ($request->hasFile('poster')) {

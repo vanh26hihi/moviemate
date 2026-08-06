@@ -15,4 +15,23 @@
         <section class="app-card rounded-2xl border app-border p-6"><h2 class="text-lg font-bold app-text">Manager và Staff</h2><div class="mt-4 space-y-3">@forelse($cinema->activeAssignments as $assignment)<div class="flex justify-between"><span class="app-text">{{ $assignment->user->name }}</span><span class="text-xs font-bold uppercase text-brand-start">{{ $assignment->user->role?->display_name }}</span></div>@empty<p class="app-muted">Chưa phân công nhân sự.</p>@endforelse</div></section>
     </div>
 </div>
+@can('cinemas.operations.manage')
+<section class="app-card mt-6 rounded-2xl border app-border p-6">
+    <h2 class="text-lg font-bold app-text">Giờ hoạt động</h2>
+    <p class="mt-1 text-sm app-muted">Giờ mở cửa là thời điểm bắt đầu sớm nhất; nhận suất chiếu cuối giới hạn giờ bắt đầu, phim vẫn có thể kết thúc sau nửa đêm.</p>
+    <form method="POST" action="{{ route('admin.cinemas.operating-hours.update', $cinema) }}" class="mt-5 space-y-4">@csrf @method('PATCH')
+        @foreach([1=>'Thứ hai',2=>'Thứ ba',3=>'Thứ tư',4=>'Thứ năm',5=>'Thứ sáu',6=>'Thứ bảy',7=>'Chủ nhật'] as $day => $label)
+            @php($hour = $cinema->operatingHours->firstWhere('day_of_week', $day))
+            <div class="grid items-end gap-3 rounded-xl border app-border p-3 md:grid-cols-4">
+                <div class="font-bold app-text">{{ $label }}<input type="hidden" name="hours[{{ $day }}][day_of_week]" value="{{ $day }}"></div>
+                <label class="text-sm app-muted">Mở cửa<input type="time" name="hours[{{ $day }}][opens_at]" value="{{ old("hours.$day.opens_at", $hour?->opens_at ? substr($hour->opens_at,0,5) : '08:00') }}" class="cinema-input mt-1"></label>
+                <label class="text-sm app-muted">Nhận suất chiếu cuối<input type="time" name="hours[{{ $day }}][latest_show_start_at]" value="{{ old("hours.$day.latest_show_start_at", $hour?->latest_show_start_at ? substr($hour->latest_show_start_at,0,5) : '23:00') }}" class="cinema-input mt-1"></label>
+                <label class="pb-3"><input type="checkbox" name="hours[{{ $day }}][is_closed]" value="1" @checked(old("hours.$day.is_closed", $hour?->is_closed))> Đóng cửa cả ngày</label>
+            </div>
+        @endforeach
+        <div class="max-w-sm"><label class="cinema-label">Vệ sinh phòng mặc định (phút)</label><input type="number" min="0" max="180" name="default_cleaning_buffer_minutes" value="{{ old('default_cleaning_buffer_minutes', $cinema->default_cleaning_buffer_minutes ?? 15) }}" class="cinema-input" required></div>
+        <button class="admin-btn-primary">Cập nhật giờ hoạt động</button>
+    </form>
+</section>
+@endcan
 @endsection

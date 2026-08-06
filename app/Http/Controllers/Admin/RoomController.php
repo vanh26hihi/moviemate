@@ -112,11 +112,17 @@ class RoomController extends Controller
         $this->ensureOperationalNameIsUnique($validated, $room->id, (int) $room->cinema_id);
 
         $beforeStatus = $room->status;
-        DB::transaction(function () use ($room, $validated, $beforeStatus): void {
+        $beforeBuffer = $room->cleaning_buffer_minutes;
+        DB::transaction(function () use ($room, $validated, $beforeStatus, $beforeBuffer): void {
             unset($validated['cinema_id']);
             $room->update($validated);
             if ($beforeStatus !== $room->status) {
                 $this->logStatusChange($room, $beforeStatus);
+            }
+            if ($beforeBuffer !== $room->cleaning_buffer_minutes) {
+                $this->activityLogger->log('room.cleaning_buffer_updated', $room,
+                    ['room_id' => $room->id, 'cleaning_buffer' => $beforeBuffer],
+                    ['room_id' => $room->id, 'cleaning_buffer' => $room->cleaning_buffer_minutes]);
             }
         });
 

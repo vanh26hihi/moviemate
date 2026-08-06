@@ -37,6 +37,8 @@ final class ActivityLogSanitizer
         'seat_type',
         'show_date',
         'show_time',
+        'movie_end_at',
+        'room_available_at',
         'showtime_id',
         'source',
         'action_scope',
@@ -54,6 +56,7 @@ final class ActivityLogSanitizer
         'failure_code',
         'actor_id',
         'vip_price',
+        'cleaning_buffer',
     ];
 
     /** @return array<string, mixed>|null */

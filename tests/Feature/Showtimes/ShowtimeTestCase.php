@@ -3,6 +3,7 @@
 namespace Tests\Feature\Showtimes;
 
 use App\Models\Cinema;
+use App\Models\CinemaPricingRule;
 use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Showtime;
@@ -28,6 +29,18 @@ abstract class ShowtimeTestCase extends TestCase
         config()->set('cinema.showtime_cleaning_buffer_minutes', 15);
         $this->seedRbac();
         $this->cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
+        CinemaPricingRule::query()->create([
+            'name' => 'Giá cơ bản kiểm thử', 'rule_type' => 'base', 'cinema_id' => $this->cinema->id,
+            'amount_vnd' => 80_000, 'priority' => 100, 'status' => 'active',
+        ]);
+        CinemaPricingRule::query()->create([
+            'name' => 'Phụ thu VIP kiểm thử', 'rule_type' => 'seat_type', 'cinema_id' => $this->cinema->id,
+            'seat_type' => 'vip', 'amount_vnd' => 30_000, 'priority' => 100, 'status' => 'active',
+        ]);
+        CinemaPricingRule::query()->create([
+            'name' => 'Phụ thu ghế đôi kiểm thử', 'rule_type' => 'seat_type', 'cinema_id' => $this->cinema->id,
+            'seat_type' => 'couple', 'amount_vnd' => 80_000, 'priority' => 100, 'status' => 'active',
+        ]);
 
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([

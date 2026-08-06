@@ -10,21 +10,26 @@ use InvalidArgumentException;
 
 class BookingPricingService
 {
+    private readonly TicketPricingService $ticketPricing;
+
+    public function __construct(?TicketPricingService $ticketPricing = null)
+    {
+        $this->ticketPricing = $ticketPricing ?? new TicketPricingService;
+    }
+
     public function calculate(Showtime $showtime, Collection $seats): BookingPriceBreakdown
     {
-        $basePrice = VndAmount::fromDatabase($showtime->getRawOriginal('price') ?? $showtime->price);
-        $vipPrice = $showtime->vip_price === null
-            ? $basePrice
-            : VndAmount::fromDatabase($showtime->getRawOriginal('vip_price') ?? $showtime->vip_price);
-
         $snapshots = [];
+        $pricingSnapshots = [];
         $subtotal = VndAmount::zero();
 
         foreach ($seats->reject(fn ($seat) => strtolower((string) $seat->type) === 'couple') as $seat) {
             $seatId = $this->seatId($seat);
-            $price = strtolower((string) $seat->type) === 'vip' ? $vipPrice : $basePrice;
+            $calculation = $this->ticketPricing->calculate($showtime, (string) $seat->type);
+            $price = VndAmount::fromInt($calculation->finalAmount);
             $this->assertUniqueSeat($snapshots, $seatId);
             $snapshots[$seatId] = $price->value();
+            $pricingSnapshots[$seatId] = $this->snapshot($calculation, 'seat:'.$seatId, (string) $seat->seat_code);
             $subtotal = $subtotal->add($price);
         }
 
@@ -38,12 +43,8 @@ class BookingPricingService
                 throw new InvalidArgumentException('A couple pair must contain one left and one right seat.');
             }
 
-            $multiplier = config('booking.couple_price_multiplier', 2);
-            if (! is_int($multiplier) || $multiplier < 1) {
-                throw new InvalidArgumentException('Couple price multiplier must be a positive integer.');
-            }
-
-            $pairTotal = $basePrice->multiply($multiplier);
+            $calculation = $this->ticketPricing->calculate($showtime, 'couple');
+            $pairTotal = VndAmount::fromInt($calculation->finalAmount);
             $leftSnapshot = intdiv($pairTotal->value(), 2);
             $rightSnapshot = $pairTotal->value() - $leftSnapshot;
             $leftId = $this->seatId($positions->get('left'));
@@ -52,12 +53,31 @@ class BookingPricingService
             $this->assertUniqueSeat($snapshots, $rightId);
             $snapshots[$leftId] = $leftSnapshot;
             $snapshots[$rightId] = $rightSnapshot;
+            $unitKey = 'couple:'.$pairCode;
+            $unitLabel = 'Ghế đôi '.$pair->pluck('seat_code')->sort()->implode('/');
+            $pricingSnapshots[$leftId] = $this->snapshot($calculation, $unitKey, $unitLabel);
+            $pricingSnapshots[$rightId] = $this->snapshot($calculation, $unitKey, $unitLabel);
             $subtotal = $subtotal->add($pairTotal);
         }
 
         ksort($snapshots);
+        ksort($pricingSnapshots);
 
-        return BookingPriceBreakdown::forSeats($subtotal->value(), $snapshots);
+        return BookingPriceBreakdown::forSeats($subtotal->value(), $snapshots, $pricingSnapshots);
+    }
+
+    private function snapshot($calculation, string $unitKey, string $unitLabel): array
+    {
+        return [
+            'pricing_unit_key' => $unitKey,
+            'pricing_unit_label' => $unitLabel,
+            'seat_type_snapshot' => $calculation->seatType,
+            'base_amount' => $calculation->baseAmount,
+            'surcharge_total' => $calculation->surchargeTotal,
+            'final_unit_amount' => $calculation->finalAmount,
+            'pricing_breakdown' => $calculation->breakdown(),
+            'pricing_fingerprint' => $calculation->fingerprint,
+        ];
     }
 
     private function seatId(object $seat): int

@@ -140,6 +140,9 @@
             <h2 class="text-xl font-extrabold app-heading">Chi phí xác thực</h2>
             <dl class="mt-4 space-y-3">
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} VNĐ</dd></div>
+                @foreach($booking->bookingSeats->filter(fn($item) => $item->pricing_unit_key)->unique('pricing_unit_key') as $pricedUnit)
+                    <div class="rounded-xl border app-border p-3 text-sm"><div class="flex justify-between gap-3"><dt class="font-semibold app-text">{{ $pricedUnit->pricing_unit_label }}</dt><dd class="font-bold app-text">{{ number_format((int)$pricedUnit->final_unit_amount,0,',','.') }} VNĐ</dd></div><div class="mt-1 app-muted">Giá cơ bản {{ number_format((int)$pricedUnit->base_amount,0,',','.') }} VNĐ · Phụ thu {{ number_format((int)$pricedUnit->surcharge_total,0,',','.') }} VNĐ</div></div>
+                @endforeach
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4 border-t app-border pt-3"><dt class="font-extrabold app-text">Tổng cuối cùng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4"><dt class="app-muted">Khoản thanh toán đã xác minh</dt><dd class="font-bold app-text">{{ $authoritativePayment ? number_format((int) $authoritativePayment->amount, 0, ',', '.').' VNĐ' : 'Chưa có' }}</dd></div>

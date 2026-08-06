@@ -34,7 +34,12 @@ class ShowtimeUpdateTest extends ShowtimeTestCase
             'show_time' => '21:00', 'price' => 95000,
         ]))->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('showtimes', ['id' => $showtime->id, 'show_time' => '21:00:00', 'price' => 95000]);
+        $this->assertDatabaseHas('showtimes', [
+            'id' => $showtime->id,
+            'show_time' => '21:00:00',
+            'price' => 80000,
+            'pricing_version' => 'cinema-pricing-v1',
+        ]);
         $this->assertDatabaseHas('activity_logs', ['action' => 'showtime.updated', 'subject_id' => (string) $showtime->id]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\BookingCheckoutConflictException;
+use App\Exceptions\PricingConfigurationException;
 use App\Models\Booking;
 use App\Models\Seat;
 use App\Models\Showtime;
@@ -112,9 +113,13 @@ class BookingCheckoutService
                     $this->assertNoIsolatedSeat($showtime, $layout, $normalizedSeatIds);
 
                     $foodBreakdown = $this->food->calculate($foodSelection, (int) $showtime->cinema_id);
-                    $priceBreakdown = $this->pricing
-                        ->calculate($showtime, $seats)
-                        ->withFood($foodBreakdown);
+                    try {
+                        $priceBreakdown = $this->pricing
+                            ->calculate($showtime, $seats)
+                            ->withFood($foodBreakdown);
+                    } catch (PricingConfigurationException $exception) {
+                        throw ValidationException::withMessages(['pricing' => $exception->getMessage()]);
+                    }
 
                     $guestToken = $userId === null
                         ? $this->tokens->guestAccessTokenForCheckout($checkoutToken)
@@ -140,7 +145,12 @@ class BookingCheckoutService
                         'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
                     ]);
 
-                    $this->seatLocks->acquire($booking, $seats, $priceBreakdown->seatSnapshots);
+                    $this->seatLocks->acquire(
+                        $booking,
+                        $seats,
+                        $priceBreakdown->seatSnapshots,
+                        $priceBreakdown->seatPricingSnapshots,
+                    );
                     $this->food->persist($foodBreakdown, [
                         'booking_id' => $booking->id,
                     ]);

@@ -10,16 +10,16 @@ use LogicException;
 
 class BookingSeatLockService
 {
-    public function acquire(Booking $booking, Collection $seats, array $priceSnapshots): Collection
+    public function acquire(Booking $booking, Collection $seats, array $priceSnapshots, array $pricingSnapshots = []): Collection
     {
-        return DB::transaction(function () use ($booking, $seats, $priceSnapshots): Collection {
+        return DB::transaction(function () use ($booking, $seats, $priceSnapshots, $pricingSnapshots): Collection {
             $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->getKey());
 
             if (! in_array($lockedBooking->booking_status, ['pending_payment', 'paid'], true)) {
                 throw new LogicException('Chỉ có thể giữ ghế cho đơn đặt vé đang hoạt động.');
             }
 
-            return $seats->sortBy('id')->map(function ($seat) use ($lockedBooking, $priceSnapshots) {
+            return $seats->sortBy('id')->map(function ($seat) use ($lockedBooking, $priceSnapshots, $pricingSnapshots) {
                 if (! array_key_exists($seat->id, $priceSnapshots)) {
                     throw new LogicException('Thiếu giá ghế tại thời điểm đặt vé.');
                 }
@@ -30,6 +30,7 @@ class BookingSeatLockService
                     'seat_id' => $seat->id,
                     'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
                     'price' => $priceSnapshots[$seat->id],
+                    ...($pricingSnapshots[$seat->id] ?? []),
                 ]);
             })->values();
         });

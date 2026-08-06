@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\PricingConfigurationException;
 use App\Exceptions\ShowtimeScheduleException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreShowtimeRequest;
@@ -74,11 +75,13 @@ class ShowtimeController extends Controller
                     after: $this->auditData($showtime),
                 );
             });
-        } catch (ShowtimeScheduleException $exception) {
-            return back()->withErrors([$exception->field => $exception->getMessage()])->withInput();
+        } catch (ShowtimeScheduleException|PricingConfigurationException $exception) {
+            $field = $exception instanceof ShowtimeScheduleException ? $exception->field : 'room_id';
+
+            return back()->withErrors([$field => $exception->getMessage()])->withInput();
         }
 
-        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được tạo thành công.');
+        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được tạo theo bảng giá hiện hành.');
     }
 
     public function edit(Showtime $showtime)
@@ -110,8 +113,10 @@ class ShowtimeController extends Controller
                     $this->auditData($updated),
                 );
             });
-        } catch (ShowtimeScheduleException $exception) {
-            return back()->withErrors([$exception->field => $exception->getMessage()])->withInput();
+        } catch (ShowtimeScheduleException|PricingConfigurationException $exception) {
+            $field = $exception instanceof ShowtimeScheduleException ? $exception->field : 'room_id';
+
+            return back()->withErrors([$field => $exception->getMessage()])->withInput();
         }
 
         return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được cập nhật.');
@@ -160,6 +165,8 @@ class ShowtimeController extends Controller
     /** @return array<string, mixed> */
     private function auditData(Showtime $showtime): array
     {
+        $window = $this->schedule->windowFor($showtime);
+
         return [
             'showtime_id' => $showtime->id,
             'movie_id' => $showtime->movie_id,
@@ -167,6 +174,9 @@ class ShowtimeController extends Controller
             'room_layout_id' => $showtime->room_layout_id,
             'show_date' => $showtime->show_date?->format('Y-m-d'),
             'show_time' => (string) $showtime->show_time,
+            'movie_end_at' => $window->movieEnd->toIso8601String(),
+            'room_available_at' => $window->operationalEnd->toIso8601String(),
+            'cleaning_buffer' => $window->cleaningBufferMinutes,
             'price' => (int) $showtime->price,
             'vip_price' => $showtime->vip_price === null ? null : (int) $showtime->vip_price,
             'status' => $showtime->status,
