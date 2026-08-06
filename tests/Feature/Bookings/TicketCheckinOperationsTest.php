@@ -184,7 +184,7 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
         $this->assertDatabaseMissing('ticket_checkin_events', ['booking_id' => $legacy->id]);
     }
 
-    public function test_ticket_qr_uses_signed_capability_and_used_ticket_has_no_active_qr(): void
+    public function test_ticket_qr_uses_signed_capability_and_used_ticket_remains_readable(): void
     {
         [$owner, $payment] = $this->verifiedOwnerPayment();
         $booking = $payment->booking->fresh();
@@ -196,7 +196,8 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
 
         $booking->forceFill(['booking_status' => 'used', 'used_at' => now()])->save();
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
-            ->assertOk()->assertDontSee('data-qr-value', false);
+            ->assertOk()->assertSee('VÉ ĐÃ ĐƯỢC SỬ DỤNG')
+            ->assertSee('data-qr-value="'.$capability.'"', false);
     }
 
     private function verifiedPayment()

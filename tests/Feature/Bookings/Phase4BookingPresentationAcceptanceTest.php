@@ -8,7 +8,7 @@ use Tests\Feature\Payments\PaymentTestCase;
 
 class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
 {
-    public function test_only_a_paid_booking_with_a_successful_payment_renders_a_usable_qr_and_print_control(): void
+    public function test_only_a_paid_booking_with_a_successful_payment_renders_a_usable_qr_without_customer_print_control(): void
     {
         $this->seedRbac();
         $owner = $this->userWithRole('user');
@@ -30,7 +30,8 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
             ->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertSee('data-qr-value="v1.', false)
-            ->assertSee('data-print-ticket', false);
+            ->assertDontSee('data-print-ticket', false)
+            ->assertDontSee('Lưu PDF');
     }
 
     #[DataProvider('nonUsableBookingStates')]
@@ -61,10 +62,10 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
     public static function nonUsableBookingStates(): array
     {
         return [
-            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'KHÔNG KHẢ DỤNG'],
-            'expired' => ['expired', Payment::STATUS_EXPIRED, 'KHÔNG KHẢ DỤNG'],
-            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'KHÔNG KHẢ DỤNG'],
-            'used' => ['used', Payment::STATUS_SUCCESS, 'KHÔNG KHẢ DỤNG'],
+            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'VÉ KHÔNG CÒN HIỆU LỰC'],
+            'expired' => ['expired', Payment::STATUS_EXPIRED, 'VÉ KHÔNG CÒN HIỆU LỰC'],
+            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'VÉ KHÔNG CÒN HIỆU LỰC'],
+            'used' => ['used', Payment::STATUS_SUCCESS, 'VÉ ĐÃ ĐƯỢC SỬ DỤNG'],
         ];
     }
 }

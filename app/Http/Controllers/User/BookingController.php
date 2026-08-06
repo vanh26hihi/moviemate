@@ -164,6 +164,7 @@ class BookingController extends Controller
             'showtime.room',
             'bookingSeats.seat',
             'foodOrder.items',
+            'acceptedTicketCheckin',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
@@ -191,43 +192,26 @@ class BookingController extends Controller
             'showtime.room',
             'bookingSeats.seat',
             'foodOrder.items',
+            'acceptedTicketCheckin',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
+        $isDeliverable = $this->ticketEligibility->isDeliverable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
-        $checkinCapability = $isUsable ? $this->checkinCapabilities->issue($booking) : null;
+        $checkinCapability = $isDeliverable ? $this->checkinCapabilities->issue($booking) : null;
+        $ticketState = match (true) {
+            $booking->payment_status === 'refunded' => 'refunded',
+            $booking->booking_status === 'cancelled' => 'cancelled',
+            $booking->booking_status === 'expired' => 'expired',
+            $booking->booking_status === 'used' => 'used',
+            $isUsable => 'valid',
+            default => 'invalid',
+        };
 
-        return view('user.bookings.ticket', compact('booking', 'isUsable', 'verifiedPayment', 'checkinCapability'));
-    }
-
-    public function printTicket(Request $request, Booking $booking)
-    {
-        $this->authorizeBookingView($request, $booking);
-
-        $booking->load([
-            'user',
-            'payments',
-            'showtime.movie',
-            'showtime.cinema',
-            'showtime.room',
-            'bookingSeats.seat',
-            'foodOrder.items',
-        ]);
-
-        abort_unless($this->ticketEligibility->isUsable($booking), 404);
-
-        $isUsable = true;
-        $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
-        $checkinCapability = $this->checkinCapabilities->issue($booking);
-        $printMode = true;
-
-        return view('user.bookings.ticket', compact(
-            'booking',
-            'isUsable',
-            'verifiedPayment',
-            'checkinCapability',
-            'printMode',
-        ));
+        return response()->view('user.bookings.ticket', compact(
+            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'checkinCapability', 'ticketState'
+        ))->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache');
     }
 
     private function authorizeBookingView(Request $request, Booking $booking): void

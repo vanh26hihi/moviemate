@@ -8,17 +8,17 @@ use App\Models\Payment;
 use App\Services\ActivityLogger;
 use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\BookingCancellationService;
+use App\Services\CinemaAccessService;
 use App\Services\Payments\PaymentReconciliationService;
 use App\Services\Tickets\BookingTicketEligibility;
-use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketDeliveryOutbox;
+use App\Services\Tickets\TicketPrintService;
 use App\Support\PrivacyMask;
 use App\Support\StatusLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\View\View;
 use Throwable;
 
 final class BookingOperationController extends Controller
@@ -111,28 +111,18 @@ final class BookingOperationController extends Controller
             : 'Đơn đặt vé này không thể hủy ở trạng thái hiện tại.');
     }
 
-    public function print(
+    public function authorizePrintRetry(
+        Request $request,
         Booking $booking,
-        BookingTicketEligibility $eligibility,
-        TicketCheckinCapability $checkinCapabilities,
-    ): View {
-        $booking->load([
-            'user', 'payments', 'showtime.movie', 'showtime.cinema', 'showtime.room',
-            'bookingSeats.seat', 'foodOrder.items',
-        ]);
-        abort_unless($eligibility->isPrintable($booking), 404);
+        CinemaAccessService $cinemas,
+        TicketPrintService $prints,
+    ): RedirectResponse {
+        $validated = $request->validate(['safe_note' => ['nullable', 'string', 'max:300']]);
+        abort_unless($booking->cinema_id, 404);
+        $cinemas->authorizeCinema($request->user(), (int) $booking->cinema_id);
+        $prints->authorizeRetry($booking, $request->user(), $validated['safe_note'] ?? null);
 
-        return view('user.bookings.ticket', [
-            'booking' => $booking,
-            'isUsable' => $eligibility->isUsable($booking),
-            'isPrintable' => true,
-            'verifiedPayment' => $eligibility->verifiedPayment($booking),
-            'printMode' => true,
-            'backUrl' => route('admin.bookings.show', $booking),
-            'backLabel' => 'Về chi tiết đơn',
-            'ticketRecipient' => PrivacyMask::email($booking->recipient_email),
-            'checkinCapability' => $eligibility->isUsable($booking) ? $checkinCapabilities->issue($booking) : null,
-        ]);
+        return back()->with('success', 'Đã cho phép thực hiện thêm một lần in.');
     }
 
     private function assertRateLimit(string $action, Request $request, int $subjectId, int $maxAttempts): void

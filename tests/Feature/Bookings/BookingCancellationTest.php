@@ -213,7 +213,6 @@ class BookingCancellationTest extends TestCase
             ->assertDontSee('action="'.route('user.bookings.cancel', $paid).'"', false)
             ->assertSee(route('user.bookings.pending', $pending), false)
             ->assertSee(route('user.bookings.ticket', $paid), false)
-            ->assertSee(route('user.bookings.ticket.print', $paid), false)
             ->assertSee(route('user.bookings.ticket-email.resend', $paid), false);
 
         $this->actingAs($owner)->get(route('user.bookings.history', ['status' => 'pending']))

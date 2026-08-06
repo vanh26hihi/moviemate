@@ -1,11 +1,11 @@
 import QRCode from 'qrcode';
-import html2canvas from 'html2canvas';
 // Both sides added a distinct entry module: R1 ships the branch-aware calendar and the
 // remote feature branch ships the cinema-finder/showtime filter helpers. They are
 // independent, so the merge keeps both rather than choosing a side.
 import './showtime-calendar';
 import './showtime';
 import './seat-gap-guard';
+import './ticket-scanner';
 
 const THEME_KEY = 'theme';
 const LEGACY_THEME_KEY = 'moviemate_theme';
@@ -452,42 +452,6 @@ async function renderTicketQrCodes() {
         });
     }));
 }
-
-document.addEventListener('click', async (event) => {
-    const printButton = event.target.closest('[data-print-ticket]');
-    if (printButton) {
-        window.print();
-
-        return;
-    }
-
-    const button = event.target.closest('[data-ticket-download]');
-    if (!button) return;
-
-    const target = document.getElementById(button.dataset.ticketDownload);
-    if (!target) return;
-
-    const original = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = '<i class="ph-bold ph-spinner-gap animate-spin"></i> Đang tạo ảnh';
-
-    try {
-        const canvas = await html2canvas(target, {
-            backgroundColor: '#ffffff',
-            scale: Math.min(window.devicePixelRatio || 2, 3),
-            useCORS: true,
-        });
-        const link = document.createElement('a');
-        link.download = button.dataset.ticketFilename || 'moviemate-ticket.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch (error) {
-        window.alert('Không thể tạo ảnh vé. Vui lòng thử lại.');
-    } finally {
-        button.disabled = false;
-        button.innerHTML = original;
-    }
-});
 
 renderTicketQrCodes().catch(() => {
     document.querySelectorAll('[data-qr-fallback]').forEach((element) => element.classList.remove('hidden'));

@@ -33,6 +33,11 @@
                 <p style="margin:10px 0 0;color:#e91e3d;font-family:monospace;font-size:21px;font-weight:bold;letter-spacing:1px">{{ $booking->booking_code }}</p>
             </div>
 
+            <div style="margin-bottom:22px;text-align:center">
+                <img src="{{ $message->embedData($ticketQrSvg, 'moviemate-ticket-qr.svg', 'image/svg+xml') }}" width="220" height="220" alt="Mã QR vé MovieMate" style="display:block;margin:0 auto;max-width:220px;width:100%;height:auto">
+                <p style="margin:8px 0 0;color:#6b7280;font-size:12px">Đưa mã QR này cho nhân viên tại quầy soát vé.</p>
+            </div>
+
             <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px">
                 @foreach([
                     'Phim' => $booking->showtime?->movie?->title,
@@ -68,7 +73,7 @@
             </table>
 
             <p style="margin:24px 0 0;text-align:center">
-                <a href="{{ $ticketAccessUrl }}" style="display:inline-block;padding:13px 22px;border-radius:10px;background:#e91e3d;color:#ffffff;text-decoration:none;font-weight:bold">Xem / In vé an toàn</a>
+                <a href="{{ $ticketAccessUrl }}" style="display:inline-block;padding:13px 22px;border-radius:10px;background:#e91e3d;color:#ffffff;text-decoration:none;font-weight:bold">Xem vé điện tử</a>
             </p>
             <p style="margin:20px 0 0;color:#4b5563;font-size:13px;line-height:1.65">Vui lòng mở vé và đưa mã QR cho nhân viên soát vé. Nên đến rạp trước giờ chiếu 15 phút. Nếu nút không mở được, hãy sử dụng liên kết trong email này trên cùng thiết bị và trình duyệt.</p>
             <p style="margin:12px 0 0;color:#6b7280;font-size:12px;line-height:1.55">MovieMate không bao giờ yêu cầu bạn gửi lại mật khẩu, mã thanh toán hoặc thông tin ngân hàng qua email. Cần hỗ trợ, vui lòng liên hệ quầy MovieMate tại rạp.</p>

@@ -37,6 +37,7 @@ final class AdminBookingQuery
                 'bookingSeats:id,booking_id,seat_id,price',
                 'bookingSeats.seat:id,seat_code,type,pair_code,pair_position,row,number,x_position,y_position',
                 'ticketDelivery:id,booking_id,status,attempts,sent_at',
+                'ticketPrint:id,booking_id,status,attempts_count,printed_by_user_id,printed_at',
                 'authoritativePayment' => fn ($query) => $query->select([
                     'payments.id', 'payments.booking_id', 'payments.provider', 'payments.amount',
                     'payments.status', 'payments.verified_at', 'payments.paid_at',

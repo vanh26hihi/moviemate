@@ -4,6 +4,7 @@ namespace App\Services\Admin;
 
 use App\Models\ActivityLog;
 use App\Models\Booking;
+use App\Models\BookingTicketPrintEvent;
 use App\Models\Payment;
 use App\Models\TicketCheckinEvent;
 use App\Services\BookingCancellationService;
@@ -30,6 +31,9 @@ final class AdminBookingDetailService
             'bookingSeats.seat',
             'foodOrder.items.food:id,name',
             'ticketDelivery',
+            'ticketPrint.printedBy:id,name',
+            'ticketPrint.lastFailedBy:id,name',
+            'ticketPrint.retryAuthorizedBy:id,name',
         ]);
 
         $payments = $booking->payments()->latest('id')->limit(100)->get();
@@ -71,6 +75,12 @@ final class AdminBookingDetailService
             $rejectedCount = (int) ($counts?->rejected_count ?? 0);
         }
 
+        $printState = $booking->ticketPrint;
+        $printEvents = $printState
+            ? BookingTicketPrintEvent::query()->with('actor:id,name')
+                ->where('booking_id', $booking->id)->latest('id')->limit(20)->get()
+            : collect();
+
         return [
             'booking' => $booking,
             'customer' => [
@@ -87,7 +97,9 @@ final class AdminBookingDetailService
             'activities' => $activities,
             'includeActivity' => $includeActivity,
             'cancellable' => $this->cancellations->isCancellable($booking),
-            'ticketEligible' => $this->ticketEligibility->isPrintable($booking),
+            'ticketEligible' => $this->ticketEligibility->isUsable($booking),
+            'printState' => $printState,
+            'printEvents' => $printEvents,
             'checkins' => $checkins,
             'acceptedCheckin' => $acceptedCheckin,
             'duplicateCheckinCount' => $duplicateCount,

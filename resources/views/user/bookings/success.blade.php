@@ -129,9 +129,6 @@
                             <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary" data-paid-ticket-link>
                                 <i class="ph-fill ph-ticket" aria-hidden="true"></i> Xem vé
                             </a>
-                            <a href="{{ route('user.bookings.ticket.print', $booking) }}" class="btn-secondary" data-paid-ticket-print-link>
-                                <i class="ph-bold ph-printer" aria-hidden="true"></i> In vé
-                            </a>
                             <a href="{{ $myTicketsUrl }}" class="btn-secondary">
                                 <i class="ph-bold ph-ticket" aria-hidden="true"></i> Về vé của tôi
                             </a>

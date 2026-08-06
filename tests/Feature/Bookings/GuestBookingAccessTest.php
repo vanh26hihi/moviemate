@@ -74,7 +74,7 @@ class GuestBookingAccessTest extends TestCase
             ->assertSee('không có mã QR sử dụng được');
     }
 
-    public function test_used_booking_is_history_without_a_usable_qr_or_download(): void
+    public function test_used_booking_without_verified_payment_is_history_without_a_usable_qr(): void
     {
         [$booking, $rawToken] = $this->guestBooking();
         $booking->forceFill([
@@ -89,7 +89,7 @@ class GuestBookingAccessTest extends TestCase
             ->assertOk()
             ->assertDontSee('data-qr-value', false)
             ->assertDontSee('data-print-ticket', false)
-            ->assertSee('KHÔNG KHẢ DỤNG');
+            ->assertSee('VÉ ĐÃ ĐƯỢC SỬ DỤNG');
     }
 
     public function test_token_for_one_guest_booking_cannot_open_another_booking(): void
