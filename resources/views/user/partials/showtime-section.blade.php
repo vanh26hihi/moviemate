@@ -41,7 +41,7 @@
                             <article class="rounded-3xl border app-border app-secondary p-5"><h3 class="text-lg font-extrabold app-text">{{ $movie->title }}</h3><p class="app-muted text-sm mt-1">{{ $movie->genres->pluck('name')->join(', ') }}</p>
                                 <div class="mt-4 flex flex-wrap gap-2">@foreach($row['showtimes'] as $showtime)
                                     @if($isPast($showtime))<span class="px-4 py-3 rounded-xl border app-border app-muted opacity-60">{{ $safeTime($showtime->show_time) }} · Đã qua</span>
-                                    @else<a href="{{ route('user.bookings.selectSeat', $showtime) }}" class="px-4 py-3 rounded-xl border border-brand-start/35 text-brand-start font-extrabold hover:bg-brand-start hover:text-white">{{ $safeTime($showtime->show_time) }} · {{ $showtime->room->name }}</a>@endif
+                                    @else<a href="{{ route('user.bookings.selectSeat', ['showtime' => $showtime, 'cinema_id' => $showtime->cinema_id]) }}" class="px-4 py-3 rounded-xl border border-brand-start/35 text-brand-start font-extrabold hover:bg-brand-start hover:text-white">{{ $safeTime($showtime->show_time) }} · {{ $showtime->room->name }} · {{ $showtime->cinema->name }}</a>@endif
                                 @endforeach</div>
                             </article>
                         @endforeach

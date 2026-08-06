@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureAdminCinemaScope;
 use App\Http\Middleware\EnsureTrustedHost;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\RequirePermission;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureUserIsActive::class,
             'role' => RequireRole::class,
             'permission' => RequirePermission::class,
+            'admin.cinema.scope' => EnsureAdminCinemaScope::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

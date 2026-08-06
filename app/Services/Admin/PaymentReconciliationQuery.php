@@ -3,6 +3,7 @@
 namespace App\Services\Admin;
 
 use App\Models\Payment;
+use App\Services\CinemaAccessService;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,7 +12,10 @@ final class PaymentReconciliationQuery
 {
     private const CACHE_KEY = 'admin:payment-reconciliation:badge:v1';
 
-    public function __construct(private readonly CacheRepository $cache) {}
+    public function __construct(
+        private readonly CacheRepository $cache,
+        private readonly CinemaAccessService $cinemaAccess,
+    ) {}
 
     public function paginate(int $perPage = 25): LengthAwarePaginator
     {
@@ -29,9 +33,7 @@ final class PaymentReconciliationQuery
 
     public function badgeLabel(): ?string
     {
-        $count = app()->environment('testing')
-            ? $this->attentionQuery()->count()
-            : $this->cache->remember(self::CACHE_KEY, now()->addMinute(), fn () => $this->attentionQuery()->count());
+        $count = $this->attentionQuery()->count();
 
         return $count === 0 ? null : ($count > 99 ? '99+' : (string) $count);
     }
@@ -45,7 +47,7 @@ final class PaymentReconciliationQuery
     {
         $stale = now()->subMinutes(15);
 
-        return Payment::query()
+        $query = Payment::query()
             ->join('bookings', 'bookings.id', '=', 'payments.booking_id')
             ->where(function (Builder $query) use ($stale): void {
                 $query->whereColumn('payments.amount', '!=', 'bookings.total_amount')
@@ -69,6 +71,13 @@ final class PaymentReconciliationQuery
                             });
                     });
             });
+        // Console commands and queued work run without an authenticated actor. Those callers
+        // are already trusted and must see every branch, so only scope real HTTP actors.
+        if ($actor = auth()->user()) {
+            $this->cinemaAccess->scope($query, $actor, 'bookings.cinema_id');
+        }
+
+        return $query;
     }
 
     private function prioritySql(): string

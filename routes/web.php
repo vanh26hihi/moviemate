@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\BookingOperationController as AdminBookingOperationController;
+use App\Http\Controllers\Admin\CinemaContextController as AdminCinemaContextController;
 use App\Http\Controllers\Admin\CinemaController as AdminCinemaController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FoodController as AdminFoodController;
@@ -19,9 +20,11 @@ use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenance
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\TicketCheckinController as AdminTicketCheckinController;
 use App\Http\Controllers\Admin\TicketDeliveryController as AdminTicketDeliveryController;
+use App\Http\Controllers\Admin\UserCinemaAssignmentController as AdminUserCinemaAssignmentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\CinemaContextController;
 use App\Http\Controllers\Payments\PaymentInitiationController;
 use App\Http\Controllers\Payments\VnpayIpnController;
 use App\Http\Controllers\Payments\VnpayReturnController;
@@ -50,6 +53,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::post('/cinema-context', CinemaContextController::class)->name('cinema-context.update');
 
 Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
     ->middleware('throttle:120,1')
@@ -213,7 +217,7 @@ Route::get('/foods/success/{order}', [UserOrderController::class, 'retired'])
     ->name('foods.success');
 
 Route::prefix('admin')->name('admin.')
-    ->middleware(['auth', 'active', 'permission:admin.access'])
+    ->middleware(['auth', 'active', 'permission:admin.access', 'admin.cinema.scope'])
     ->group(function () {
         Route::get('/', AdminDashboardController::class)
             ->middleware('permission:dashboard.view')->name('dashboard');
@@ -260,12 +264,15 @@ Route::prefix('admin')->name('admin.')
             ->middlewareFor(['edit', 'update'], 'permission:genres.update')
             ->middlewareFor('destroy', 'permission:genres.delete');
 
-        Route::get('/cinema', [AdminCinemaController::class, 'show'])
+        Route::post('/cinema-context', AdminCinemaContextController::class)
+            ->middleware('permission:cinemas.view')->name('cinema-context.update');
+        Route::get('/cinema', [AdminCinemaController::class, 'legacyShow'])
             ->middleware('permission:cinema.view')->name('cinema.show');
-        Route::patch('/cinema', [AdminCinemaController::class, 'update'])
+        Route::patch('/cinema', [AdminCinemaController::class, 'legacyUpdate'])
             ->middleware('permission:cinema.update')->name('cinema.update');
-        Route::get('/cinemas', fn () => redirect()->route('admin.cinema.show'))
-            ->middleware('permission:cinema.view')->name('cinemas.index');
+        Route::resource('cinemas', AdminCinemaController::class)->except(['destroy'])
+            ->middlewareFor(['index', 'show'], 'permission:cinemas.view')
+            ->middlewareFor(['create', 'store', 'edit', 'update'], 'permission:cinemas.manage');
 
         Route::patch('/rooms/{room}/status', [AdminRoomController::class, 'updateStatus'])
             ->middleware('permission:rooms.update')->name('rooms.status.update');
@@ -358,6 +365,11 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:users.manage-role')->name('users.role.update');
         Route::patch('/users/{user}/status', [AdminUserController::class, 'updateStatus'])
             ->middleware('permission:users.manage-status')->name('users.status.update');
+        Route::post('/users/{user}/cinema-assignments', [AdminUserCinemaAssignmentController::class, 'store'])
+            ->middleware('permission:cinema_assignments.manage')->name('users.cinema-assignments.store');
+        Route::delete('/users/{user}/cinema-assignments/{assignment}', [AdminUserCinemaAssignmentController::class, 'destroy'])
+            ->middleware('permission:cinema_assignments.manage')
+            ->name('users.cinema-assignments.destroy');
 
         Route::get('/roles', [AdminRoleController::class, 'index'])
             ->middleware('permission:roles.view')->name('roles.index');

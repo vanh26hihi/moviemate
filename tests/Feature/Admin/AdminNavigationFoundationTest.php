@@ -103,7 +103,9 @@ class AdminNavigationFoundationTest extends TestCase
         );
 
         $this->assertStringNotContainsString('admin.activity-logs.index', $managerNavigation);
-        $this->assertStringNotContainsString('admin.users.index', $managerNavigation);
+        // Multi-cinema gives Manager scoped 'users.view' so it can manage branch Staff
+        // assignments. The list itself stays scoped to assigned branches by UserController.
+        $this->assertStringContainsString('admin.users.index', $managerNavigation);
         $this->assertStringNotContainsString('admin.roles.index', $managerNavigation);
         $this->assertStringContainsString('admin.bookings.index', $managerNavigation);
         $this->assertStringContainsString('admin.payments.index', $managerNavigation);

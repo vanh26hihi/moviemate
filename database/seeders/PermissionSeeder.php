@@ -8,6 +8,10 @@ use Illuminate\Database\Seeder;
 class PermissionSeeder extends Seeder
 {
     public const PERMISSIONS = [
+        'cinemas.view' => 'Xem danh sách chi nhánh',
+        'cinemas.manage' => 'Quản lý chi nhánh',
+        'cinema_assignments.view' => 'Xem phân công chi nhánh',
+        'cinema_assignments.manage' => 'Quản lý phân công chi nhánh',
         'admin.access' => 'Truy cập khu vực quản trị',
         'dashboard.view' => 'Xem tổng quan',
         'cinema.view' => 'Xem rạp',

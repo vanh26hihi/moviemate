@@ -97,16 +97,16 @@ class UserManagementTest extends TestCase
         }
     }
 
-    public function test_manager_permission_editor_rejects_user_management_permissions(): void
+    public function test_manager_permission_editor_allows_staff_visibility_but_rejects_global_role_management(): void
     {
         $admin = $this->userWithRole('admin');
         $managerRole = Role::query()->where('slug', 'manager')->firstOrFail();
 
         $this->actingAs($admin)
-            ->patch(route('admin.roles.permissions.update', $managerRole), ['permissions' => ['users.view']])
+            ->patch(route('admin.roles.permissions.update', $managerRole), ['permissions' => ['users.manage-role']])
             ->assertSessionHasErrors('permissions.0');
 
-        $this->assertFalse($managerRole->fresh()->hasPermission('users.view'));
+        $this->assertFalse($managerRole->fresh()->hasPermission('users.manage-role'));
         $this->assertDatabaseCount('activity_logs', 0);
     }
 

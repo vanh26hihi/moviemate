@@ -22,6 +22,9 @@ class DatabaseSeeder extends Seeder
             CinemaSeeder::class,
             RoomSeeder::class,
             MovieSeeder::class,
+            DemoCinemaLayoutSeeder::class,
+            ShowtimeSeeder::class,
+            DemoUserSeeder::class,
             FoodItemSeeder::class,
         ]);
     }

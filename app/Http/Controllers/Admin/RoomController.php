@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveRoomRequest;
+use App\Models\Cinema;
 use App\Models\Room;
 use App\Services\ActivityLogger;
-use App\Services\CinemaContext;
+use App\Services\CinemaAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ use Illuminate\View\View;
 class RoomController extends Controller
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
+        private readonly CinemaAccessService $cinemaAccess,
         private readonly ActivityLogger $activityLogger,
     ) {}
 
@@ -28,13 +29,14 @@ class RoomController extends Controller
         $status = (string) $request->query('status', '');
         $roomType = (string) $request->query('room_type', '');
 
-        $rooms = Room::query()
+        $query = Room::query()
             ->with(['cinema', 'latestPublishedLayout.cells.seat', 'draftLayout'])
             ->withCount([
                 'showtimes',
                 'showtimes as upcoming_showtimes_count' => fn (Builder $query) => $this->futureActiveShowtimes($query),
-            ])
-            ->where('cinema_id', $this->cinemaContext->id())
+            ]);
+        $this->cinemaAccess->scope($query, $request->user(), 'rooms.cinema_id');
+        $rooms = $query
             ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%");
@@ -50,20 +52,22 @@ class RoomController extends Controller
 
     public function create(): View
     {
-        $cinema = $this->cinemaContext->current();
+        $cinema = $this->cinemaAccess->currentCinema(auth()->user());
+        $cinemas = $this->cinemaAccess->accessibleCinemas(auth()->user());
 
-        return view('admin.rooms.create', compact('cinema'));
+        return view('admin.rooms.create', compact('cinema', 'cinemas'));
     }
 
     public function store(SaveRoomRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $this->ensureOperationalNameIsUnique($validated);
+        $cinemaId = $this->targetCinemaId($request, $validated);
+        $this->ensureOperationalNameIsUnique($validated, cinemaId: $cinemaId);
 
         $room = Room::query()->create([
             ...$validated,
             'total_seats' => 0,
-            'cinema_id' => $this->cinemaContext->id(),
+            'cinema_id' => $cinemaId,
         ]);
 
         if ($room->status === 'active') {
@@ -94,9 +98,10 @@ class RoomController extends Controller
     public function edit(Room $room): View
     {
         $this->assertManagedRoom($room);
-        $cinema = $this->cinemaContext->current();
+        $cinema = $room->cinema;
+        $cinemas = collect([$cinema]);
 
-        return view('admin.rooms.edit', compact('room', 'cinema'));
+        return view('admin.rooms.edit', compact('room', 'cinema', 'cinemas'));
     }
 
     public function update(SaveRoomRequest $request, Room $room): RedirectResponse
@@ -104,11 +109,12 @@ class RoomController extends Controller
         $this->assertManagedRoom($room);
         $validated = $request->validated();
         $this->ensureStatusTransitionIsSafe($room, $validated['status']);
-        $this->ensureOperationalNameIsUnique($validated, $room->id);
+        $this->ensureOperationalNameIsUnique($validated, $room->id, (int) $room->cinema_id);
 
         $beforeStatus = $room->status;
         DB::transaction(function () use ($room, $validated, $beforeStatus): void {
-            $room->update([...$validated, 'cinema_id' => $this->cinemaContext->id()]);
+            unset($validated['cinema_id']);
+            $room->update($validated);
             if ($beforeStatus !== $room->status) {
                 $this->logStatusChange($room, $beforeStatus);
             }
@@ -128,7 +134,7 @@ class RoomController extends Controller
         $this->ensureOperationalNameIsUnique([
             'name' => $room->name,
             'status' => $validated['status'],
-        ], $room->id);
+        ], $room->id, (int) $room->cinema_id);
 
         $beforeStatus = $room->status;
         DB::transaction(function () use ($room, $validated, $beforeStatus): void {
@@ -165,7 +171,7 @@ class RoomController extends Controller
 
     private function assertManagedRoom(Room $room): void
     {
-        abort_unless($room->cinema_id === $this->cinemaContext->id(), 404);
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $room->cinema_id);
     }
 
     private function logStatusChange(Room $room, string $beforeStatus): void
@@ -207,14 +213,15 @@ class RoomController extends Controller
     }
 
     /** @param array{name: string, status: string} $data */
-    private function ensureOperationalNameIsUnique(array $data, ?int $exceptId = null): void
+    private function ensureOperationalNameIsUnique(array $data, ?int $exceptId = null, ?int $cinemaId = null): void
     {
         if ($data['status'] !== 'active') {
             return;
         }
 
         $normalizedName = mb_strtolower(trim($data['name']));
-        $exists = Room::query()->where('cinema_id', $this->cinemaContext->id())
+        $cinemaId ??= $this->cinemaAccess->currentCinemaId(auth()->user());
+        $exists = Room::query()->where('cinema_id', $cinemaId)
             ->where('status', 'active')
             ->when($exceptId, fn (Builder $query) => $query->whereKeyNot($exceptId))
             ->pluck('name')->contains(fn ($name) => mb_strtolower(trim($name)) === $normalizedName);
@@ -224,5 +231,15 @@ class RoomController extends Controller
                 'name' => 'Tên phòng đang hoạt động không được trùng trong cùng cơ sở.',
             ]);
         }
+    }
+
+    private function targetCinemaId(Request $request, array $validated): int
+    {
+        $cinemaId = $this->cinemaAccess->currentCinemaId($request->user())
+            ?? (isset($validated['cinema_id']) ? (int) $validated['cinema_id'] : null)
+            ?? Cinema::query()->active()->primary()->value('id');
+        abort_unless($cinemaId && $this->cinemaAccess->canAccessCinema($request->user(), $cinemaId), 403);
+
+        return (int) $cinemaId;
     }
 }

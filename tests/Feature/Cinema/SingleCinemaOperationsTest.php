@@ -40,7 +40,7 @@ class SingleCinemaOperationsTest extends TestCase
         $this->assertSame(1, Cinema::query()->primary()->active()->count());
     }
 
-    public function test_cinema_routes_are_singleton_and_fixed_fields_ignore_tampering(): void
+    public function test_legacy_cinema_route_still_ignores_tampering_of_fixed_identity_fields(): void
     {
         $manager = $this->userWithRole('manager');
         $cinema = app(CinemaContext::class)->current();
@@ -57,7 +57,7 @@ class SingleCinemaOperationsTest extends TestCase
             'longitude' => 0,
             'is_primary' => false,
             'status' => 'inactive',
-        ])->assertRedirect(route('admin.cinema.show'));
+        ])->assertRedirect(route('admin.cinemas.show', $cinema));
 
         $cinema->refresh();
         $this->assertSame('MovieMate Cinema – FPT Polytechnic', $cinema->name);
@@ -69,8 +69,10 @@ class SingleCinemaOperationsTest extends TestCase
         $this->assertSame('active', $cinema->status);
         $this->assertSame('0123456789', $cinema->phone);
 
-        $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.create'));
-        $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.store'));
+        // Multi-cinema intentionally introduces branch CRUD for global Admin, but a branch
+        // must never be hard-deleted; deactivation preserves historical bookings.
+        $this->assertTrue(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.create'));
+        $this->assertTrue(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.store'));
         $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.destroy'));
     }
 
@@ -156,9 +158,12 @@ class SingleCinemaOperationsTest extends TestCase
         $this->actingAs($manager)->post(route('admin.showtimes.store'), [
             ...$payload, 'room_id' => $archived->id,
         ])->assertSessionHasErrors('room_id');
+        // Under multi-cinema a room from another branch is refused by the branch scope before
+        // validation runs, so the caller gets 404 instead of a field error. Either way the
+        // showtime is never created.
         $this->actingAs($manager)->post(route('admin.showtimes.store'), [
             ...$payload, 'room_id' => $legacyRoom->id,
-        ])->assertSessionHasErrors('room_id');
+        ])->assertNotFound();
         $this->actingAs($manager)->get(route('admin.rooms.edit', $archived))->assertOk();
         $this->actingAs($manager)->get(route('admin.seats.manage', $archived))->assertNotFound();
 
@@ -191,17 +196,20 @@ class SingleCinemaOperationsTest extends TestCase
         $this->assertDatabaseCount('bookings', 0);
     }
 
-    public function test_public_ui_has_no_cinema_selector_and_standalone_food_checkout_is_retired(): void
+    public function test_public_branch_selector_lists_only_active_branches_and_standalone_food_checkout_is_retired(): void
     {
         $canonical = app(CinemaContext::class)->current();
         $legacy = Cinema::factory()->legacy()->create();
         $food = FoodItem::query()->create(['name' => 'Bắp rang', 'price' => 50000, 'active' => true]);
 
+        // Multi-cinema restores a customer branch selector. It must offer active branches
+        // only, so an inactive legacy branch stays unreachable from the public UI.
         $this->get(route('home'))
             ->assertOk()
             ->assertSee($canonical->name)
             ->assertSee($canonical->address)
-            ->assertDontSee('name="cinema_id"', false);
+            ->assertSee('name="cinema_id"', false)
+            ->assertDontSee('value="'.$legacy->id.'"', false);
 
         $this->withSession(['food_cart' => [$food->id => 2]])
             ->get(route('foods.checkout'))

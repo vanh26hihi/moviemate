@@ -13,7 +13,8 @@ class Role extends Model
 
     public const MANAGER_PERMISSION_SLUGS = [
         'admin.access', 'dashboard.view',
-        'cinema.view', 'cinema.update',
+        'cinema.view', 'cinema.update', 'cinemas.view',
+        'cinema_assignments.view', 'cinema_assignments.manage', 'users.view',
         'rooms.view', 'rooms.create', 'rooms.update', 'rooms.delete',
         'seats.view', 'seats.manage',
         'movies.view', 'movies.create', 'movies.update', 'movies.delete',

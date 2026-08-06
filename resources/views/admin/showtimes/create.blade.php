@@ -7,7 +7,7 @@
 <div class="max-w-5xl">
     <div class="cinema-card p-6 sm:p-8">
         <h1 class="text-2xl font-extrabold app-text mb-2">Thông tin suất chiếu</h1>
-        <p class="app-muted mb-6">Cơ sở cố định: {{ $cinema->name }}</p>
+        <p class="app-muted mb-6">Chi nhánh: {{ $cinema?->name ?? 'Toàn hệ thống — chọn phòng để xác định chi nhánh' }}</p>
 
         <form method="POST" action="{{ route('admin.showtimes.store') }}" class="space-y-6">
             @csrf

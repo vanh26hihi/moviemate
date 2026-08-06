@@ -14,6 +14,8 @@ class CinemaFactory extends Factory
     public function definition(): array
     {
         return [
+            'code' => fake()->unique()->bothify('TST-###'),
+            'timezone' => 'Asia/Ho_Chi_Minh',
             'name' => fake()->company().' Cinema',
             'address' => fake()->streetAddress(),
             'city' => fake()->city(),
@@ -29,6 +31,8 @@ class CinemaFactory extends Factory
     {
         return $this->state(fn () => [
             'canonical_key' => CinemaContext::CANONICAL_KEY,
+            'code' => 'CG',
+            'timezone' => 'Asia/Ho_Chi_Minh',
             'name' => 'MovieMate Cinema – FPT Polytechnic',
             'school_name' => CinemaContext::SCHOOL_NAME,
             'address' => CinemaContext::ADDRESS,

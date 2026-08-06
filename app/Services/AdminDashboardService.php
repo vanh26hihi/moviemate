@@ -9,12 +9,15 @@ use App\Models\Movie;
 use App\Models\Payment;
 use App\Models\Showtime;
 use App\Models\User;
+use App\Models\UserCinemaAssignment;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
 final class AdminDashboardService
 {
+    public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
+
     private const REVENUE_BOOKING_STATUSES = ['paid', 'used'];
 
     /** @return array<string, mixed> */
@@ -36,20 +39,17 @@ final class AdminDashboardService
             'metrics' => [
                 'totalRevenue' => $this->vnd($this->recognizedBookings()->sum('bookings.total_amount')),
                 'ticketsSold' => $this->ticketsSold(),
-                'users' => User::query()->count(),
+                'users' => $this->visibleUserCount(),
                 'nowShowingMovies' => Movie::query()->where('status', 'now_showing')->count(),
-                'showtimesToday' => Showtime::query()
+                'showtimesToday' => tap(Showtime::query(), fn (Builder $query) => $this->scope($query, 'showtimes.cinema_id'))
                     ->whereDate('show_date', $today->toDateString())
                     ->where('status', 'active')
-                    ->whereHas('cinema', fn (Builder $query): Builder => $query
-                        ->active()
-                        ->primary()
-                        ->where('canonical_key', CinemaContext::CANONICAL_KEY))
+                    ->whereHas('cinema', fn (Builder $query): Builder => $query->active())
                     ->whereHas('room', fn (Builder $query): Builder => $query->operational())
                     ->count(),
             ],
             'operations' => [
-                'pendingBookings' => Booking::query()
+                'pendingBookings' => tap(Booking::query(), fn (Builder $query) => $this->scope($query, 'bookings.cinema_id'))
                     ->where('booking_status', 'pending_payment')
                     ->where('payment_status', 'unpaid')
                     ->where(function (Builder $query) use ($generatedAt): void {
@@ -69,12 +69,15 @@ final class AdminDashboardService
 
     private function recognizedBookings(): Builder
     {
-        return Booking::query()
+        $query = Booking::query()
             ->joinSub($this->firstSuccessfulPayments(), 'first_successful_payments', function ($join): void {
                 $join->on('first_successful_payments.booking_id', '=', 'bookings.id');
             })
             ->where('bookings.payment_status', 'paid')
             ->whereIn('bookings.booking_status', self::REVENUE_BOOKING_STATUSES);
+        $this->scope($query, 'bookings.cinema_id');
+
+        return $query;
     }
 
     private function firstSuccessfulPayments(): Builder
@@ -176,17 +179,21 @@ final class AdminDashboardService
 
     private function recentBookings(): EloquentCollection
     {
-        return Booking::query()
+        $query = Booking::query()
             ->select([
                 'id',
                 'user_id',
                 'showtime_id',
+                'cinema_id',
                 'booking_code',
                 'total_amount',
                 'payment_status',
                 'booking_status',
                 'created_at',
-            ])
+            ]);
+        $this->scope($query, 'bookings.cinema_id');
+
+        return $query
             ->with([
                 'user:id,name',
                 'showtime:id,movie_id,cinema_id,room_id,show_date,show_time',
@@ -197,6 +204,28 @@ final class AdminDashboardService
             ->latest('id')
             ->limit(6)
             ->get();
+    }
+
+    private function visibleUserCount(): int
+    {
+        $user = auth()->user();
+        if (! $user) {
+            return User::query()->count();
+        }
+        $cinemaId = $this->cinemaAccess->currentCinemaId($user);
+        if ($cinemaId === null) {
+            return $this->cinemaAccess->hasGlobalAccess(auth()->user()) ? User::query()->count() : 0;
+        }
+
+        return UserCinemaAssignment::query()->where('cinema_id', $cinemaId)
+            ->where('status', UserCinemaAssignment::STATUS_ACTIVE)->distinct()->count('user_id');
+    }
+
+    private function scope(Builder $query, string $column): void
+    {
+        if ($user = auth()->user()) {
+            $this->cinemaAccess->scope($query, $user, $column);
+        }
     }
 
     private function weekdayLabel(CarbonImmutable $day): string

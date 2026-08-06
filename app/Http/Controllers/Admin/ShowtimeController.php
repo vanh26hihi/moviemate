@@ -10,7 +10,7 @@ use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\ActivityLogger;
-use App\Services\CinemaContext;
+use App\Services\CinemaAccessService;
 use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,15 +18,15 @@ use Illuminate\Support\Facades\DB;
 class ShowtimeController extends Controller
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
+        private readonly CinemaAccessService $cinemaAccess,
         private readonly ShowtimeScheduleService $schedule,
         private readonly ActivityLogger $activityLogger,
     ) {}
 
     public function index(Request $request)
     {
-        $query = Showtime::query()->with(['movie', 'cinema', 'room', 'roomLayout'])
-            ->where('cinema_id', $this->cinemaContext->id());
+        $query = Showtime::query()->with(['movie', 'cinema', 'room', 'roomLayout']);
+        $this->cinemaAccess->scope($query, $request->user(), 'showtimes.cinema_id');
 
         foreach (['movie_id', 'status'] as $filter) {
             if ($value = $request->query($filter)) {
@@ -63,6 +63,8 @@ class ShowtimeController extends Controller
 
     public function store(StoreShowtimeRequest $request)
     {
+        $room = Room::query()->findOrFail($request->validated('room_id'));
+        $this->cinemaAccess->authorizeCinema($request->user(), (int) $room->cinema_id);
         try {
             DB::transaction(function () use ($request): void {
                 $showtime = $this->schedule->schedule($request->validated());
@@ -82,7 +84,7 @@ class ShowtimeController extends Controller
     public function edit(Showtime $showtime)
     {
         $this->assertOperationalShowtime($showtime);
-        $showtime->loadMissing(['movie', 'roomLayout']);
+        $showtime->loadMissing(['movie', 'roomLayout', 'cinema']);
 
         return view('admin.showtimes.edit', [
             ...$this->formData(),
@@ -94,6 +96,8 @@ class ShowtimeController extends Controller
     public function update(UpdateShowtimeRequest $request, Showtime $showtime)
     {
         $this->assertOperationalShowtime($showtime);
+        $targetRoom = Room::query()->findOrFail($request->validated('room_id'));
+        $this->cinemaAccess->authorizeCinema($request->user(), (int) $targetRoom->cinema_id);
 
         $before = $this->auditData($showtime);
         try {
@@ -130,7 +134,7 @@ class ShowtimeController extends Controller
         return [
             'movies' => Movie::query()->where('status', '!=', 'stopped')->orderBy('title')->get(),
             'rooms' => $this->operationalRooms(),
-            'cinema' => $this->cinemaContext->current(),
+            'cinema' => $this->cinemaAccess->currentCinema(auth()->user()),
             'cleaningBufferMinutes' => $this->schedule->cleaningBufferMinutes(),
             'cinemaTimezone' => $this->schedule->timezone(),
         ];
@@ -138,20 +142,19 @@ class ShowtimeController extends Controller
 
     private function operationalRooms()
     {
-        return Room::query()->where('cinema_id', $this->cinemaContext->id())
-            ->operational()->whereHas('latestPublishedLayout')->with('latestPublishedLayout')
+        $query = Room::query()->operational()->whereHas('latestPublishedLayout')
+            ->with(['latestPublishedLayout', 'cinema']);
+        $this->cinemaAccess->scope($query, auth()->user(), 'rooms.cinema_id');
+
+        return $query
             ->orderBy('code')->get();
     }
 
     private function assertOperationalShowtime(Showtime $showtime): void
     {
         $showtime->loadMissing('room');
-        abort_unless(
-            $showtime->cinema_id === $this->cinemaContext->id()
-            && $showtime->room?->cinema_id === $this->cinemaContext->id()
-            && $showtime->room?->status === 'active',
-            404
-        );
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $showtime->cinema_id);
+        abort_unless($showtime->room?->cinema_id === $showtime->cinema_id && $showtime->room?->status === 'active', 404);
     }
 
     /** @return array<string, mixed> */

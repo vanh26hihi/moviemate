@@ -65,9 +65,9 @@ class AdminRouteAccessTest extends TestCase
             ->get(route('admin.seats.index'))
             ->assertRedirect(route('admin.rooms.index'));
 
-        $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.create'));
+        $this->assertTrue(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.create'));
         $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.destroy'));
-        $this->actingAs($manager)->get(route('admin.users.index'))->assertForbidden();
+        $this->actingAs($manager)->get(route('admin.users.index'))->assertOk();
         $this->actingAs($manager)->get(route('admin.roles.index'))->assertForbidden();
     }
 

@@ -1,8 +1,15 @@
 @php($editing = isset($room))
 
 <div class="rounded-2xl border app-border app-card-soft p-4">
-    <span class="text-sm app-muted">{{ __('rooms.fields.cinema') }}</span>
-    <strong class="block app-text">{{ $cinema->name }}</strong>
+    <label for="cinema_id" class="text-sm app-muted">{{ __('rooms.fields.cinema') }}</label>
+    @if($editing || $cinema)
+        <strong class="block app-text">{{ $cinema->name }}</strong>
+        <input type="hidden" name="cinema_id" value="{{ $cinema->id }}">
+    @else
+        <select id="cinema_id" name="cinema_id" required class="cinema-input mt-2">
+            @foreach($cinemas as $availableCinema)<option value="{{ $availableCinema->id }}" @selected(old('cinema_id') == $availableCinema->id)>{{ $availableCinema->name }}</option>@endforeach
+        </select>
+    @endif
 </div>
 
 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">

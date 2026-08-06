@@ -27,7 +27,6 @@ class BookingCheckoutService
         private readonly BookingCodeGenerator $bookingCodes,
         private readonly BookingPricingService $pricing,
         private readonly BookingFoodService $food,
-        private readonly CinemaContext $cinemaContext,
     ) {}
 
     public function createPendingBooking(
@@ -83,7 +82,7 @@ class BookingCheckoutService
                     }
 
                     $showtime = Showtime::query()
-                        ->with(['room', 'roomLayout'])
+                        ->with(['cinema', 'room', 'roomLayout'])
                         ->lockForUpdate()
                         ->findOrFail($showtimeId);
 
@@ -104,7 +103,7 @@ class BookingCheckoutService
 
                     $this->assertSeatsCanBeReserved($seats, $normalizedSeatIds, $layout->id);
 
-                    $foodBreakdown = $this->food->calculate($foodSelection);
+                    $foodBreakdown = $this->food->calculate($foodSelection, (int) $showtime->cinema_id);
                     $priceBreakdown = $this->pricing
                         ->calculate($showtime, $seats)
                         ->withFood($foodBreakdown);
@@ -198,12 +197,11 @@ class BookingCheckoutService
     private function assertShowtimeCanBeReserved(Showtime $showtime): void
     {
         $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time);
-        $canonicalCinemaId = $this->cinemaContext->id();
-
         if ($showtime->status !== 'active'
-            || $showtime->cinema_id !== $canonicalCinemaId
+            || $showtime->cinema?->status !== 'active'
+            || $showtime->cinema?->archived_at !== null
             || $showtime->room?->status !== 'active'
-            || $showtime->room?->cinema_id !== $canonicalCinemaId
+            || $showtime->room?->cinema_id !== $showtime->cinema_id
             || ! $showtime->roomLayout
             || $showtime->roomLayout->status !== 'published'
             || $showtime->roomLayout->room_id !== $showtime->room_id

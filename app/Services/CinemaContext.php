@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Exceptions\CinemaConfigurationException;
 use App\Models\Cinema;
+use Illuminate\Support\Collection;
 
+/** Customer-facing branch selection. Admin authorization uses CinemaAccessService. */
 class CinemaContext
 {
     public const CANONICAL_KEY = 'moviemate-fpt-polytechnic';
@@ -21,7 +23,16 @@ class CinemaContext
 
     public const LONGITUDE = '105.44239119453124';
 
+    public const SESSION_KEY = 'customer_cinema_id';
+
     private ?Cinema $resolved = null;
+
+    /** @return Collection<int, Cinema> */
+    public function activeCinemas(): Collection
+    {
+        return Cinema::query()->active()->orderBy('name')
+            ->get(['id', 'code', 'name', 'address', 'city', 'timezone']);
+    }
 
     public function current(): Cinema
     {
@@ -29,23 +40,42 @@ class CinemaContext
             return $this->resolved;
         }
 
-        $matches = Cinema::query()->primary()->active()->limit(2)->get();
-
-        if ($matches->count() !== 1 || $matches->first()?->canonical_key !== self::CANONICAL_KEY) {
-            throw new CinemaConfigurationException(
-                $matches->isEmpty()
-                    ? 'Canonical FPT cinema is not configured.'
-                    : ($matches->count() > 1
-                        ? 'Multiple active primary cinemas are configured.'
-                        : 'The active primary cinema is not the canonical FPT cinema.')
-            );
+        $selectedId = request()->hasSession()
+            ? request()->session()->get(self::SESSION_KEY)
+            : null;
+        if ($selectedId !== null) {
+            $selected = Cinema::query()->active()->find($selectedId);
+            if ($selected) {
+                return $this->resolved = $selected;
+            }
+            request()->session()->forget(self::SESSION_KEY);
         }
 
-        return $this->resolved = $matches->sole();
+        // More than one active primary branch is a configuration fault, not a fallback case.
+        // Failing loudly here keeps the customer default deterministic across branches.
+        $primaries = Cinema::query()->active()->primary()->limit(2)->get();
+        if ($primaries->count() > 1) {
+            throw new CinemaConfigurationException('Multiple active primary cinemas are configured.');
+        }
+        $primary = $primaries->first();
+        if (! $primary) {
+            throw new CinemaConfigurationException('No active primary cinema is configured.');
+        }
+
+        return $this->resolved = $primary;
+    }
+
+    public function select(Cinema $cinema): void
+    {
+        if ($cinema->status !== 'active' || $cinema->archived_at !== null) {
+            throw new \InvalidArgumentException('Inactive cinema cannot be selected.');
+        }
+        request()->session()->put(self::SESSION_KEY, $cinema->id);
+        $this->resolved = $cinema;
     }
 
     public function id(): int
     {
-        return $this->current()->getKey();
+        return (int) $this->current()->getKey();
     }
 }
