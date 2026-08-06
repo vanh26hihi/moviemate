@@ -62,4 +62,17 @@ final class PaymentPresentation
 
         return 'Chưa có kết quả provider';
     }
+
+    public static function reviewCategory(?string $category): string
+    {
+        return match ($category) {
+            'query_started' => 'Đã bắt đầu truy vấn provider',
+            'authoritative_success' => 'Thành công có bằng chứng provider',
+            'validation_rejected' => 'Bằng chứng không vượt qua kiểm tra an toàn',
+            'authentication_error', 'authentication_rejected' => 'Provider từ chối xác thực',
+            'not_successful' => 'Provider chưa xác nhận thành công',
+            'uncertain', 'transport_error', 'invalid_response' => 'Kết quả provider chưa chắc chắn',
+            default => 'Cần kiểm tra thêm',
+        };
+    }
 }

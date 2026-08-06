@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Models\ActivityLog;
 use App\Models\Payment;
 use App\Models\PaymentReviewEvent;
 use App\Services\BookingCheckoutService;
@@ -95,6 +96,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
             'provider_result_category' => 'authoritative_success',
             'provider_result_code' => '1',
         ]);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.reconciliation_completed')->count());
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.review_resolved')->count());
     }
 
     public function test_expired_booking_remains_unfulfilled_and_creates_no_ticket(): void

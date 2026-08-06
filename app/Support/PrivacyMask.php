@@ -4,6 +4,18 @@ namespace App\Support;
 
 final class PrivacyMask
 {
+    public static function name(?string $name): string
+    {
+        $parts = preg_split('/\s+/u', trim((string) $name), -1, PREG_SPLIT_NO_EMPTY);
+        if (! is_array($parts) || $parts === []) {
+            return 'Khách đặt vé';
+        }
+
+        return collect($parts)
+            ->map(fn (string $part): string => self::firstCharacter($part).'***')
+            ->join(' ');
+    }
+
     public static function email(?string $email): string
     {
         $email = trim((string) $email);

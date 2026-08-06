@@ -53,6 +53,8 @@ final class PaymentReconciliationQuery
                     ->orWhere(fn (Builder $query) => $query->where('payments.status', Payment::STATUS_SUCCESS)->whereNotNull('payments.verified_at')
                         ->where(fn (Builder $query) => $query->where('bookings.payment_status', '!=', 'paid')->orWhereNotIn('bookings.booking_status', ['paid', 'used'])))
                     ->orWhere(fn (Builder $query) => $query->whereIn('payments.status', [Payment::STATUS_REVIEW, Payment::STATUS_UNRESOLVED]))
+                    ->orWhere(fn (Builder $query) => $query->where('payments.status', Payment::STATUS_FAILED)
+                        ->where('payments.failure_reason', 'query_failed'))
                     ->orWhere(fn (Builder $query) => $query->whereIn('payments.status', Payment::RECONCILABLE_STATUSES)
                         ->where(fn (Builder $query) => $query->where('payments.reconcile_until', '<=', now())
                             ->orWhere(fn (Builder $query) => $query->whereNull('payments.last_queried_at')->where('payments.created_at', '<=', now()->subMinutes(5)))
@@ -81,6 +83,7 @@ final class PaymentReconciliationQuery
                 WHERE verified_payments.booking_id = bookings.id
                   AND verified_payments.status = 'success' AND verified_payments.verified_at IS NOT NULL
             ) THEN 'Khẩn cấp'
+            WHEN payments.status = 'failed' AND payments.failure_reason = 'query_failed' THEN 'Cao'
             WHEN payments.status IN ('review', 'unresolved') OR payments.reconcile_until <= CURRENT_TIMESTAMP THEN 'Cao'
             ELSE 'Bình thường' END";
     }
@@ -101,6 +104,7 @@ final class PaymentReconciliationQuery
             ) THEN 'Đơn ghi nhận đã thanh toán nhưng thiếu giao dịch có thẩm quyền'
             WHEN payments.status = 'review' THEN 'Giao dịch đang chờ kiểm tra'
             WHEN payments.status = 'unresolved' THEN 'Kết quả provider chưa xác định'
+            WHEN payments.status = 'failed' AND payments.failure_reason = 'query_failed' THEN 'Provider xác nhận giao dịch thất bại qua truy vấn'
             WHEN payments.reconcile_until <= CURRENT_TIMESTAMP THEN 'Đã quá thời hạn đối soát'
             ELSE 'Giao dịch chờ provider đã lâu' END";
     }

@@ -5,6 +5,8 @@ namespace App\Services\Payments;
 use App\Domain\Payments\PaymentReviewResolutionResult;
 use App\Domain\Payments\VerifiedPaymentData;
 use App\Domain\Payments\ZaloPayConfig;
+use App\Exceptions\VnpayResponseException;
+use App\Exceptions\VnpayTransportException;
 use App\Exceptions\ZaloPayAuthenticationException;
 use App\Exceptions\ZaloPayResponseException;
 use App\Exceptions\ZaloPayTransportException;
@@ -22,6 +24,7 @@ class PaymentReviewResolutionService
         private readonly ZaloPayGateway $gateway,
         private readonly ZaloPayConfig $config,
         private readonly VerifiedPaymentService $verifiedPayments,
+        private readonly VnpayQueryService $vnpayQueries,
     ) {}
 
     public function resolve(Payment $payment, User $actor): PaymentReviewResolutionResult
@@ -34,7 +37,7 @@ class PaymentReviewResolutionService
                 throw new LogicException('Chỉ giao dịch đang chờ kiểm tra mới có thể được đối soát thủ công.');
             }
 
-            if ($lockedPayment->provider !== 'zalopay') {
+            if (! in_array($lockedPayment->provider, Payment::SUPPORTED_PROVIDERS, true)) {
                 throw new LogicException('Nhà cung cấp thanh toán này không hỗ trợ đối soát đơn hàng thủ công.');
             }
 
@@ -48,6 +51,10 @@ class PaymentReviewResolutionService
                 'provider_result_code' => null,
             ]);
         });
+
+        if ($payment->provider === 'vnpay') {
+            return $this->resolveVnpay($payment, $event);
+        }
 
         try {
             $response = $this->gateway->query($payment->fresh());
@@ -113,6 +120,59 @@ class PaymentReviewResolutionService
             $result->accepted
                 ? 'Authoritative provider success was verified and the valid booking was fulfilled.'
                 : $result->message.' Payment remains in review; do not create a replacement until the discrepancy is resolved.',
+        );
+    }
+
+    private function resolveVnpay(
+        Payment $payment,
+        PaymentReviewEvent $event,
+    ): PaymentReviewResolutionResult {
+        try {
+            $status = $this->vnpayQueries->reconcileReview($payment);
+        } catch (VnpayTransportException) {
+            return $this->finish(
+                $event,
+                'uncertain',
+                'transport_error',
+                'Chưa kết nối được VNPAY. Giao dịch vẫn ở trạng thái cần kiểm tra và có thể thử lại sau.',
+            );
+        } catch (VnpayResponseException) {
+            return $this->finish(
+                $event,
+                'uncertain',
+                'invalid_response',
+                'VNPAY trả về phản hồi không hợp lệ. Giao dịch vẫn ở trạng thái cần kiểm tra.',
+            );
+        }
+
+        $fresh = $payment->fresh();
+        $category = match (true) {
+            $status === Payment::STATUS_SUCCESS => 'authoritative_success',
+            $fresh->failure_reason === 'query_authentication_error' => 'authentication_error',
+            in_array($fresh->failure_reason, [
+                'amount_mismatch',
+                'query_amount_invalid',
+                'query_identity_mismatch',
+                'provider_transaction_id_mismatch',
+                'duplicate_provider_transaction_id',
+                'late_payment_after_expiration',
+                'seat_ownership_lost',
+                'booking_not_payable',
+            ], true) => 'validation_rejected',
+            $fresh->failure_reason === 'query_failed' => 'not_successful',
+            default => 'uncertain',
+        };
+        $code = collect([$fresh->response_code, $fresh->transaction_status])
+            ->filter(fn ($value): bool => is_string($value) && $value !== '')
+            ->join('/');
+
+        return $this->finish(
+            $event,
+            $category,
+            $code === '' ? null : $code,
+            $status === Payment::STATUS_SUCCESS
+                ? 'VNPAY đã xác nhận giao dịch hợp lệ và đơn đặt vé đã được hoàn tất an toàn.'
+                : 'Kết quả VNPAY chưa đủ điều kiện hoàn tất đơn. Giao dịch vẫn được giữ để kiểm tra.',
         );
     }
 

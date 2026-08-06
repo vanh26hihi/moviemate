@@ -2,14 +2,19 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Domain\Payments\VnpaySigner;
+use App\Exceptions\VnpayTransportException;
 use App\Models\ActivityLog;
 use App\Models\Payment;
 use App\Models\Permission;
+use App\Services\Admin\PaymentReconciliationQuery;
 use App\Services\Payments\PaymentReconciliationService;
+use App\Support\PrivacyMask;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Mockery;
 use Tests\Feature\Payments\PaymentTestCase;
+use TypeError;
 
 class AdminPaymentOperationsTest extends PaymentTestCase
 {
@@ -72,6 +77,14 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         $this->actingAs($this->userWithRole('manager'))
             ->get(route('admin.payments.index', ['sort' => 'drop table payments']))
             ->assertSessionHasErrors('sort');
+
+        $maximum = $this->paymentMatchingBooking(['amount' => 49000]);
+        $aboveMaximum = $this->paymentMatchingBooking(['amount' => 51000]);
+        $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.payments.index', ['amount_max' => 50000]))
+            ->assertOk()
+            ->assertSee('#'.$maximum->id)
+            ->assertDontSee('#'.$aboveMaximum->id);
     }
 
     public function test_detail_marks_authoritative_payment_and_exposes_only_safe_evidence(): void
@@ -87,6 +100,8 @@ class AdminPaymentOperationsTest extends PaymentTestCase
 
         $this->actingAs($this->userWithRole('manager'))->get(route('admin.payments.show', $payment))
             ->assertOk()->assertSee('Giao dịch có thẩm quyền')->assertSee('Đã khớp')
+            ->assertSee('Đang xem')->assertSee($booking->showtime_label)
+            ->assertSee(PrivacyMask::email($booking->recipient_email))
             ->assertDontSee('provider.example.test/private')->assertDontSee(str_repeat('a', 64))
             ->assertDontSee(str_repeat('b', 64))->assertDontSee('Nhật ký thao tác')
             ->assertDontSee('Đánh dấu đã thanh toán')->assertDontSee('Sửa số tiền')
@@ -103,6 +118,10 @@ class AdminPaymentOperationsTest extends PaymentTestCase
             'amount' => (int) $fresh->booking->total_amount + 1,
         ]);
         $unresolved = $this->paymentMatchingBooking(['status' => Payment::STATUS_UNRESOLVED]);
+        $failedQuery = $this->paymentMatchingBooking([
+            'status' => Payment::STATUS_FAILED,
+            'failure_reason' => 'query_failed',
+        ]);
 
         $response = $this->actingAs($this->userWithRole('manager'))
             ->get(route('admin.payment-reconciliation.index'));
@@ -110,6 +129,7 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         $response->assertOk()->assertSee('#'.$mismatch->id)->assertSee('Khẩn cấp')
             ->assertSee('Số tiền giao dịch không khớp tổng đơn')
             ->assertSee('#'.$unresolved->id)->assertSee('Kết quả provider chưa xác định')
+            ->assertSee('#'.$failedQuery->id)->assertSee('Provider xác nhận giao dịch thất bại qua truy vấn')
             ->assertDontSee('#'.$fresh->id);
     }
 
@@ -133,6 +153,7 @@ class AdminPaymentOperationsTest extends PaymentTestCase
 
         $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
         $this->assertNull($payment->fresh()->verified_at);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.provider_query_requested')->count());
         $this->assertSame(1, ActivityLog::query()->where('action', 'payment.provider_query_completed')->count());
         $log = ActivityLog::query()->where('action', 'payment.provider_query_completed')->sole();
         $encoded = json_encode($log->toArray());
@@ -152,13 +173,14 @@ class AdminPaymentOperationsTest extends PaymentTestCase
 
         $pending = $this->paymentMatchingBooking();
         $service = Mockery::mock(PaymentReconciliationService::class);
-        $service->shouldReceive('reconcile')->once()->andThrow(new \RuntimeException('provider unavailable'));
+        $service->shouldReceive('reconcile')->once()->andThrow(new VnpayTransportException('provider unavailable'));
         $this->app->instance(PaymentReconciliationService::class, $service);
         $this->actingAs($manager)->post(route('admin.payments.query-provider', $pending))
             ->assertRedirect()->assertSessionHas('error');
 
         $this->assertSame(Payment::STATUS_PENDING, $pending->fresh()->status);
-        $this->assertDatabaseCount('activity_logs', 0);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.provider_query_requested')->count());
+        $this->assertDatabaseMissing('activity_logs', ['action' => 'payment.provider_query_completed']);
     }
 
     public function test_rate_limit_is_scoped_by_actor_and_payment(): void
@@ -197,23 +219,123 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         $this->assertSame(1, ActivityLog::query()->where('action', 'payment.reconciliation_completed')->count());
     }
 
-    public function test_vnpay_review_is_preserved_when_no_safe_review_adapter_exists(): void
+    public function test_provider_query_audits_a_real_transition_into_review_once(): void
     {
+        $payment = $this->paymentMatchingBooking();
+        $service = Mockery::mock(PaymentReconciliationService::class);
+        $service->shouldReceive('reconcile')->once()->andReturnUsing(function (Payment $selected): string {
+            $selected->forceFill([
+                'status' => Payment::STATUS_REVIEW,
+                'failure_reason' => 'query_identity_mismatch',
+                'failed_at' => now(),
+            ])->save();
+
+            return Payment::STATUS_REVIEW;
+        });
+        $this->app->instance(PaymentReconciliationService::class, $service);
+
+        $this->actingAs($this->userWithRole('manager'))
+            ->post(route('admin.payments.query-provider', $payment))
+            ->assertRedirect()->assertSessionHas('success');
+
+        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.review_entered')->count());
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.provider_query_completed')->count());
+    }
+
+    public function test_vnpay_review_is_resolved_only_by_authenticated_matching_query_evidence(): void
+    {
+        $this->configureVnpay();
         $payment = $this->paymentMatchingBooking([
             'provider' => 'vnpay',
             'status' => Payment::STATUS_REVIEW,
             'app_id' => null,
             'app_trans_id' => null,
             'order_code' => 'VNP-REVIEW-'.bin2hex(random_bytes(6)),
+            'provider_transaction_created_at' => now(),
         ]);
+        $fields = [
+            'vnp_ResponseId' => 'ADMINREVIEW01',
+            'vnp_Command' => 'querydr',
+            'vnp_ResponseCode' => '00',
+            'vnp_Message' => 'Success',
+            'vnp_TmnCode' => 'MOVIE123',
+            'vnp_TxnRef' => $payment->order_code,
+            'vnp_Amount' => (string) ($payment->amount * 100),
+            'vnp_BankCode' => 'NCB',
+            'vnp_PayDate' => now('Asia/Ho_Chi_Minh')->format('YmdHis'),
+            'vnp_TransactionNo' => '987654321',
+            'vnp_TransactionType' => '01',
+            'vnp_TransactionStatus' => '00',
+        ];
+        $fields['vnp_SecureHash'] = hash_hmac(
+            'sha512',
+            app(VnpaySigner::class)->queryResponseCanonical($fields),
+            (string) config('payment.vnpay.hash_secret'),
+        );
+        Http::fake(['*' => Http::response($fields, 200)]);
 
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.payments.reconcile', $payment))
-            ->assertRedirect()->assertSessionHas('warning');
+            ->assertRedirect()->assertSessionHas('success');
+
+        $this->assertSame(Payment::STATUS_SUCCESS, $payment->fresh()->status);
+        $this->assertNotNull($payment->fresh()->verified_at);
+        $this->assertSame('paid', $payment->booking->fresh()->payment_status);
+        $this->assertDatabaseHas('payment_review_events', [
+            'payment_id' => $payment->id,
+            'resulting_status' => Payment::STATUS_SUCCESS,
+            'provider_result_category' => 'authoritative_success',
+        ]);
+        $this->assertDatabaseHas('booking_ticket_deliveries', ['booking_id' => $payment->booking_id]);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.review_resolved')->count());
+    }
+
+    public function test_vnpay_review_amount_mismatch_stays_unpaid_and_is_not_resolved(): void
+    {
+        $this->configureVnpay();
+        $payment = $this->paymentMatchingBooking([
+            'provider' => 'vnpay',
+            'status' => Payment::STATUS_REVIEW,
+            'app_id' => null,
+            'app_trans_id' => null,
+            'order_code' => 'VNP-REVIEW-'.bin2hex(random_bytes(6)),
+            'provider_transaction_created_at' => now(),
+        ]);
+        $fields = [
+            'vnp_ResponseId' => 'ADMINREVIEW02',
+            'vnp_Command' => 'querydr',
+            'vnp_ResponseCode' => '00',
+            'vnp_Message' => 'Success',
+            'vnp_TmnCode' => 'MOVIE123',
+            'vnp_TxnRef' => $payment->order_code,
+            'vnp_Amount' => (string) (($payment->amount + 1000) * 100),
+            'vnp_BankCode' => 'NCB',
+            'vnp_PayDate' => now('Asia/Ho_Chi_Minh')->format('YmdHis'),
+            'vnp_TransactionNo' => '987654322',
+            'vnp_TransactionType' => '01',
+            'vnp_TransactionStatus' => '00',
+        ];
+        $fields['vnp_SecureHash'] = hash_hmac(
+            'sha512',
+            app(VnpaySigner::class)->queryResponseCanonical($fields),
+            (string) config('payment.vnpay.hash_secret'),
+        );
+        Http::fake(['*' => Http::response($fields, 200)]);
+
+        $this->actingAs($this->userWithRole('manager'))
+            ->post(route('admin.payments.reconcile', $payment))
+            ->assertRedirect()->assertSessionHas('success');
 
         $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
-        $this->assertDatabaseCount('payment_review_events', 0);
-        $this->assertDatabaseCount('activity_logs', 0);
+        $this->assertNull($payment->fresh()->verified_at);
+        $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
+        $this->assertDatabaseHas('payment_review_events', [
+            'payment_id' => $payment->id,
+            'provider_result_category' => 'validation_rejected',
+        ]);
+        $this->assertDatabaseMissing('booking_ticket_deliveries', ['booking_id' => $payment->booking_id]);
+        $this->assertDatabaseMissing('activity_logs', ['action' => 'payment.review_resolved']);
     }
 
     public function test_unsupported_provider_query_does_not_mutate_or_log_false_success(): void
@@ -241,6 +363,26 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         }
     }
 
+    public function test_programming_errors_are_not_hidden_as_provider_failures(): void
+    {
+        $payment = $this->paymentMatchingBooking();
+        $service = Mockery::mock(PaymentReconciliationService::class);
+        $service->shouldReceive('reconcile')->once()->andThrow(new TypeError('confirmed programming defect'));
+        $this->app->instance(PaymentReconciliationService::class, $service);
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->userWithRole('manager'))
+                ->post(route('admin.payments.query-provider', $payment));
+            $this->fail('Programming errors must escape the safe provider-error handler.');
+        } catch (TypeError $exception) {
+            $this->assertSame('confirmed programming defect', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('activity_logs', ['action' => 'payment.provider_query_requested']);
+        $this->assertDatabaseMissing('activity_logs', ['action' => 'payment.provider_query_completed']);
+    }
+
     public function test_payment_index_query_count_is_bounded(): void
     {
         for ($index = 0; $index < 18; $index++) {
@@ -256,6 +398,64 @@ class AdminPaymentOperationsTest extends PaymentTestCase
 
         $response->assertOk()->assertSee('page=2', false);
         $this->assertLessThanOrEqual(12, $queryCount, 'Danh sách payment có dấu hiệu N+1.');
+    }
+
+    public function test_detail_queue_and_badge_queries_are_bounded_and_navigation_has_one_active_item(): void
+    {
+        $payment = $this->paymentMatchingBooking([
+            'status' => Payment::STATUS_UNRESOLVED,
+            'failure_reason' => 'query_unresolved',
+        ]);
+        $manager = $this->userWithRole('manager');
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $detail = $this->actingAs($manager)->get(route('admin.payments.show', $payment));
+        $detailQueries = count(DB::getQueryLog());
+        DB::flushQueryLog();
+        $queue = $this->actingAs($manager)->get(route('admin.payment-reconciliation.index'));
+        $queueQueries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $detail->assertOk();
+        $queue->assertOk();
+        $this->assertLessThanOrEqual(14, $detailQueries, 'Chi tiết payment có dấu hiệu N+1.');
+        $this->assertLessThanOrEqual(8, $queueQueries, 'Queue đối soát có dấu hiệu N+1.');
+        $this->assertSame(1, substr_count($detail->getContent(), 'aria-current="page"'));
+        $this->assertSame(1, substr_count($queue->getContent(), 'aria-current="page"'));
+        $this->assertMatchesRegularExpression('/data-admin-nav-route="admin\.payments\.index"[^>]*aria-current="page"|aria-current="page"[^>]*data-admin-nav-route="admin\.payments\.index"/s', $detail->getContent());
+        $this->assertMatchesRegularExpression('/data-admin-nav-route="admin\.payment-reconciliation\.index"[^>]*aria-current="page"|aria-current="page"[^>]*data-admin-nav-route="admin\.payment-reconciliation\.index"/s', $queue->getContent());
+    }
+
+    public function test_reconciliation_badge_is_capped_at_ninety_nine_plus(): void
+    {
+        $booking = $this->payableBooking();
+        for ($index = 0; $index < 100; $index++) {
+            $this->pendingPayment($booking, [
+                'status' => Payment::STATUS_FAILED,
+                'failure_reason' => 'query_failed',
+            ]);
+        }
+
+        $this->assertSame('99+', app(PaymentReconciliationQuery::class)->badgeLabel());
+    }
+
+    private function configureVnpay(): void
+    {
+        config([
+            'payment.vnpay.environment' => 'sandbox',
+            'payment.vnpay.tmn_code' => 'MOVIE123',
+            'payment.vnpay.hash_secret' => str_repeat('sandbox-secret-', 4),
+            'payment.vnpay.payment_url' => 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+            'payment.vnpay.query_url' => 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
+            'payment.vnpay.bank_code' => 'VNPAYQR',
+            'payment.vnpay.locale' => 'vn',
+            'payment.vnpay.order_type' => 'other',
+            'payment.vnpay.payment_ttl_minutes' => 15,
+            'payment.vnpay.http_timeout_seconds' => 10,
+            'payment.vnpay.query_interval_seconds' => 60,
+            'payment.vnpay.query_ip' => '127.0.0.1',
+        ]);
     }
 
     private function paymentMatchingBooking(array $overrides = []): Payment
