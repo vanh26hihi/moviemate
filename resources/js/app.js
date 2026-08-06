@@ -1,6 +1,10 @@
 import QRCode from 'qrcode';
 import html2canvas from 'html2canvas';
+// Both sides added a distinct entry module: R1 ships the branch-aware calendar and the
+// remote feature branch ships the cinema-finder/showtime filter helpers. They are
+// independent, so the merge keeps both rather than choosing a side.
 import './showtime-calendar';
+import './showtime';
 
 const THEME_KEY = 'theme';
 const LEGACY_THEME_KEY = 'moviemate_theme';
