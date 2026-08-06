@@ -22,6 +22,11 @@ final class IndexPaymentRequest extends FormRequest
 
     public function rules(): array
     {
+        $amountMaxRules = ['nullable', 'integer', 'min:0', 'max:1000000000'];
+        if ($this->filled('amount_min')) {
+            $amountMaxRules[] = 'gte:amount_min';
+        }
+
         return [
             'booking_code' => ['nullable', 'string', 'max:60'],
             'provider' => ['nullable', Rule::in(Payment::SUPPORTED_PROVIDERS)],
@@ -34,7 +39,7 @@ final class IndexPaymentRequest extends FormRequest
             'paid_from' => ['nullable', 'date_format:Y-m-d'],
             'paid_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:paid_from'],
             'amount_min' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
-            'amount_max' => ['nullable', 'integer', 'min:0', 'max:1000000000', 'gte:amount_min'],
+            'amount_max' => $amountMaxRules,
             'amount_mismatch' => ['nullable', Rule::in(['yes', 'no'])],
             'reconciled' => ['nullable', Rule::in(['yes', 'no'])],
             'sort' => ['nullable', Rule::in(['created_at', 'amount', 'verified_at', 'last_queried_at', 'status'])],

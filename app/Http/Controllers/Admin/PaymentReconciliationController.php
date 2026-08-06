@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\PaymentConfigurationException;
+use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\VnpayResponseException;
+use App\Exceptions\VnpayTransportException;
+use App\Exceptions\ZaloPayResponseException;
+use App\Exceptions\ZaloPayTransportException;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\ActivityLogger;
@@ -13,7 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
-use Throwable;
+use LogicException;
 
 final class PaymentReconciliationController extends Controller
 {
@@ -38,13 +44,21 @@ final class PaymentReconciliationController extends Controller
         if (! in_array($payment->status, Payment::RECONCILABLE_STATUSES, true)) {
             return back()->with('warning', 'Giao dịch này không ở trạng thái được phép truy vấn provider. Không có dữ liệu nào bị thay đổi.');
         }
+        if (! in_array($payment->provider, Payment::SUPPORTED_PROVIDERS, true)) {
+            return back()->with('error', 'Nhà cung cấp này chưa hỗ trợ truy vấn giao dịch. Dữ liệu thanh toán được giữ nguyên.');
+        }
 
         $this->assertRateLimit('query-provider', $request, $payment, 6);
         $before = $payment->status;
+        $activities->log('payment.provider_query_requested', $payment, context: [
+            'payment_id' => $payment->id,
+            'booking_id' => $payment->booking_id,
+            'provider' => $payment->provider,
+        ]);
 
         try {
             $result = $reconciliation->reconcile($payment);
-        } catch (Throwable $exception) {
+        } catch (PaymentConfigurationException|PaymentInitiationException|VnpayResponseException|VnpayTransportException|ZaloPayResponseException|ZaloPayTransportException $exception) {
             report($exception);
 
             return back()->with('error', 'Chưa nhận được kết quả provider đủ tin cậy. Giao dịch không bị ép sang thành công.');
@@ -61,6 +75,7 @@ final class PaymentReconciliationController extends Controller
             'provider' => $payment->provider,
             'result' => $result,
         ]);
+        $this->logReviewTransition($activities, $payment, $before);
         $queue->forgetBadge();
 
         return back()->with('success', 'Đã truy vấn provider. Trạng thái hiện tại: '.StatusLabel::for('payment', $payment->status).'.');
@@ -77,7 +92,8 @@ final class PaymentReconciliationController extends Controller
         if (! in_array($payment->status, Payment::UNSAFE_RETRY_STATUSES, true)) {
             return back()->with('warning', 'Giao dịch đã ở trạng thái kết thúc; hệ thống không cho phép ghi đè kết quả.');
         }
-        if ($payment->status === Payment::STATUS_REVIEW && $payment->provider !== 'zalopay') {
+        if ($payment->status === Payment::STATUS_REVIEW
+            && ! in_array($payment->provider, Payment::SUPPORTED_PROVIDERS, true)) {
             return back()->with('warning', 'Provider này chưa hỗ trợ truy vấn lại giao dịch ở trạng thái review. Hệ thống giữ nguyên dữ liệu để điều tra.');
         }
 
@@ -91,7 +107,7 @@ final class PaymentReconciliationController extends Controller
             } else {
                 $category = $reconciliation->reconcile($payment);
             }
-        } catch (Throwable $exception) {
+        } catch (LogicException|PaymentConfigurationException|PaymentInitiationException|VnpayResponseException|VnpayTransportException|ZaloPayResponseException|ZaloPayTransportException $exception) {
             report($exception);
 
             return back()->with('error', 'Không thể hoàn tất đối soát bằng bằng chứng provider hiện có. Giao dịch không bị ép sang thành công.');
@@ -108,6 +124,7 @@ final class PaymentReconciliationController extends Controller
             'provider' => $payment->provider,
             'result' => $category,
         ]);
+        $this->logReviewTransition($activities, $payment, $before);
         $queue->forgetBadge();
 
         return back()->with('success', 'Đã hoàn tất lượt đối soát provider. Trạng thái hiện tại: '.StatusLabel::for('payment', $payment->status).'.');
@@ -118,5 +135,36 @@ final class PaymentReconciliationController extends Controller
         $key = implode(':', ['admin-payment', $action, $request->user()->id, $payment->id]);
         abort_if(RateLimiter::tooManyAttempts($key, $maxAttempts), 429);
         RateLimiter::hit($key, 60);
+    }
+
+    private function logReviewTransition(ActivityLogger $activities, Payment $payment, string $before): void
+    {
+        if ($before !== Payment::STATUS_REVIEW && $payment->status === Payment::STATUS_REVIEW) {
+            $activities->log('payment.review_entered', $payment, [
+                'payment_status' => $before,
+            ], [
+                'payment_status' => $payment->status,
+            ], [
+                'payment_id' => $payment->id,
+                'booking_id' => $payment->booking_id,
+                'provider' => $payment->provider,
+                'reason' => $payment->failure_reason,
+            ]);
+        }
+
+        if ($before === Payment::STATUS_REVIEW
+            && $payment->status === Payment::STATUS_SUCCESS
+            && $payment->verified_at !== null) {
+            $activities->log('payment.review_resolved', $payment, [
+                'payment_status' => $before,
+            ], [
+                'payment_status' => $payment->status,
+            ], [
+                'payment_id' => $payment->id,
+                'booking_id' => $payment->booking_id,
+                'provider' => $payment->provider,
+                'result' => 'verified_provider_success',
+            ]);
+        }
     }
 }

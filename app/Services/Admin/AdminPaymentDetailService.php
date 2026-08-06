@@ -5,13 +5,14 @@ namespace App\Services\Admin;
 use App\Models\ActivityLog;
 use App\Models\Payment;
 use App\Models\PaymentReviewEvent;
+use App\Support\PrivacyMask;
 
 final class AdminPaymentDetailService
 {
     public function get(Payment $payment, bool $canViewActivity): array
     {
         $payment->load([
-            'booking:id,user_id,showtime_id,booking_code,total_amount,payment_status,booking_status,paid_at,created_at',
+            'booking:id,user_id,showtime_id,booking_code,customer_email,total_amount,payment_status,booking_status,paid_at,created_at',
             'booking.user:id,name,email',
             'booking.showtime:id,movie_id,room_id,show_date,show_time',
             'booking.showtime.movie:id,title',
@@ -21,10 +22,12 @@ final class AdminPaymentDetailService
             ]),
         ]);
 
-        $attempts = Payment::query()->select(AdminPaymentQuery::SAFE_COLUMNS)
-            ->where('booking_id', $payment->booking_id)->latest('id')->get();
+        $attemptRows = Payment::query()->select(AdminPaymentQuery::SAFE_COLUMNS)
+            ->where('booking_id', $payment->booking_id)->latest('id')->limit(101)->get();
+        $attemptsTruncated = $attemptRows->count() > 100;
+        $attempts = $attemptRows->take(100);
         $reviewEvents = PaymentReviewEvent::query()->with('actor:id,name')
-            ->where('payment_id', $payment->id)->latest('id')->get();
+            ->where('payment_id', $payment->id)->latest('id')->limit(50)->get();
         $activityLogs = $canViewActivity
             ? ActivityLog::query()->with('actor:id,name')->where('subject_type', $payment->getMorphClass())
                 ->where('subject_id', (string) $payment->id)->latest('id')->limit(50)->get()
@@ -33,9 +36,12 @@ final class AdminPaymentDetailService
         return [
             'payment' => $payment,
             'attempts' => $attempts,
+            'attemptsTruncated' => $attemptsTruncated,
             'reviewEvents' => $reviewEvents,
             'activityLogs' => $activityLogs,
             'isAuthoritative' => $payment->booking?->authoritativePayment?->id === $payment->id,
+            'customerNameMasked' => PrivacyMask::name($payment->booking?->user?->name),
+            'recipientEmailMasked' => PrivacyMask::email($payment->booking?->recipient_email),
             'evidence' => $this->evidence($payment),
         ];
     }

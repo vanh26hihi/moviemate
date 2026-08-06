@@ -29,7 +29,12 @@
                             <td class="px-5 py-4">{{ $payment->booking->booking_code }}</td>
                             <td class="px-5 py-4">{{ $payment->provider }}</td>
                             <td class="px-5 py-4 text-right">{{ number_format((int) $payment->amount, 0, ',', '.') }} VNĐ</td>
-                            <td class="px-5 py-4"><span>Cần nhân viên kiểm tra</span>@if($payment->failure_reason)<code class="mt-1 block text-xs app-muted">{{ $payment->failure_reason }}</code>@endif</td>
+                            <td class="px-5 py-4">
+                                <span>Cần nhân viên kiểm tra</span>
+                                @if($payment->failure_reason)
+                                    <span class="mt-1 block text-xs app-muted">Có bằng chứng đối soát nội bộ cần xem xét.</span>
+                                @endif
+                            </td>
                             <td class="px-5 py-4 text-right">
                                 <form method="POST" action="{{ route('admin.payment-reviews.resolve', ['paymentId' => $payment->id]) }}">
                                     @csrf
