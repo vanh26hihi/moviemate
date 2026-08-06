@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Exceptions\PricingConfigurationException;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\BookingSeat;
@@ -13,6 +14,7 @@ use App\Services\BookingCheckoutPreviewService;
 use App\Services\GuestBookingAccessService;
 use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\RoomLayoutService;
+use App\Services\TicketPricingService;
 use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\TicketCheckinCapability;
 use App\Support\SeatPresentation;
@@ -31,6 +33,7 @@ class BookingController extends Controller
         private readonly BookingTicketEligibility $ticketEligibility,
         private readonly TicketCheckinCapability $checkinCapabilities,
         private readonly TicketMailConfigurationInspector $mailConfiguration,
+        private readonly TicketPricingService $pricing,
     ) {}
 
     /**
@@ -50,6 +53,12 @@ class BookingController extends Controller
         $layout = $this->layouts->resolveForShowtime($showtime);
         $layoutCells = $layout->cells->sortBy(fn ($cell) => sprintf('%03d:%03d', $cell->y_position, $cell->x_position))->values();
         $seats = $layoutCells->where('cell_type', 'seat')->pluck('seat')->filter()->values();
+        try {
+            $seatPrices = $this->pricing->calculateSeatTypes($showtime);
+        } catch (PricingConfigurationException $exception) {
+            return redirect()->route('user.movies.show', $showtime->movie->slug)
+                ->with('error', $exception->getMessage());
+        }
 
         $bookedSeatIds = BookingSeat::query()
             ->where('showtime_id', $showtime->id)
@@ -77,6 +86,7 @@ class BookingController extends Controller
             'seats',
             'bookedSeatIds',
             'selectedSeatIds',
+            'seatPrices',
         ));
     }
 

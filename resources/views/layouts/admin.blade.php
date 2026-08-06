@@ -37,6 +37,7 @@
                     ['route' => 'admin.cinemas.index', 'active' => ['admin.cinema.*', 'admin.cinemas.*'], 'permission' => 'cinemas.view', 'label' => 'Chi nhánh', 'icon' => 'ph-buildings'],
                     ['route' => 'admin.rooms.index', 'active' => ['admin.rooms.*', 'admin.seats.*'], 'permission' => 'rooms.view', 'label' => 'Phòng chiếu', 'icon' => 'ph-projector-screen'],
                     ['route' => 'admin.showtimes.index', 'active' => 'admin.showtimes.*', 'permission' => 'showtimes.view', 'label' => 'Suất chiếu', 'icon' => 'ph-calendar-plus'],
+                    ['route' => 'admin.pricing-rules.index', 'active' => 'admin.pricing-rules.*', 'permission' => 'pricing.view', 'label' => 'Bảng giá vé', 'icon' => 'ph-ticket'],
                 ]],
                 ['label' => 'Kinh doanh', 'items' => [
                     ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],

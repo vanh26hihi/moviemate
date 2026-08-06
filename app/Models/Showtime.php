@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Domain\Money\VndAmount;
 use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,20 +10,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Showtime extends Model
 {
     public const MAX_PRICE = 99_999_999;
-
-    public function priceForSeatType(string $seatType): int
-    {
-        $basePrice = VndAmount::fromDatabase($this->getRawOriginal('price') ?? $this->price);
-        $vipPrice = $this->vip_price === null
-            ? $basePrice
-            : VndAmount::fromDatabase($this->getRawOriginal('vip_price') ?? $this->vip_price);
-
-        return match ($seatType) {
-            'vip' => $vipPrice->value(),
-            'couple' => $basePrice->multiply(config('booking.couple_price_multiplier', 2))->value(),
-            default => $basePrice->value(),
-        };
-    }
 
     protected $fillable = [
         'movie_id',
@@ -35,6 +20,7 @@ class Showtime extends Model
         'show_time',
         'price',
         'vip_price',
+        'pricing_version',
         'status',
     ];
 

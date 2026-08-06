@@ -55,6 +55,7 @@ final class CinemaController extends Controller
         $cinema->load([
             'rooms' => fn ($query) => $query->withCount('showtimes')->orderBy('code'),
             'activeAssignments.user.role',
+            'operatingHours',
         ])->loadCount([
             'rooms',
             'rooms as active_rooms_count' => fn ($query) => $query->where('status', 'active'),

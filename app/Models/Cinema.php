@@ -21,6 +21,7 @@ class Cinema extends Model
         'city',
         'country',
         'timezone',
+        'default_cleaning_buffer_minutes',
         'phone',
         'latitude',
         'longitude',
@@ -38,6 +39,7 @@ class Cinema extends Model
             'longitude' => 'decimal:14',
             'is_primary' => 'boolean',
             'archived_at' => 'datetime',
+            'default_cleaning_buffer_minutes' => 'integer',
         ];
     }
 
@@ -75,6 +77,16 @@ class Cinema extends Model
     public function showtimes(): HasMany
     {
         return $this->hasMany(Showtime::class);
+    }
+
+    public function operatingHours(): HasMany
+    {
+        return $this->hasMany(CinemaOperatingHour::class);
+    }
+
+    public function pricingRules(): HasMany
+    {
+        return $this->hasMany(CinemaPricingRule::class);
     }
 
     public function pickupOrders(): HasMany

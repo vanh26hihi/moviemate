@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\BookingOperationController as AdminBookingOperationController;
 use App\Http\Controllers\Admin\CinemaContextController as AdminCinemaContextController;
 use App\Http\Controllers\Admin\CinemaController as AdminCinemaController;
+use App\Http\Controllers\Admin\CinemaOperatingHoursController as AdminCinemaOperatingHoursController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\FoodController as AdminFoodController;
 use App\Http\Controllers\Admin\FoodOrderController as AdminFoodOrderController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Admin\MovieController as AdminMovieController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentReconciliationController;
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
+use App\Http\Controllers\Admin\PricingRuleController as AdminPricingRuleController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
@@ -271,6 +273,23 @@ Route::prefix('admin')->name('admin.')
         Route::resource('cinemas', AdminCinemaController::class)->except(['destroy'])
             ->middlewareFor(['index', 'show'], 'permission:cinemas.view')
             ->middlewareFor(['create', 'store', 'edit', 'update'], 'permission:cinemas.manage');
+        Route::patch('/cinemas/{cinema}/operating-hours', [AdminCinemaOperatingHoursController::class, 'update'])
+            ->middleware('permission:cinemas.operations.manage')->name('cinemas.operating-hours.update');
+
+        Route::get('/pricing-rules', [AdminPricingRuleController::class, 'index'])
+            ->middleware('permission:pricing.view')->name('pricing-rules.index');
+        Route::get('/pricing-rules/create', [AdminPricingRuleController::class, 'create'])
+            ->middleware('permission:pricing.manage')->name('pricing-rules.create');
+        Route::post('/pricing-rules', [AdminPricingRuleController::class, 'store'])
+            ->middleware('permission:pricing.manage')->name('pricing-rules.store');
+        Route::get('/pricing-rules/{pricingRule}/edit', [AdminPricingRuleController::class, 'edit'])
+            ->middleware('permission:pricing.manage')->name('pricing-rules.edit');
+        Route::patch('/pricing-rules/{pricingRule}', [AdminPricingRuleController::class, 'update'])
+            ->middleware('permission:pricing.manage')->name('pricing-rules.update');
+        Route::post('/pricing-rules/{pricingRule}/status', [AdminPricingRuleController::class, 'status'])
+            ->middleware('permission:pricing.manage')->name('pricing-rules.status');
+        Route::post('/pricing-rules-preview', [AdminPricingRuleController::class, 'preview'])
+            ->middleware(['permission:pricing.view', 'throttle:30,1'])->name('pricing-rules.preview');
 
         Route::patch('/rooms/{room}/status', [AdminRoomController::class, 'updateStatus'])
             ->middleware('permission:rooms.update')->name('rooms.status.update');

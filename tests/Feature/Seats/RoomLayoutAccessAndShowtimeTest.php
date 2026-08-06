@@ -3,6 +3,7 @@
 namespace Tests\Feature\Seats;
 
 use App\Models\Cinema;
+use App\Models\CinemaPricingRule;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\CinemaContext;
@@ -26,6 +27,8 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         parent::setUp();
         $this->seedRbac();
         $this->cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
+        CinemaPricingRule::query()->create(['name' => 'Giá cơ bản layout test', 'rule_type' => 'base', 'cinema_id' => $this->cinema->id, 'amount_vnd' => 50_000, 'priority' => 100, 'status' => 'active']);
+        CinemaPricingRule::query()->create(['name' => 'VIP layout test', 'rule_type' => 'seat_type', 'cinema_id' => $this->cinema->id, 'seat_type' => 'vip', 'amount_vnd' => 20_000, 'priority' => 100, 'status' => 'active']);
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([
                 'cinema_id' => $this->cinema->id, 'code' => $code, 'name' => 'Phòng '.($index + 1),

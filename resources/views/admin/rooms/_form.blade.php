@@ -12,6 +12,13 @@
     @endif
 </div>
 
+<div>
+    <label for="cleaning_buffer_minutes" class="cinema-label">Vệ sinh phòng (phút)</label>
+    <input id="cleaning_buffer_minutes" type="number" min="0" max="180" name="cleaning_buffer_minutes" value="{{ old('cleaning_buffer_minutes', $room->cleaning_buffer_minutes ?? '') }}" class="cinema-input" placeholder="Để trống để dùng mặc định chi nhánh">
+    <p class="mt-1 text-xs app-muted">Để trống để kế thừa thời gian vệ sinh mặc định của chi nhánh.</p>
+    @error('cleaning_buffer_minutes')<p class="mt-1 text-sm text-error">{{ $message }}</p>@enderror
+</div>
+
 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
     <div>
         <label for="code" class="cinema-label">{{ __('rooms.fields.code') }} <span aria-hidden="true">*</span></label>

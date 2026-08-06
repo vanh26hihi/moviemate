@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\PricingConfigurationException;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Seat;
@@ -48,7 +49,11 @@ class BookingCheckoutPreviewService
         $this->assertSeatsAvailable($showtime, $seats, $seatIds, $layout, $ownBookingId);
         $this->assertNoIsolatedSeat($showtime, $layout, $seatIds, $ownBookingId);
         $food = $this->food->calculate($draft['food_items'] ?? [], (int) $showtime->cinema_id);
-        $prices = $this->pricing->calculate($showtime, $seats)->withFood($food);
+        try {
+            $prices = $this->pricing->calculate($showtime, $seats)->withFood($food);
+        } catch (PricingConfigurationException $exception) {
+            throw ValidationException::withMessages(['pricing' => $exception->getMessage()]);
+        }
 
         return new BookingCheckoutPreview($showtime, $seats, $prices);
     }

@@ -10,6 +10,7 @@ class PermissionSeeder extends Seeder
     public const PERMISSIONS = [
         'cinemas.view' => 'Xem danh sách chi nhánh',
         'cinemas.manage' => 'Quản lý chi nhánh',
+        'cinemas.operations.manage' => 'Quản lý giờ hoạt động chi nhánh',
         'cinema_assignments.view' => 'Xem phân công chi nhánh',
         'cinema_assignments.manage' => 'Quản lý phân công chi nhánh',
         'admin.access' => 'Truy cập khu vực quản trị',
@@ -36,6 +37,8 @@ class PermissionSeeder extends Seeder
         'showtimes.create' => 'Tạo suất chiếu',
         'showtimes.update' => 'Sửa suất chiếu',
         'showtimes.delete' => 'Xóa suất chiếu',
+        'pricing.view' => 'Xem bảng giá vé',
+        'pricing.manage' => 'Quản lý bảng giá vé',
         'foods.view' => 'Xem danh mục món ăn',
         'foods.create' => 'Tạo món ăn',
         'foods.update' => 'Sửa món ăn',
