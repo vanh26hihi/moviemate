@@ -121,6 +121,13 @@
                                             </a>
                                         @endif
                                     @endcan
+                                    @can('seats.maintenance.view')
+                                        @if($room->status === 'active' && $published)
+                                            <a href="{{ route('admin.rooms.seat-maintenance.index', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="Bảo trì ghế" aria-label="Bảo trì ghế {{ $room->name }}">
+                                                <i class="ph ph-wrench" aria-hidden="true"></i> Bảo trì ghế
+                                            </a>
+                                        @endif
+                                    @endcan
                                     @can('rooms.update')
                                         <a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="{{ __('rooms.actions.edit') }}" aria-label="{{ __('rooms.actions.edit') }} {{ $room->name }}">
                                             <i class="ph ph-pencil-simple" aria-hidden="true"></i> {{ __('rooms.actions.edit') }}

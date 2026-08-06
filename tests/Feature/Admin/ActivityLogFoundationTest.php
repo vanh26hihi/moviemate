@@ -5,6 +5,8 @@ namespace Tests\Feature\Admin;
 use App\Models\ActivityLog;
 use App\Models\Movie;
 use App\Models\Room;
+use App\Models\RoomLayout;
+use App\Models\RoomLayoutCell;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\ActivityLogger;
@@ -244,9 +246,26 @@ class ActivityLogFoundationTest extends TestCase
             'type' => 'normal',
             'status' => 'active',
         ]);
+        $layout = RoomLayout::query()->create([
+            'room_id' => $room->id,
+            'version' => 1,
+            'name' => 'Sơ đồ hiện hành',
+            'rows' => 1,
+            'columns' => 1,
+            'screen_position' => 'top',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        RoomLayoutCell::query()->create([
+            'room_layout_id' => $layout->id,
+            'x_position' => 1,
+            'y_position' => 1,
+            'cell_type' => 'seat',
+            'seat_id' => $seat->id,
+        ]);
 
         $this->actingAs($admin)
-            ->patch(route('admin.seats.update', $seat), ['type' => 'normal', 'status' => 'maintenance'])
+            ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seat]), ['status' => 'maintenance'])
             ->assertSessionHas('success');
 
         $this->assertSame('maintenance', $seat->fresh()->status);

@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewCont
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
+use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\TicketCheckinController as AdminTicketCheckinController;
 use App\Http\Controllers\Admin\TicketDeliveryController as AdminTicketDeliveryController;
@@ -283,14 +284,22 @@ Route::prefix('admin')->name('admin.')
         Route::post('/rooms/{room}/layout/publish', [AdminSeatController::class, 'publish'])
             ->middleware('permission:seats.manage')->name('rooms.layout.publish');
 
+        Route::get('/rooms/{room}/seat-maintenance', [AdminSeatMaintenanceController::class, 'index'])
+            ->whereNumber('room')
+            ->middleware('permission:seats.maintenance.view')->name('rooms.seat-maintenance.index');
+        Route::patch('/rooms/{room}/seat-maintenance/{seat}', [AdminSeatMaintenanceController::class, 'update'])
+            ->whereNumber('room')->whereNumber('seat')->scopeBindings()
+            ->middleware('permission:seats.maintenance.update')->name('rooms.seat-maintenance.update');
+        Route::post('/rooms/{room}/seat-maintenance/bulk', [AdminSeatMaintenanceController::class, 'bulk'])
+            ->whereNumber('room')
+            ->middleware('permission:seats.maintenance.update')->name('rooms.seat-maintenance.bulk');
+
         Route::get('/seats', [AdminSeatController::class, 'index'])
             ->middleware('permission:seats.maintenance.view')->name('seats.index');
         Route::get('/seats/manage/{room}', [AdminSeatController::class, 'manage'])
             ->middleware('permission:seats.manage')->name('seats.manage');
         Route::post('/seats/generate/{room}', [AdminSeatController::class, 'generate'])
             ->middleware('permission:seats.manage')->name('seats.generate');
-        Route::patch('/seats/{seat}', [AdminSeatController::class, 'update'])
-            ->middleware('permission:seats.maintenance.update')->name('seats.update');
 
         Route::resource('showtimes', AdminShowtimeController::class)->except(['show'])
             ->middlewareFor('index', 'permission:showtimes.view')
