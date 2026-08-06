@@ -171,8 +171,11 @@ class FoodSelectionThrottleTest extends PaymentTestCase
 
         $response = $this->startFoodSelection($this->bookingScenario(false));
         $response->assertSee('name="checkout_action" value="confirm_food"', false)
-            ->assertSee('name="checkout_action" value="skip_food"', false)
+            ->assertDontSee('name="checkout_action" value="skip_food"', false)
             ->assertDontSee('name="skip_food"', false)
+            ->assertDontSee('Bỏ qua đồ ăn')
+            ->assertSee('Tiếp tục thanh toán')
+            ->assertSee('Quay lại chọn ghế')
             ->assertDontSee('formaction=', false)
             ->assertDontSee('onclick=', false);
 

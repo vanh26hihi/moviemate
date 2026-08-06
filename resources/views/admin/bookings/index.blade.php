@@ -80,6 +80,13 @@
             </select>
         </label>
         <div class="flex flex-wrap items-end gap-2">
+            {{-- Đơn tạm/hết hạn vẫn được lưu để bảo đảm chống trùng ghế và đối chiếu thanh toán,
+                 nhưng mặc định được ẩn khỏi danh sách vận hành. --}}
+            <label class="inline-flex items-center gap-2 rounded-xl border app-border px-3 py-2 text-sm font-bold app-text">
+                <input type="checkbox" name="include_drafts" value="1"
+                       @checked(filter_var($filters['include_drafts'] ?? false, FILTER_VALIDATE_BOOLEAN))>
+                Hiển thị đơn tạm và đơn hết hạn
+            </label>
             <button type="submit" class="btn-primary"><i class="ph ph-funnel" aria-hidden="true"></i>Lọc</button>
             <a href="{{ route('admin.bookings.index') }}" class="btn-secondary">Xóa bộ lọc</a>
         </div>
@@ -91,7 +98,7 @@
                 <thead><tr>
                     <th>Mã đặt vé</th><th>Khách hàng</th><th>Phim</th><th>Suất chiếu</th><th>Phòng</th><th>Ghế</th>
                     <th class="text-right">Tiền ghế</th><th class="text-right">Tiền đồ ăn</th><th class="text-right">Tổng thanh toán</th>
-                    <th>Đặt vé</th><th>Thanh toán</th><th>Vé điện tử</th><th>Soát vé</th><th>Ngày tạo</th><th class="text-right">Thao tác</th>
+                    <th>Trạng thái đơn</th><th>Trạng thái thanh toán</th><th>Trạng thái vé</th><th>Soát vé</th><th>Ngày tạo</th><th class="text-right">Thao tác</th>
                 </tr></thead>
                 <tbody>
                     @forelse($bookings as $booking)

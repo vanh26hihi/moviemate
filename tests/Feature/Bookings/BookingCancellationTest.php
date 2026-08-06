@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Bookings;
 
+use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\FoodItem;
@@ -100,6 +101,15 @@ class BookingCancellationTest extends TestCase
             'id' => $orderItem->id,
             'order_id' => $order->id,
         ]);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'booking.cancelled')->count());
+        $this->assertSame(
+            ['A1'],
+            ActivityLog::query()->where('action', 'booking.cancelled')->sole()->context['seat_units'],
+        );
+
+        $replacement = $this->reserve($scenario, [$scenario['seats'][0]->id], $owner->id)->booking;
+        $this->assertNotSame($booking->id, $replacement->id);
+        $this->assertSame(BookingSeat::ACTIVE_LOCK_KEY, $replacement->bookingSeats()->sole()->active_lock_key);
     }
 
     public function test_duplicate_cancellation_is_idempotent(): void
@@ -114,6 +124,7 @@ class BookingCancellationTest extends TestCase
 
         $this->assertSame('cancelled', $booking->fresh()->booking_status);
         $this->assertNull($booking->bookingSeats()->sole()->active_lock_key);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'booking.cancelled')->count());
     }
 
     public function test_failed_and_expired_payment_attempts_are_terminal_and_allow_cancellation(): void

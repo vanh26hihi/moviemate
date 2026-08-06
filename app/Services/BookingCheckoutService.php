@@ -6,6 +6,8 @@ use App\Exceptions\BookingCheckoutConflictException;
 use App\Models\Booking;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Services\Seats\SeatAvailabilitySnapshot;
+use App\Services\Seats\SeatSelectionPolicy;
 use App\Support\SeatPresentation;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -27,6 +29,7 @@ class BookingCheckoutService
         private readonly BookingCodeGenerator $bookingCodes,
         private readonly BookingPricingService $pricing,
         private readonly BookingFoodService $food,
+        private readonly SeatSelectionPolicy $seatSelectionPolicy,
     ) {}
 
     public function createPendingBooking(
@@ -101,7 +104,12 @@ class BookingCheckoutService
                         ->orderBy('id')
                         ->get();
 
-                    $this->assertSeatsCanBeReserved($seats, $normalizedSeatIds, $layout->id);
+                    $this->assertSeatsCanBeReserved($seats, $normalizedSeatIds, $layout);
+
+                    // Final authoritative gap check inside the showtime transaction. The shared
+                    // showtime lock serializes checkout writers, selected Seat rows are locked,
+                    // and the snapshot locks existing BookingSeat inventory before insertion.
+                    $this->assertNoIsolatedSeat($showtime, $layout, $normalizedSeatIds);
 
                     $foodBreakdown = $this->food->calculate($foodSelection, (int) $showtime->cinema_id);
                     $priceBreakdown = $this->pricing
@@ -174,6 +182,27 @@ class BookingCheckoutService
         throw new LogicException('Không thể tạo mã đặt vé sau nhiều lần thử.');
     }
 
+    /**
+     * Reject a hold that would leave exactly one isolated available seat. Runs inside the
+     * hold transaction after the shared showtime lock and selected Seat locks. The snapshot
+     * also locks existing BookingSeat inventory before the hold is persisted.
+     */
+    private function assertNoIsolatedSeat(Showtime $showtime, $layout, Collection $seatIds): void
+    {
+        $snapshot = SeatAvailabilitySnapshot::for($showtime, $layout, lockHolds: true);
+
+        if ($this->seatSelectionPolicy->violates(
+            $layout,
+            $snapshot->unavailableSeatIds,
+            $seatIds,
+            $snapshot->cells,
+        )) {
+            throw ValidationException::withMessages([
+                'seat_ids' => SeatSelectionPolicy::MESSAGE_ISOLATED_SEAT,
+            ]);
+        }
+    }
+
     private function result(
         Booking $booking,
         string $checkoutToken,
@@ -212,7 +241,7 @@ class BookingCheckoutService
         }
     }
 
-    private function assertSeatsCanBeReserved(Collection $seats, Collection $seatIds, int $layoutId): void
+    private function assertSeatsCanBeReserved(Collection $seats, Collection $seatIds, $layout): void
     {
         if ($seats->count() !== $seatIds->count()) {
             throw ValidationException::withMessages([
@@ -228,16 +257,14 @@ class BookingCheckoutService
 
         foreach ($seats->where('type', 'couple')->groupBy('pair_code') as $pairCode => $selectedPair) {
             $validPositions = $selectedPair->pluck('pair_position')->sort()->values()->all() === ['left', 'right'];
-            $layoutPairCount = $pairCode
-                ? Seat::query()
-                    ->where('room_id', $selectedPair->first()->room_id)
-                    ->where('type', 'couple')
-                    ->where('pair_code', $pairCode)
-                    ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layoutId))
-                    ->count()
-                : 0;
+            $layoutPair = $pairCode
+                ? $layout->cells->whereIn('seat_id', $selectedPair->pluck('id'))->values()
+                : collect();
+            $layoutPairIsContiguous = $layoutPair->count() === 2
+                && $layoutPair->pluck('y_position')->unique()->count() === 1
+                && abs((int) $layoutPair[0]->x_position - (int) $layoutPair[1]->x_position) === 1;
 
-            if ($selectedPair->count() !== 2 || ! $validPositions || $layoutPairCount !== 2
+            if ($selectedPair->count() !== 2 || ! $validPositions || ! $layoutPairIsContiguous
                 || ! SeatPresentation::isValidCouple($selectedPair)) {
                 throw ValidationException::withMessages([
                     'seat_ids' => 'Ghế đôi phải được giữ đủ cả cặp trong cùng layout.',

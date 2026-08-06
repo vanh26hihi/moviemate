@@ -5,7 +5,9 @@
 @section('content')
 @php
     $cellMap = $layoutCells->keyBy(fn ($cell) => $cell->x_position.':'.$cell->y_position);
+    $seatCellLookup = $layoutCells->where('cell_type', 'seat')->keyBy('seat_id');
     $bookedSeatLookup = array_fill_keys($bookedSeatIds, true);
+    $selectedSeatLookup = array_fill_keys($selectedSeatIds ?? [], true);
     $seatGroups = \App\Support\SeatPresentation::groups($seats);
     $seatGroupLookup = collect();
     foreach ($seatGroups as $group) {
@@ -55,8 +57,16 @@
                                         $seat = $cell?->seat;
                                         $seatGroup = $seat ? $seatGroupLookup->get($seat->id) : null;
                                         $groupSeats = $seatGroup['seats'] ?? collect([$seat]);
-                                        $isMergedCouple = (bool) ($seatGroup['is_couple'] ?? false) && (bool) ($seatGroup['is_valid'] ?? false);
-                                        $primarySeatId = $isMergedCouple ? $groupSeats->sortBy('x_position')->first()?->id : $seat?->id;
+                                        $groupCells = $groupSeats->map(fn ($member) => $seatCellLookup->get($member?->id))->filter()->values();
+                                        $isLayoutCoupleValid = $groupCells->count() === 2
+                                            && $groupCells->pluck('y_position')->unique()->count() === 1
+                                            && abs((int) $groupCells[0]->x_position - (int) $groupCells[1]->x_position) === 1;
+                                        $isMergedCouple = (bool) ($seatGroup['is_couple'] ?? false)
+                                            && (bool) ($seatGroup['is_valid'] ?? false)
+                                            && $isLayoutCoupleValid;
+                                        $primarySeatId = $isMergedCouple
+                                            ? $groupCells->sortBy('x_position')->first()?->seat_id
+                                            : $seat?->id;
                                     @endphp
 
                                     @if(!$cell)
@@ -69,7 +79,8 @@
                                         @php
                                             $booked = $groupSeats->contains(fn ($member) => isset($bookedSeatLookup[$member->id]));
                                             $maintenance = $groupSeats->contains(fn ($member) => $member->status !== 'active');
-                                            $invalidPair = (bool) ($seatGroup['is_couple'] ?? false) && ! (bool) ($seatGroup['is_valid'] ?? false);
+                                            $invalidPair = (bool) ($seatGroup['is_couple'] ?? false)
+                                                && (! (bool) ($seatGroup['is_valid'] ?? false) || ! $isLayoutCoupleValid);
                                             $disabled = $booked || $maintenance || $invalidPair;
                                             $price = $showtime->priceForSeatType($seatGroup['type'] ?? $seat->type);
                                             $seatClass = match(true) {
@@ -90,6 +101,13 @@
                                             $typeLabel = $seatTypeLabels[$type] ?? \App\Support\StatusLabel::for('seat_type', $type);
                                             $seatCode = $seatGroup['seat_code'] ?? $seat->seat_code;
                                             $seatIds = implode(',', $seatGroup['seat_ids'] ?? [$seat->id]);
+                                            $seatGeometry = $groupCells
+                                                ->sortBy('x_position')
+                                                ->map(fn ($groupCell) => $groupCell->seat_id.':'.$groupCell->x_position)
+                                                ->implode(',');
+                                            $preselected = !$disabled && $groupSeats->every(
+                                                fn ($member) => isset($selectedSeatLookup[$member->id])
+                                            );
                                         @endphp
                                         <button
                                             type="button"
@@ -98,9 +116,13 @@
                                             data-seat-code="{{ $seatCode }}"
                                             data-seat-type="{{ $type }}"
                                             data-pair-code="{{ $seat->pair_code }}"
+                                            data-seat-row="{{ $y }}"
+                                            data-seat-x="{{ $x }}"
+                                            data-seat-geometry="{{ $seatGeometry }}"
+                                            data-seat-available="{{ $disabled ? '0' : '1' }}"
                                             data-price="{{ $price }}"
                                             aria-label="{{ $isMergedCouple ? 'Ghế đôi '.$seatCode : 'Ghế '.$seatCode }}, loại {{ $typeLabel }}, {{ $availability }}, {{ number_format($price, 0, ',', '.') }} VNĐ"
-                                            aria-pressed="false"
+                                            aria-pressed="{{ $preselected ? 'true' : 'false' }}"
                                             @disabled($disabled)
                                         >{{ $seatCode }}</button>
                                     @endif

@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 // independent, so the merge keeps both rather than choosing a side.
 import './showtime-calendar';
 import './showtime';
+import './seat-gap-guard';
 
 const THEME_KEY = 'theme';
 const LEGACY_THEME_KEY = 'moviemate_theme';
@@ -96,6 +97,10 @@ function initializeSeatPickers() {
         }
 
         buttons.forEach((button) => {
+            if (button.getAttribute('aria-pressed') === 'true') {
+                setSelected(button, true);
+            }
+
             button.addEventListener('click', () => {
                 const seatIds = (button.dataset.seatIds || '').split(',').filter(Boolean);
                 if (button.dataset.seatType === 'couple' && seatIds.length !== 2) {
