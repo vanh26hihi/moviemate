@@ -10,11 +10,10 @@ use App\Models\Seat;
 use App\Services\ActivityLogger;
 use App\Services\CinemaContext;
 use App\Services\RoomLayoutService;
-use App\Support\SeatPresentation;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class SeatController extends Controller
 {
@@ -24,20 +23,9 @@ class SeatController extends Controller
         private readonly ActivityLogger $activityLogger,
     ) {}
 
-    public function index(Request $request)
+    public function index(): RedirectResponse
     {
-        $rooms = $this->operationalRooms();
-        $roomId = $request->query('room_id');
-        $query = Seat::query()->with(['room.cinema'])->whereHas('room', fn ($query) => $query
-            ->where('cinema_id', $this->cinemaContext->id())->where('status', 'active'));
-
-        if ($roomId && $rooms->contains('id', (int) $roomId)) {
-            $query->where('room_id', $roomId);
-        }
-
-        $seats = $query->orderBy('room_id')->orderBy('row')->orderBy('number')->paginate(30)->withQueryString();
-
-        return view('admin.seats.index', compact('seats', 'rooms', 'roomId'));
+        return redirect()->route('admin.rooms.index');
     }
 
     public function manage(Room $room)
@@ -137,79 +125,6 @@ class SeatController extends Controller
 
         return redirect()->route('admin.rooms.layout.show', $room)
             ->with('warning', 'Trình tạo ma trận ghế cũ đã ngừng sử dụng. Hãy dùng trình thiết kế sơ đồ ghế mới.');
-    }
-
-    public function update(Request $request, Seat $seat)
-    {
-        $seat->loadMissing('room');
-        $this->assertOperationalRoom($seat->room);
-        $validated = $request->validate([
-            'type' => ['required', 'in:normal,vip,couple'],
-            'status' => ['required', 'in:active,maintenance,inactive,retired'],
-        ]);
-        DB::transaction(function () use ($seat, $validated): void {
-            $locked = Seat::query()->whereKey($seat->id)->lockForUpdate()->firstOrFail();
-            $before = ['status' => $locked->status, 'seat_type' => $locked->type];
-            $affectedCount = 1;
-            if ($locked->type !== 'couple' && $validated['type'] === 'couple') {
-                throw ValidationException::withMessages([
-                    'seat' => 'Hãy tạo ghế đôi trong trình thiết kế để hệ thống ghép đủ hai vị trí liền nhau.',
-                ]);
-            }
-
-            if ($locked->type === 'couple') {
-                $pair = Seat::query()
-                    ->where('room_id', $locked->room_id)
-                    ->where('pair_code', $locked->pair_code)
-                    ->lockForUpdate()
-                    ->get();
-                if (! SeatPresentation::isValidCouple($pair)) {
-                    throw ValidationException::withMessages([
-                        'seat' => 'Dữ liệu cặp ghế này không đồng nhất. Hãy sửa trong trình thiết kế sơ đồ ghế.',
-                    ]);
-                }
-                if ($validated['type'] !== 'couple' && $pair->contains(fn (Seat $member): bool => $member->bookingSeats()->exists())) {
-                    throw ValidationException::withMessages([
-                        'seat' => 'Không thể tách ghế đôi đã có lịch sử đặt vé.',
-                    ]);
-                }
-
-                foreach ($pair as $member) {
-                    $member->update([
-                        'type' => $validated['type'],
-                        'status' => $validated['status'],
-                        'pair_code' => $validated['type'] === 'couple' ? $member->pair_code : null,
-                        'pair_position' => $validated['type'] === 'couple' ? $member->pair_position : null,
-                    ]);
-                }
-                $affectedCount = $pair->count();
-            } else {
-                $locked->update($validated);
-            }
-
-            if ($before !== ['status' => $validated['status'], 'seat_type' => $validated['type']]) {
-                $this->activityLogger->log(
-                    'seat.maintenance_updated',
-                    $locked,
-                    $before,
-                    ['status' => $validated['status'], 'seat_type' => $validated['type']],
-                    [
-                        'room_id' => $locked->room_id,
-                        'seat_id' => $locked->id,
-                        'seat_code' => $locked->seat_code,
-                        'count' => $affectedCount,
-                    ],
-                );
-            }
-        });
-
-        return back()->with('success', 'Cập nhật ghế thành công.');
-    }
-
-    private function operationalRooms()
-    {
-        return Room::query()->with('cinema')->where('cinema_id', $this->cinemaContext->id())
-            ->operational()->orderBy('code')->get();
     }
 
     private function assertOperationalRoom(Room $room): void

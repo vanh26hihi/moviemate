@@ -2,6 +2,11 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\Room;
+use App\Models\RoomLayout;
+use App\Models\RoomLayoutCell;
+use App\Models\Seat;
+use App\Services\CinemaContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -52,8 +57,38 @@ class AdminNavigationFoundationTest extends TestCase
 
     public function test_seat_maintenance_keeps_room_navigation_item_as_the_only_active_item(): void
     {
+        $room = Room::factory()->create(['cinema_id' => app(CinemaContext::class)->id()]);
+        $layout = RoomLayout::query()->create([
+            'room_id' => $room->id,
+            'version' => 1,
+            'name' => 'Sơ đồ hiện hành',
+            'rows' => 1,
+            'columns' => 1,
+            'screen_position' => 'top',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $seat = Seat::query()->create([
+            'room_id' => $room->id,
+            'row' => 'A',
+            'number' => 1,
+            'seat_code' => 'A1',
+            'type' => 'normal',
+            'status' => 'active',
+        ]);
+        RoomLayoutCell::query()->create([
+            'room_layout_id' => $layout->id,
+            'x_position' => 1,
+            'y_position' => 1,
+            'cell_type' => 'seat',
+            'seat_id' => $seat->id,
+        ]);
+
         $navigation = $this->navigationHtml(
-            $this->actingAs($this->userWithRole('admin'))->get(route('admin.seats.index'))->assertOk()->getContent()
+            $this->actingAs($this->userWithRole('admin'))
+                ->get(route('admin.rooms.seat-maintenance.index', $room))
+                ->assertOk()
+                ->getContent()
         );
 
         $this->assertSame(1, substr_count($navigation, 'aria-current="page"'));

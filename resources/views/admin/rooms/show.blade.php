@@ -28,8 +28,8 @@
                 @endif
             @endcan
             @can('seats.maintenance.view')
-                @if($room->status === 'active')
-                    <a href="{{ route('admin.seats.index', ['room_id' => $room->id]) }}" class="btn-secondary"><i class="ph ph-wrench" aria-hidden="true"></i> Bảo trì ghế</a>
+                @if($room->status === 'active' && $published)
+                    <a href="{{ route('admin.rooms.seat-maintenance.index', $room) }}" class="btn-secondary"><i class="ph ph-wrench" aria-hidden="true"></i> Bảo trì ghế</a>
                 @endif
             @endcan
         </div>
