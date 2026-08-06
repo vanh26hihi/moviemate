@@ -113,6 +113,11 @@ class Booking extends Model
         return $this->hasOne(BookingTicketDelivery::class);
     }
 
+    public function ticketPrint(): HasOne
+    {
+        return $this->hasOne(BookingTicketPrint::class);
+    }
+
     public function ticketCheckinEvents(): HasMany
     {
         return $this->hasMany(TicketCheckinEvent::class);

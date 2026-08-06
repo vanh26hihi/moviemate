@@ -31,6 +31,8 @@ use App\Http\Controllers\Payments\VnpayReturnController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
 use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
+use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
+use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
 use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
@@ -166,16 +168,12 @@ Route::get('/my-ticket/{booking}', [BookingController::class, 'ticket'])
     ->middleware(ProtectBookingResponses::class)
     ->name('user.bookings.ticket.legacy');
 
-Route::get('/bookings/{booking}/ticket/print', [BookingController::class, 'printTicket'])
-    ->middleware(ProtectBookingResponses::class)
-    ->name('user.bookings.ticket.print');
-
 Route::post('/bookings/{booking}/ticket-email/resend', TicketEmailResendController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:3,1'])
     ->name('user.bookings.ticket-email.resend');
 
 Route::get('/booking/access/{booking}', [GuestBookingAccessController::class, 'show'])
-    ->middleware(ProtectBookingResponses::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
     ->name('user.bookings.access.show');
 
 Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, 'exchange'])
@@ -242,9 +240,9 @@ Route::prefix('admin')->name('admin.')
         Route::post('/bookings/{booking}/cancel', [AdminBookingOperationController::class, 'cancel'])
             ->whereNumber('booking')
             ->middleware('permission:bookings.operate')->name('bookings.cancel');
-        Route::get('/bookings/{booking}/ticket/print', [AdminBookingOperationController::class, 'print'])
+        Route::post('/bookings/{booking}/ticket-print/authorize-retry', [AdminBookingOperationController::class, 'authorizePrintRetry'])
             ->whereNumber('booking')
-            ->middleware('permission:tickets.print')->name('bookings.ticket.print');
+            ->middleware('permission:tickets.print.override')->name('bookings.ticket-print.authorize-retry');
 
         Route::resource('foods', AdminFoodController::class)->except(['show'])
             ->middlewareFor('index', 'permission:foods.view')
@@ -390,8 +388,20 @@ Route::prefix('staff')->name('staff.')
             ->middleware('permission:seats.view')->name('rooms.layout.preview');
         Route::get('/', fn () => view('staff.dashboard'))
             ->middleware('permission:dashboard.view')->name('dashboard');
-        Route::get('/tickets', fn () => view('staff.tickets.index'))
-            ->middleware('permission:bookings.view')->name('tickets.index');
+        Route::get('/tickets', [StaffTicketWorkspaceController::class, 'index'])
+            ->middleware('permission:tickets.lookup')->name('tickets.index');
+        Route::post('/tickets/resolve', [StaffTicketWorkspaceController::class, 'resolve'])
+            ->middleware(['permission:tickets.lookup', 'throttle:30,1'])->name('tickets.resolve');
+        Route::get('/tickets/{booking}/operations', [StaffTicketWorkspaceController::class, 'operations'])
+            ->whereNumber('booking')->middleware('permission:tickets.lookup')->name('tickets.operations');
+        Route::post('/tickets/{booking}/print', [StaffTicketPrintController::class, 'start'])
+            ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.start');
+        Route::get('/tickets/{booking}/print', [StaffTicketPrintController::class, 'show'])
+            ->whereNumber('booking')->middleware('permission:tickets.print')->name('tickets.print.show');
+        Route::post('/tickets/{booking}/print/succeed', [StaffTicketPrintController::class, 'succeed'])
+            ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.succeed');
+        Route::post('/tickets/{booking}/print/fail', [StaffTicketPrintController::class, 'fail'])
+            ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.fail');
         Route::get('/tickets/check', [StaffTicketCheckinController::class, 'show'])
             ->middleware('permission:tickets.checkin')->name('tickets.check');
         Route::post('/tickets/check', [StaffTicketCheckinController::class, 'store'])

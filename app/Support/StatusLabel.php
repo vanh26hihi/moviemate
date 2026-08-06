@@ -59,6 +59,14 @@ final class StatusLabel
             'invalid_token' => 'Mã vé không hợp lệ',
             'rejected' => 'Bị từ chối',
         ],
+        'ticket_print' => [
+            'unprinted' => 'Chưa in',
+            'printing' => 'Đang in',
+            'printed' => 'Đã in',
+            'retry_allowed' => 'In lỗi · được thử lại',
+            'retry_requires_authorization' => 'Chờ duyệt in lại',
+            'retry_authorized' => 'Được phép in lại',
+        ],
         'movie' => [
             'now_showing' => 'Đang chiếu',
             'coming_soon' => 'Sắp chiếu',

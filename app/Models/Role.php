@@ -28,7 +28,8 @@ class Role extends Model
         'seats.maintenance.view', 'seats.maintenance.update',
         'discounts.view', 'discounts.manage',
         'reviews.view', 'reviews.moderate',
-        'reports.view', 'tickets.print', 'tickets.checkin',
+        'reports.view', 'tickets.print', 'tickets.checkin', 'tickets.lookup',
+        'tickets.print.override', 'ticket_prints.view',
     ];
 
     public const STAFF_PERMISSION_SLUGS = [
@@ -43,6 +44,7 @@ class Role extends Model
         'ticket_checkins.view',
         'tickets.print',
         'tickets.checkin',
+        'tickets.lookup',
     ];
 
     protected $fillable = ['name', 'slug', 'description', 'is_system'];

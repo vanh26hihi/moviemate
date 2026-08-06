@@ -98,7 +98,7 @@
                 <thead><tr>
                     <th>Mã đặt vé</th><th>Khách hàng</th><th>Phim</th><th>Suất chiếu</th><th>Phòng</th><th>Ghế</th>
                     <th class="text-right">Tiền ghế</th><th class="text-right">Tiền đồ ăn</th><th class="text-right">Tổng thanh toán</th>
-                    <th>Trạng thái đơn</th><th>Trạng thái thanh toán</th><th>Trạng thái vé</th><th>Soát vé</th><th>Ngày tạo</th><th class="text-right">Thao tác</th>
+                    <th>Trạng thái đơn</th><th>Trạng thái thanh toán</th><th>Trạng thái in vé</th><th>Trạng thái soát vé</th><th>Gửi vé điện tử</th><th>Ngày tạo</th><th class="text-right">Thao tác</th>
                 </tr></thead>
                 <tbody>
                     @forelse($bookings as $booking)
@@ -114,13 +114,14 @@
                             <td class="text-right whitespace-nowrap font-extrabold app-text">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</td>
                             <td><span class="status-badge bg-ai-start/10 text-ai-start">{{ \App\Support\StatusLabel::for('booking_admin', $booking->booking_status) }}</span></td>
                             <td><span class="status-badge {{ $booking->payment_status === 'paid' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">{{ $booking->payment_status_label }}</span></td>
-                            <td>{{ $booking->ticketDelivery?->status_label ?? 'Chưa có yêu cầu gửi' }}</td>
+                            <td>{{ $booking->ticketPrint?->status_label ?? 'Chưa có dữ liệu in' }}</td>
                             <td>{{ $booking->booking_status === 'used' ? 'Đã soát vé' : 'Chưa soát vé' }}</td>
+                            <td>{{ $booking->ticketDelivery?->status_label ?? 'Chưa có yêu cầu gửi' }}</td>
                             <td class="whitespace-nowrap">{{ $booking->created_at?->format('d/m/Y H:i') }}</td>
                             <td class="text-right"><a class="btn-secondary !px-3 !py-2 text-xs" href="{{ route('admin.bookings.show', $booking) }}">Xem chi tiết</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="15" class="py-12 text-center app-muted">Không có đơn đặt vé phù hợp.</td></tr>
+                        <tr><td colspan="16" class="py-12 text-center app-muted">Không có đơn đặt vé phù hợp.</td></tr>
                     @endforelse
                 </tbody>
             </table>

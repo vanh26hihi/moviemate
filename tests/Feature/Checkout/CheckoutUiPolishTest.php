@@ -168,7 +168,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertOk()
             ->assertSee('data-ticket-state="usable"', false)
             ->assertSee('data-qr-value="v1.', false)
-            ->assertSee('data-print-ticket', false)
+            ->assertDontSee('data-print-ticket', false)
             ->assertSee('A1')
             ->assertSee('Bắp rang caramel')
             ->assertSee('90.000 VNĐ')

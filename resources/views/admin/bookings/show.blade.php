@@ -22,7 +22,7 @@
         </div>
         <div class="flex flex-wrap gap-2">
             @can('tickets.print')
-                @if($ticketEligible)<a href="{{ route('admin.bookings.ticket.print', $booking) }}" class="btn-secondary" target="_blank"><i class="ph ph-printer" aria-hidden="true"></i>In vé</a>@endif
+                @if($ticketEligible)<a href="{{ route('staff.tickets.operations', $booking) }}" class="btn-secondary"><i class="ph ph-printer" aria-hidden="true"></i>Vận hành in vé</a>@endif
             @endcan
             @can('ticket_deliveries.retry')
                 @if($ticketEligible)
@@ -48,14 +48,42 @@
         </div>
     </header>
 
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Tóm tắt đơn">
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Tóm tắt đơn">
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái đặt vé</p><p class="mt-2 font-extrabold app-text">{{ \App\Support\StatusLabel::for('booking_admin', $booking->booking_status) }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái thanh toán</p><p class="mt-2 font-extrabold app-text">{{ $booking->payment_status_label }}</p></div>
+        <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái in vé</p><p class="mt-2 font-extrabold app-text">{{ $printState?->status_label ?? 'Chưa có dữ liệu in' }}</p></div>
+        <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái soát vé</p><p class="mt-2 font-extrabold app-text">{{ $acceptedCheckin ? 'Đã soát vé' : 'Chưa soát vé' }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Tạo lúc</p><p class="mt-2 font-extrabold app-text">{{ $booking->created_at?->format('d/m/Y H:i:s') ?? '—' }}</p></div>
-        <div class="cinema-card p-5"><p class="text-sm app-muted">Tổng thanh toán</p><p class="mt-2 text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p></div>
     </section>
 
     <div class="grid gap-6 xl:grid-cols-2">
+        <section class="cinema-card p-6">
+            <h2 class="text-xl font-extrabold app-heading">In vé cứng</h2>
+            <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div><dt class="text-sm app-muted">Trạng thái</dt><dd class="font-bold app-text">{{ $printState?->status_label ?? 'Chưa có dữ liệu in' }}</dd></div>
+                <div><dt class="text-sm app-muted">Số lần bắt đầu</dt><dd class="font-bold app-text">{{ $printState?->attempts_count ?? 0 }}</dd></div>
+                <div><dt class="text-sm app-muted">Người in thành công</dt><dd class="font-bold app-text">{{ $printState?->printedBy?->name ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">In thành công lúc</dt><dd class="font-bold app-text">{{ $printState?->printed_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Lỗi gần nhất</dt><dd class="font-bold app-text">{{ $printState?->last_failure_code ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$printState->last_failure_code] ?? 'Lỗi in') : '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Duyệt in lại</dt><dd class="font-bold app-text">{{ $printState?->retryAuthorizedBy?->name ?? '—' }} @if($printState?->retry_authorized_at)· {{ $printState->retry_authorized_at->format('d/m/Y H:i:s') }}@endif</dd></div>
+            </dl>
+            @can('tickets.print.override')
+                @if($printState?->status === 'retry_requires_authorization')
+                    <form method="POST" action="{{ route('admin.bookings.ticket-print.authorize-retry', $booking) }}" class="mt-5">@csrf
+                        <label class="cinema-label">Ghi chú duyệt (không chứa dữ liệu máy in)<textarea name="safe_note" maxlength="300" class="cinema-input mt-1"></textarea></label>
+                        <button class="btn-primary mt-3" type="submit">Cho phép thêm một lần in</button>
+                    </form>
+                @endif
+            @endcan
+            @can('ticket_prints.view')
+                @if($printEvents->isNotEmpty())
+                    <div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Sự kiện</th><th>Lần</th><th>Chi tiết an toàn</th><th>Người thực hiện</th></tr></thead><tbody>
+                        @foreach($printEvents as $event)<tr><td>{{ $event->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ match($event->event_type) { 'print_started' => 'Bắt đầu in', 'print_succeeded' => 'In thành công', 'print_failed' => 'In lỗi', 'retry_authorized' => 'Duyệt in lại', 'stale_print_released' => 'Lần in hết hạn', default => 'Sự kiện in' } }}</td><td>{{ $event->attempt_number }}</td><td>{{ $event->failure_code ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? 'Lỗi in') : '—' }}@if($event->safe_note)<span class="mt-1 block max-w-md break-words text-xs app-muted">{{ $event->safe_note }}</span>@endif</td><td>{{ $event->actor?->name ?? 'Hệ thống' }}</td></tr>@endforeach
+                    </tbody></table></div>
+                @endif
+            @endcan
+        </section>
+
         <section class="cinema-card p-6">
             <h2 class="text-xl font-extrabold app-heading">Mốc thời gian</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
@@ -166,7 +194,7 @@
         <section class="cinema-card overflow-hidden">
             <div class="border-b app-border p-6"><h2 class="text-xl font-extrabold app-heading">Lịch sử hoạt động</h2></div>
             <div class="overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Mã yêu cầu</th></tr></thead><tbody>
-                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
+                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', 'ticket.print_started' => 'Bắt đầu in vé cứng', 'ticket.print_succeeded' => 'Xác nhận in thành công', 'ticket.print_failed' => 'Ghi nhận in lỗi', 'ticket.print_retry_authorized' => 'Cho phép in lại', 'ticket.print_stale_released' => 'Giải phóng lần in hết hạn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
                 @empty<tr><td colspan="4" class="py-8 text-center app-muted">Chưa có hoạt động quản trị liên quan.</td></tr>@endforelse
             </tbody></table></div>
         </section>

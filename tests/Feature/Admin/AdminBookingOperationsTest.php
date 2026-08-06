@@ -149,7 +149,8 @@ class AdminBookingOperationsTest extends PaymentTestCase
             ->assertOk()
             ->assertSee('Trạng thái đơn')
             ->assertSee('Trạng thái thanh toán')
-            ->assertSee('Trạng thái vé');
+            ->assertSee('Trạng thái in vé')
+            ->assertSee('Trạng thái soát vé');
 
         foreach ([$paid, $used, $refunded, $unresolved, $review, $processing, $meaningfulCancelled] as $visible) {
             $response->assertSee($visible->booking_code);
@@ -237,9 +238,9 @@ class AdminBookingOperationsTest extends PaymentTestCase
             ->get(route('admin.bookings.show', $booking))
             ->assertOk()->assertSee('Lịch sử hoạt động')->assertSee('Truy vấn nhà cung cấp');
         $this->actingAs($this->userWithRole('manager'))
-            ->get(route('admin.bookings.ticket.print', $booking))
-            ->assertOk()->assertSee('data-ticket-print-page="true"', false)
-            ->assertSee('data-print-ticket', false)->assertDontSee('data-qr-value', false)
+            ->get(route('staff.tickets.operations', $booking))
+            ->assertOk()->assertSee($booking->booking_code)
+            ->assertSee('Trạng thái in vé')->assertDontSee('data-qr-value', false)
             ->assertDontSee($booking->recipient_email);
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.bookings.ticket-email.resend', $booking))
@@ -326,7 +327,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
         $manager = $this->userWithRole('manager');
 
         $this->actingAs($manager)->post(route('admin.bookings.ticket-email.resend', $unpaid))->assertNotFound();
-        $this->actingAs($manager)->get(route('admin.bookings.ticket.print', $unpaid))->assertNotFound();
+        $this->actingAs($manager)->post(route('staff.tickets.print.start', $unpaid))->assertStatus(409);
         $this->actingAs($manager)->post(route('admin.bookings.payment-query', $unpaid))
             ->assertRedirect()->assertSessionHas('warning');
         $this->assertDatabaseCount('activity_logs', 0);

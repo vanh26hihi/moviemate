@@ -266,7 +266,7 @@ final class AdminTicketOperationsTest extends PaymentTestCase
             [route('admin.ticket-deliveries.show', $delivery), 18, 'delivery detail'],
             [route('admin.ticket-checkins.index'), 16, 'check-in index'],
             [route('admin.ticket-checkins.show', $event), 18, 'check-in detail'],
-            [route('admin.bookings.show', $delivery->booking), 22, 'booking detail'],
+            [route('admin.bookings.show', $delivery->booking), 23, 'booking detail'],
         ] as [$url, $limit, $label]) {
             DB::flushQueryLog();
             DB::enableQueryLog();

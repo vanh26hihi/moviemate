@@ -13,7 +13,7 @@
             @endif
             @endcan
             @can('tickets.print')
-                @if($booking && $eligible)<a class="btn-secondary" href="{{ route('admin.bookings.ticket.print', $booking) }}" target="_blank">In vé</a>@endif
+                @if($booking && $eligible)<a class="btn-secondary" href="{{ route('staff.tickets.operations', $booking) }}">Vận hành in vé</a>@endif
             @endcan
             @can('ticket_deliveries.retry')
                 @if($retryAllowed)

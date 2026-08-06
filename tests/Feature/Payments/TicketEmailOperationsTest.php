@@ -191,7 +191,9 @@ class TicketEmailOperationsTest extends PaymentTestCase
                 && str_contains($html, 'Booking Foundation Movie')
                 && str_contains($html, 'Test booking room')
                 && str_contains($html, '50.000 VNĐ')
-                && str_contains($html, 'Xem / In vé an toàn')
+                && str_contains($html, 'Xem vé điện tử')
+                && str_contains($html, 'Mã QR vé MovieMate')
+                && ! str_contains($html, 'Lưu PDF')
                 && ! str_contains($html, 'tracking')
                 && ! str_contains($html, 'VNPAY_HASH_SECRET')
                 && ! str_contains($html, 'api.qrserver.com');

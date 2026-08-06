@@ -48,6 +48,11 @@ final class ActivityLogSanitizer
         'error_category',
         'checkin_event_id',
         'checkin_result',
+        'cinema_id',
+        'print_state_id',
+        'print_status',
+        'failure_code',
+        'actor_id',
         'vip_price',
     ];
 

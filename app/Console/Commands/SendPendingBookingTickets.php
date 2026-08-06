@@ -12,6 +12,8 @@ use App\Services\BookingTokenService;
 use App\Services\Mail\ProductionMailTransportGuard;
 use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\Tickets\BookingTicketEligibility;
+use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\TicketQrCode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -177,7 +179,9 @@ class SendPendingBookingTickets extends Command
             : route('user.bookings.access.show', $booking)
                 .'#token='.rawurlencode($ticketEmailToken).'&destination=ticket';
 
-        Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl));
+        $checkinCapability = app(TicketCheckinCapability::class)->issue($booking);
+        $ticketQrSvg = app(TicketQrCode::class)->svg($checkinCapability);
+        Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl, $ticketQrSvg));
 
         DB::transaction(function () use ($delivery, $booking): void {
             $claimedAt = $delivery->processing_started_at;
