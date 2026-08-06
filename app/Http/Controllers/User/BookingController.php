@@ -10,7 +10,6 @@ use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
-use App\Services\CinemaContext;
 use App\Services\GuestBookingAccessService;
 use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\RoomLayoutService;
@@ -25,7 +24,6 @@ use Illuminate\Support\Facades\Gate;
 class BookingController extends Controller
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
         private readonly GuestBookingAccessService $guestAccess,
         private readonly BookingCheckoutDraftService $drafts,
@@ -38,9 +36,10 @@ class BookingController extends Controller
     /**
      * Show seat selection page for a given showtime.
      */
-    public function selectSeat(Showtime $showtime)
+    public function selectSeat(Request $request, Showtime $showtime)
     {
         $showtime->load(['movie', 'cinema', 'room', 'roomLayout.cells.seat']);
+        $this->assertExpectedCinema($request, $showtime);
 
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
@@ -73,6 +72,7 @@ class BookingController extends Controller
     public function checkout(Request $request, Showtime $showtime)
     {
         $showtime->load(['movie', 'cinema', 'room', 'roomLayout']);
+        $this->assertExpectedCinema($request, $showtime);
 
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
@@ -250,9 +250,10 @@ class BookingController extends Controller
     protected function isShowtimeAvailable(Showtime $showtime): bool
     {
         if ($showtime->status !== 'active'
-            || $showtime->cinema_id !== $this->cinemaContext->id()
+            || $showtime->cinema?->status !== 'active'
+            || $showtime->cinema?->archived_at !== null
             || $showtime->room?->status !== 'active'
-            || $showtime->room?->cinema_id !== $this->cinemaContext->id()
+            || $showtime->room?->cinema_id !== $showtime->cinema_id
             || ! $showtime->roomLayout
             || $showtime->roomLayout->status !== 'published'
             || $showtime->roomLayout->room_id !== $showtime->room_id) {
@@ -264,6 +265,13 @@ class BookingController extends Controller
         );
 
         return $showDateTime->isFuture();
+    }
+
+    private function assertExpectedCinema(Request $request, Showtime $showtime): void
+    {
+        if ($request->query->has('cinema_id')) {
+            abort_unless($request->integer('cinema_id') === (int) $showtime->cinema_id, 404);
+        }
     }
 
     private function coupleSelectionIsComplete($seats, int $layoutId): bool

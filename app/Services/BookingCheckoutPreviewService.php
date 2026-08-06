@@ -13,7 +13,6 @@ use Illuminate\Validation\ValidationException;
 class BookingCheckoutPreviewService
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
         private readonly BookingPricingService $pricing,
         private readonly BookingFoodService $food,
@@ -41,7 +40,7 @@ class BookingCheckoutPreviewService
             ->get();
 
         $this->assertSeatsAvailable($showtime, $seats, $seatIds, $layout->id);
-        $food = $this->food->calculate($draft['food_items'] ?? []);
+        $food = $this->food->calculate($draft['food_items'] ?? [], (int) $showtime->cinema_id);
         $prices = $this->pricing->calculate($showtime, $seats)->withFood($food);
 
         return new BookingCheckoutPreview($showtime, $seats, $prices);
@@ -50,12 +49,11 @@ class BookingCheckoutPreviewService
     private function assertShowtimeAvailable(Showtime $showtime): void
     {
         $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time);
-        $canonicalCinemaId = $this->cinemaContext->id();
-
         if ($showtime->status !== 'active'
-            || $showtime->cinema_id !== $canonicalCinemaId
+            || $showtime->cinema?->status !== 'active'
+            || $showtime->cinema?->archived_at !== null
             || $showtime->room?->status !== 'active'
-            || $showtime->room?->cinema_id !== $canonicalCinemaId
+            || $showtime->room?->cinema_id !== $showtime->cinema_id
             || ! $showtime->roomLayout
             || $showtime->roomLayout->status !== 'published'
             || $showtime->roomLayout->room_id !== $showtime->room_id

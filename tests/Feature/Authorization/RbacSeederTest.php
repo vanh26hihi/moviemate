@@ -30,7 +30,9 @@ class RbacSeederTest extends TestCase
         $this->assertTrue($manager->hasPermission('admin.access'));
         $this->assertTrue($manager->hasPermission('cinema.update'));
         $this->assertFalse($manager->hasPermission('cinema.delete'));
-        $this->assertFalse($manager->hasPermission('users.view'));
+        $this->assertTrue($manager->hasPermission('users.view'));
+        $this->assertTrue($manager->hasPermission('cinemas.view'));
+        $this->assertTrue($manager->hasPermission('cinema_assignments.manage'));
         foreach ([
             'bookings.view',
             'payments.view',
@@ -54,6 +56,7 @@ class RbacSeederTest extends TestCase
         $this->assertFalse($staff->hasPermission('activity_logs.view'));
         $this->assertTrue($staff->hasPermission('tickets.checkin'));
         $this->assertFalse($staff->hasPermission('admin.access'));
+        $this->assertFalse($staff->hasPermission('cinemas.view'));
         $this->assertSame(0, $user->permissions()->count());
     }
 }

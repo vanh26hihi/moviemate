@@ -25,6 +25,7 @@ class Booking extends Model
         'checkout_idempotency_key_hash',
         'checkout_request_fingerprint_hash',
         'showtime_id',
+        'cinema_id',
         'booking_code',
         'total_amount',
         'seat_subtotal',
@@ -65,6 +66,22 @@ class Booking extends Model
     public function showtime(): BelongsTo
     {
         return $this->belongsTo(Showtime::class);
+    }
+
+    public function cinema(): BelongsTo
+    {
+        return $this->belongsTo(Cinema::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Booking $booking): void {
+            $showtime = Showtime::query()->with('room')->findOrFail($booking->showtime_id);
+            if ((int) $showtime->cinema_id !== (int) $showtime->room?->cinema_id) {
+                throw new \LogicException('Showtime and room cinema ownership are inconsistent.');
+            }
+            $booking->cinema_id = $showtime->cinema_id;
+        });
     }
 
     public function bookingSeats(): HasMany

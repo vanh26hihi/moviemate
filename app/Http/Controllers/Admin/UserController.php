@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\CinemaAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,8 @@ use Illuminate\View\View;
 
 class UserController extends Controller
 {
+    public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
+
     public function index(Request $request): View
     {
         Gate::authorize('viewAny', User::class);
@@ -24,7 +27,18 @@ class UserController extends Controller
             'status' => ['nullable', 'in:active,inactive'],
         ]);
 
-        $users = User::query()->with('role')
+        $query = User::query()->with(['role', 'activeCinemaAssignments.cinema']);
+        if (! $this->cinemaAccess->hasGlobalAccess($request->user())) {
+            $cinemaId = $this->cinemaAccess->currentCinemaId($request->user());
+            $query->where(function ($query) use ($request, $cinemaId): void {
+                $query->whereKey($request->user()->id)
+                    ->orWhere(function ($query) use ($cinemaId): void {
+                        $query->whereHas('role', fn ($role) => $role->where('slug', 'staff'))
+                            ->when($cinemaId, fn ($query) => $query->whereHas('activeCinemaAssignments', fn ($assignments) => $assignments->where('cinema_id', $cinemaId)), fn ($query) => $query->whereRaw('1 = 0'));
+                    });
+            });
+        }
+        $users = $query
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
@@ -46,8 +60,9 @@ class UserController extends Controller
         Gate::authorize('view', $user);
 
         return view('admin.users.edit', [
-            'managedUser' => $user->load('role'),
+            'managedUser' => $user->load(['role', 'cinemaAssignments.cinema']),
             'roles' => Role::query()->orderBy('name')->get(),
+            'assignableCinemas' => $this->cinemaAccess->accessibleCinemas(auth()->user()),
         ]);
     }
 

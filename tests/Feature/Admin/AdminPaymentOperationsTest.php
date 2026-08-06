@@ -419,7 +419,9 @@ class AdminPaymentOperationsTest extends PaymentTestCase
 
         $detail->assertOk();
         $queue->assertOk();
-        $this->assertLessThanOrEqual(14, $detailQueries, 'Chi tiết payment có dấu hiệu N+1.');
+        // Multi-cinema adds exactly one bounded query per admin page: the branch selector
+        // loads the accessible cinema list once and memoises it for the rest of the request.
+        $this->assertLessThanOrEqual(15, $detailQueries, 'Chi tiết payment có dấu hiệu N+1.');
         $this->assertLessThanOrEqual(8, $queueQueries, 'Queue đối soát có dấu hiệu N+1.');
         $this->assertSame(1, substr_count($detail->getContent(), 'aria-current="page"'));
         $this->assertSame(1, substr_count($queue->getContent(), 'aria-current="page"'));

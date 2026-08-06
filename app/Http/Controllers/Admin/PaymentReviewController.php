@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\ActivityLogger;
 use App\Services\Admin\PaymentReconciliationQuery;
+use App\Services\CinemaAccessService;
 use App\Services\Payments\PaymentReviewResolutionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,10 +16,15 @@ use LogicException;
 
 class PaymentReviewController extends Controller
 {
-    public function index(): View
+    public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
+
+    public function index(Request $request): View
     {
         $payments = Payment::query()
             ->with('booking')
+            ->whereHas('booking', function ($query) use ($request): void {
+                $this->cinemaAccess->scope($query, $request->user(), 'bookings.cinema_id');
+            })
             ->where('status', Payment::STATUS_REVIEW)
             ->latest('id')
             ->paginate(25);
@@ -34,6 +40,8 @@ class PaymentReviewController extends Controller
         ActivityLogger $activities,
     ): RedirectResponse {
         $payment = Payment::query()->findOrFail($paymentId);
+        abort_unless($payment->booking?->cinema_id, 404);
+        $this->cinemaAccess->authorizeCinema($request->user(), (int) $payment->booking->cinema_id);
 
         if ($payment->status !== Payment::STATUS_REVIEW) {
             return redirect()->route('admin.payment-reviews.index')

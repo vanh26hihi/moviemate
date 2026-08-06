@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Room;
-use App\Services\CinemaContext;
+use App\Services\CinemaAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -44,12 +44,16 @@ class SaveRoomRequest extends FormRequest
     public function rules(): array
     {
         $room = $this->route('room');
-        $cinemaId = app(CinemaContext::class)->id();
+        $access = app(CinemaAccessService::class);
+        $roomCinemaId = $room instanceof Room ? (int) $room->cinema_id : null;
+        $requestedCinemaId = filter_var($this->input('cinema_id'), FILTER_VALIDATE_INT) ?: null;
+        $cinemaId = $roomCinemaId ?? $access->currentCinemaId($this->user()) ?? $requestedCinemaId;
 
         return [
+            'cinema_id' => ['nullable', 'integer', 'exists:cinemas,id'],
             'code' => [
                 'required', 'string', 'max:32',
-                Rule::unique('rooms', 'code')->where('cinema_id', $cinemaId)
+                Rule::unique('rooms', 'code')->where('cinema_id', $cinemaId ?? 0)
                     ->ignore($room instanceof Room ? $room->id : null),
             ],
             'name' => ['required', 'string', 'max:255'],

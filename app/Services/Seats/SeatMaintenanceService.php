@@ -7,7 +7,7 @@ use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Services\ActivityLogger;
-use App\Services\CinemaContext;
+use App\Services\CinemaAccessService;
 use App\Support\SeatPresentation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +18,7 @@ final class SeatMaintenanceService
     private const MAX_BULK_UNITS = 50;
 
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
+        private readonly CinemaAccessService $cinemaAccess,
         private readonly SeatMaintenanceProtectionService $protections,
         private readonly ActivityLogger $activities,
     ) {}
@@ -50,7 +50,8 @@ final class SeatMaintenanceService
 
         return DB::transaction(function () use ($room, $inputIds, $targetStatus, $bulk): SeatMaintenanceResult {
             $lockedRoom = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
-            abort_unless($lockedRoom->cinema_id === $this->cinemaContext->id() && $lockedRoom->status === 'active', 404);
+            $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $lockedRoom->cinema_id);
+            abort_unless($lockedRoom->status === 'active', 404);
             $layout = RoomLayout::query()->where('room_id', $lockedRoom->id)->where('status', 'published')
                 ->orderByDesc('version')->lockForUpdate()->firstOrFail();
             $requested = Seat::query()->whereIn('id', $inputIds)->where('room_id', $lockedRoom->id)->get();

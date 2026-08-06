@@ -6,13 +6,13 @@ use App\Models\Booking;
 use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Showtime;
-use App\Services\CinemaContext;
+use App\Services\CinemaAccessService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 final class AdminBookingQuery
 {
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
+    public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
 
     public function paginate(array $filters): LengthAwarePaginator
     {
@@ -32,7 +32,9 @@ final class AdminBookingQuery
                     'payments.id', 'payments.booking_id', 'payments.provider', 'payments.amount',
                     'payments.status', 'payments.verified_at', 'payments.paid_at',
                 ]),
-            ])
+            ]);
+        $this->cinemaAccess->scope($query, auth()->user(), 'bookings.cinema_id');
+        $query
             ->when($filters['booking_code'] ?? null, fn (Builder $query, string $value) => $query
                 ->where('booking_code', 'like', '%'.$this->escapeLike($value).'%'))
             ->when($filters['customer_name'] ?? null, fn (Builder $query, string $value) => $query
@@ -81,7 +83,8 @@ final class AdminBookingQuery
     {
         return [
             'movies' => Movie::query()->orderBy('title')->get(['id', 'title']),
-            'rooms' => Room::query()->where('cinema_id', $this->cinemaContext->id())->orderBy('code')->get(['id', 'code', 'name']),
+            'rooms' => tap(Room::query(), fn (Builder $query) => $this->cinemaAccess->scope($query, auth()->user(), 'rooms.cinema_id'))
+                ->orderBy('code')->get(['id', 'code', 'name', 'cinema_id']),
         ];
     }
 

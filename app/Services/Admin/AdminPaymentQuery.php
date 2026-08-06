@@ -3,11 +3,14 @@
 namespace App\Services\Admin;
 
 use App\Models\Payment;
+use App\Services\CinemaAccessService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 final class AdminPaymentQuery
 {
+    public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
+
     /** @var list<string> */
     public const SAFE_COLUMNS = [
         'payments.id', 'payments.booking_id', 'payments.provider', 'payments.app_trans_id',
@@ -33,6 +36,9 @@ final class AdminPaymentQuery
                     'payments.id', 'payments.booking_id', 'payments.provider', 'payments.status', 'payments.verified_at',
                 ]),
             ])
+            ->whereHas('booking', function (Builder $query): void {
+                $this->cinemaAccess->scope($query, auth()->user(), 'bookings.cinema_id');
+            })
             ->when($filters['booking_code'] ?? null, fn (Builder $query, string $value) => $query
                 ->whereHas('booking', fn (Builder $query) => $query->where('booking_code', 'like', '%'.$this->escapeLike($value).'%')))
             ->when($filters['provider'] ?? null, fn (Builder $query, string $value) => $query->where('provider', $value))

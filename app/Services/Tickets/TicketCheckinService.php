@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\TicketCheckinEvent;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\CinemaAccessService;
 use Illuminate\Support\Facades\DB;
 
 final class TicketCheckinService
@@ -16,6 +17,7 @@ final class TicketCheckinService
         private readonly TicketCheckinCapability $capabilities,
         private readonly TicketCheckinRecorder $events,
         private readonly ActivityLogger $activities,
+        private readonly CinemaAccessService $cinemaAccess,
     ) {}
 
     public function checkIn(string $capability, User $actor): TicketCheckinResult
@@ -30,6 +32,7 @@ final class TicketCheckinService
             if (! $booking) {
                 return new TicketCheckinResult(TicketCheckinEvent::RESULT_INVALID_TOKEN, 'Không tìm thấy vé phù hợp.');
             }
+            abort_unless($booking->cinema_id && $this->cinemaAccess->canAccessCinema($actor, (int) $booking->cinema_id), 404);
 
             if (! $this->capabilities->isValid($booking, $capability)) {
                 return $this->rejected($booking, $actor, TicketCheckinEvent::RESULT_INVALID_TOKEN, 'invalid_capability', 'Mã vé không hợp lệ hoặc đã bị thay đổi.');

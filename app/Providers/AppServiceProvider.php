@@ -11,6 +11,7 @@ use App\Policies\UserPolicy;
 use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\Admin\PaymentReconciliationQuery;
 use App\Services\BookingCheckoutDraftService;
+use App\Services\CinemaAccessService;
 use App\Services\CinemaContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -28,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(CinemaContext::class, fn () => new CinemaContext);
+        $this->app->scoped(CinemaAccessService::class, fn () => new CinemaAccessService);
     }
 
     /**
@@ -71,6 +73,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         View::composer('layouts.admin', function ($view): void {
+            $access = app(CinemaAccessService::class);
+            $user = auth()->user();
+            $adminCinemas = $user ? $access->accessibleCinemas($user) : collect();
+            $adminCurrentCinema = $user ? $access->resolve($user) : null;
             $badge = auth()->check() && auth()->user()->can('payments.reconcile')
                 ? app(PaymentReconciliationQuery::class)->badgeLabel()
                 : null;
@@ -82,6 +88,20 @@ class AppServiceProvider extends ServiceProvider
             $view->with([
                 'paymentReconciliationBadge' => $badge,
                 'ticketDeliveryBadge' => $ticketDeliveryBadge,
+                'adminAccessibleCinemas' => $adminCinemas,
+                'adminCurrentCinema' => $adminCurrentCinema,
+                'adminHasGlobalCinemaAccess' => $user ? $access->hasGlobalAccess($user) : false,
+            ]);
+        });
+
+        View::composer('layouts.user', function ($view): void {
+            if (! Schema::hasTable('cinemas')) {
+                return;
+            }
+            $context = app(CinemaContext::class);
+            $view->with([
+                'customerCinemas' => $context->activeCinemas(),
+                'customerCurrentCinema' => $context->current(),
             ]);
         });
     }

@@ -8,7 +8,7 @@ use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Services\ActivityLogger;
-use App\Services\CinemaContext;
+use App\Services\CinemaAccessService;
 use App\Services\RoomLayoutService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 class SeatController extends Controller
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
+        private readonly CinemaAccessService $cinemaAccess,
         private readonly RoomLayoutService $layouts,
         private readonly ActivityLogger $activityLogger,
     ) {}
@@ -129,12 +129,13 @@ class SeatController extends Controller
 
     private function assertOperationalRoom(Room $room): void
     {
-        abort_unless($room->cinema_id === $this->cinemaContext->id() && $room->status === 'active', 404);
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $room->cinema_id);
+        abort_unless($room->status === 'active', 404);
     }
 
     private function assertManagedRoom(Room $room): void
     {
-        abort_unless($room->cinema_id === $this->cinemaContext->id(), 404);
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $room->cinema_id);
     }
 
     private function layoutSummary(?RoomLayout $layout): array

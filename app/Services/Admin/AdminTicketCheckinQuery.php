@@ -3,11 +3,14 @@
 namespace App\Services\Admin;
 
 use App\Models\TicketCheckinEvent;
+use App\Services\CinemaAccessService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 final class AdminTicketCheckinQuery
 {
+    public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
+
     public function paginate(array $filters): LengthAwarePaginator
     {
         $query = TicketCheckinEvent::query()
@@ -24,6 +27,9 @@ final class AdminTicketCheckinQuery
                 'showtime.movie:id,title',
                 'showtime.room:id,code,name',
             ])
+            ->whereHas('booking', function (Builder $query): void {
+                $this->cinemaAccess->scope($query, auth()->user(), 'bookings.cinema_id');
+            })
             ->when($filters['booking_code'] ?? null, fn (Builder $query, string $value) => $query
                 ->whereHas('booking', fn (Builder $booking) => $booking->where('booking_code', 'like', '%'.$this->escapeLike($value).'%')))
             ->when($filters['movie'] ?? null, fn (Builder $query, string $value) => $query

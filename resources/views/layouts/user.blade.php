@@ -38,6 +38,15 @@
                 </nav>
 
                 <div class="hidden md:flex items-center gap-3">
+                    <form method="POST" action="{{ route('cinema-context.update') }}">
+                        @csrf
+                        <label class="sr-only" for="customer-cinema-context">Chọn chi nhánh</label>
+                        <select id="customer-cinema-context" name="cinema_id" class="app-card app-text max-w-48 rounded-xl border app-border px-3 py-2 text-sm" onchange="this.form.submit()">
+                            @foreach($customerCinemas as $contextCinema)
+                                <option value="{{ $contextCinema->id }}" @selected($customerCurrentCinema->id === $contextCinema->id)>{{ $contextCinema->name }}</option>
+                            @endforeach
+                        </select>
+                    </form>
                     <button data-theme-toggle type="button"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border hover:border-brand-start transition-all text-sm app-muted hover:app-text"
                         title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối" aria-pressed="false">

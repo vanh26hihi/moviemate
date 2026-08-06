@@ -34,4 +34,21 @@
     </form>
     @endcan
 </div>
+
+@if($managedUser->hasRole(['manager', 'staff']) && auth()->user()->can('cinema_assignments.manage'))
+<section class="app-card mt-6 rounded-2xl border app-border p-6">
+    <h2 class="text-lg font-bold app-text">Phân công chi nhánh</h2>
+    <form method="POST" action="{{ route('admin.users.cinema-assignments.store', $managedUser) }}" class="mt-4 flex flex-col gap-3 sm:flex-row">@csrf
+        <select name="cinema_id" class="app-input flex-1 rounded-xl border app-border px-4 py-3" required>
+            @foreach($assignableCinemas as $cinema)<option value="{{ $cinema->id }}">{{ $cinema->name }}</option>@endforeach
+        </select>
+        <button class="admin-btn-primary" type="submit">Phân công</button>
+    </form>
+    <div class="mt-5 divide-y app-border">
+        @forelse($managedUser->cinemaAssignments->where('status', 'active') as $assignment)
+            <div class="flex items-center justify-between gap-4 py-3"><div><strong class="app-text">{{ $assignment->cinema->name }}</strong><p class="text-xs app-muted">Từ {{ $assignment->assigned_at?->format('d/m/Y H:i') }}</p></div><form method="POST" action="{{ route('admin.users.cinema-assignments.destroy', [$managedUser, $assignment]) }}">@csrf @method('DELETE')<button class="admin-btn-secondary" type="submit">Thu hồi</button></form></div>
+        @empty<p class="py-4 app-muted">Chưa có phân công đang hoạt động.</p>@endforelse
+    </div>
+</section>
+@endif
 @endsection

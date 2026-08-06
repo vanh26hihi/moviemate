@@ -26,8 +26,6 @@ class ShowtimeScheduleService
     /** @var list<string> */
     public const NON_OCCUPYING_STATUSES = ['cancelled'];
 
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
-
     public function timezone(): string
     {
         $timezone = config('cinema.timezone');
@@ -230,8 +228,9 @@ class ShowtimeScheduleService
 
     private function assertRoomIsOperational(Room $room): void
     {
-        if ($room->cinema_id !== $this->cinemaContext->id() || $room->status !== 'active') {
-            throw new ShowtimeScheduleException('Phòng chiếu phải đang hoạt động và thuộc rạp FPT Polytechnic.', 'room_id');
+        $room->loadMissing('cinema');
+        if ($room->status !== 'active' || ! $room->cinema || $room->cinema->status !== 'active' || $room->cinema->archived_at !== null) {
+            throw new ShowtimeScheduleException('Phòng chiếu và chi nhánh phải đang hoạt động.', 'room_id');
         }
     }
 
@@ -254,7 +253,7 @@ class ShowtimeScheduleService
     ): array {
         return [
             'movie_id' => $movie->id,
-            'cinema_id' => $this->cinemaContext->id(),
+            'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
             'show_date' => $window->start->toDateString(),

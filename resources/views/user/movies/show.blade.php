@@ -91,7 +91,7 @@
                                 <p class="mt-1 text-sm app-muted">{{ $first->cinema->address }}</p>
                                 <div class="mt-4 flex flex-wrap gap-2">
                                     @foreach($items as $show)
-                                        <a href="{{ route('user.bookings.selectSeat', $show->id) }}" class="rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 font-extrabold text-brand-start transition-colors hover:bg-brand-start hover:text-white">
+                                        <a href="{{ route('user.bookings.selectSeat', ['showtime' => $show, 'cinema_id' => $show->cinema_id]) }}" class="rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 font-extrabold text-brand-start transition-colors hover:bg-brand-start hover:text-white">
                                             {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }} · {{ $show->room->name }}
                                         </a>
                                     @endforeach

@@ -5,7 +5,7 @@ namespace App\Services\Admin;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
-use App\Services\CinemaContext;
+use App\Services\CinemaAccessService;
 use App\Services\Seats\SeatMaintenanceProtectionService;
 use App\Support\SeatPresentation;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -15,14 +15,15 @@ use Illuminate\Support\Collection;
 final class AdminSeatMaintenanceQuery
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
+        private readonly CinemaAccessService $cinemaAccess,
         private readonly SeatMaintenanceProtectionService $protections,
     ) {}
 
     /** @return array<string, mixed> */
     public function get(Room $room, array $filters): array
     {
-        abort_unless($room->cinema_id === $this->cinemaContext->id() && $room->status === 'active', 404);
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $room->cinema_id);
+        abort_unless($room->status === 'active', 404);
         $layout = RoomLayout::query()->where('room_id', $room->id)->where('status', 'published')
             ->orderByDesc('version')->firstOrFail();
         $seats = Seat::query()->where('room_id', $room->id)

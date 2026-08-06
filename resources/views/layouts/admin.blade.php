@@ -34,7 +34,7 @@
                 ['label' => 'Vận hành & phim', 'items' => [
                     ['route' => 'admin.movies.index', 'active' => 'admin.movies.*', 'permission' => 'movies.view', 'label' => 'Phim', 'icon' => 'ph-film-slate'],
                     ['route' => 'admin.genres.index', 'active' => 'admin.genres.*', 'permission' => 'genres.view', 'label' => 'Thể loại', 'icon' => 'ph-tag'],
-                    ['route' => 'admin.cinema.show', 'active' => 'admin.cinema.*', 'permission' => 'cinema.view', 'label' => 'Thông tin rạp', 'icon' => 'ph-buildings'],
+                    ['route' => 'admin.cinemas.index', 'active' => ['admin.cinema.*', 'admin.cinemas.*'], 'permission' => 'cinemas.view', 'label' => 'Chi nhánh', 'icon' => 'ph-buildings'],
                     ['route' => 'admin.rooms.index', 'active' => ['admin.rooms.*', 'admin.seats.*'], 'permission' => 'rooms.view', 'label' => 'Phòng chiếu', 'icon' => 'ph-projector-screen'],
                     ['route' => 'admin.showtimes.index', 'active' => 'admin.showtimes.*', 'permission' => 'showtimes.view', 'label' => 'Suất chiếu', 'icon' => 'ph-calendar-plus'],
                 ]],
@@ -98,6 +98,17 @@
                 <p class="text-lg font-bold app-text hidden sm:block">@yield('page-title')</p>
             </div>
             <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <form method="POST" action="{{ route('admin.cinema-context.update') }}" class="hidden lg:flex items-center gap-2">
+                    @csrf
+                    <label for="admin-cinema-context" class="sr-only">Ngữ cảnh chi nhánh</label>
+                    <select id="admin-cinema-context" name="cinema_id" class="app-input max-w-56 rounded-lg border app-border px-3 py-2 text-sm" onchange="this.form.submit()">
+                        @if($adminHasGlobalCinemaAccess)<option value="all" @selected(!$adminCurrentCinema)>Toàn hệ thống</option>@endif
+                        @foreach($adminAccessibleCinemas as $contextCinema)
+                            <option value="{{ $contextCinema->id }}" @selected($adminCurrentCinema?->id === $contextCinema->id)>{{ $contextCinema->name }}</option>
+                        @endforeach
+                    </select>
+                </form>
+                <span class="hidden xl:inline-flex rounded-full border app-border px-3 py-1 text-xs font-bold text-brand-start">{{ $adminCurrentCinema?->name ?? ($adminHasGlobalCinemaAccess ? 'Toàn hệ thống' : 'Chưa phân công') }}</span>
                 <div class="relative hidden md:block w-56">
                     <i class="ph ph-magnifying-glass app-muted text-sm absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"></i>
                     <input type="text" class="app-input w-full pl-9 pr-3 py-2 rounded-lg border app-border focus:outline-none focus:border-brand-start transition-colors text-sm" placeholder="Tìm kiếm (Ctrl+K)">

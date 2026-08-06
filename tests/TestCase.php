@@ -2,8 +2,10 @@
 
 namespace Tests;
 
+use App\Models\Cinema;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserCinemaAssignment;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -34,6 +36,17 @@ abstract class TestCase extends BaseTestCase
     {
         $roleId = Role::query()->where('slug', $role)->value('id');
 
-        return User::factory()->create(['status' => 'active', ...$attributes, 'role_id' => $roleId]);
+        $user = User::factory()->create(['status' => 'active', ...$attributes, 'role_id' => $roleId]);
+        if (in_array($role, ['manager', 'staff'], true)
+            && ($cinemaId = Cinema::query()->active()->primary()->value('id'))) {
+            UserCinemaAssignment::query()->create([
+                'user_id' => $user->id,
+                'cinema_id' => $cinemaId,
+                'status' => UserCinemaAssignment::STATUS_ACTIVE,
+                'assigned_at' => now(),
+            ]);
+        }
+
+        return $user;
     }
 }
