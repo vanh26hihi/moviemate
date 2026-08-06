@@ -21,7 +21,7 @@
                     <span class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-start to-brand-end text-white flex items-center justify-center shadow-lg shadow-brand-start/25">
                         <i class="ph-fill ph-film-strip text-2xl"></i>
                     </span>
-                    <span class="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end">
+                    <span class="hidden text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end sm:inline md:text-2xl">
                         MovieMate
                     </span>
                 </a>
@@ -29,6 +29,7 @@
                 <nav class="hidden md:flex items-center gap-1 rounded-full app-card border app-border p-1">
                     <a href="{{ route('home') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('home')]) @if(request()->routeIs('home')) aria-current="page" @endif>Trang chủ</a>
                     <a href="{{ route('user.movies.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.movies.*')]) @if(request()->routeIs('user.movies.*')) aria-current="page" @endif>Phim</a>
+                    <a href="{{ route('cinemas.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('cinemas.*')]) @if(request()->routeIs('cinemas.*')) aria-current="page" @endif>Rạp</a>
                     <a href="{{ route('home') }}#home-showtime-calendar" class="user-nav-link">Lịch chiếu</a>
                     <a href="{{ route('foods.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('foods.*')]) @if(request()->routeIs('foods.*')) aria-current="page" @endif>Đồ ăn</a>
                     <a href="{{ route('user.ai.recommend') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.ai.*')]) @if(request()->routeIs('user.ai.*')) aria-current="page" @endif>
@@ -37,16 +38,15 @@
                     <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Vé của tôi</a>
                 </nav>
 
+                <details id="customer-cinema-selector" class="relative ml-auto md:ml-0">
+                    <summary class="flex max-w-44 cursor-pointer list-none items-center gap-2 rounded-xl border app-border app-card px-3 py-2 text-sm font-bold app-text" aria-label="Chọn rạp ưu tiên"><i class="ph-fill ph-map-pin text-brand-start" aria-hidden="true"></i><span class="truncate">{{ $customerPreferredCinema?->name ?? 'Tất cả rạp' }}</span><i class="ph ph-caret-down text-xs" aria-hidden="true"></i></summary>
+                    <div class="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border app-border app-card p-2 shadow-2xl">
+                        <form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="all"><button type="submit" class="user-dropdown-link w-full text-left" @if(!$customerPreferredCinema) aria-current="true" @endif>Tất cả rạp</button></form>
+                        @foreach($customerCinemas as $contextCinema)<form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="{{ $contextCinema->code }}"><button type="submit" class="user-dropdown-link w-full text-left" @if($customerPreferredCinema?->is($contextCinema)) aria-current="true" @endif>{{ $contextCinema->name }}</button></form>@endforeach
+                    </div>
+                </details>
+
                 <div class="hidden md:flex items-center gap-3">
-                    <form method="POST" action="{{ route('cinema-context.update') }}">
-                        @csrf
-                        <label class="sr-only" for="customer-cinema-context">Chọn chi nhánh</label>
-                        <select id="customer-cinema-context" name="cinema_id" class="app-card app-text max-w-48 rounded-xl border app-border px-3 py-2 text-sm" onchange="this.form.submit()">
-                            @foreach($customerCinemas as $contextCinema)
-                                <option value="{{ $contextCinema->id }}" @selected($customerCurrentCinema->id === $contextCinema->id)>{{ $contextCinema->name }}</option>
-                            @endforeach
-                        </select>
-                    </form>
                     <button data-theme-toggle type="button"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border hover:border-brand-start transition-all text-sm app-muted hover:app-text"
                         title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối" aria-pressed="false">
@@ -95,6 +95,7 @@
             <div class="px-4 pt-2 pb-4 space-y-1">
                 <a href="{{ route('home') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('home')])>Trang chủ</a>
                 <a href="{{ route('user.movies.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.movies.*')])>Phim</a>
+                <a href="{{ route('cinemas.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('cinemas.*')])>Rạp</a>
                 <a href="{{ route('home') }}#home-showtime-calendar" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Lịch chiếu</a>
                 <a href="{{ route('foods.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('foods.*')])>Đồ ăn</a>
                 <a href="{{ route('user.ai.recommend') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-ai-start hover:bg-ai-start/10 transition-colors">

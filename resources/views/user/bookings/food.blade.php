@@ -98,7 +98,7 @@
 
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row">
                     {{-- Đồ ăn là tuỳ chọn: khách có thể để trống và bấm "Tiếp tục thanh toán". --}}
-                    <a href="{{ route('user.bookings.selectSeat', ['showtime' => $preview->showtime->id, 'cinema_id' => $preview->showtime->cinema_id]) }}"
+                    <a href="{{ route('user.bookings.selectSeat', ['showtime' => $preview->showtime->id, 'cinema' => $preview->showtime->cinema->code]) }}"
                        class="btn-secondary flex-1 justify-center">
                         <i class="ph-bold ph-arrow-left" aria-hidden="true"></i>
                         Quay lại chọn ghế
@@ -116,6 +116,7 @@
                 <h2 id="food-summary-title" class="mt-2 text-xl font-bold app-text">{{ $preview->showtime->movie->title }}</h2>
                 <p class="mt-1 text-sm app-muted">{{ $preview->showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($preview->showtime->show_time)->format('H:i') }}</p>
                 <p class="mt-1 text-sm app-muted">{{ $preview->showtime->cinema->name }} · {{ $preview->showtime->room->name }}</p>
+                <p class="mt-1 text-xs app-muted">{{ $preview->showtime->cinema->address }}</p>
 
                 <div class="mt-5 space-y-3">
                     @foreach($preview->seatSummaries() as $seat)

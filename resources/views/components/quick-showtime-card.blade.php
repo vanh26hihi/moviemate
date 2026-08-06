@@ -2,7 +2,7 @@
     $movie = $showtime->movie;
     $showDate = $showtime->show_date ? \Carbon\Carbon::parse($showtime->show_date)->format('d/m') : '--/--';
     $showTime = $showtime->show_time ? \Carbon\Carbon::parse($showtime->show_time)->format('H:i') : '--:--';
-    $bookingUrl = route('user.bookings.selectSeat', ['showtime' => $showtime, 'cinema_id' => $showtime->cinema_id]);
+    $bookingUrl = route('user.bookings.selectSeat', ['showtime' => $showtime, 'cinema' => $showtime->cinema->code]);
     $detailUrl = $movie?->slug ? route('user.movies.show', $movie->slug) : ($movie?->id ? url('/movies/'.$movie->id) : route('user.movies.index'));
 @endphp
 

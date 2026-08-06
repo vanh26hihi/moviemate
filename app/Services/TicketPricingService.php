@@ -16,6 +16,42 @@ final class TicketPricingService
     /** @var array<string, Collection<int, CinemaPricingRule>> */
     private array $ruleCache = [];
 
+    /**
+     * Warm every cinema/room pricing context with one bounded rule query. Public catalog
+     * pages call this before presenting many showtimes so pricing never becomes N+1.
+     *
+     * @param  Collection<int, Showtime>  $showtimes
+     */
+    public function warmForShowtimes(Collection $showtimes): void
+    {
+        $contexts = $showtimes->filter(fn (Showtime $showtime): bool => $showtime->room !== null && $showtime->cinema !== null)
+            ->unique(fn (Showtime $showtime): string => $showtime->cinema_id.':'.$showtime->room_id)
+            ->values();
+        if ($contexts->isEmpty()) {
+            return;
+        }
+
+        $cinemaIds = $contexts->pluck('cinema_id')->map(fn ($id): int => (int) $id)->unique();
+        $roomIds = $contexts->pluck('room_id')->map(fn ($id): int => (int) $id)->unique();
+        $rules = CinemaPricingRule::query()->active()
+            ->where(fn ($query) => $query->whereNull('cinema_id')->orWhereIn('cinema_id', $cinemaIds))
+            ->where(fn ($query) => $query->whereNull('room_id')->orWhereIn('room_id', $roomIds))
+            ->with('room:id,cinema_id')->orderBy('id')->get();
+
+        foreach ($contexts as $showtime) {
+            $timezone = $this->timezone($showtime);
+            $now = CarbonImmutable::now($timezone);
+            $key = implode(':', [$showtime->cinema_id, $showtime->room_id, $timezone]);
+            $this->ruleCache[$key] = $rules->filter(
+                fn (CinemaPricingRule $rule): bool => (! $rule->cinema_id || (int) $rule->cinema_id === (int) $showtime->cinema_id)
+                    && (! $rule->room_id || (int) $rule->room_id === (int) $showtime->room_id)
+                    && (! $rule->room_id || (int) $rule->room?->cinema_id === (int) $showtime->cinema_id)
+                    && (! $rule->starts_at || $now->greaterThanOrEqualTo($rule->starts_at))
+                    && (! $rule->ends_at || $now->lessThan($rule->ends_at))
+            )->values();
+        }
+    }
+
     public function calculate(Showtime $showtime, string $seatType, bool $allowLegacySnapshot = true): TicketPrice
     {
         $seatType = strtolower($seatType);

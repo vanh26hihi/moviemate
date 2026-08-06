@@ -49,7 +49,7 @@
         <form
             method="GET"
             action="{{ route('user.movies.index') }}"
-            class="mt-6 cinema-card p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_170px_170px_170px_180px_auto] gap-3"
+            class="mt-6 cinema-card p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"
         >
             <label class="flex items-center gap-3 px-4 app-input border app-border rounded-2xl">
                 <i class="ph ph-magnifying-glass app-muted text-xl"></i>
@@ -75,6 +75,10 @@
                     </option>
                 @endforeach
             </select>
+
+            <label><span class="sr-only">Chi nhánh</span><select name="cinema" class="cinema-input"><option value="">Tất cả rạp</option>@foreach($cinemas as $filterCinema)<option value="{{ $filterCinema->code }}" @selected($selectedCinema?->is($filterCinema))>{{ $filterCinema->name }}</option>@endforeach</select></label>
+
+            <label><span class="sr-only">Ngày chiếu</span><select name="date" class="cinema-input">@foreach($dates as $date)<option value="{{ $date['date'] }}" @selected($selectedDate === $date['date'])>{{ $date['label'] }} · {{ $date['day'] }}</option>@endforeach</select></label>
 
             <select name="country" class="cinema-input">
                 <option value="">Tất cả quốc gia</option>
@@ -143,6 +147,7 @@
             'country',
             'status',
             'sort'
+            ,'cinema','date'
         ]))
             <div class="mt-4">
                 <a

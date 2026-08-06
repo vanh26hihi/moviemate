@@ -208,7 +208,8 @@ class SingleCinemaOperationsTest extends TestCase
             ->assertOk()
             ->assertSee($canonical->name)
             ->assertSee($canonical->address)
-            ->assertSee('name="cinema_id"', false)
+            ->assertSee('name="cinema"', false)
+            ->assertSee('value="'.$canonical->code.'"', false)
             ->assertDontSee('value="'.$legacy->id.'"', false);
 
         $this->withSession(['food_cart' => [$food->id => 2]])

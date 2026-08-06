@@ -31,7 +31,31 @@ class CinemaContext
     public function activeCinemas(): Collection
     {
         return Cinema::query()->active()->orderBy('name')
-            ->get(['id', 'code', 'name', 'address', 'city', 'timezone']);
+            ->get(['id', 'code', 'name', 'address', 'city', 'district', 'timezone']);
+    }
+
+    public function preference(): ?Cinema
+    {
+        if ($this->resolved) {
+            return $this->resolved;
+        }
+        $selectedId = request()->hasSession() ? request()->session()->get(self::SESSION_KEY) : null;
+        if ($selectedId === null) {
+            return null;
+        }
+        if (! is_int($selectedId) && ! ctype_digit((string) $selectedId)) {
+            request()->session()->forget(self::SESSION_KEY);
+
+            return null;
+        }
+        $selected = Cinema::query()->active()->find((int) $selectedId);
+        if (! $selected) {
+            request()->session()->forget(self::SESSION_KEY);
+
+            return null;
+        }
+
+        return $this->resolved = $selected;
     }
 
     public function current(): Cinema
@@ -40,15 +64,8 @@ class CinemaContext
             return $this->resolved;
         }
 
-        $selectedId = request()->hasSession()
-            ? request()->session()->get(self::SESSION_KEY)
-            : null;
-        if ($selectedId !== null) {
-            $selected = Cinema::query()->active()->find($selectedId);
-            if ($selected) {
-                return $this->resolved = $selected;
-            }
-            request()->session()->forget(self::SESSION_KEY);
+        if ($selected = $this->preference()) {
+            return $selected;
         }
 
         // More than one active primary branch is a configuration fault, not a fallback case.
@@ -72,6 +89,12 @@ class CinemaContext
         }
         request()->session()->put(self::SESSION_KEY, $cinema->id);
         $this->resolved = $cinema;
+    }
+
+    public function clearPreference(): void
+    {
+        request()->session()->forget(self::SESSION_KEY);
+        $this->resolved = null;
     }
 
     public function id(): int
