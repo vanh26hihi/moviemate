@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'payments/zalopay/callback',
+            'payments/payos/webhook',
             'booking/store',
         ]);
 

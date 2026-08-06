@@ -13,6 +13,7 @@
     $provider = match ($verifiedPayment?->provider) {
         'vnpay' => 'VNPAY',
         'zalopay' => 'ZaloPay',
+        'payos' => 'payOS',
         default => 'Cổng thanh toán',
     };
     $foodItems = $booking->foodOrder?->items ?? collect();

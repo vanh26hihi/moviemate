@@ -8,12 +8,16 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\ActivityLogger;
 use App\Services\Tickets\TicketDeliveryOutbox;
 use Illuminate\Support\Facades\DB;
 
 class VerifiedPaymentService
 {
-    public function __construct(private readonly TicketDeliveryOutbox $ticketDeliveries) {}
+    public function __construct(
+        private readonly TicketDeliveryOutbox $ticketDeliveries,
+        private readonly ActivityLogger $activities,
+    ) {}
 
     public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
     {
@@ -158,6 +162,19 @@ class VerifiedPaymentService
                 ->first();
             $foodOrder?->forceFill(['status' => 'paid'])->save();
             $this->ticketDeliveries->enqueueVerifiedBooking($booking);
+            $this->activities->log(
+                'payment.verified',
+                $lockedPayment,
+                ['payment_status' => $payment->status],
+                ['payment_status' => Payment::STATUS_SUCCESS],
+                [
+                    'payment_id' => $lockedPayment->id,
+                    'booking_id' => $booking->id,
+                    'cinema_id' => $booking->cinema_id,
+                    'provider' => $lockedPayment->provider,
+                    'result' => 'verified_provider_success',
+                ],
+            );
 
             return PaymentVerificationResult::transitioned();
         });
@@ -198,6 +215,12 @@ class VerifiedPaymentService
                 'card_type' => $data->cardType,
                 'provider_paid_at' => $data->providerPaidAt,
             ];
+        } elseif ($payment->provider === 'payos') {
+            $fields += [
+                'response_code' => $data->responseCode,
+                'transaction_status' => $data->transactionStatus,
+                'provider_paid_at' => $data->providerPaidAt,
+            ];
         }
 
         if (in_array($data->source, ['callback', 'ipn'], true)) {
@@ -221,6 +244,7 @@ class VerifiedPaymentService
                 && $payment->app_id === $data->appId
                 && $payment->app_trans_id === $data->merchantReference,
             'vnpay' => $payment->order_code === $data->merchantReference,
+            'payos' => $payment->order_code === $data->merchantReference,
             default => false,
         };
     }

@@ -33,12 +33,14 @@ class VnpayPaymentInitiationService
 
                 $activeAttempt = Payment::query()
                     ->where('booking_id', $lockedBooking->id)
-                    ->where('provider', 'vnpay')
                     ->whereIn('status', Payment::UNSAFE_RETRY_STATUSES)
                     ->latest('id')
                     ->lockForUpdate()
                     ->first();
                 if ($activeAttempt) {
+                    if ($activeAttempt->provider !== 'vnpay') {
+                        throw new PaymentInitiationException('Another payment provider attempt is still unresolved.');
+                    }
                     if ($activeAttempt->status === Payment::STATUS_REVIEW) {
                         throw new PaymentInitiationException(
                             'The existing VNPAY attempt requires review and cannot be replaced.',
@@ -86,11 +88,10 @@ class VnpayPaymentInitiationService
         } catch (UniqueConstraintViolationException $exception) {
             $active = Payment::query()
                 ->where('booking_id', $booking->getKey())
-                ->where('provider', 'vnpay')
                 ->whereIn('status', Payment::UNSAFE_RETRY_STATUSES)
                 ->latest('id')
                 ->first();
-            if (! $active) {
+            if (! $active || $active->provider !== 'vnpay') {
                 throw new PaymentInitiationException('Unable to allocate a unique VNPAY transaction reference.', previous: $exception);
             }
             $payment = $active;

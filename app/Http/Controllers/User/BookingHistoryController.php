@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use App\Services\BookingCancellationService;
 use App\Services\Tickets\BookingTicketEligibility;
 use Illuminate\Http\Request;
@@ -45,11 +46,19 @@ final class BookingHistoryController extends Controller
         $ticketableBookingIds = $bookings->getCollection()
             ->filter(fn ($booking): bool => $ticketEligibility->isUsable($booking))
             ->modelKeys();
+        $payOsCancellableBookingIds = $bookings->getCollection()
+            ->filter(fn ($booking): bool => $booking->booking_status === 'pending_payment'
+                && $booking->payments->contains(
+                    fn (Payment $payment): bool => $payment->provider === 'payos'
+                        && in_array($payment->status, Payment::RECONCILABLE_STATUSES, true),
+                ))
+            ->modelKeys();
 
         return view('user.bookings.history', compact(
             'bookings',
             'cancellableBookingIds',
             'ticketableBookingIds',
+            'payOsCancellableBookingIds',
         ));
     }
 }

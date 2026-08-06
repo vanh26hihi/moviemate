@@ -16,7 +16,7 @@
             <td class="max-w-80">{{ $payment->reconciliation_reason }}</td>
             <td><a class="font-extrabold text-brand-start" href="{{ route('admin.payments.show', $payment) }}">#{{ $payment->id }}</a></td>
             <td><a class="font-bold text-brand-start" href="{{ route('admin.bookings.show', $payment->booking_id) }}">{{ $payment->booking?->booking_code ?? '#'.$payment->booking_id }}</a></td>
-            <td>{{ strtoupper($payment->provider) }}</td>
+            <td>{{ \App\Support\PaymentPresentation::providerLabel($payment->provider) }}</td>
             <td class="text-right whitespace-nowrap">{{ number_format((int) $payment->booking?->total_amount, 0, ',', '.') }} VNĐ</td>
             <td class="text-right whitespace-nowrap">{{ number_format($payment->amount, 0, ',', '.') }} {{ $payment->currency }}</td>
             <td>{{ $payment->status_label }}</td><td>{{ \App\Support\PaymentPresentation::providerCategory($payment) }}</td><td>{{ $payment->last_queried_at?->format('d/m/Y H:i') ?? 'Chưa truy vấn' }}</td>

@@ -14,7 +14,7 @@ final class AdminPaymentQuery
     /** @var list<string> */
     public const SAFE_COLUMNS = [
         'payments.id', 'payments.booking_id', 'payments.provider', 'payments.app_trans_id',
-        'payments.order_code', 'payments.amount', 'payments.currency', 'payments.status',
+        'payments.order_code', 'payments.transaction_code', 'payments.amount', 'payments.currency', 'payments.status',
         'payments.transaction_status', 'payments.response_code', 'payments.transaction_id',
         'payments.provider_transaction_created_at', 'payments.provider_paid_at', 'payments.zp_trans_id',
         'payments.provider_return_code', 'payments.provider_sub_return_code', 'payments.callback_received_at',
@@ -47,6 +47,7 @@ final class AdminPaymentQuery
                 $query->where(fn (Builder $query) => $query
                     ->where('app_trans_id', 'like', $like)
                     ->orWhere('order_code', 'like', $like)
+                    ->orWhere('transaction_code', 'like', $like)
                     ->orWhere('transaction_id', 'like', $like)
                     ->orWhere('zp_trans_id', 'like', $like));
             })

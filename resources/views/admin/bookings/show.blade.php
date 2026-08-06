@@ -155,8 +155,8 @@
         <div class="overflow-x-auto"><table class="admin-table min-w-[78rem]"><thead><tr><th>Nhà cung cấp</th><th>Mã tham chiếu</th><th class="text-right">Số tiền</th><th>Trạng thái</th><th>Phân loại an toàn</th><th>Tạo lúc</th><th>Xác minh lúc</th><th>Nhà cung cấp ghi nhận</th></tr></thead><tbody>
             @forelse($payments as $payment)
                 <tr class="{{ $authoritativePayment?->id === $payment->id ? 'bg-success/5' : '' }}">
-                    <td class="font-bold app-text">{{ strtoupper($payment->provider) }}@if($authoritativePayment?->id === $payment->id)<span class="ml-2 status-badge bg-success/10 text-success">Giao dịch xác thực</span>@endif</td>
-                    <td class="font-mono text-xs">{{ $payment->provider === 'vnpay' ? ($payment->order_code ?? '—') : ($payment->app_trans_id ?? '—') }}</td>
+                    <td class="font-bold app-text">{{ \App\Support\PaymentPresentation::providerLabel($payment->provider) }}@if($authoritativePayment?->id === $payment->id)<span class="ml-2 status-badge bg-success/10 text-success">Giao dịch xác thực</span>@endif</td>
+                    <td class="font-mono text-xs">{{ $payment->provider === 'zalopay' ? ($payment->app_trans_id ?? '—') : ($payment->order_code ?? '—') }}</td>
                     <td class="text-right">{{ number_format((int) $payment->amount, 0, ',', '.') }} VNĐ</td>
                     <td>{{ $payment->status_label }}</td><td>{{ $paymentCategories[$payment->id] }}</td>
                     <td>{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->verified_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? $payment->paid_at?->format('d/m/Y H:i:s') ?? '—' }}</td>

@@ -28,7 +28,17 @@ Automatic reconciliation processes only `pending`, `processing`, and `unresolved
 
 Keep the payment in review when the provider remains uncertain, the amount or transaction identity differs, the booking has expired, or its seats were released or rebooked. These cases must not issue a ticket. Escalate late success and possible refund cases to the payment provider and finance team before changing any operational state.
 
-Do not initiate a replacement payment while any attempt for the same booking and provider is `pending`, `processing`, `unresolved`, or `review`. Resolve the existing attempt and its refund exposure first.
+Do not initiate a replacement payment while any attempt for the same booking is `pending`, `processing`, `unresolved`, or `review`, even when the customer selects another provider. Resolve the existing attempt and its payment exposure first.
+
+## payOS configuration and verification
+
+Configure `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, and `PAYOS_CHECKSUM_KEY` outside Git. `PAYOS_BASE_URL` defaults to `https://api-merchant.payos.vn`. The public endpoints are:
+
+- Webhook: `POST /payments/payos/webhook`
+- Browser return: `GET /payments/payos/return`
+- Browser cancel return: `GET /payments/payos/cancel`
+
+For local provider testing, expose MovieMate through a trusted HTTPS tunnel, set `APP_URL` to that public origin, clear cached configuration, and explicitly register `https://YOUR_HOST/payments/payos/webhook` in the payOS merchant channel. Never hard-code an ngrok hostname or token. Browser return and cancel parameters are presentation-only; only a valid signed webhook or an authenticated server-to-server payOS query may finalize or cancel a payment. Keep all provider credentials, signatures, raw webhook data, QR payloads, and banking details outside logs and source control.
 
 Duplicate callbacks never repair ticket delivery. For a historical `success` payment whose booking is still fully paid but whose outbox row is missing, an active operator with `bookings.operate` must run `php artisan payments:recover-ticket-delivery PAYMENT_ID --actor=USER_ID`. The command locks and revalidates the payment and booking, creates only the missing pending delivery row, and logs the operator/payment/booking IDs. It never queries or creates a provider order.
 

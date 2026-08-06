@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Payments;
 
 use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\PayOsResponseException;
+use App\Exceptions\PayOsTransportException;
 use App\Exceptions\VnpayResponseException;
 use App\Exceptions\VnpayTransportException;
 use App\Exceptions\ZaloPayResponseException;
@@ -33,7 +35,7 @@ class PaymentInitiationController extends Controller
                 $provider,
                 $request->ip(),
             );
-        } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
+        } catch (PaymentInitiationException|PayOsResponseException|PayOsTransportException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
             $paymentStatus = $booking->payments()->latest('id')->value('status');
             $statusRoute = match ($paymentStatus) {
                 Payment::STATUS_SUCCESS => 'user.bookings.success',
@@ -46,9 +48,11 @@ class PaymentInitiationController extends Controller
 
             return redirect()
                 ->route($statusRoute, $booking)
-                ->with('warning', $provider === 'vnpay'
-                    ? 'Không thể khởi tạo thanh toán VNPAY. Vui lòng thử lại hoặc liên hệ hỗ trợ.'
-                    : 'MovieMate đang đối soát lần thanh toán ZaloPay hiện tại.');
+                ->with('warning', match ($provider) {
+                    'vnpay' => 'Không thể khởi tạo thanh toán VNPAY. Vui lòng thử lại hoặc liên hệ hỗ trợ.',
+                    'payos' => 'Chưa thể xác minh giao dịch lúc này. Hệ thống tiếp tục giữ trạng thái an toàn và bạn có thể kiểm tra lại sau.',
+                    default => 'MovieMate đang đối soát lần thanh toán ZaloPay hiện tại.',
+                });
         }
 
         abort_unless(is_string($result->orderUrl) && $result->orderUrl !== '', 409);

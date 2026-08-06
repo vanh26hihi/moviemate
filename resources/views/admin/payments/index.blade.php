@@ -12,7 +12,7 @@
 
     <form method="GET" action="{{ route('admin.payments.index') }}" class="admin-toolbar grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Bộ lọc thanh toán">
         <label class="cinema-label">Mã đặt vé<input class="cinema-input mt-1" name="booking_code" maxlength="60" value="{{ $filters['booking_code'] ?? '' }}"></label>
-        <label class="cinema-label">Provider<select class="cinema-input mt-1" name="provider"><option value="">Tất cả</option>@foreach(\App\Models\Payment::SUPPORTED_PROVIDERS as $provider)<option value="{{ $provider }}" @selected(($filters['provider'] ?? '') === $provider)>{{ strtoupper($provider) }}</option>@endforeach</select></label>
+        <label class="cinema-label">Provider<select class="cinema-input mt-1" name="provider"><option value="">Tất cả</option>@foreach(\App\Models\Payment::SUPPORTED_PROVIDERS as $provider)<option value="{{ $provider }}" @selected(($filters['provider'] ?? '') === $provider)>{{ \App\Support\PaymentPresentation::providerLabel($provider) }}</option>@endforeach</select></label>
         <label class="cinema-label">Mã tham chiếu<input class="cinema-input mt-1" name="reference" maxlength="100" value="{{ $filters['reference'] ?? '' }}" placeholder="Mã đơn hoặc giao dịch provider"></label>
         <label class="cinema-label">Trạng thái<select class="cinema-input mt-1" name="status"><option value="">Tất cả</option>@foreach(\App\Models\Payment::STATUSES as $value)<option value="{{ $value }}" @selected(($filters['status'] ?? '') === $value)>{{ \App\Support\StatusLabel::for('payment', $value) }}</option>@endforeach</select></label>
         <label class="cinema-label">Đã xác minh<select class="cinema-input mt-1" name="verified"><option value="">Tất cả</option><option value="yes" @selected(($filters['verified'] ?? '') === 'yes')>Có</option><option value="no" @selected(($filters['verified'] ?? '') === 'no')>Chưa</option></select></label>
@@ -38,7 +38,7 @@
             <tr>
                 <td class="font-extrabold app-text">#{{ $payment->id }}</td>
                 <td><a class="font-bold text-brand-start" href="{{ route('admin.bookings.show', $payment->booking_id) }}">{{ $payment->booking?->booking_code ?? '#'.$payment->booking_id }}</a></td>
-                <td>{{ strtoupper($payment->provider) }}</td>
+                <td>{{ \App\Support\PaymentPresentation::providerLabel($payment->provider) }}</td>
                 <td><span class="block max-w-64 truncate" title="{{ $payment->app_trans_id ?: $payment->order_code ?: $payment->transaction_id ?: $payment->zp_trans_id }}">{{ $payment->app_trans_id ?: $payment->order_code ?: $payment->transaction_id ?: $payment->zp_trans_id ?: '—' }}</span></td>
                 <td class="text-right whitespace-nowrap">{{ number_format($payment->amount, 0, ',', '.') }} {{ $payment->currency }}</td>
                 <td><span class="status-badge {{ $payment->status === 'success' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">{{ $payment->status_label }}</span></td>
