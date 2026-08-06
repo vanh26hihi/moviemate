@@ -9,7 +9,9 @@
     $checkoutDeadline = \Carbon\Carbon::createFromTimestamp((int) $draft['created_at'])
         ->addMinutes((int) config('booking.checkout_token_ttl_minutes', 15));
     $pendingMinutes = (int) config('booking.pending_ttl_minutes', 15);
-    $defaultProvider = ($paymentProviders['vnpay'] ?? false) ? 'vnpay' : 'zalopay';
+    $defaultProvider = ($paymentProviders['vnpay'] ?? false)
+        ? 'vnpay'
+        : (($paymentProviders['payos'] ?? false) ? 'payos' : 'zalopay');
 @endphp
 
 <x-validation-summary class="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8" :errors="$errors" :except="['payment_method']" />
@@ -111,6 +113,12 @@
                                     <i class="ph-bold ph-qr-code text-2xl text-red-500" aria-hidden="true"></i>
                                     <span><strong class="block app-text">Thanh toán bằng VNPAY</strong><small class="app-muted">Bạn sẽ được chuyển đến VNPAY để quét QR hoặc chọn ngân hàng.</small></span>
                                     @unless($paymentProviders['vnpay'] ?? false)<small class="ml-auto text-warning">Chưa cấu hình</small>@endunless
+                                </label>
+                                <label class="flex cursor-pointer items-center gap-3 rounded-xl border app-border bg-white/5 p-3">
+                                    <input type="radio" name="payment_method" value="payos" class="accent-emerald-600" @checked(old('payment_method', $defaultProvider) === 'payos') @disabled(!($paymentProviders['payos'] ?? false))>
+                                    <i class="ph-bold ph-bank text-2xl text-emerald-500" aria-hidden="true"></i>
+                                    <span><strong class="block app-text">payOS — Chuyển khoản ngân hàng / VietQR</strong><small class="app-muted">Bạn sẽ được chuyển tới trang thanh toán bảo mật của payOS.</small></span>
+                                    @unless($paymentProviders['payos'] ?? false)<small class="ml-auto text-warning">Chưa cấu hình</small>@endunless
                                 </label>
                                 @if($paymentProviders['zalopay'] ?? false)
                                     <label class="flex cursor-pointer items-center gap-3 rounded-xl border app-border bg-white/5 p-3">

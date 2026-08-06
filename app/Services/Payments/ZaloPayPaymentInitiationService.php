@@ -42,13 +42,16 @@ class ZaloPayPaymentInitiationService
 
             $activeAttempt = Payment::query()
                 ->where('booking_id', $lockedBooking->id)
-                ->where('provider', 'zalopay')
                 ->whereIn('status', Payment::UNSAFE_RETRY_STATUSES)
                 ->latest('id')
                 ->lockForUpdate()
                 ->first();
 
             if ($activeAttempt) {
+                if ($activeAttempt->provider !== 'zalopay') {
+                    throw new PaymentInitiationException('Another payment provider attempt is still unresolved.');
+                }
+
                 return [$activeAttempt, true];
             }
 

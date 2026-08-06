@@ -4,7 +4,11 @@
 
 @section('content')
 @php
-    $providerLabel = $payment->provider === 'vnpay' ? 'VNPAY' : 'ZaloPay';
+    $providerLabel = match ($payment->provider) {
+        'vnpay' => 'VNPAY',
+        'payos' => 'payOS',
+        default => 'ZaloPay',
+    };
     $isVerifiedPaid = $payment->status === \App\Models\Payment::STATUS_SUCCESS
         && $payment->verified_at !== null
         && $booking->payment_status === 'paid'
@@ -46,6 +50,14 @@
     ];
     $states[\App\Models\Payment::STATUS_UNRESOLVED] = $states[\App\Models\Payment::STATUS_PENDING];
     $states[\App\Models\Payment::STATUS_PROCESSING] = $states[\App\Models\Payment::STATUS_PENDING];
+    if (($payOsCancelReturn ?? false) && $payment->failure_reason === 'payos_cancelled') {
+        $states[\App\Models\Payment::STATUS_FAILED] = [
+            'title' => 'Thanh toán đã được hủy',
+            'message' => 'payOS đã xác nhận hủy giao dịch. Ghế của đơn đủ điều kiện đã được giải phóng an toàn.',
+            'icon' => 'ph-x-circle',
+            'colour' => 'text-error',
+        ];
+    }
     $state = $states[$stateStatus] ?? [
         'title' => 'Đang xử lý trạng thái',
         'message' => 'MovieMate đang kiểm tra dữ liệu giao dịch hiện tại.',

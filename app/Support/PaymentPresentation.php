@@ -34,6 +34,17 @@ final class PaymentPresentation
         'create_rejected' => 'Provider từ chối khởi tạo giao dịch',
         'manual_review' => 'Giao dịch đang chờ kiểm tra',
         'duplicate_active_attempt_migration' => 'Phát hiện nhiều lần thử đang hoạt động',
+        'payos_cancelled' => 'payOS xác nhận giao dịch đã hủy',
+        'payos_pending' => 'payOS đang chờ thanh toán',
+        'payos_processing' => 'payOS đang xử lý giao dịch',
+        'payos_unknown_status' => 'payOS trả về trạng thái chưa xác định',
+        'payos_response_schema_invalid' => 'Phản hồi payOS không đúng cấu trúc',
+        'payos_order_code_mismatch' => 'Mã đơn payOS không khớp',
+        'payos_payment_link_mismatch' => 'Mã liên kết payOS không khớp',
+        'payos_currency_mismatch' => 'Đơn vị tiền payOS không khớp',
+        'payos_amount_paid_mismatch' => 'Số tiền payOS ghi nhận đã thanh toán không khớp',
+        'late_paid_after_payos_cancelled' => 'payOS ghi nhận thanh toán sau khi liên kết đã được xác nhận hủy',
+        'create_response_identity_mismatch' => 'Liên kết thanh toán payOS không khớp lần thử',
     ];
 
     public static function reason(?string $reason): string
@@ -73,6 +84,16 @@ final class PaymentPresentation
             'not_successful' => 'Provider chưa xác nhận thành công',
             'uncertain', 'transport_error', 'invalid_response' => 'Kết quả provider chưa chắc chắn',
             default => 'Cần kiểm tra thêm',
+        };
+    }
+
+    public static function providerLabel(?string $provider): string
+    {
+        return match ($provider) {
+            'vnpay' => 'VNPAY',
+            'zalopay' => 'ZaloPay',
+            'payos' => 'payOS',
+            default => 'Cổng thanh toán',
         };
     }
 }

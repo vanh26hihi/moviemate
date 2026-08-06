@@ -73,6 +73,7 @@
                         };
                         $poster = $booking->showtime->movie->poster_url;
                         $canCancel = in_array($booking->id, $cancellableBookingIds, true);
+                        $canCancelPayOs = in_array($booking->id, $payOsCancellableBookingIds, true);
                         $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
                     @endphp
 
@@ -139,6 +140,13 @@
                                                 @method('DELETE')
                                                 <button type="submit" data-loading-label="Đang hủy…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('Bạn chắc chắn muốn hủy đơn đặt vé này?')">
                                                     Hủy đơn
+                                                </button>
+                                            </form>
+                                        @elseif($canCancelPayOs)
+                                            <form method="POST" action="{{ route('payments.payos.cancel-attempt', $booking) }}" class="inline" data-submit-once>
+                                                @csrf
+                                                <button type="submit" data-loading-label="Đang xác minh hủy…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('MovieMate sẽ yêu cầu payOS hủy liên kết trước khi giải phóng ghế. Tiếp tục?')">
+                                                    Hủy qua payOS
                                                 </button>
                                             </form>
                                         @endif

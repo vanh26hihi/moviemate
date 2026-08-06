@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
-    public const SUPPORTED_PROVIDERS = ['zalopay', 'vnpay'];
+    public const SUPPORTED_PROVIDERS = ['zalopay', 'vnpay', 'payos'];
 
     public const STATUS_PENDING = 'pending';
 

@@ -74,6 +74,8 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee('50.000 VNĐ')
             ->assertSee('Không chọn đồ ăn')
             ->assertSee('ZaloPay')
+            ->assertSee('payOS — Chuyển khoản ngân hàng / VietQR')
+            ->assertSee('value="payos"', false)
             ->assertSee('mobile@example.test')
             ->assertSee('Thời gian phiên đặt vé còn lại')
             ->assertDontSee('name="total_amount"', false)

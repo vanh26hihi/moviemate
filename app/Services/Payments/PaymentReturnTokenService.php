@@ -193,7 +193,7 @@ class PaymentReturnTokenService
 
     private function attemptReference(Payment $payment): string
     {
-        $reference = $payment->provider === 'vnpay' ? $payment->order_code : $payment->app_trans_id;
+        $reference = $payment->provider === 'zalopay' ? $payment->app_trans_id : $payment->order_code;
         if (! is_string($reference) || $reference === '') {
             throw new PaymentConfigurationException('Payment attempt reference is missing.');
         }

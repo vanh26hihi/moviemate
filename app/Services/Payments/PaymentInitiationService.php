@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Domain\Payments\PayOsConfig;
 use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\ZaloPayConfig;
 use App\Exceptions\PaymentConfigurationException;
@@ -21,6 +22,7 @@ class PaymentInitiationService
         return match ($provider) {
             'vnpay' => app(VnpayPaymentInitiationService::class)->initiate($booking, $clientIp ?? '127.0.0.1'),
             'zalopay' => app(ZaloPayPaymentInitiationService::class)->initiate($booking),
+            'payos' => app(PayOsPaymentInitiationService::class)->initiate($booking),
             default => throw new PaymentInitiationException('The selected payment provider is not supported.'),
         };
     }
@@ -38,6 +40,7 @@ class PaymentInitiationService
         return [
             'vnpay' => $this->isAvailable('vnpay'),
             'zalopay' => $this->isAvailable('zalopay'),
+            'payos' => $this->isAvailable('payos'),
         ];
     }
 
@@ -47,6 +50,7 @@ class PaymentInitiationService
             return match (strtolower(trim($provider))) {
                 'vnpay' => VnpayConfig::isConfigured() && app(VnpayConfig::class) instanceof VnpayConfig,
                 'zalopay' => ZaloPayConfig::isConfigured() && app(ZaloPayConfig::class) instanceof ZaloPayConfig,
+                'payos' => PayOsConfig::isConfigured() && app(PayOsConfig::class) instanceof PayOsConfig,
                 default => false,
             };
         } catch (PaymentConfigurationException) {

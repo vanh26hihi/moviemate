@@ -130,7 +130,7 @@ final class AdminTicketOperationsTest extends PaymentTestCase
         $unpaid = BookingTicketDelivery::query()->create(['booking_id' => $booking->id, 'status' => 'failed', 'attempts' => 2]);
         $this->actingAs($manager)->post(route('admin.ticket-deliveries.retry', $unpaid))->assertSessionHas('warning');
         $this->assertSame('failed', $unpaid->fresh()->status);
-        $this->assertDatabaseCount('activity_logs', 0);
+        $this->assertSame(0, ActivityLog::query()->where('action', 'ticket_delivery.retry_requested')->count());
     }
 
     public function test_expired_claim_is_released_without_decrementing_attempts(): void

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\PaymentConfigurationException;
 use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\PayOsResponseException;
+use App\Exceptions\PayOsTransportException;
 use App\Exceptions\VnpayResponseException;
 use App\Exceptions\VnpayTransportException;
 use App\Exceptions\ZaloPayResponseException;
@@ -58,7 +60,7 @@ final class PaymentReconciliationController extends Controller
 
         try {
             $result = $reconciliation->reconcile($payment);
-        } catch (PaymentConfigurationException|PaymentInitiationException|VnpayResponseException|VnpayTransportException|ZaloPayResponseException|ZaloPayTransportException $exception) {
+        } catch (PaymentConfigurationException|PaymentInitiationException|PayOsResponseException|PayOsTransportException|VnpayResponseException|VnpayTransportException|ZaloPayResponseException|ZaloPayTransportException $exception) {
             report($exception);
 
             return back()->with('error', 'Chưa nhận được kết quả provider đủ tin cậy. Giao dịch không bị ép sang thành công.');
@@ -107,7 +109,7 @@ final class PaymentReconciliationController extends Controller
             } else {
                 $category = $reconciliation->reconcile($payment);
             }
-        } catch (LogicException|PaymentConfigurationException|PaymentInitiationException|VnpayResponseException|VnpayTransportException|ZaloPayResponseException|ZaloPayTransportException $exception) {
+        } catch (LogicException|PaymentConfigurationException|PaymentInitiationException|PayOsResponseException|PayOsTransportException|VnpayResponseException|VnpayTransportException|ZaloPayResponseException|ZaloPayTransportException $exception) {
             report($exception);
 
             return back()->with('error', 'Không thể hoàn tất đối soát bằng bằng chứng provider hiện có. Giao dịch không bị ép sang thành công.');

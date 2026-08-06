@@ -28,6 +28,9 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CinemaContextController;
 use App\Http\Controllers\Payments\PaymentInitiationController;
+use App\Http\Controllers\Payments\PayOsCancellationController;
+use App\Http\Controllers\Payments\PayOsReturnController;
+use App\Http\Controllers\Payments\PayOsWebhookController;
 use App\Http\Controllers\Payments\VnpayIpnController;
 use App\Http\Controllers\Payments\VnpayReturnController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
@@ -69,6 +72,27 @@ Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
     ->middleware('throttle:120,1')
     ->name('payments.zalopay.callback');
 
+Route::post('/payments/payos/webhook', PayOsWebhookController::class)
+    ->withoutMiddleware([
+        EncryptCookies::class,
+        AddQueuedCookiesToResponse::class,
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        PreventRequestForgery::class,
+    ])
+    ->middleware('throttle:240,1')
+    ->name('payments.payos.webhook');
+
+Route::get('/payments/payos/return', PayOsReturnController::class)
+    ->middleware(ProtectBookingResponses::class)
+    ->defaults('payos_return_mode', 'return')
+    ->name('payments.payos.return');
+
+Route::get('/payments/payos/cancel', PayOsReturnController::class)
+    ->middleware(ProtectBookingResponses::class)
+    ->defaults('payos_return_mode', 'cancel')
+    ->name('payments.payos.cancel');
+
 Route::get('/payments/zalopay/return', ZaloPayReturnController::class)
     ->middleware(ProtectBookingResponses::class)
     ->name('payments.zalopay.return');
@@ -96,6 +120,15 @@ Route::post('/payments/vnpay/bookings/{booking}', PaymentInitiationController::c
     ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
     ->defaults('payment_provider', 'vnpay')
     ->name('payments.vnpay.initiate');
+
+Route::post('/payments/payos/bookings/{booking}', PaymentInitiationController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->defaults('payment_provider', 'payos')
+    ->name('payments.payos.initiate');
+
+Route::post('/payments/payos/bookings/{booking}/cancel', PayOsCancellationController::class)
+    ->middleware(['auth', 'active', 'throttle:10,1'])
+    ->name('payments.payos.cancel-attempt');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', function () {
