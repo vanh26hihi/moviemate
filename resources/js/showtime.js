@@ -1,8 +1,23 @@
+// MERGE REPAIR - the incoming branch committed this module with placeholder bodies written
+// literally as "{ ... }", which is not valid JavaScript and fails the production build.
+// origin/main was therefore already unbuildable before this merge.
+//
+// The placeholders are replaced with safe no-ops so the bundle compiles and existing
+// server-rendered links keep working via normal navigation. The intended behaviour
+// (Ajax showtime filtering) is NOT implemented here, because inventing it would go beyond
+// reconciling the two histories. The owning branch should finish these.
 const SHOWTIME_QUERY_KEYS = ['cinema_id', 'date', 'city', 'brand', 'nearby', 'lat', 'lng'];
 
-function shouldPinShowtimeSection() { ... }
+function shouldPinShowtimeSection() {
+    const params = new URLSearchParams(window.location.search);
 
-function scrollToShowtimeSection() { ... }
+    return window.location.hash === '#home-showtime-calendar'
+        || SHOWTIME_QUERY_KEYS.some((key) => params.has(key));
+}
+
+function scrollToShowtimeSection() {
+    document.getElementById('home-showtime-calendar')?.scrollIntoView({ block: 'start' });
+}
 
 if (shouldPinShowtimeSection()) {
     document.documentElement.style.scrollBehavior = 'auto';
@@ -19,16 +34,43 @@ window.addEventListener('load', () => {
         scrollToShowtimeSection();
     }
 });
-function setNearbyButtonLoading(button, isLoading) { ... }
+function setNearbyButtonLoading(button, isLoading) {
+    if (!button) return;
+    button.disabled = isLoading;
+    button.setAttribute('aria-busy', String(isLoading));
+}
 
-function redirectToNearby(latitude, longitude) { ... }
+function redirectToNearby(latitude, longitude) {
+    const target = new URL(window.location.href);
+    target.searchParams.set('nearby', '1');
+    target.searchParams.set('lat', String(latitude));
+    target.searchParams.set('lng', String(longitude));
+    target.hash = 'home-showtime-calendar';
+    window.location.assign(target.toString());
+}
 
-function handleNearbyError(error) { ... }
+function handleNearbyError(button) {
+    setNearbyButtonLoading(button, false);
+}
 
-function requestNearbyLocation(button) { ... }
-function setShowtimeLoading(section, isLoading) { ... }
+function requestNearbyLocation(button) {
+    if (!navigator.geolocation) {
+        handleNearbyError(button);
 
-async function updateShowtimeSection(targetUrl) { ... }
+        return;
+    }
+
+    setNearbyButtonLoading(button, true);
+    navigator.geolocation.getCurrentPosition(
+        (position) => redirectToNearby(position.coords.latitude, position.coords.longitude),
+        () => handleNearbyError(button),
+    );
+}
+
+// Full-page navigation is the safe fallback until Ajax filtering is implemented.
+function updateShowtimeSection(targetUrl) {
+    window.location.assign(targetUrl.toString());
+}
 window.addEventListener('popstate', () => {
     if (shouldPinShowtimeSection()) {
         window.location.reload();

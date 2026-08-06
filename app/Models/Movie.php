@@ -116,6 +116,15 @@ class Movie extends Model
         return $this->hasMany(Showtime::class);
     }
 
+    /**
+     * Only visible reviews count toward the public rating so hidden/moderated entries never
+     * influence the aggregates rendered on the movie list.
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class)->where('status', Review::STATUS_VISIBLE);
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return StatusLabel::for('movie', $this->status);
