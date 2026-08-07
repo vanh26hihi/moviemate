@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
-use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketPrintService;
+use App\Services\Tickets\TicketQrPayload;
 use App\Services\Tickets\TicketResolutionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +29,7 @@ final class TicketPrintController extends Controller
         Booking $booking,
         TicketResolutionService $tickets,
         TicketPrintService $prints,
-        TicketCheckinCapability $capabilities,
+        TicketQrPayload $payloads,
     ): Response {
         $booking = $tickets->authorizedBooking($booking, $request->user());
         $operation = $this->operation($request, $booking);
@@ -38,7 +38,7 @@ final class TicketPrintController extends Controller
         return response()->view('staff.tickets.print', [
             'booking' => $booking,
             'printState' => $state,
-            'checkinCapability' => $capabilities->issue($booking),
+            'ticketQrPayload' => $payloads->url($booking),
             'failureReasons' => TicketPrintService::FAILURE_REASONS,
         ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache');

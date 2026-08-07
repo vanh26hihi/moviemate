@@ -2,6 +2,7 @@
 
 namespace App\Services\Tickets;
 
+use App\Jobs\Payments\SendBookingTicket;
 use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ final class TicketDeliveryOutbox
             throw new RuntimeException('ticket_booking_not_eligible');
         }
 
-        return BookingTicketDelivery::query()->firstOrCreate(
+        $delivery = BookingTicketDelivery::query()->firstOrCreate(
             ['booking_id' => $booking->getKey()],
             [
                 'status' => BookingTicketDelivery::STATUS_PENDING,
@@ -26,11 +27,15 @@ final class TicketDeliveryOutbox
                 'available_at' => now(),
             ],
         );
+
+        SendBookingTicket::dispatchAfterResponse($booking->getKey());
+
+        return $delivery;
     }
 
     public function requestResend(Booking $booking, ?int $actorUserId): BookingTicketDelivery
     {
-        return DB::transaction(function () use ($booking, $actorUserId): BookingTicketDelivery {
+        $delivery = DB::transaction(function () use ($booking, $actorUserId): BookingTicketDelivery {
             $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->getKey());
             if (! $this->eligibility->isDeliverable($lockedBooking)) {
                 throw new RuntimeException('ticket_booking_not_eligible');
@@ -70,5 +75,9 @@ final class TicketDeliveryOutbox
 
             return $delivery;
         });
+
+        SendBookingTicket::dispatchAfterResponse($booking->getKey());
+
+        return $delivery;
     }
 }

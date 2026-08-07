@@ -130,11 +130,11 @@
                                         @endif
 
                                         @if($actions['can_cancel_local'])
-                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" onclick="document.getElementById('cancel-booking-{{ $booking->id }}').showModal()">
+                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" data-modal-open="cancel-booking-{{ $booking->id }}" aria-haspopup="dialog" aria-controls="cancel-booking-{{ $booking->id }}">
                                                 Hủy đơn
                                             </button>
                                         @elseif($actions['can_cancel_payos'])
-                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" onclick="document.getElementById('cancel-booking-{{ $booking->id }}').showModal()">
+                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" data-modal-open="cancel-booking-{{ $booking->id }}" aria-haspopup="dialog" aria-controls="cancel-booking-{{ $booking->id }}">
                                                 Hủy đơn
                                             </button>
                                         @endif
@@ -144,14 +144,10 @@
                         </div>
 
                         @if($actions['can_cancel_local'] || $actions['can_cancel_payos'])
-                            <dialog id="cancel-booking-{{ $booking->id }}" class="app-card app-text w-[min(28rem,calc(100%-2rem))] rounded-3xl border app-border p-0 shadow-2xl backdrop:bg-black/60">
-                                <div class="p-6">
-                                    <h3 class="text-lg font-bold">Hủy đơn đặt vé?</h3>
-                                    <p class="app-muted mt-2 text-sm">Nếu tiếp tục, các ghế đang giữ sẽ được giải phóng và đơn này không thể tiếp tục thanh toán.</p>
+                            <x-ui.modal id="cancel-booking-{{ $booking->id }}" title="Hủy đơn đặt vé?" description-id="cancel-booking-{{ $booking->id }}-description">
+                                    <p id="cancel-booking-{{ $booking->id }}-description" class="app-muted text-sm">Nếu tiếp tục, các ghế đang giữ sẽ được giải phóng và đơn này không thể tiếp tục thanh toán.</p>
                                     <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                                        <form method="dialog">
-                                            <button type="submit" class="w-full px-4 py-2 border app-border app-muted hover:app-text rounded-xl text-sm font-semibold transition-colors">Giữ đơn</button>
-                                        </form>
+                                        <button type="button" data-modal-close="cancel-booking-{{ $booking->id }}" data-modal-initial-focus class="px-4 py-2 border app-border app-muted hover:app-text rounded-xl text-sm font-semibold transition-colors">Giữ đơn</button>
                                         <form method="POST" action="{{ $actions['can_cancel_payos'] ? route('payments.payos.cancel-attempt', $booking) : route('user.bookings.cancel', $booking) }}" data-submit-once>
                                             @csrf
                                             @unless($actions['can_cancel_payos'])
@@ -160,8 +156,7 @@
                                             <button type="submit" data-loading-label="Đang xác minh hủy…" class="w-full px-4 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-sm font-bold transition-colors">Hủy đơn</button>
                                         </form>
                                     </div>
-                                </div>
-                            </dialog>
+                            </x-ui.modal>
                         @endif
                     </article>
                 @empty

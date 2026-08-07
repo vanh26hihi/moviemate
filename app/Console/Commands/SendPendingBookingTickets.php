@@ -12,8 +12,8 @@ use App\Services\BookingTokenService;
 use App\Services\Mail\ProductionMailTransportGuard;
 use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\Tickets\BookingTicketEligibility;
-use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketQrCode;
+use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,7 +24,7 @@ use Throwable;
 
 class SendPendingBookingTickets extends Command
 {
-    protected $signature = 'bookings:send-pending-tickets {--batch= : Maximum deliveries to claim}';
+    protected $signature = 'bookings:send-pending-tickets {--batch= : Maximum deliveries to claim} {--booking= : Process only this booking ID}';
 
     protected $description = 'Send paid booking tickets from the durable delivery outbox';
 
@@ -58,7 +58,7 @@ class SendPendingBookingTickets extends Command
         $counts = ['sent' => 0, 'failed' => 0];
 
         for ($i = 0; $i < $batch; $i++) {
-            $claim = $this->claimNext();
+            $claim = $this->claimNext($this->option('booking') === null ? null : (int) $this->option('booking'));
             if ($claim === null) {
                 break;
             }
@@ -106,13 +106,14 @@ class SendPendingBookingTickets extends Command
         return self::SUCCESS;
     }
 
-    private function claimNext(): ?BookingTicketDelivery
+    private function claimNext(?int $bookingId = null): ?BookingTicketDelivery
     {
-        return DB::transaction(function (): ?BookingTicketDelivery {
+        return DB::transaction(function () use ($bookingId): ?BookingTicketDelivery {
             $now = now()->startOfSecond();
             $leaseSeconds = max(30, (int) config('payment.ticket_delivery.lease_seconds', 300));
             $staleStartedAt = $now->copy()->subSeconds($leaseSeconds);
             $delivery = BookingTicketDelivery::query()
+                ->when($bookingId !== null, fn ($query) => $query->where('booking_id', $bookingId))
                 ->whereNull('sent_at')
                 ->where(function ($query) use ($now, $staleStartedAt): void {
                     $query->where(function ($ready) use ($now): void {
@@ -179,9 +180,9 @@ class SendPendingBookingTickets extends Command
             : route('user.bookings.access.show', $booking)
                 .'#token='.rawurlencode($ticketEmailToken).'&destination=ticket';
 
-        $checkinCapability = app(TicketCheckinCapability::class)->issue($booking);
-        $ticketQrSvg = app(TicketQrCode::class)->svg($checkinCapability);
-        Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl, $ticketQrSvg));
+        $ticketQrPayload = app(TicketQrPayload::class)->url($booking);
+        $ticketQrPng = app(TicketQrCode::class)->png($ticketQrPayload);
+        Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl, $ticketQrPng));
 
         DB::transaction(function () use ($delivery, $booking): void {
             $claimedAt = $delivery->processing_started_at;

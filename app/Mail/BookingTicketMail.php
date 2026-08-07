@@ -14,7 +14,7 @@ class BookingTicketMail extends Mailable
     public function __construct(
         public Booking $booking,
         public string $ticketAccessUrl,
-        public string $ticketQrSvg,
+        public string $ticketQrPng,
     ) {}
 
     public function build(): self

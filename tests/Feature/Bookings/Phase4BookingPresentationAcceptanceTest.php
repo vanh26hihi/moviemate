@@ -3,6 +3,7 @@
 namespace Tests\Feature\Bookings;
 
 use App\Models\Payment;
+use App\Services\Tickets\TicketCheckinCapability;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -29,7 +30,7 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
         $this->actingAs($owner)
             ->get(route('user.bookings.ticket', $booking))
             ->assertOk()
-            ->assertSee('data-qr-value="v1.', false)
+            ->assertSee('data-qr-value="'.route('tickets.verify', ['capability' => app(TicketCheckinCapability::class)->issue($booking)]).'"', false)
             ->assertDontSee('data-print-ticket', false)
             ->assertDontSee('Lưu PDF');
     }

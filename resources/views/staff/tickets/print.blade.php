@@ -27,7 +27,7 @@
             <div><dt>Nhân viên</dt><dd>{{ request()->user()->name }}</dd></div>
             <div><dt>Bắt đầu in</dt><dd>{{ $printState->updated_at?->format('d/m/Y H:i:s') }}</dd></div>
         </dl>
-        <div class="qr"><canvas data-qr-value="{{ $checkinCapability }}" data-qr-size="180" width="180" height="180" aria-label="QR soát vé"></canvas><div><strong>{{ $booking->booking_code }}</strong><p>Quét tại quầy soát vé. Việc in không đồng nghĩa vé đã được sử dụng.</p></div></div>
+        <div class="qr"><canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="180" width="180" height="180" aria-label="QR xác minh vé"></canvas><div><strong>{{ $booking->booking_code }}</strong><p>QR xác minh đúng mã vé này. Việc in không đồng nghĩa vé đã được sử dụng.</p></div></div>
     </article>
 
     <section class="controls">

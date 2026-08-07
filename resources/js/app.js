@@ -349,6 +349,35 @@ if (document.documentElement.dataset.flashDismissInitialized !== 'true') {
     });
 }
 
+const modalTriggers = new WeakMap();
+const modalFocusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function openModal(modal, trigger) {
+    if (!(modal instanceof HTMLElement)) return;
+
+    modalTriggers.set(modal, trigger);
+    modal.hidden = false;
+    modal.classList.remove('hidden');
+    modal.classList.add('grid');
+    document.body.classList.add('overflow-hidden');
+    const initialFocus = modal.querySelector('[data-modal-initial-focus]')
+        || modal.querySelector(modalFocusableSelector)
+        || modal.querySelector('[data-modal-panel]');
+    window.requestAnimationFrame(() => initialFocus?.focus());
+}
+
+function closeModal(modal) {
+    if (!(modal instanceof HTMLElement)) return;
+
+    modal.hidden = true;
+    modal.classList.add('hidden');
+    modal.classList.remove('grid');
+    document.body.classList.toggle('overflow-hidden', Boolean(document.querySelector('[data-modal]:not([hidden])')));
+    const trigger = modalTriggers.get(modal);
+    if (trigger instanceof HTMLElement) trigger.focus();
+    modalTriggers.delete(modal);
+}
+
 document.addEventListener('click', (event) => {
     const mobileMenuButton = event.target.closest('#mobile-menu-btn');
 
@@ -370,14 +399,15 @@ document.addEventListener('click', (event) => {
         const modalId = modalTrigger?.dataset.modalOpen || modalClose?.dataset.modalClose;
         const modal = modalId ? document.getElementById(modalId) : null;
 
-        if (modal) {
-            const shouldOpen = Boolean(modalTrigger);
-            modal.hidden = !shouldOpen;
-            modal.classList.toggle('hidden', !shouldOpen);
-            modal.classList.toggle('flex', shouldOpen);
-            document.body.classList.toggle('overflow-hidden', shouldOpen);
-        }
+        if (modalTrigger) openModal(modal, modalTrigger);
+        else closeModal(modal);
 
+        return;
+    }
+
+    const modalBackdrop = event.target.closest('[data-modal]');
+    if (modalBackdrop && event.target === modalBackdrop) {
+        closeModal(modalBackdrop);
         return;
     }
 
@@ -417,6 +447,28 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
+    const openModalElement = document.querySelector('[data-modal]:not([hidden])');
+    if (event.key === 'Tab' && openModalElement) {
+        const focusable = Array.from(openModalElement.querySelectorAll(modalFocusableSelector))
+            .filter((element) => element.getClientRects().length > 0);
+        if (focusable.length === 0) {
+            event.preventDefault();
+            openModalElement.querySelector('[data-modal-panel]')?.focus();
+            return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+        return;
+    }
+
     if (event.key !== 'Escape') return;
 
     const mobileMenu = document.getElementById('mobile-menu');
@@ -430,13 +482,7 @@ document.addEventListener('keydown', (event) => {
 
     document.querySelectorAll('.user-account-menu[open]').forEach((menu) => menu.removeAttribute('open'));
 
-    const openModal = document.querySelector('[data-modal]:not([hidden])');
-    if (openModal) {
-        openModal.hidden = true;
-        openModal.classList.add('hidden');
-        openModal.classList.remove('flex');
-        document.body.classList.remove('overflow-hidden');
-    }
+    if (openModalElement) closeModal(openModalElement);
 });
 
 const posterFallback = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
@@ -472,9 +518,9 @@ async function renderTicketQrCodes() {
         const width = Number.parseInt(canvas.dataset.qrSize || '200', 10);
         await QRCode.toCanvas(canvas, value, {
             width,
-            margin: 1,
+            margin: 4,
             color: { dark: '#111827', light: '#ffffff' },
-            errorCorrectionLevel: 'M',
+            errorCorrectionLevel: 'Q',
         });
     }));
 }

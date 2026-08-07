@@ -31,19 +31,20 @@
 
         <div style="padding:24px">
             <div style="margin-bottom:22px;padding:16px;border:1px dashed #fb7185;border-radius:12px;text-align:center">
-                <p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase">Mã đặt vé / soát vé</p>
+                <p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase">Mã vé</p>
                 <p style="margin:10px 0 0;color:#e91e3d;font-family:monospace;font-size:21px;font-weight:bold;letter-spacing:1px">{{ $booking->booking_code }}</p>
             </div>
 
             <div style="margin-bottom:22px;text-align:center">
-                <img src="{{ $message->embedData($ticketQrSvg, 'moviemate-ticket-qr.svg', 'image/svg+xml') }}" width="220" height="220" alt="Mã QR vé MovieMate" style="display:block;margin:0 auto;max-width:220px;width:100%;height:auto">
-                <p style="margin:8px 0 0;color:#6b7280;font-size:12px">Đưa mã QR này cho nhân viên tại quầy soát vé.</p>
+                <img src="{{ $message->embedData($ticketQrPng, 'moviemate-ticket-qr.png', 'image/png') }}" width="220" height="220" alt="Mã QR xác minh vé MovieMate" style="display:block;margin:0 auto;max-width:220px;width:100%;height:auto">
+                <p style="margin:8px 0 0;color:#6b7280;font-size:12px">QR dùng để xác minh vé. Sau khi quét, MovieMate hiển thị đúng mã vé tương ứng.</p>
             </div>
 
             <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px">
                 @foreach([
                     'Phim' => $booking->showtime?->movie?->title,
                     'Rạp' => $booking->showtime?->cinema?->name,
+                    'Địa chỉ' => $booking->showtime?->cinema?->address,
                     'Phòng' => $booking->showtime?->room?->name,
                     'Suất chiếu' => $booking->showtime_label,
                     'Ghế' => $booking->seat_codes,

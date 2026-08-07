@@ -26,6 +26,17 @@ final class TicketResolutionService
         return $this->load($booking);
     }
 
+    public function resolvePublic(string $capability): Booking
+    {
+        $bookingId = $this->capabilities->bookingId($capability);
+        abort_if($bookingId === null, 404, 'Mã vé không hợp lệ.');
+
+        $booking = Booking::query()->find($bookingId);
+        abort_unless($booking && $this->capabilities->isValid($booking, $capability), 404, 'Mã vé không hợp lệ.');
+
+        return $this->load($booking);
+    }
+
     public function authorizedBooking(Booking $booking, User $actor): Booking
     {
         abort_unless($booking->cinema_id, 404);

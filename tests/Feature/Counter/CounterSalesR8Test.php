@@ -22,6 +22,7 @@ use App\Services\Tickets\TicketCheckinCapability;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Tests\Support\CreatesBookingFixtures;
 use Tests\TestCase;
@@ -186,13 +187,14 @@ final class CounterSalesR8Test extends TestCase
 
     public function test_email_delivery_is_enqueued_exactly_once_only_when_recipient_exists(): void
     {
+        Mail::fake();
         [$booking, , $staff] = $this->counterHold('counter@example.test');
         $this->actingAs($staff)->post(route('staff.counter.cash', $booking))->assertRedirect();
         $this->post(route('staff.counter.cash', $booking))->assertRedirect();
 
         $this->assertDatabaseCount('booking_ticket_deliveries', 1);
         $this->assertDatabaseHas('booking_ticket_deliveries', [
-            'booking_id' => $booking->id, 'status' => BookingTicketDelivery::STATUS_PENDING,
+            'booking_id' => $booking->id, 'status' => BookingTicketDelivery::STATUS_SENT,
         ]);
     }
 

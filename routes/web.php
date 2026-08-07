@@ -41,6 +41,7 @@ use App\Http\Controllers\Staff\CounterSaleController as StaffCounterSaleControll
 use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
+use App\Http\Controllers\TicketVerificationController;
 use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
@@ -70,6 +71,10 @@ Route::get('/cinemas', [UserCinemaController::class, 'index'])->middleware('thro
 Route::get('/cinemas/{cinema:code}', [UserCinemaController::class, 'show'])
     ->where('cinema', '[A-Za-z0-9-]+')->name('cinemas.show');
 Route::get('/showtimes/filter', ShowtimeFilterController::class)->middleware('throttle:60,1')->name('showtimes.filter');
+Route::get('/tickets/verify/{capability}', TicketVerificationController::class)
+    ->middleware('throttle:60,1')
+    ->where('capability', 'v1\\.[1-9][0-9]{0,18}\\.[A-Za-z0-9_-]{43}')
+    ->name('tickets.verify');
 
 Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
     ->middleware('throttle:120,1')
