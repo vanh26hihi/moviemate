@@ -20,6 +20,7 @@
     ];
 
     $searchValue = $search ?? request('search', '');
+    $statusValue = $status ?? request('status', '');
 @endphp
 
 @section('content')
@@ -68,12 +69,43 @@
             >
         </label>
 
-        <button type="submit" class="admin-btn-primary">
+        <select
+            name="status"
+            class="admin-input sm:w-52"
+        >
+            <option value="">Tất cả trạng thái</option>
+
+            <option
+                value="now_showing"
+                {{ $statusValue === 'now_showing' ? 'selected' : '' }}
+            >
+                Đang chiếu
+            </option>
+
+            <option
+                value="coming_soon"
+                {{ $statusValue === 'coming_soon' ? 'selected' : '' }}
+            >
+                Sắp chiếu
+            </option>
+
+            <option
+                value="stopped"
+                {{ $statusValue === 'stopped' ? 'selected' : '' }}
+            >
+                Ngừng chiếu
+            </option>
+        </select>
+
+        <button
+            type="submit"
+            class="admin-btn-primary"
+        >
             <i class="ph-bold ph-magnifying-glass"></i>
             Tìm kiếm
         </button>
 
-        @if($searchValue !== '')
+        @if($searchValue !== '' || $statusValue !== '')
             <a
                 href="{{ route('admin.movies.index') }}"
                 class="inline-flex items-center justify-center gap-2 rounded-xl border app-border px-4 py-3 text-sm font-bold app-text transition-colors hover:border-brand-start hover:text-brand-start"
@@ -85,7 +117,7 @@
     </form>
 </div>
 
-@if($searchValue !== '')
+@if($searchValue !== '' || $statusValue !== '')
     <div class="mb-5 rounded-2xl border app-border app-card px-4 py-3 text-sm app-text-muted">
         Tìm thấy
 
@@ -93,11 +125,29 @@
             {{ $movies->total() }}
         </span>
 
-        phim phù hợp với từ khóa
+        phim phù hợp
 
-        <span class="font-extrabold text-brand-start">
-            “{{ $searchValue }}”
-        </span>.
+        @if($searchValue !== '')
+            với từ khóa
+
+            <span class="font-extrabold text-brand-start">
+                “{{ $searchValue }}”
+            </span>
+        @endif
+
+        @if($statusValue !== '')
+            @php
+                $selectedStatus = $statusMeta[$statusValue]['label'] ?? $statusValue;
+            @endphp
+
+            <span class="ml-1">
+                trạng thái
+                <span class="font-extrabold text-brand-start">
+                    {{ $selectedStatus }}
+                </span>
+            </span>
+        @endif
+        .
     </div>
 @endif
 
@@ -118,7 +168,7 @@
             <tbody>
                 @forelse($movies as $movie)
                     @php
-                        $status = $statusMeta[$movie->status] ?? [
+                        $movieStatus = $statusMeta[$movie->status] ?? [
                             'label' => $movie->status ?: 'Chưa rõ',
                             'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
                         ];
@@ -174,8 +224,8 @@
                         </td>
 
                         <td>
-                            <span class="admin-badge {{ $status['class'] }}">
-                                {{ $status['label'] }}
+                            <span class="admin-badge {{ $movieStatus['class'] }}">
+                                {{ $movieStatus['label'] }}
                             </span>
                         </td>
 
@@ -234,9 +284,8 @@
                                 <i class="ph-fill ph-film-slate text-3xl"></i>
                             </div>
 
-                            @if($searchValue !== '')
-                                Không tìm thấy phim phù hợp với từ khóa
-                                “{{ $searchValue }}”.
+                            @if($searchValue !== '' || $statusValue !== '')
+                                Không tìm thấy phim phù hợp với điều kiện lọc.
                             @else
                                 Chưa có phim nào.
                             @endif
