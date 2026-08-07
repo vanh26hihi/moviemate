@@ -31,6 +31,12 @@ Movie-first: `/movies` → `/movies/{slug}` → suất/rạp/ngày → `/booking
 
 Cinema-first: `/cinemas` → `/cinemas/CG` → phim/suất trong chi nhánh → cùng checkout authoritative ở trên.
 
+## Luồng Staff hoàn chỉnh để nghiệm thu
+
+Đăng nhập Staff → `/staff` → chọn suất tại `/staff/counter` → chọn ghế → đồ ăn tùy chọn → nhập thông tin khách → review → thu tiền mặt → **In vé** → xác nhận kết quả in thực tế → quét QR hoặc nhập mã MMT tại `/staff/tickets` → xem trước vé → **Soát vé** → kiểm tra `/staff/sales`, `/staff/print-queue` và `/staff/check-in-history`.
+
+Print preview và bố cục nhiệt 80 mm có thể kiểm tra trong trình duyệt. Máy in nhiệt vật lý và camera thật vẫn là **MANUAL ACCEPTANCE** khi môi trường demo không có phần cứng; không được suy diễn thành công từ việc mở hộp thoại in.
+
 ## Checklist ngay trước demo
 
 - Chạy `php artisan migrate:status`, bảo đảm không migration pending.

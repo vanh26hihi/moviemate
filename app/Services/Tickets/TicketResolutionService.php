@@ -45,6 +45,15 @@ final class TicketResolutionService
         return $this->load($booking);
     }
 
+    public function resolveBookingCode(string $bookingCode, User $actor): Booking
+    {
+        abort_unless(preg_match('/^MMT-[0-9]{4}-[A-F0-9]{16}$/D', $bookingCode) === 1, 404, 'Không tìm thấy mã vé.');
+        $booking = Booking::query()->where('booking_code', $bookingCode)->first();
+        abort_unless($booking, 404, 'Không tìm thấy mã vé.');
+
+        return $this->authorizedBooking($booking, $actor);
+    }
+
     private function load(Booking $booking): Booking
     {
         return $booking->load([

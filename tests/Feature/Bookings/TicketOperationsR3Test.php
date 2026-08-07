@@ -44,6 +44,8 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->actingAs($staff)->post(route('staff.tickets.resolve'), ['ticket' => $capability])
             ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé hợp lệ và đã thanh toán.')
             ->assertSee('Chưa có dữ liệu in')->assertSee('Chưa soát vé');
+        $this->post(route('staff.tickets.resolve'), ['ticket' => strtolower($booking->booking_code)])
+            ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé hợp lệ và đã thanh toán.');
 
         $booking->refresh();
         $this->assertSame('paid', $booking->booking_status);
@@ -95,6 +97,9 @@ final class TicketOperationsR3Test extends PaymentTestCase
 
         $this->get(route('staff.tickets.print.show', $booking))
             ->assertOk()->assertSee($booking->booking_code)->assertSee('data-staff-print-trigger', false)
+            ->assertSee('MOVIEMATE')->assertSee('VÉ XEM PHIM')->assertSee('width:80mm', false)
+            ->assertSee('data-qr-value="'.app(TicketQrPayload::class)->url($booking).'"', false)
+            ->assertDontSee('data-qr-value="'.$booking->booking_code.'"', false)
             ->assertDontSee('provider')->assertDontSee('ticket_email_token');
         $this->get(route('staff.tickets.print.show', $booking))->assertOk();
         $this->assertSame(1, BookingTicketPrint::query()->sole()->attempts_count);

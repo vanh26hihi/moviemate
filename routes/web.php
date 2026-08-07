@@ -41,6 +41,7 @@ use App\Http\Controllers\Staff\CounterSaleController as StaffCounterSaleControll
 use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
+use App\Http\Controllers\Staff\WorkspaceController as StaffWorkspaceController;
 use App\Http\Controllers\TicketVerificationController;
 use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
@@ -463,8 +464,14 @@ Route::prefix('staff')->name('staff.')
     ->group(function () {
         Route::get('/rooms/{room}/layout/preview', [AdminSeatController::class, 'preview'])
             ->middleware('permission:seats.view')->name('rooms.layout.preview');
-        Route::get('/', fn () => view('staff.dashboard'))
+        Route::get('/', [StaffWorkspaceController::class, 'dashboard'])
             ->middleware('permission:dashboard.view')->name('dashboard');
+        Route::get('/sales', [StaffWorkspaceController::class, 'sales'])
+            ->middleware('permission:counter_sales.view')->name('sales.index');
+        Route::get('/print-queue', [StaffWorkspaceController::class, 'prints'])
+            ->middleware('permission:tickets.print')->name('prints.index');
+        Route::get('/check-in-history', [StaffWorkspaceController::class, 'checkins'])
+            ->middleware('permission:ticket_checkins.view')->name('checkins.index');
         Route::get('/tickets', [StaffTicketWorkspaceController::class, 'index'])
             ->middleware('permission:tickets.lookup')->name('tickets.index');
         Route::post('/tickets/resolve', [StaffTicketWorkspaceController::class, 'resolve'])
@@ -483,6 +490,8 @@ Route::prefix('staff')->name('staff.')
             ->middleware('permission:tickets.checkin')->name('tickets.check');
         Route::post('/tickets/check', [StaffTicketCheckinController::class, 'store'])
             ->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume');
+        Route::post('/tickets/{booking}/check-in', [StaffTicketCheckinController::class, 'storeBooking'])
+            ->whereNumber('booking')->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume-booking');
         Route::get('/counter', [StaffCounterSaleController::class, 'index'])
             ->middleware('permission:counter_sales.view')->name('counter.index');
         Route::post('/counter/cinema', [StaffCounterSaleController::class, 'selectCinema'])

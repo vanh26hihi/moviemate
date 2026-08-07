@@ -109,6 +109,15 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        View::composer('layouts.staff', function ($view): void {
+            $access = app(CinemaAccessService::class);
+            $user = auth()->user();
+            $view->with([
+                'staffAccessibleCinemas' => $user ? $access->accessibleCinemas($user) : collect(),
+                'staffCurrentCinema' => $user ? $access->currentCinema($user) : null,
+            ]);
+        });
+
         View::composer('layouts.user', function ($view): void {
             if (! Schema::hasTable('cinemas')) {
                 return;
