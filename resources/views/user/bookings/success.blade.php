@@ -118,10 +118,10 @@
                     </div>
 
                     <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-                        <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->movie->title }}</dd></div>
+                        <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $booking->movie_title }}</dd></div>
                         <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime_label }}</dd></div>
-                        <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->cinema->name }}</dd></div>
-                        <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->room->name }}</dd></div>
+                        <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $booking->cinema_label }}</dd></div>
+                        <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $booking->room_label }}</dd></div>
                     </dl>
 
                     <div class="mt-5 border-t pt-4 app-border">

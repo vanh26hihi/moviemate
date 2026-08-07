@@ -71,7 +71,7 @@
 
             <div class="p-8 bg-white text-gray-900">
                 <div class="text-center mb-6">
-                    <h2 class="text-xl font-bold text-gray-900 mb-1">{{ $booking->showtime?->movie?->title ?? 'Thông tin phim đang cập nhật' }}</h2>
+                    <h2 class="text-xl font-bold text-gray-900 mb-1">{{ $booking->movie_title }}</h2>
                     <p class="text-gray-500 font-medium">{{ $booking->showtime?->room?->room_type ? ucfirst($booking->showtime->room->room_type) : 'Phòng chiếu' }} {{ $booking->showtime?->movie?->age_rating ?? '' }}</p>
                     <span class="mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-bold {{ $status['class'] }}"><i class="ph-bold {{ $status['icon'] }} mr-1" aria-hidden="true"></i>{{ $status['label'] }}</span>
                 </div>
@@ -87,11 +87,11 @@
                     </div>
                     <div>
                         <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Rạp</p>
-                        <p class="font-bold text-gray-900">{{ $booking->showtime?->cinema?->name ?? 'Đang cập nhật' }}</p>
+                        <p class="font-bold text-gray-900">{{ $booking->cinema_label }}</p>
                     </div>
                     <div class="text-right">
                         <p class="text-xs text-gray-400 uppercase tracking-wider mb-1">Phòng chiếu</p>
-                        <p class="font-bold text-gray-900">{{ $booking->showtime?->room?->name ?? 'Đang cập nhật' }}</p>
+                        <p class="font-bold text-gray-900">{{ $booking->room_label }}</p>
                     </div>
                 </div>
 
@@ -99,7 +99,7 @@
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-xs text-gray-400 uppercase tracking-wider">Ghế</p>
-                            <p class="mt-1 font-bold text-gray-900">{{ $seatCodes ?: 'Đang cập nhật' }}</p>
+                            <p class="mt-1 font-bold text-gray-900">{{ $seatCodes }}</p>
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-400 uppercase tracking-wider">Tổng tiền</p>
