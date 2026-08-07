@@ -124,4 +124,17 @@ class Booking extends Model
     {
         return $this->showtime?->movie?->title ?: 'Phim đang cập nhật';
     }
+
+    public function getCinemaLabelAttribute(): string
+    {
+        $cinema = $this->showtime?->cinema;
+
+        if (! $cinema) {
+            return 'Rạp đang cập nhật';
+        }
+
+        return collect([$cinema->name, $cinema->address])
+            ->filter()
+            ->join(' - ');
+    }
 }
