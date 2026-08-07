@@ -30,15 +30,21 @@ final class BookingTicketEligibility
     {
         if ($booking->relationLoaded('payments')) {
             return $booking->payments
-                ->where('status', Payment::STATUS_SUCCESS)
-                ->filter(fn (Payment $payment): bool => $payment->verified_at !== null)
+                ->filter(fn (Payment $payment): bool => $payment->hasAuthoritativeSuccessEvidence())
                 ->sortByDesc('id')
                 ->first();
         }
 
         $query = $booking->payments()
             ->where('status', Payment::STATUS_SUCCESS)
-            ->whereNotNull('verified_at')
+            ->where(function ($query): void {
+                $query->whereNotNull('verified_at')
+                    ->orWhere(function ($counter): void {
+                        $counter->where('provider', Payment::PROVIDER_COUNTER_CASH)
+                            ->whereNotNull('settled_at')
+                            ->whereNotNull('settled_by_user_id');
+                    });
+            })
             ->latest('id');
 
         return $query->first();

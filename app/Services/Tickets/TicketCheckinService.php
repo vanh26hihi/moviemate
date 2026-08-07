@@ -60,7 +60,14 @@ final class TicketCheckinService
             $verifiedPayment = Payment::query()
                 ->where('booking_id', $booking->id)
                 ->where('status', Payment::STATUS_SUCCESS)
-                ->whereNotNull('verified_at')
+                ->where(function ($query): void {
+                    $query->whereNotNull('verified_at')
+                        ->orWhere(function ($counter): void {
+                            $counter->where('provider', Payment::PROVIDER_COUNTER_CASH)
+                                ->whereNotNull('settled_at')
+                                ->whereNotNull('settled_by_user_id');
+                        });
+                })
                 ->latest('id')
                 ->lockForUpdate()
                 ->first();

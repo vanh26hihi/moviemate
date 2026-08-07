@@ -29,7 +29,7 @@ final class IndexPaymentRequest extends FormRequest
 
         return [
             'booking_code' => ['nullable', 'string', 'max:60'],
-            'provider' => ['nullable', Rule::in(Payment::SUPPORTED_PROVIDERS)],
+            'provider' => ['nullable', Rule::in([...Payment::SUPPORTED_PROVIDERS, Payment::PROVIDER_COUNTER_CASH])],
             'reference' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(Payment::STATUSES)],
             'verified' => ['nullable', Rule::in(['yes', 'no'])],

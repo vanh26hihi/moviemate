@@ -47,6 +47,13 @@
                 @foreach(\App\Models\Booking::PAYMENT_STATUSES as $status)<option value="{{ $status }}" @selected(($filters['payment_status'] ?? '') === $status)>{{ \App\Support\StatusLabel::for('booking_payment', $status) }}</option>@endforeach
             </select>
         </label>
+        <label class="cinema-label">Kênh bán
+            <select class="cinema-input mt-1" name="sales_channel">
+                <option value="">Tất cả kênh</option>
+                <option value="online" @selected(($filters['sales_channel'] ?? '') === 'online')>Online</option>
+                <option value="counter" @selected(($filters['sales_channel'] ?? '') === 'counter')>Tại quầy</option>
+            </select>
+        </label>
         <label class="cinema-label">Trạng thái gửi vé
             <select class="cinema-input mt-1" name="ticket_status">
                 <option value="">Tất cả trạng thái</option>
@@ -96,7 +103,7 @@
         <div class="overflow-x-auto">
             <table class="admin-table min-w-[118rem]">
                 <thead><tr>
-                    <th>Mã đặt vé</th><th>Khách hàng</th><th>Phim</th><th>Suất chiếu</th><th>Phòng</th><th>Ghế</th>
+                    <th>Mã đặt vé</th><th>Kênh bán</th><th>Nhân viên tạo</th><th>Khách hàng</th><th>Phim</th><th>Suất chiếu</th><th>Phòng</th><th>Ghế</th>
                     <th class="text-right">Tiền ghế</th><th class="text-right">Tiền đồ ăn</th><th class="text-right">Tổng thanh toán</th>
                     <th>Trạng thái đơn</th><th>Trạng thái thanh toán</th><th>Trạng thái in vé</th><th>Trạng thái soát vé</th><th>Gửi vé điện tử</th><th>Ngày tạo</th><th class="text-right">Thao tác</th>
                 </tr></thead>
@@ -104,7 +111,9 @@
                     @forelse($bookings as $booking)
                         <tr>
                             <td><a class="font-extrabold text-brand-start" href="{{ route('admin.bookings.show', $booking) }}">{{ $booking->booking_code }}</a></td>
-                            <td><span class="font-bold app-text">{{ $booking->user?->name ?? 'Khách đặt vé' }}</span><span class="mt-1 block text-xs app-muted">{{ \App\Support\PrivacyMask::email($booking->recipient_email) }}</span></td>
+                            <td><span class="status-badge {{ $booking->sales_channel === 'counter' ? 'bg-ai-start/10 text-ai-start' : 'bg-success/10 text-success' }}">{{ $booking->sales_channel === 'counter' ? 'Tại quầy' : 'Online' }}</span></td>
+                            <td>{{ $booking->createdByStaff?->name ?? '—' }}</td>
+                            <td><span class="font-bold app-text">{{ $booking->user?->name ?? $booking->customer_name ?? 'Khách đặt vé' }}</span><span class="mt-1 block text-xs app-muted">{{ \App\Support\PrivacyMask::email($booking->recipient_email) }}</span></td>
                             <td>{{ $booking->showtime?->movie?->title ?? 'Thông tin không còn khả dụng' }}</td>
                             <td>{{ $booking->showtime?->show_date?->format('d/m/Y') ?? '—' }}<span class="block text-xs app-muted">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '—' }}</span></td>
                             <td>{{ $booking->showtime?->room?->code ?? '—' }}</td>
@@ -121,7 +130,7 @@
                             <td class="text-right"><a class="btn-secondary !px-3 !py-2 text-xs" href="{{ route('admin.bookings.show', $booking) }}">Xem chi tiết</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="16" class="py-12 text-center app-muted">Không có đơn đặt vé phù hợp.</td></tr>
+                        <tr><td colspan="18" class="py-12 text-center app-muted">Không có đơn đặt vé phù hợp.</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
+    public const PROVIDER_COUNTER_CASH = 'counter_cash';
+
     public const SUPPORTED_PROVIDERS = ['zalopay', 'vnpay', 'payos'];
 
     public const STATUS_PENDING = 'pending';
@@ -114,6 +116,7 @@ class Payment extends Model
         'callback_received_at' => 'datetime',
         'last_queried_at' => 'datetime',
         'verified_at' => 'datetime',
+        'settled_at' => 'datetime',
         'failed_at' => 'datetime',
         'provider_transaction_created_at' => 'datetime',
         'provider_paid_at' => 'datetime',
@@ -128,6 +131,20 @@ class Payment extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function settledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'settled_by_user_id');
+    }
+
+    public function hasAuthoritativeSuccessEvidence(): bool
+    {
+        return $this->status === self::STATUS_SUCCESS
+            && ($this->verified_at !== null
+                || ($this->provider === self::PROVIDER_COUNTER_CASH
+                    && $this->settled_at !== null
+                    && $this->settled_by_user_id !== null));
     }
 
     public function getStatusLabelAttribute(): string

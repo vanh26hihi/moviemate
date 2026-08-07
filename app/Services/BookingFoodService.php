@@ -27,7 +27,12 @@ class BookingFoodService
             return FoodPriceBreakdown::empty();
         }
 
-        $foods = FoodItem::query()->whereIn('id', array_column($selection, 'food_id'))->get()->keyBy('id');
+        $foods = FoodItem::query()
+            ->whereIn('id', array_column($selection, 'food_id'))
+            ->when($cinemaId !== null, fn ($query) => $query->where(
+                fn ($scope) => $scope->whereNull('cinema_id')->orWhere('cinema_id', $cinemaId)
+            ))
+            ->get()->keyBy('id');
         $lines = [];
         $subtotal = VndAmount::zero();
 
@@ -88,8 +93,8 @@ class BookingFoodService
         $order = Order::query()->create([
             'booking_id' => $booking->id,
             'user_id' => $booking->user_id,
-            'customer_name' => '',
-            'customer_phone' => null,
+            'customer_name' => (string) ($attributes['customer_name'] ?? $booking->customer_name ?? ''),
+            'customer_phone' => $attributes['customer_phone'] ?? $booking->customer_phone,
             'customer_email' => $booking->customer_email,
             'pickup_cinema_id' => $booking->cinema_id,
             'subtotal' => $food->foodSubtotal,

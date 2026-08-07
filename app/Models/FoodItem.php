@@ -12,7 +12,7 @@ class FoodItem extends Model
     public const MAX_PRICE = 999_999;
 
     protected $fillable = [
-        'name', 'description', 'price', 'image', 'active',
+        'cinema_id', 'name', 'description', 'price', 'image', 'active',
     ];
 
     protected $casts = [

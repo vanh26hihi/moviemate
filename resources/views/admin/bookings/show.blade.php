@@ -58,6 +58,23 @@
 
     <div class="grid gap-6 xl:grid-cols-2">
         <section class="cinema-card p-6">
+            <h2 class="text-xl font-extrabold app-heading">Thông tin bán vé</h2>
+            <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div><dt class="text-sm app-muted">Kênh bán</dt><dd class="font-bold app-text">{{ $booking->sales_channel === 'counter' ? 'Tại quầy' : 'Online' }}</dd></div>
+                <div><dt class="text-sm app-muted">Chi nhánh</dt><dd class="font-bold app-text">{{ $booking->showtime?->cinema?->name ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Người tạo đơn</dt><dd class="font-bold app-text">{{ $booking->createdByStaff?->name ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Thời gian tạo</dt><dd class="font-bold app-text">{{ $booking->created_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Phương thức thanh toán</dt><dd class="font-bold app-text">{{ $authoritativePayment ? \App\Support\PaymentPresentation::providerLabel($authoritativePayment->provider) : '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Người thu tiền</dt><dd class="font-bold app-text">{{ $authoritativePayment?->settledBy?->name ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Thời gian thu tiền</dt><dd class="font-bold app-text">{{ $authoritativePayment?->settled_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Người in vé</dt><dd class="font-bold app-text">{{ $printState?->printedBy?->name ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Thời gian in</dt><dd class="font-bold app-text">{{ $printState?->printed_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Người soát vé</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->actor?->name ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Thời gian soát</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->scanned_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+            </dl>
+        </section>
+
+        <section class="cinema-card p-6">
             <h2 class="text-xl font-extrabold app-heading">In vé cứng</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Trạng thái</dt><dd class="font-bold app-text">{{ $printState?->status_label ?? 'Chưa có dữ liệu in' }}</dd></div>
@@ -100,6 +117,7 @@
                 <div><dt class="text-sm app-muted">Tên hiển thị</dt><dd class="font-bold app-text">{{ $customer['name'] }}</dd></div>
                 <div><dt class="text-sm app-muted">Loại khách</dt><dd class="font-bold app-text">{{ $customer['kind'] }}</dd></div>
                 <div><dt class="text-sm app-muted">Email nhận vé</dt><dd class="font-bold app-text">{{ $customer['email'] }}</dd></div>
+                <div><dt class="text-sm app-muted">Điện thoại</dt><dd class="font-bold app-text">{{ $customer['phone'] }}</dd></div>
                 @if($booking->user_id)<div><dt class="text-sm app-muted">Mã tài khoản nội bộ</dt><dd class="font-bold app-text">#{{ $booking->user_id }}</dd></div>@endif
             </dl>
         </section>
@@ -156,7 +174,7 @@
             @forelse($payments as $payment)
                 <tr class="{{ $authoritativePayment?->id === $payment->id ? 'bg-success/5' : '' }}">
                     <td class="font-bold app-text">{{ \App\Support\PaymentPresentation::providerLabel($payment->provider) }}@if($authoritativePayment?->id === $payment->id)<span class="ml-2 status-badge bg-success/10 text-success">Giao dịch xác thực</span>@endif</td>
-                    <td class="font-mono text-xs">{{ $payment->provider === 'zalopay' ? ($payment->app_trans_id ?? '—') : ($payment->order_code ?? '—') }}</td>
+                    <td class="font-mono text-xs">{{ $payment->provider === 'counter_cash' ? ($payment->transaction_code ?? '—') : ($payment->provider === 'zalopay' ? ($payment->app_trans_id ?? '—') : ($payment->order_code ?? '—')) }}</td>
                     <td class="text-right">{{ number_format((int) $payment->amount, 0, ',', '.') }} VNĐ</td>
                     <td>{{ $payment->status_label }}</td><td>{{ $paymentCategories[$payment->id] }}</td>
                     <td>{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->verified_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? $payment->paid_at?->format('d/m/Y H:i:s') ?? '—' }}</td>

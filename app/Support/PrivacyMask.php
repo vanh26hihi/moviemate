@@ -31,6 +31,16 @@ final class PrivacyMask
         return self::firstCharacter($local).'***@'.self::firstCharacter($domainName).'***'.$suffix;
     }
 
+    public static function phone(?string $phone): string
+    {
+        $phone = preg_replace('/\D+/', '', (string) $phone);
+        if (! is_string($phone) || $phone === '') {
+            return 'Chưa có số điện thoại';
+        }
+
+        return str_repeat('*', max(0, strlen($phone) - 4)).substr($phone, -4);
+    }
+
     private static function firstCharacter(string $value): string
     {
         return $value === '' ? '*' : mb_substr($value, 0, 1);

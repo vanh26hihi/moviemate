@@ -85,7 +85,14 @@ final class AdminDashboardService
         return Payment::query()
             ->selectRaw('booking_id, MIN(paid_at) as recognized_at')
             ->where('status', Payment::STATUS_SUCCESS)
-            ->whereNotNull('verified_at')
+            ->where(function (Builder $query): void {
+                $query->whereNotNull('verified_at')
+                    ->orWhere(function (Builder $counter): void {
+                        $counter->where('provider', Payment::PROVIDER_COUNTER_CASH)
+                            ->whereNotNull('settled_at')
+                            ->whereNotNull('settled_by_user_id');
+                    });
+            })
             ->whereNotNull('paid_at')
             ->groupBy('booking_id');
     }

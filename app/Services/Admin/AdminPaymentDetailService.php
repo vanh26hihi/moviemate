@@ -12,13 +12,15 @@ final class AdminPaymentDetailService
     public function get(Payment $payment, bool $canViewActivity): array
     {
         $payment->load([
-            'booking:id,user_id,showtime_id,booking_code,customer_email,total_amount,payment_status,booking_status,paid_at,created_at',
+            'settledBy:id,name,email',
+            'booking:id,user_id,showtime_id,booking_code,customer_name,customer_email,total_amount,payment_status,booking_status,paid_at,created_at',
             'booking.user:id,name,email',
             'booking.showtime:id,movie_id,room_id,show_date,show_time',
             'booking.showtime.movie:id,title',
             'booking.showtime.room:id,code,name',
             'booking.authoritativePayment' => fn ($query) => $query->select([
                 'payments.id', 'payments.booking_id', 'payments.provider', 'payments.status', 'payments.verified_at',
+                'payments.settled_by_user_id', 'payments.settled_at',
             ]),
         ]);
 
@@ -49,7 +51,7 @@ final class AdminPaymentDetailService
     /** @return array<string, array{state:string,label:string}> */
     private function evidence(Payment $payment): array
     {
-        $verified = $payment->status === Payment::STATUS_SUCCESS && $payment->verified_at !== null;
+        $verified = $payment->hasAuthoritativeSuccessEvidence();
         $reason = strtolower((string) $payment->failure_reason);
         $booking = $payment->booking;
 

@@ -22,6 +22,8 @@
             <div><dt>Suất chiếu</dt><dd>{{ $booking->showtime_label }}</dd></div>
             <div><dt>Phòng</dt><dd>{{ $booking->showtime?->room?->name }}</dd></div>
             <div><dt>Ghế</dt><dd>{{ $booking->seat_codes }}</dd></div>
+            <div><dt>Tổng thanh toán</dt><dd>{{ number_format((int)$booking->total_amount, 0, ',', '.') }} VNĐ</dd></div>
+            <div><dt>Phương thức</dt><dd>{{ $booking->sales_channel === 'counter' ? 'Thanh toán tại quầy' : \App\Support\PaymentPresentation::providerLabel($booking->payment_method) }}</dd></div>
             <div><dt>Nhân viên</dt><dd>{{ request()->user()->name }}</dd></div>
             <div><dt>Bắt đầu in</dt><dd>{{ $printState->updated_at?->format('d/m/Y H:i:s') }}</dd></div>
         </dl>

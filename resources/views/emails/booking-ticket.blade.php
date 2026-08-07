@@ -14,6 +14,7 @@
         'vnpay' => 'VNPAY',
         'zalopay' => 'ZaloPay',
         'payos' => 'payOS',
+        'counter_cash' => 'Tiền mặt tại quầy',
         default => 'Cổng thanh toán',
     };
     $foodItems = $booking->foodOrder?->items ?? collect();
@@ -46,7 +47,7 @@
                     'Phòng' => $booking->showtime?->room?->name,
                     'Suất chiếu' => $booking->showtime_label,
                     'Ghế' => $booking->seat_codes,
-                    'Thanh toán' => $provider.' · Đã xác minh',
+                    'Thanh toán' => $provider.' · '.($verifiedPayment?->provider === 'counter_cash' ? 'Đã thu tại quầy' : 'Đã xác minh'),
                 ] as $label => $value)
                     <tr>
                         <td style="padding:9px 0;color:#6b7280;vertical-align:top">{{ $label }}</td>

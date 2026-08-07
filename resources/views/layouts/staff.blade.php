@@ -25,7 +25,7 @@
             @can('dashboard.view')<x-admin.nav-link route-name="staff.dashboard" active-pattern="staff.dashboard" label="Tổng quan" icon="ph-squares-four" />@endcan
             @can('tickets.checkin')<x-admin.nav-link route-name="staff.tickets.check" active-pattern="staff.tickets.check" label="Kiểm tra vé QR" icon="ph-qr-code" />@endcan
             @can('tickets.lookup')<x-admin.nav-link route-name="staff.tickets.index" active-pattern="staff.tickets.*" label="Tra cứu vé" icon="ph-ticket" />@endcan
-            @can('bookings.operate')<x-admin.nav-link route-name="staff.sales.counter" active-pattern="staff.sales.counter" label="Bán vé tại quầy" icon="ph-storefront" />@endcan
+            @can('counter_sales.view')<x-admin.nav-link route-name="staff.counter.index" active-pattern="staff.counter.*" label="Bán vé tại quầy" icon="ph-storefront" />@endcan
         </nav>
         <div class="p-4 border-t app-border shrink-0">
             <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về trang chính</a>
