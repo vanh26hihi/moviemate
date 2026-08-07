@@ -53,7 +53,7 @@ abstract class ShowtimeTestCase extends TestCase
             ]);
         }
 
-        $this->artisan('moviemate:rebuild-seat-layouts', ['--force' => true])->assertSuccessful();
+        $this->artisan('moviemate:rebuild-seat-layouts', ['--initialize-empty' => true])->assertSuccessful();
         $this->rooms = Room::query()->whereIn('code', ['P01', 'P02', 'P03'])->get()->keyBy('code');
     }
 

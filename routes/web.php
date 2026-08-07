@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewCont
 use App\Http\Controllers\Admin\PricingRuleController as AdminPricingRuleController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
+use App\Http\Controllers\Admin\RoomLayoutTemplateController as AdminRoomLayoutTemplateController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
@@ -291,11 +292,22 @@ Route::prefix('admin')->name('admin.')
             ->middlewareFor(['edit', 'update'], 'permission:foods.update')
             ->middlewareFor('destroy', 'permission:foods.delete');
 
-        Route::resource('movies', AdminMovieController::class)
+        Route::resource('movies', AdminMovieController::class)->except(['destroy'])
             ->middlewareFor(['index', 'show'], 'permission:movies.view')
             ->middlewareFor(['create', 'store'], 'permission:movies.create')
-            ->middlewareFor(['edit', 'update'], 'permission:movies.update')
-            ->middlewareFor('destroy', 'permission:movies.delete');
+            ->middlewareFor(['edit', 'update'], 'permission:movies.update');
+
+        Route::post('/movies/{movie}/lifecycle', [AdminMovieController::class, 'lifecycle'])
+            ->middleware('permission:movies.lifecycle')->name('movies.lifecycle');
+
+        Route::resource('layout-templates', AdminRoomLayoutTemplateController::class)
+            ->parameters(['layout-templates' => 'layout_template'])->except(['destroy'])
+            ->middlewareFor(['index', 'show'], 'permission:layout_templates.view')
+            ->middlewareFor(['create', 'store', 'edit', 'update'], 'permission:layout_templates.manage');
+        Route::post('/layout-templates/{layout_template}/activate', [AdminRoomLayoutTemplateController::class, 'activate'])
+            ->middleware('permission:layout_templates.manage')->name('layout-templates.activate');
+        Route::post('/layout-templates/{layout_template}/archive', [AdminRoomLayoutTemplateController::class, 'archive'])
+            ->middleware('permission:layout_templates.manage')->name('layout-templates.archive');
 
         Route::resource('genres', AdminGenreController::class)->except(['show'])
             ->middlewareFor('index', 'permission:genres.view')
@@ -332,11 +344,14 @@ Route::prefix('admin')->name('admin.')
 
         Route::patch('/rooms/{room}/status', [AdminRoomController::class, 'updateStatus'])
             ->middleware('permission:rooms.update')->name('rooms.status.update');
-        Route::resource('rooms', AdminRoomController::class)
+        Route::resource('rooms', AdminRoomController::class)->except(['destroy'])
             ->middlewareFor(['index', 'show'], 'permission:rooms.view')
             ->middlewareFor(['create', 'store'], 'permission:rooms.create')
-            ->middlewareFor(['edit', 'update'], 'permission:rooms.update')
-            ->middlewareFor('destroy', 'permission:rooms.delete');
+            ->middlewareFor(['edit', 'update'], 'permission:rooms.update');
+        Route::delete('/rooms/{room}', [AdminRoomController::class, 'destroy'])
+            ->middleware('permission:rooms.update')->name('rooms.destroy');
+        Route::post('/rooms/{room}/layout/apply-template', [AdminRoomController::class, 'applyTemplate'])
+            ->middleware('permission:room_layouts.apply_template')->name('rooms.layout.apply-template');
 
         Route::get('/rooms/{room}/layout', [AdminSeatController::class, 'layout'])
             ->middleware('permission:seats.view')->name('rooms.layout.show');

@@ -36,7 +36,10 @@ class SaveMovieRequest extends FormRequest
             'duration' => ['nullable', 'integer', 'min:1'],
             'age_rating' => ['nullable', 'string', 'max:10'],
             'release_date' => ['nullable', 'date'],
-            'status' => ['required', Rule::in(['now_showing', 'coming_soon', 'stopped'])],
+            'status' => ['nullable', Rule::in([
+                Movie::STATUS_DRAFT, Movie::STATUS_COMING_SOON, Movie::STATUS_NOW_SHOWING,
+                Movie::STATUS_INACTIVE, Movie::STATUS_ARCHIVED,
+            ])],
             'genres' => ['nullable', 'array'],
             'genres.*' => ['integer', 'exists:genres,id'],
         ];

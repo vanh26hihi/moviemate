@@ -9,7 +9,6 @@ use App\Services\RoomLayoutService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Throwable;
 
@@ -17,9 +16,10 @@ class RebuildSeatLayouts extends Command
 {
     protected $signature = 'moviemate:rebuild-seat-layouts
         {--dry-run : Chỉ hiển thị kế hoạch, không ghi database}
-        {--force : Xác nhận xóa dữ liệu nghiệp vụ cũ và dựng layout sạch}';
+        {--initialize-empty : Chỉ dựng dữ liệu mẫu khi cả ba phòng hoàn toàn chưa có lịch sử}
+        {--force : Tùy chọn cũ đã bị vô hiệu hóa từ R7 để bảo toàn lịch sử}';
 
-    protected $description = 'Dựng lại dữ liệu layout ghế sạch cho các phòng P01, P02 và P03 của rạp canonical';
+    protected $description = 'Chỉ xem kế hoạch layout cũ; chế độ ghi phá hủy đã bị vô hiệu hóa từ R7';
 
     public function __construct(private readonly RoomLayoutService $layouts)
     {
@@ -39,52 +39,50 @@ class RebuildSeatLayouts extends Command
                 return self::SUCCESS;
             }
 
+            if ($this->option('initialize-empty')) {
+                return $this->initializeEmpty($cinema, $rooms);
+            }
+
             if (! $this->option('force')) {
-                $this->warn('Chưa có --force: không có dữ liệu nào được ghi. Review kế hoạch rồi chạy lại với --force.');
+                $this->warn('Chế độ chỉ đọc: không có dữ liệu nào được ghi. --force đã bị vô hiệu hóa từ R7.');
 
                 return self::SUCCESS;
             }
 
-            DB::transaction(function () use ($cinema, $rooms): void {
-                [$lockedCinema, $lockedRooms] = $this->resolveScope(lock: true);
-                if ($lockedCinema->id !== $cinema->id || $lockedRooms->pluck('id')->all() !== $rooms->pluck('id')->all()) {
-                    throw new RuntimeException('Canonical scope đã thay đổi trong khi chờ transaction lock.');
-                }
+            $this->error('Chế độ --force đã ngừng hoạt động từ R7 vì xóa ghế, sơ đồ và lịch sử vận hành không còn được phép. Hãy dùng mẫu sơ đồ để tạo phiên bản mới.');
 
-                $roomIds = $lockedRooms->pluck('id');
-                $showtimeIds = DB::table('showtimes')->where('cinema_id', $lockedCinema->id)
-                    ->whereIn('room_id', $roomIds)->lockForUpdate()->pluck('id');
-                $bookingIds = DB::table('bookings')->whereIn('showtime_id', $showtimeIds)
-                    ->lockForUpdate()->pluck('id');
-
-                $this->deleteOptionalDependencies($bookingIds, $showtimeIds, $roomIds);
-                DB::table('payments')->whereIn('booking_id', $bookingIds)->delete();
-                DB::table('booking_seats')->whereIn('booking_id', $bookingIds)->delete();
-                DB::table('bookings')->whereIn('id', $bookingIds)->delete();
-                DB::table('showtimes')->whereIn('id', $showtimeIds)->delete();
-                DB::table('room_layout_cells')->whereIn(
-                    'room_layout_id',
-                    DB::table('room_layouts')->whereIn('room_id', $roomIds)->select('id')
-                )->delete();
-                DB::table('room_layouts')->whereIn('room_id', $roomIds)->delete();
-                DB::table('seats')->whereIn('room_id', $roomIds)->delete();
-
-                $this->ensureSeatTypes();
-                $layouts = $this->layouts->rebuildDefaultLayouts($lockedRooms);
-
-                if ($layouts->count() !== 3 || $layouts->contains(fn ($layout) => $layout->status !== 'published')) {
-                    throw new RuntimeException('Không tạo đủ ba published layouts.');
-                }
-            }, 3);
-
-            $this->info('Đã dựng lại thành công 3 layouts và 332 ghế trong một transaction.');
-
-            return self::SUCCESS;
+            return self::FAILURE;
         } catch (Throwable $exception) {
             $this->error('Rebuild bị hủy và rollback: '.$exception->getMessage());
 
             return self::FAILURE;
         }
+    }
+
+    private function initializeEmpty(Cinema $cinema, Collection $rooms): int
+    {
+        return DB::transaction(function () use ($cinema, $rooms): int {
+            [$lockedCinema, $lockedRooms] = $this->resolveScope(lock: true);
+            if ($lockedCinema->id !== $cinema->id || $lockedRooms->pluck('id')->all() !== $rooms->pluck('id')->all()) {
+                throw new RuntimeException('Canonical scope đã thay đổi trong khi chờ transaction lock.');
+            }
+            $roomIds = $lockedRooms->pluck('id');
+            $hasHistory = DB::table('seats')->whereIn('room_id', $roomIds)->exists()
+                || DB::table('room_layouts')->whereIn('room_id', $roomIds)->exists()
+                || DB::table('showtimes')->whereIn('room_id', $roomIds)->exists();
+            if ($hasHistory) {
+                throw new RuntimeException('Không thể khởi tạo: phòng đã có ghế, sơ đồ hoặc lịch sử suất chiếu.');
+            }
+
+            $this->ensureSeatTypes();
+            $layouts = $this->layouts->rebuildDefaultLayouts($lockedRooms);
+            if ($layouts->count() !== 3 || $layouts->contains(fn ($layout) => $layout->status !== 'published')) {
+                throw new RuntimeException('Không tạo đủ ba published layouts.');
+            }
+            $this->info('Đã khởi tạo an toàn 3 layouts và 332 ghế cho các phòng hoàn toàn trống.');
+
+            return self::SUCCESS;
+        }, 3);
     }
 
     /** @return array{Cinema, Collection<int, Room>} */
@@ -173,51 +171,17 @@ class RebuildSeatLayouts extends Command
             });
             if ($existing) {
                 DB::table('seat_types')->where('id', $existing->id)->update([
-                    'status' => true,
-                    'is_pair' => $definition['pair'],
-                    'updated_at' => now(),
+                    'status' => true, 'is_pair' => $definition['pair'], 'updated_at' => now(),
                 ]);
 
                 continue;
             }
-
             DB::table('seat_types')->insert([
-                'name' => $definition['name'],
-                'code' => $code,
-                'slug' => $code,
-                'description' => null,
-                'image_path' => null,
-                'color' => null,
-                'text_color' => null,
-                'price_modifier' => $definition['modifier'],
-                'is_pair' => $definition['pair'],
-                'status' => true,
-                'sort_order' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'name' => $definition['name'], 'code' => $code, 'slug' => $code,
+                'description' => null, 'image_path' => null, 'color' => null, 'text_color' => null,
+                'price_modifier' => $definition['modifier'], 'is_pair' => $definition['pair'],
+                'status' => true, 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now(),
             ]);
-        }
-    }
-
-    private function deleteOptionalDependencies(Collection $bookingIds, Collection $showtimeIds, Collection $roomIds): void
-    {
-        $definitions = [
-            'seat_holds' => ['booking_id' => $bookingIds, 'showtime_id' => $showtimeIds, 'room_id' => $roomIds],
-            'tickets' => ['booking_id' => $bookingIds],
-            'ticket_checkins' => ['booking_id' => $bookingIds],
-            'check_ins' => ['booking_id' => $bookingIds],
-        ];
-
-        foreach ($definitions as $table => $columns) {
-            if (! Schema::hasTable($table)) {
-                continue;
-            }
-            foreach ($columns as $column => $ids) {
-                if (Schema::hasColumn($table, $column)) {
-                    DB::table($table)->whereIn($column, $ids)->delete();
-                    break;
-                }
-            }
         }
     }
 }

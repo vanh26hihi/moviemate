@@ -25,12 +25,16 @@ class RoomLayoutService
         ?int $userId = null,
         int $rows = 10,
         int $columns = 12,
-        string $screenPosition = 'top'
+        string $screenPosition = 'top',
+        ?string $name = null,
     ): RoomLayout {
         $this->assertOperationalRoom($room);
         $this->validateDimensions($rows, $columns, $screenPosition);
 
-        return DB::transaction(function () use ($room, $userId, $rows, $columns, $screenPosition): RoomLayout {
+        $name ??= "Sơ đồ phòng {$room->code}";
+        $this->assertMeaningfulName($name);
+
+        return DB::transaction(function () use ($room, $userId, $rows, $columns, $screenPosition, $name): RoomLayout {
             Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
             if (RoomLayout::query()->where('room_id', $room->id)->where('status', 'draft')->exists()) {
                 throw ValidationException::withMessages(['layout' => 'Phòng này đã có một bản nháp sơ đồ ghế.']);
@@ -41,7 +45,7 @@ class RoomLayoutService
             return RoomLayout::query()->create([
                 'room_id' => $room->id,
                 'version' => $version,
-                'name' => "Sơ đồ phiên bản {$version}",
+                'name' => $name,
                 'rows' => $rows,
                 'columns' => $columns,
                 'screen_position' => $screenPosition,
@@ -52,22 +56,22 @@ class RoomLayoutService
         });
     }
 
-    public function clonePublishedToDraft(Room $room, ?int $userId = null): RoomLayout
+    public function clonePublishedToDraft(Room $room, ?int $userId = null, ?string $name = null): RoomLayout
     {
         $published = $this->latestPublishedFor($room);
         if (! $published) {
-            return $this->createBlankDraft($room, $userId);
+            return $this->createBlankDraft($room, $userId, name: $name);
         }
 
-        return DB::transaction(function () use ($room, $published, $userId): RoomLayout {
+        return DB::transaction(function () use ($room, $published, $userId, $name): RoomLayout {
             $draft = $this->createBlankDraft(
                 $room,
                 $userId,
                 $published->rows,
                 $published->columns,
-                $published->screen_position
+                $published->screen_position,
+                $name ?? "Điều chỉnh từ {$published->display_name}",
             );
-            $draft->update(['name' => "Bản nháp từ v{$published->version}"]);
 
             $published->loadMissing('cells');
             foreach ($published->cells as $cell) {
@@ -81,6 +85,7 @@ class RoomLayoutService
     public function saveDraft(RoomLayout $layout, array $payload, ?int $userId = null): RoomLayout
     {
         $normalized = $this->validateDraft($layout, $payload);
+        $this->assertMeaningfulName($normalized['name']);
 
         return DB::transaction(function () use ($layout, $normalized, $userId): RoomLayout {
             $locked = RoomLayout::query()->whereKey($layout->id)->lockForUpdate()->firstOrFail();
@@ -141,6 +146,19 @@ class RoomLayoutService
                         ->where('room_id', $locked->room_id)
                         ->lockForUpdate()
                         ->firstOrFail();
+                    $structural = ['row', 'number', 'type', 'seat_type_id', 'pair_code', 'pair_position', 'row_label', 'seat_number', 'x_position', 'y_position'];
+                    $changedStructure = collect($structural)->contains(
+                        fn (string $attribute): bool => (string) $seat->{$attribute} !== (string) $attributes[$attribute]
+                    );
+                    if ($changedStructure && RoomLayoutCell::query()->where('seat_id', $seat->id)
+                        ->whereHas('layout', fn ($query) => $query->where('status', 'published'))->exists()) {
+                        throw ValidationException::withMessages([
+                            'layout' => "Ghế {$seat->seat_code} thuộc sơ đồ đã phát hành nên không thể đổi vị trí, loại hoặc mã. Hãy dùng một mã ghế mới.",
+                        ]);
+                    }
+                    if ($seat->status !== 'active') {
+                        $attributes['status'] = $seat->status;
+                    }
                     $seat->update($attributes);
                 } else {
                     $seat = Seat::query()->create($attributes + [
@@ -160,7 +178,7 @@ class RoomLayoutService
             Seat::query()->where('room_id', $locked->room_id)
                 ->whereDoesntHave('layoutCells')
                 ->whereDoesntHave('bookingSeats')
-                ->delete();
+                ->update(['status' => Seat::STATUS_RETIRED]);
 
             return $locked->fresh(['cells.seat']);
         });
@@ -323,6 +341,8 @@ class RoomLayoutService
 
     public function publish(RoomLayout $layout, ?int $userId = null): RoomLayout
     {
+        $this->assertMeaningfulName($layout->name);
+
         return DB::transaction(function () use ($layout, $userId): RoomLayout {
             $locked = RoomLayout::query()->with('cells.seat')->whereKey($layout->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== 'draft') {
@@ -343,6 +363,7 @@ class RoomLayoutService
                 ->whereHas('seat', fn ($query) => $query->where('status', 'active'))
                 ->count();
             $locked->room()->update(['total_seats' => $usableCapacity]);
+            $this->retireSeatsAbsentFromPublishedLayout($locked);
 
             return $locked->fresh(['cells.seat']);
         });
@@ -470,7 +491,7 @@ class RoomLayoutService
         }
     }
 
-    private function seatTypeIds(): array
+    public function seatTypeIds(): array
     {
         $rows = DB::table('seat_types')->where('status', true)->get();
         $aliases = [
@@ -492,6 +513,41 @@ class RoomLayoutService
         }
 
         return $resolved;
+    }
+
+    public function assertMeaningfulName(?string $name): void
+    {
+        $name = trim((string) $name);
+        if (mb_strlen($name) < 5 || preg_match('/^(sơ đồ\s+)?(phiên bản|version)\s*\d+$/iu', $name)) {
+            throw ValidationException::withMessages([
+                'name' => 'Hãy đặt tên mô tả mục đích của sơ đồ, ví dụ “Tiêu chuẩn 100 ghế – mùa hè”.',
+            ]);
+        }
+    }
+
+    private function retireSeatsAbsentFromPublishedLayout(RoomLayout $layout): void
+    {
+        $currentSeatIds = $layout->cells()->where('cell_type', 'seat')->pluck('seat_id');
+        $now = now();
+        $protectedByFutureShowtime = DB::table('room_layout_cells')
+            ->join('showtimes', 'showtimes.room_layout_id', '=', 'room_layout_cells.room_layout_id')
+            ->where('showtimes.room_id', $layout->room_id)
+            ->where('showtimes.status', 'active')
+            ->where(function ($query) use ($now): void {
+                $query->whereDate('showtimes.show_date', '>', $now->toDateString())
+                    ->orWhere(function ($query) use ($now): void {
+                        $query->whereDate('showtimes.show_date', $now->toDateString())
+                            ->whereTime('showtimes.show_time', '>=', $now->format('H:i:s'));
+                    });
+            })
+            ->whereNotNull('room_layout_cells.seat_id')
+            ->select('room_layout_cells.seat_id');
+
+        Seat::query()->where('room_id', $layout->room_id)
+            ->where('status', Seat::STATUS_ACTIVE)
+            ->whereNotIn('id', $currentSeatIds)
+            ->whereNotIn('id', $protectedByFutureShowtime)
+            ->update(['status' => Seat::STATUS_RETIRED]);
     }
 
     private function rowLabel(int $index): string

@@ -10,6 +10,20 @@ use Illuminate\Support\Facades\Storage;
 
 class Movie extends Model
 {
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_COMING_SOON = 'coming_soon';
+
+    public const STATUS_NOW_SHOWING = 'now_showing';
+
+    public const STATUS_INACTIVE = 'inactive';
+
+    public const STATUS_ARCHIVED = 'archived';
+
+    public const PUBLIC_STATUSES = [self::STATUS_COMING_SOON, self::STATUS_NOW_SHOWING];
+
+    public const SCHEDULABLE_STATUSES = self::PUBLIC_STATUSES;
+
     protected $fillable = [
         'title',
         'slug',
@@ -28,6 +42,13 @@ class Movie extends Model
         'duration' => 'integer',
         'release_date' => 'date',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (): void {
+            throw new \LogicException('Phim không thể bị xóa. Hãy chuyển phim sang trạng thái lưu trữ.');
+        });
+    }
 
     public function getPosterUrlAttribute(): ?string
     {

@@ -35,7 +35,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
                 'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
             ]);
         }
-        $this->artisan('moviemate:rebuild-seat-layouts', ['--force' => true])->assertSuccessful();
+        $this->artisan('moviemate:rebuild-seat-layouts', ['--initialize-empty' => true])->assertSuccessful();
         $this->rooms = Room::query()->whereIn('code', ['P01', 'P02', 'P03'])->get()->keyBy('code');
         $this->movieId = DB::table('movies')->insertGetId([
             'title' => 'Dynamic Movie', 'slug' => 'dynamic-movie', 'duration' => 100,
@@ -236,17 +236,17 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $this->assertNotSame($v2->id, $showtime->fresh()->room_layout_id);
     }
 
-    public function test_unused_room_with_layout_can_be_deleted_in_dependency_order(): void
+    public function test_unused_room_with_layout_cannot_be_deleted_and_history_is_preserved(): void
     {
         $room = $this->rooms['P03'];
         $admin = $this->userWithRole('admin');
 
         $this->actingAs($admin)->delete(route('admin.rooms.destroy', $room))
-            ->assertRedirect(route('admin.rooms.index'));
+            ->assertStatus(409);
 
-        $this->assertDatabaseMissing('rooms', ['id' => $room->id]);
-        $this->assertDatabaseMissing('room_layouts', ['room_id' => $room->id]);
-        $this->assertDatabaseMissing('seats', ['room_id' => $room->id]);
+        $this->assertDatabaseHas('rooms', ['id' => $room->id]);
+        $this->assertDatabaseHas('room_layouts', ['room_id' => $room->id]);
+        $this->assertDatabaseHas('seats', ['room_id' => $room->id]);
     }
 
     private function showtimePayload(Room $room, array $overrides = []): array

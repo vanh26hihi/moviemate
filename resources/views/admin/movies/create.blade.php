@@ -70,14 +70,7 @@
                 </div>
             </div>
 
-            <div>
-                <label class="admin-label">Trạng thái *</label>
-                <select name="status" required class="admin-input">
-                    <option value="now_showing" {{ old('status') == 'now_showing' ? 'selected' : '' }}>Đang chiếu</option>
-                    <option value="coming_soon" {{ old('status') == 'coming_soon' ? 'selected' : '' }}>Sắp chiếu</option>
-                    <option value="stopped" {{ old('status') == 'stopped' ? 'selected' : '' }}>Ngừng chiếu</option>
-                </select>
-            </div>
+            <div><label class="admin-label">Trạng thái</label><div class="admin-input">Bản nháp</div><input type="hidden" name="status" value="draft"><p class="admin-help">Tạo phim trước, sau đó quản trị viên đưa phim qua vòng đời phát hành.</p></div>
 
             <div>
                 <label class="admin-label">Ảnh áp phích</label>

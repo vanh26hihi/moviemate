@@ -13,7 +13,7 @@ final class ShowtimeSeeder extends Seeder
 {
     public function run(): void
     {
-        $movies = Movie::query()->where('status', '!=', 'stopped')->orderBy('id')->limit(3)->get();
+        $movies = Movie::query()->whereIn('status', Movie::SCHEDULABLE_STATUSES)->orderBy('id')->limit(3)->get();
         if ($movies->isEmpty()) {
             return;
         }

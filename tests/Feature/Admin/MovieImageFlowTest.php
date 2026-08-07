@@ -83,7 +83,7 @@ class MovieImageFlowTest extends TestCase
         Storage::disk('public')->assertExists([$movie->poster, $movie->cover_image]);
     }
 
-    public function test_successful_replacement_deletes_only_unreferenced_old_file(): void
+    public function test_successful_replacement_preserves_shared_file_and_movie_delete_is_unavailable(): void
     {
         $first = $this->movie(['poster' => 'public/storage/movies/posters/shared.jpg']);
         $second = $this->movie(['title' => 'Second', 'slug' => 'second', 'poster' => 'movies/posters/shared.jpg']);
@@ -98,8 +98,9 @@ class MovieImageFlowTest extends TestCase
         $this->assertStringStartsWith('movies/posters/', $first->poster);
         Storage::disk('public')->assertExists([$first->poster, 'movies/posters/shared.jpg']);
 
-        $this->actingAs($this->userWithRole('admin'))->delete(route('admin.movies.destroy', $second));
-        Storage::disk('public')->assertMissing('movies/posters/shared.jpg');
+        $this->actingAs($this->userWithRole('admin'))->delete('/admin/movies/'.$second->id)->assertMethodNotAllowed();
+        $this->assertDatabaseHas('movies', ['id' => $second->id]);
+        Storage::disk('public')->assertExists('movies/posters/shared.jpg');
         Storage::disk('public')->assertExists($first->poster);
     }
 

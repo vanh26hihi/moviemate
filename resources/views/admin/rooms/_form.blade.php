@@ -59,6 +59,16 @@
     <p class="mt-1">Sức chứa được tính tự động từ sơ đồ ghế đã phát hành. Dữ liệu gửi từ trình duyệt không thể thay đổi tổng số ghế.</p>
 </div>
 
+@if(! $editing && isset($templates) && $templates->isNotEmpty() && auth()->user()->hasPermission('room_layouts.apply_template'))
+<div class="rounded-2xl border app-border app-card-soft p-4 space-y-4">
+    <div><p class="font-bold app-text">Khởi tạo từ mẫu sơ đồ</p><p class="text-sm app-muted">Tùy chọn. Hệ thống sao chép mẫu thành ghế và sơ đồ riêng của phòng rồi phát hành ngay.</p></div>
+    <label class="cinema-label">Mẫu<select name="template_id" class="cinema-input"><option value="">Thiết kế sau</option>@foreach($templates as $template)<option value="{{ $template->id }}" @selected(old('template_id')==$template->id)>{{ $template->name }} · {{ $template->rows }}×{{ $template->columns }}{{ $template->room_type ? ' · '.$template->room_type : '' }}</option>@endforeach</select></label>
+    <label class="cinema-label">Tên sơ đồ<input name="layout_name" class="cinema-input" value="{{ old('layout_name') }}" placeholder="Ví dụ: Tiêu chuẩn 100 ghế – khai trương"></label>
+    <label class="cinema-label">Ghi chú thay đổi<textarea name="change_note" class="cinema-input" rows="2">{{ old('change_note') }}</textarea></label>
+    @error('template_id')<p class="text-error">{{ $message }}</p>@enderror @error('layout_name')<p class="text-error">{{ $message }}</p>@enderror
+</div>
+@endif
+
 <div class="flex flex-col gap-3 pt-3 sm:flex-row">
     <button type="submit" class="btn-primary">{{ $editing ? __('rooms.actions.update') : __('rooms.actions.save') }}</button>
     <a href="{{ $editing ? route('admin.rooms.show', $room) : route('admin.rooms.index') }}" class="btn-secondary">{{ __('rooms.actions.cancel') }}</a>
