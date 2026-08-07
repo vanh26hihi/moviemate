@@ -1,6 +1,9 @@
 import { BrowserQRCodeReader } from '@zxing/browser';
 
 document.querySelectorAll('[data-ticket-scanner]').forEach((workspace) => {
+    if (workspace.dataset.scannerInitialized === 'true') return;
+    workspace.dataset.scannerInitialized = 'true';
+
     const video = workspace.querySelector('[data-scanner-video]');
     const start = workspace.querySelector('[data-scanner-start]');
     const stop = workspace.querySelector('[data-scanner-stop]');
@@ -47,5 +50,5 @@ document.querySelectorAll('[data-ticket-scanner]').forEach((workspace) => {
     });
 
     stop?.addEventListener('click', stopCamera);
-    window.addEventListener('pagehide', stopCamera, { once: true });
+    window.addEventListener('pagehide', stopCamera);
 });

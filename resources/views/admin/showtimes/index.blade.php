@@ -84,11 +84,13 @@
                                         <a href="{{ route('admin.showtimes.edit', $showtime) }}" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa"><i class="ph-bold ph-pencil-simple text-xs"></i></a>
                                     @endcan
                                     @can('showtimes.delete')
-                                        <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn xóa suất chiếu này?');">
+                                        @if($showtime->status === 'active')
+                                        <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn hủy suất chiếu này? Suất đã có đơn đặt vé sẽ không thể hủy trực tiếp.');">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-white hover:bg-error hover:border-error transition-colors" title="Xóa"><i class="ph-bold ph-trash text-xs"></i></button>
+                                            <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-white hover:bg-error hover:border-error transition-colors" title="Hủy suất chiếu" aria-label="Hủy suất chiếu"><i class="ph-bold ph-x-circle text-xs" aria-hidden="true"></i></button>
                                         </form>
+                                        @endif
                                     @endcan
                                 </div>
                             </td>

@@ -15,6 +15,7 @@ use App\Services\CinemaAccessService;
 use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ShowtimeController extends Controller
 {
@@ -126,12 +127,27 @@ class ShowtimeController extends Controller
     {
         $this->assertOperationalShowtime($showtime);
         DB::transaction(function () use ($showtime): void {
-            $before = $this->auditData($showtime);
-            $showtime->delete();
-            $this->activityLogger->log('showtime.cancelled', $showtime, $before, ['status' => 'cancelled']);
+            $locked = Showtime::query()->whereKey($showtime->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === 'cancelled') {
+                return;
+            }
+            if ($locked->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'showtime' => 'Chỉ suất chiếu đang hoạt động mới có thể hủy.',
+                ]);
+            }
+            if ($locked->bookings()->exists()) {
+                throw ValidationException::withMessages([
+                    'showtime' => 'Suất chiếu đã có lịch sử đặt vé nên không thể hủy trực tiếp.',
+                ]);
+            }
+
+            $before = $this->auditData($locked);
+            $locked->forceFill(['status' => 'cancelled'])->save();
+            $this->activityLogger->log('showtime.cancelled', $locked, $before, ['status' => 'cancelled']);
         });
 
-        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được xóa.');
+        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được hủy và giữ lại trong lịch sử.');
     }
 
     private function formData(): array
