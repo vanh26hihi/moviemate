@@ -4,19 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ReportRequest;
-use App\Services\AdminDashboardService;
+use App\Services\Reports\AdminReportingService;
 use App\Services\Reports\ReportScopeFactory;
 use Illuminate\View\View;
 
-final class DashboardController extends Controller
+final class ReportController extends Controller
 {
     public function __invoke(
         ReportRequest $request,
         ReportScopeFactory $scopes,
-        AdminDashboardService $dashboard,
+        AdminReportingService $reports,
     ): View {
-        return view('admin.dashboard', $dashboard->overview(
-            $scopes->forUser($request->user(), $request->validated()),
-        ));
+        $scope = $scopes->forUser($request->user(), $request->validated());
+
+        return view('admin.reports.index', $reports->report($scope));
     }
 }

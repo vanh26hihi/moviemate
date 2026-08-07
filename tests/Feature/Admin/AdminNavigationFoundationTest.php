@@ -112,7 +112,8 @@ class AdminNavigationFoundationTest extends TestCase
         $this->assertStringContainsString('admin.payment-reconciliation.index', $managerNavigation);
         $this->assertStringContainsString('admin.ticket-deliveries.index', $managerNavigation);
         $this->assertStringContainsString('admin.ticket-checkins.index', $managerNavigation);
-        foreach (['admin.discounts.index', 'admin.reports.index', 'admin.reviews.index'] as $missingRoute) {
+        $this->assertStringContainsString('admin.reports.index', $managerNavigation);
+        foreach (['admin.discounts.index', 'admin.reviews.index'] as $missingRoute) {
             $this->assertStringNotContainsString($missingRoute, $managerNavigation);
         }
 
