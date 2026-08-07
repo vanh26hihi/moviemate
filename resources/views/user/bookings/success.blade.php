@@ -124,7 +124,7 @@
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <h2 id="paid-ticket-actions-title" class="font-extrabold app-text">Vé của bạn đã sẵn sàng</h2>
-                            <p class="mt-1 text-sm app-muted">Mở vé, in trực tiếp hoặc lưu PDF ngay từ trình duyệt.</p>
+                            <p class="mt-1 text-sm app-muted">Mở vé điện tử và xuất trình mã QR khi đến rạp.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary" data-paid-ticket-link>
@@ -178,11 +178,11 @@
                     </div>
 
                     <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-                        <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->movie->title }}</dd></div>
+                        <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $booking->movie_title }}</dd></div>
                         <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime_label }}</dd></div>
-                        <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->cinema->name }}</dd></div>
-                        <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->cinema->address }}</dd></div>
-                        <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime->room->name }}</dd></div>
+                        <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime?->cinema?->name ?: 'Rạp đang cập nhật' }}</dd></div>
+                        <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime?->cinema?->address ?: 'Địa chỉ đang cập nhật' }}</dd></div>
+                        <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $booking->room_label }}</dd></div>
                     </dl>
 
                     <div class="mt-5 border-t pt-4 app-border">

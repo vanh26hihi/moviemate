@@ -171,7 +171,12 @@ class Booking extends Model
 
     public function getSeatCodesAttribute(): string
     {
-        return $this->seat_display_groups->pluck('label')->filter()->join(', ');
+        $labels = $this->seat_display_groups
+            ->pluck('label')
+            ->filter()
+            ->join(', ');
+
+        return $labels !== '' ? $labels : 'Chưa có thông tin ghế';
     }
 
     public function getSeatDisplayGroupsAttribute(): Collection
@@ -202,5 +207,28 @@ class Booking extends Model
     public function getFormattedTotalAttribute(): string
     {
         return number_format((int) $this->total_amount, 0, ',', '.').' VNĐ';
+    }
+
+    public function getMovieTitleAttribute(): string
+    {
+        return $this->showtime?->movie?->title ?: 'Phim đang cập nhật';
+    }
+
+    public function getCinemaLabelAttribute(): string
+    {
+        $cinema = $this->showtime?->cinema;
+
+        if (! $cinema) {
+            return 'Rạp đang cập nhật';
+        }
+
+        return collect([$cinema->name, $cinema->address])
+            ->filter()
+            ->join(' - ');
+    }
+
+    public function getRoomLabelAttribute(): string
+    {
+        return $this->showtime?->room?->name ?: 'Phòng đang cập nhật';
     }
 }
