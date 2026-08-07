@@ -26,12 +26,12 @@
             </div>
         </section>
 
-        <form method="POST" action="{{ route('staff.tickets.resolve') }}" class="cinema-card p-6" autocomplete="off">
+        <form method="POST" action="{{ route('staff.tickets.resolve') }}" class="cinema-card p-6" autocomplete="off" data-submit-once>
             @csrf
-            <h2 class="text-xl font-extrabold app-heading">Nhập mã thủ công</h2>
-            <label for="ticket" class="cinema-label mt-5 block">Dữ liệu mã QR</label>
+            <h2 class="text-xl font-extrabold app-heading">Tra cứu thủ công</h2>
+            <label for="ticket" class="cinema-label mt-5 block">Mã vé hoặc dữ liệu QR bảo mật</label>
             <textarea id="ticket" name="ticket" data-scanner-input class="cinema-input mt-2 min-h-32" required maxlength="512" autocomplete="off" spellcheck="false">{{ old('ticket') }}</textarea>
-            <p class="mt-2 text-sm app-muted">Dữ liệu chỉ được gửi bằng POST để xác minh trên máy chủ; không ghi vào nhật ký hoạt động.</p>
+            <p class="mt-2 text-sm app-muted">Nhập chính xác mã MMT-… hoặc URL/dữ liệu QR bảo mật. Máy chủ luôn xác minh vé và phạm vi chi nhánh trước khi hiển thị.</p>
             @error('ticket')<p class="mt-2 text-sm text-error" role="alert">{{ $message }}</p>@enderror
             <button class="btn-primary mt-5" type="submit"><i class="ph ph-magnifying-glass"></i>Xem trước vé</button>
         </form>

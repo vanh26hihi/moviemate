@@ -32,6 +32,7 @@ final class TicketPrintController extends Controller
         TicketQrPayload $payloads,
     ): Response {
         $booking = $tickets->authorizedBooking($booking, $request->user());
+        $booking->loadMissing(['payments.settledBy:id,name', 'createdByStaff:id,name']);
         $operation = $this->operation($request, $booking);
         $state = $prints->active($booking, $request->user(), $operation['id'], $operation['token']);
 

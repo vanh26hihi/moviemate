@@ -32,7 +32,8 @@ final class TicketCheckinService
             if (! $booking) {
                 return new TicketCheckinResult(TicketCheckinEvent::RESULT_INVALID_TOKEN, 'Không tìm thấy vé phù hợp.');
             }
-            abort_unless($booking->cinema_id && $this->cinemaAccess->canAccessCinema($actor, (int) $booking->cinema_id), 404);
+            abort_unless($booking->cinema_id, 404);
+            $this->cinemaAccess->authorizeCinema($actor, (int) $booking->cinema_id);
 
             if (! $this->capabilities->isValid($booking, $capability)) {
                 return $this->rejected($booking, $actor, TicketCheckinEvent::RESULT_INVALID_TOKEN, 'invalid_capability', 'Mã vé không hợp lệ hoặc đã bị thay đổi.');

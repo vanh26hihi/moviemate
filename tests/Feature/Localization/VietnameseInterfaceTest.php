@@ -40,7 +40,7 @@ class VietnameseInterfaceTest extends TestCase
         $this->actingAs($this->userWithRole('manager'))->get(route('manager.dashboard'))
             ->assertRedirect(route('admin.dashboard'));
         $this->actingAs($this->userWithRole('staff'))->get(route('staff.dashboard'))
-            ->assertOk()->assertSee('Tổng quan nhân viên');
+            ->assertOk()->assertSee('Bàn làm việc hôm nay');
         $this->actingAs($this->userWithRole('staff'))->get(route('staff.tickets.check'))
             ->assertOk()->assertSee('Soát vé');
     }

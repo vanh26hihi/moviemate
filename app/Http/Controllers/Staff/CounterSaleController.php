@@ -26,21 +26,35 @@ final class CounterSaleController extends Controller
 {
     public function index(Request $request, CinemaAccessService $cinemas, PublicShowtimeCatalog $catalog): View
     {
+        $validated = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'movie' => ['nullable', 'integer', 'min:1'],
+        ]);
         $actor = $request->user();
         $accessible = $cinemas->accessibleCinemas($actor);
         $cinema = $cinemas->currentCinema($actor);
         $showtimes = collect();
+        $movies = collect();
+        $selectedDate = null;
 
         if ($cinema || $cinemas->hasGlobalAccess($actor)) {
             $timezone = $cinema?->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
             $from = CarbonImmutable::today($timezone);
             $to = $from->addDays(PublicShowtimeCatalog::WINDOW_DAYS - 1);
+            $selectedDate = CarbonImmutable::createFromFormat('!Y-m-d', $validated['date'] ?? $from->toDateString(), $timezone);
+            abort_unless($selectedDate->betweenIncluded($from, $to), 422, 'Ngày bán vé nằm ngoài phạm vi vận hành.');
             $showtimes = $cinema
                 ? $catalog->between($from->toDateString(), $to->toDateString(), $cinema)
                 : $catalog->betweenForCinemas($accessible->pluck('id')->map(fn ($id) => (int) $id)->all(), $from->toDateString(), $to->toDateString());
+            $movies = $showtimes->pluck('movie')->filter()->unique('id')->sortBy('title')->values();
+            $showtimes = $showtimes
+                ->where('show_date', '>=', $selectedDate->startOfDay())
+                ->where('show_date', '<=', $selectedDate->endOfDay())
+                ->when($validated['movie'] ?? null, fn ($items, $movieId) => $items->where('movie_id', (int) $movieId))
+                ->values();
         }
 
-        return view('staff.counter.index', compact('accessible', 'cinema', 'showtimes'));
+        return view('staff.counter.index', compact('accessible', 'cinema', 'showtimes', 'movies', 'selectedDate'));
     }
 
     public function selectCinema(Request $request, CinemaAccessService $cinemas): RedirectResponse

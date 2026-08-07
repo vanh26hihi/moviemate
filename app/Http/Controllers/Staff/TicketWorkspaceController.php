@@ -27,13 +27,18 @@ final class TicketWorkspaceController extends Controller
         TicketResolutionService $tickets,
     ): View {
         $validated = $request->validate(['ticket' => ['required', 'string', 'max:512']]);
+        $input = strtoupper(trim($validated['ticket']));
         $capability = $payloads->capabilityFrom($validated['ticket']);
         $bookingId = $capabilities->bookingId($capability);
-        $key = 'staff-ticket-resolve:'.$request->user()->id.':'.($bookingId ?? 'invalid');
+        $key = 'staff-ticket-resolve:'.$request->user()->id.':'.($bookingId ?? hash('sha256', $input));
         abort_if(RateLimiter::tooManyAttempts($key, 12), 429);
         RateLimiter::hit($key, 60);
 
-        return $this->operationsView($tickets->resolve((string) $capability, $request->user()));
+        $booking = $capability !== null
+            ? $tickets->resolve($capability, $request->user())
+            : $tickets->resolveBookingCode($input, $request->user());
+
+        return $this->operationsView($booking);
     }
 
     public function operations(Request $request, Booking $booking, TicketResolutionService $tickets): View
@@ -57,10 +62,11 @@ final class TicketWorkspaceController extends Controller
 
         return view('staff.tickets.operations', [
             'booking' => $booking,
-            'customerName' => PrivacyMask::name($booking->user?->name),
+            'customerName' => PrivacyMask::name($booking->customer_name ?: $booking->user?->name),
             'customerEmail' => PrivacyMask::email($booking->recipient_email),
             'eligibilityMessage' => $eligibility,
             'printState' => $booking->ticketPrint,
+            'checkinEvent' => $booking->acceptedTicketCheckin,
         ]);
     }
 }

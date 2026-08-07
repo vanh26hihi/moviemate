@@ -8,36 +8,54 @@
     <title>In vé cứng {{ $booking->booking_code }} - MovieMate</title>
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/staff-ticket-print.js'])
     <style>
-        body{background:#eef1f5;color:#111827;font-family:system-ui,sans-serif}.hard-ticket{max-width:760px;margin:24px auto;background:#fff;border:2px solid #111827;border-radius:18px;padding:28px}.hard-ticket dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.hard-ticket dt{font-size:12px;color:#6b7280;text-transform:uppercase}.hard-ticket dd{margin:3px 0 0;font-weight:800}.controls{max-width:760px;margin:20px auto;background:#fff;border-radius:18px;padding:20px}.qr{display:flex;align-items:center;gap:20px;margin-top:22px;border-top:1px dashed #9ca3af;padding-top:20px}@media print{body{background:#fff}.controls{display:none!important}.hard-ticket{margin:0;max-width:none;border-radius:0}.qr canvas{width:150px!important;height:150px!important}}
+        *{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#111;font-family:Arial,sans-serif}.ticket{width:80mm;margin:16px auto;background:#fff;padding:4mm 4.5mm;font-size:11px;line-height:1.35}.brand{text-align:center}.brand-name{font-size:24px;font-weight:900;letter-spacing:1.5px}.ticket-title{margin:2px 0 0;font-size:12px;font-weight:800;letter-spacing:2px}.rule{margin:3mm 0;border:0;border-top:1px dashed #111}.movie{margin:0;text-align:center;font-size:17px;line-height:1.2;text-transform:uppercase}.code{margin:2mm 0 0;text-align:center;font-family:ui-monospace,monospace;font-size:13px;font-weight:900;overflow-wrap:anywhere}.facts{display:grid;gap:1.5mm}.fact{display:grid;grid-template-columns:22mm 1fr;gap:2mm}.fact dt{font-size:10px;color:#444}.fact dd{margin:0;font-weight:700;text-align:right;overflow-wrap:anywhere}.fact.strong dd{font-size:14px}.food-line,.money-line{display:flex;justify-content:space-between;gap:3mm;margin-top:1.5mm}.money-total{font-size:14px;font-weight:900}.qr{text-align:center}.qr canvas{display:block;width:32mm!important;height:32mm!important;margin:0 auto;background:#fff}.qr-note{margin:2mm 0 0;font-size:9px}.footer{text-align:center;font-size:9px}.controls{max-width:680px;margin:20px auto;background:#fff;border-radius:18px;padding:20px}.controls form{margin-top:16px}@page{size:80mm auto;margin:0}@media(max-width:360px){.ticket{width:58mm;padding:3mm;font-size:9px}.brand-name{font-size:19px}.movie{font-size:14px}.fact{grid-template-columns:17mm 1fr}.qr canvas{width:28mm!important;height:28mm!important}}@media print{html,body{width:80mm;background:#fff}.controls{display:none!important}.ticket{width:80mm;margin:0;padding:3mm 4mm}.qr canvas{width:32mm!important;height:32mm!important}}
     </style>
 </head>
 <body>
 <main>
-    <article class="hard-ticket">
-        <header><strong>MOVIEMATE CINEMA · VÉ CỨNG</strong><h1>{{ $booking->showtime?->movie?->title }}</h1><p>ĐÃ THANH TOÁN · Lần in {{ $printState->attempts_count }}</p></header>
-        <dl>
-            <div><dt>Mã đặt vé</dt><dd>{{ $booking->booking_code }}</dd></div>
-            <div><dt>Chi nhánh</dt><dd>{{ $booking->showtime?->cinema?->name }}</dd></div>
-            <div><dt>Địa chỉ</dt><dd>{{ $booking->showtime?->cinema?->address }}</dd></div>
-            <div><dt>Suất chiếu</dt><dd>{{ $booking->showtime_label }}</dd></div>
-            <div><dt>Phòng</dt><dd>{{ $booking->showtime?->room?->name }}</dd></div>
-            <div><dt>Ghế</dt><dd>{{ $booking->seat_codes }}</dd></div>
-            <div><dt>Tổng thanh toán</dt><dd>{{ number_format((int)$booking->total_amount, 0, ',', '.') }} VNĐ</dd></div>
-            <div><dt>Phương thức</dt><dd>{{ $booking->sales_channel === 'counter' ? 'Thanh toán tại quầy' : \App\Support\PaymentPresentation::providerLabel($booking->payment_method) }}</dd></div>
-            <div><dt>Nhân viên</dt><dd>{{ request()->user()->name }}</dd></div>
-            <div><dt>Bắt đầu in</dt><dd>{{ $printState->updated_at?->format('d/m/Y H:i:s') }}</dd></div>
+    <article class="ticket">
+        <header class="brand"><div class="brand-name">MOVIEMATE</div><p class="ticket-title">VÉ XEM PHIM</p></header>
+        <hr class="rule">
+        <h1 class="movie">{{ $booking->showtime?->movie?->title }}</h1>
+        <p class="code">{{ $booking->booking_code }}</p>
+        <hr class="rule">
+        <dl class="facts">
+            <div class="fact"><dt>Rạp</dt><dd>{{ $booking->showtime?->cinema?->name }}</dd></div>
+            <div class="fact"><dt>Địa chỉ</dt><dd>{{ $booking->showtime?->cinema?->address }}</dd></div>
+            <div class="fact"><dt>Định dạng</dt><dd>{{ $booking->showtime?->room?->room_type ?: '2D' }}</dd></div>
+            <div class="fact"><dt>Ngày</dt><dd>{{ $booking->showtime?->show_date?->format('d/m/Y') }}</dd></div>
+            <div class="fact"><dt>Giờ</dt><dd>{{ \Carbon\CarbonImmutable::parse($booking->showtime?->show_time)->format('H:i') }}</dd></div>
+            <div class="fact"><dt>Phòng</dt><dd>{{ $booking->showtime?->room?->name }}</dd></div>
+            <div class="fact strong"><dt>Ghế</dt><dd>{{ $booking->seat_codes }}</dd></div>
         </dl>
-        <div class="qr"><canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="180" width="180" height="180" aria-label="QR xác minh vé"></canvas><div><strong>{{ $booking->booking_code }}</strong><p>QR xác minh đúng mã vé này. Việc in không đồng nghĩa vé đã được sử dụng.</p></div></div>
+        <hr class="rule">
+        <div class="money-line"><span>Tiền vé</span><strong>{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} VNĐ</strong></div>
+        @forelse($booking->foodOrder?->items ?? [] as $item)
+            <div class="food-line"><span>{{ $item->snapshot_name }} × {{ $item->quantity }}</span><strong>{{ number_format((int) $item->line_total, 0, ',', '.') }} VNĐ</strong></div>
+        @empty
+            <div class="money-line"><span>Đồ ăn</span><strong>0 VNĐ</strong></div>
+        @endforelse
+        <div class="money-line money-total"><span>Tổng</span><span>{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</span></div>
+        <hr class="rule">
+        <dl class="facts">
+            <div class="fact"><dt>Kênh</dt><dd>{{ $booking->sales_channel === 'counter' ? 'Tại quầy' : 'Online' }}</dd></div>
+            <div class="fact"><dt>Thu ngân</dt><dd>{{ $booking->payments->first(fn($payment) => $payment->settledBy)?->settledBy?->name ?? $booking->createdByStaff?->name ?? 'Online' }}</dd></div>
+            <div class="fact"><dt>Thời gian in</dt><dd>{{ now($booking->showtime?->cinema?->timezone)->format('d/m/Y H:i') }}</dd></div>
+        </dl>
+        <hr class="rule">
+        <div class="qr"><canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="256" width="256" height="256" aria-label="QR bảo mật xác minh vé"></canvas><p class="code">{{ $booking->booking_code }}</p><p class="qr-note">QR bảo mật dùng để xác minh vé. Việc in không đồng nghĩa vé đã được soát.</p></div>
+        <hr class="rule">
+        <footer class="footer">Vui lòng đến trước giờ chiếu 15 phút.<br>Giữ vé trong suốt thời gian xem phim.</footer>
     </article>
 
     <section class="controls">
         <h2>Hoàn tất lần in</h2>
         <p>Hộp thoại trình duyệt không thể xác nhận máy in vật lý. Hãy chọn kết quả thực tế.</p>
         <button type="button" class="btn-primary" data-staff-print-trigger><i class="ph ph-printer"></i>Mở hộp thoại in</button>
-        <form method="POST" action="{{ route('staff.tickets.print.succeed', $booking) }}" class="mt-4">@csrf
+        <form method="POST" action="{{ route('staff.tickets.print.succeed', $booking) }}" class="mt-4" data-submit-once>@csrf
             <button type="submit" class="btn-primary">Đã in thành công</button>
         </form>
-        <form method="POST" action="{{ route('staff.tickets.print.fail', $booking) }}" class="mt-5 space-y-3">@csrf
+        <form method="POST" action="{{ route('staff.tickets.print.fail', $booking) }}" class="mt-5 space-y-3" data-submit-once>@csrf
             <label class="cinema-label">Lý do in lỗi<select name="failure_code" class="cinema-input mt-1" required><option value="">Chọn lý do</option>@foreach($failureReasons as $code => $label)<option value="{{ $code }}">{{ $label }}</option>@endforeach</select></label>
             <label class="cinema-label">Ghi chú an toàn<textarea name="safe_note" class="cinema-input mt-1" maxlength="300"></textarea></label>
             <button type="submit" class="btn-secondary text-error">Báo lỗi in</button>

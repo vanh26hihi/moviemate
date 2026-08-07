@@ -68,6 +68,29 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
         $this->assertSame(1, ActivityLog::query()->where('action', 'ticket.checkin_duplicate')->count());
     }
 
+    public function test_resolved_booking_can_be_checked_in_explicitly_without_printing(): void
+    {
+        $payment = $this->verifiedPayment();
+        $booking = $payment->booking->fresh();
+        $staff = $this->userWithRole('staff');
+
+        $this->actingAs($staff)->get(route('staff.tickets.operations', $booking))
+            ->assertOk()->assertSee('Soát vé');
+        $this->assertDatabaseCount('ticket_checkin_events', 0);
+
+        $this->post(route('staff.tickets.consume-booking', $booking))
+            ->assertRedirect(route('staff.tickets.operations', $booking))
+            ->assertSessionHas('checkin_result.result', 'accepted');
+
+        $this->assertSame('used', $booking->fresh()->booking_status);
+        $this->assertDatabaseHas('ticket_checkin_events', [
+            'booking_id' => $booking->id,
+            'actor_user_id' => $staff->id,
+            'result' => 'accepted',
+        ]);
+        $this->assertDatabaseCount('booking_ticket_prints', 0);
+    }
+
     public function test_invalid_unpaid_cancelled_and_expired_scans_never_become_used(): void
     {
         $staff = $this->userWithRole('staff');

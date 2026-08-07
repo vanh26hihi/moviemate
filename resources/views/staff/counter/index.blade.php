@@ -22,7 +22,24 @@
         </form>
     @endif
 
-    @if(!$cinema && !auth()->user()->hasRole('admin'))
+    @if($cinema)
+        <form method="GET" action="{{ route('staff.counter.index') }}" class="cinema-card grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] sm:items-end">
+            <label class="cinema-label">Ngày chiếu
+                <input name="date" type="date" class="cinema-input mt-1" value="{{ $selectedDate?->toDateString() }}" min="{{ now($cinema->timezone)->toDateString() }}" max="{{ now($cinema->timezone)->addDays(\App\Services\PublicShowtimeCatalog::WINDOW_DAYS - 1)->toDateString() }}">
+            </label>
+            <label class="cinema-label">Phim
+                <select name="movie" class="cinema-input mt-1">
+                    <option value="">Tất cả phim</option>
+                    @foreach($movies as $movie)<option value="{{ $movie->id }}" @selected((int) request('movie') === $movie->id)>{{ $movie->title }}</option>@endforeach
+                </select>
+            </label>
+            <button class="btn-secondary" type="submit"><i class="ph ph-funnel"></i>Lọc suất chiếu</button>
+        </form>
+    @endif
+
+    @if($accessible->isEmpty() && !auth()->user()->hasRole('admin'))
+        <x-empty-state title="Bạn chưa được phân công chi nhánh" description="Liên hệ quản lý để được cấp phạm vi vận hành trước khi bán vé." icon="ph-map-pin" />
+    @elseif(!$cinema && !auth()->user()->hasRole('admin'))
         <x-empty-state title="Chọn chi nhánh vận hành" description="Tài khoản có nhiều chi nhánh. Hãy chọn một chi nhánh trước khi bán vé." icon="ph-map-pin" />
     @elseif($showtimes->isEmpty())
         <x-empty-state title="Chưa có suất chiếu có thể bán" description="Không tìm thấy suất chiếu còn hạn bán, có layout đã phát hành và cấu hình giá hợp lệ." icon="ph-calendar-x" />
@@ -35,6 +52,7 @@
                     <dl class="mt-4 space-y-2 text-sm">
                         <div class="flex justify-between gap-3"><dt class="app-muted">Thời gian</dt><dd class="font-bold">{{ $showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}</dd></div>
                         <div class="flex justify-between gap-3"><dt class="app-muted">Phòng</dt><dd class="font-bold">{{ $showtime->room->name }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Định dạng</dt><dd class="font-bold">{{ $showtime->room->room_type ?: '2D' }}</dd></div>
                         <div class="flex justify-between gap-3"><dt class="app-muted">Giá từ</dt><dd class="font-bold">{{ number_format((int)$showtime->starting_price, 0, ',', '.') }} VNĐ</dd></div>
                     </dl>
                     <a href="{{ route('staff.counter.seats', $showtime) }}" class="btn-primary mt-5 w-full">Chọn ghế</a>
