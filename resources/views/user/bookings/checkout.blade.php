@@ -2,16 +2,6 @@
 
 @section('title', 'Đặt vé - MovieMate')
 
-<<<<<<< HEAD
-@php
-    $loyaltyPoints = app(\App\Services\LoyaltyPointService::class)->calculate($totalAmount);
-    $subtotalAmount = $subtotalAmount ?? $totalAmount;
-    $voucherSummary = $voucherSummary ?? ['voucher' => null, 'code' => null, 'discount' => 0, 'total' => $totalAmount];
-    $selectedSeatQuery = collect($seatSummaries)->pluck('id')->join(',');
-@endphp
-
-@section('content')
-=======
 @section('content')
 <main class="user-page-shell px-4 py-10 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-3xl">
@@ -29,4 +19,3 @@
     </div>
 </main>
 @endsection
->>>>>>> 2085321f924f762f85bc22987b110ce9eaa68f44

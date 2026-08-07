@@ -4,6 +4,9 @@ namespace Tests\Unit;
 
 use App\Models\Booking;
 use App\Models\BookingSeat;
+use App\Models\Cinema;
+use App\Models\Movie;
+use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Models\User;
@@ -57,6 +60,29 @@ class BookingPresentationTest extends TestCase
 
         $this->assertSame('Chưa sử dụng', $booking->status_label);
         $this->assertSame('180.000 VNĐ', $booking->formatted_total);
+    }
+
+    public function test_it_provides_complete_ticket_context_and_safe_fallbacks(): void
+    {
+        $showtime = new Showtime;
+        $showtime->setRelation('movie', new Movie(['title' => 'MovieMate Premiere']));
+        $showtime->setRelation('cinema', new Cinema(['name' => 'MovieMate FPT', 'address' => 'Quận 12']));
+        $showtime->setRelation('room', new Room(['name' => 'Phòng 01']));
+
+        $booking = new Booking;
+        $booking->setRelation('showtime', $showtime);
+        $booking->setRelation('bookingSeats', new Collection);
+
+        $this->assertSame('MovieMate Premiere', $booking->movie_title);
+        $this->assertSame('MovieMate FPT - Quận 12', $booking->cinema_label);
+        $this->assertSame('Phòng 01', $booking->room_label);
+        $this->assertSame('Chưa có thông tin ghế', $booking->seat_codes);
+
+        $booking->setRelation('showtime', null);
+
+        $this->assertSame('Phim đang cập nhật', $booking->movie_title);
+        $this->assertSame('Rạp đang cập nhật', $booking->cinema_label);
+        $this->assertSame('Phòng đang cập nhật', $booking->room_label);
     }
 
     public function test_it_presents_a_couple_pair_once_with_a_combined_label(): void
