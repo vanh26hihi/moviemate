@@ -42,6 +42,20 @@ class VerifiedPaymentService
                 return PaymentVerificationResult::duplicate();
             }
 
+            if ($lockedPayment->status === Payment::STATUS_FAILED) {
+                $this->markReview(
+                    $lockedPayment,
+                    $data,
+                    $booking->booking_status === 'cancelled'
+                        ? 'late_success_after_terminal_cancellation'
+                        : 'success_conflicts_with_terminal_failure',
+                );
+
+                return PaymentVerificationResult::rejected(
+                    'Provider success conflicts with a recorded terminal failure and requires review.',
+                );
+            }
+
             $eligible = $allowReview
                 ? $lockedPayment->status === Payment::STATUS_REVIEW
                 : in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true);

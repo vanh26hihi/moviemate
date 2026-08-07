@@ -104,6 +104,7 @@ function initializeSeatPickers() {
             display.textContent = values.length ? values.map((item) => item.code).join(', ') : 'Chưa chọn';
             totalDisplay.textContent = formatVnd(values.reduce((total, item) => total + item.price, 0));
             continueButton.disabled = values.length === 0;
+            form.dispatchEvent(new CustomEvent('seat-selection:changed'));
         }
 
         buttons.forEach((button) => {

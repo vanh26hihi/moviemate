@@ -3,7 +3,7 @@
  * the checkout transaction. This module uses physical rendered coordinates and physical seat
  * ids, including both halves represented by one couple control.
  */
-const MESSAGE_ISOLATED_SEAT = "Vui lòng không để lại một ghế trống riêng lẻ giữa các ghế đã chọn hoặc ở cuối hàng.";
+const MESSAGE_ISOLATED_SEAT = "Không thể chọn ghế này vì lựa chọn hiện tại sẽ để trống một ghế đơn trong hàng. Vui lòng chọn các ghế liền nhau.";
 const guards = new WeakMap();
 
 function positionsFor(button) {
@@ -92,11 +92,21 @@ function selectedSeatIds(form) {
     );
 }
 
-function revealError(hint) {
-    if (!hint) return;
-    if (!hint.hasAttribute("tabindex")) hint.setAttribute("tabindex", "-1");
-    hint.focus({ preventScroll: true });
-    hint.scrollIntoView({ behavior: "smooth", block: "center" });
+function orphanMessage(segments, introduced) {
+    const orphan = segments.flat().find((position) => introduced.has(position.seatId));
+    const code = orphan?.button.dataset.seatCode?.trim();
+    const row = orphan?.button.dataset.seatRowLabel?.trim();
+
+    return code && row
+        ? `Không thể tiếp tục vì ghế ${code} sẽ bị bỏ trống một mình trong hàng ${row}.`
+        : MESSAGE_ISOLATED_SEAT;
+}
+
+function revealError(error) {
+    if (!error) return;
+    if (!error.hasAttribute("tabindex")) error.setAttribute("tabindex", "-1");
+    error.focus({ preventScroll: true });
+    error.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 export function initializeSeatGapGuard() {
@@ -110,9 +120,10 @@ export function initializeSeatGapGuard() {
         const segments = buildSegments(form);
         if (!segments.length) return;
 
-        const hint = document.getElementById("seatSelectionHint");
-        const defaultHint = hint?.textContent || "";
+        const error = document.getElementById("seatSelectionError");
+        const continueButton = document.getElementById("continueBookingButton");
         const baseline = isolatedSeatIds(segments, new Set());
+        let userInteracted = false;
 
         const evaluate = () => {
             const selected = selectedSeatIds(form);
@@ -121,25 +132,33 @@ export function initializeSeatGapGuard() {
             const invalid = selected.size > 0 && introduced.size > 0;
 
             form.dataset.seatGapInvalid = invalid ? "true" : "false";
-            if (hint && invalid) {
-                hint.textContent = MESSAGE_ISOLATED_SEAT;
-                hint.classList.add("text-error");
-            } else if (hint?.textContent === MESSAGE_ISOLATED_SEAT) {
-                hint.textContent = defaultHint;
-                hint.classList.remove("text-error");
+            if (continueButton) {
+                continueButton.disabled = selected.size === 0 || invalid;
+            }
+            if (error && invalid) {
+                error.textContent = orphanMessage(segments, introduced);
+                error.hidden = false;
+                error.dataset.serverError = "false";
+            } else if (error && (userInteracted || error.dataset.serverError !== "true")) {
+                error.textContent = "";
+                error.hidden = true;
+                error.dataset.serverError = "false";
             }
         };
 
         form.addEventListener("click", (event) => {
             if (event.target.closest(".seat-button")) {
+                userInteracted = true;
                 window.setTimeout(evaluate, 0);
             }
         });
+        form.addEventListener("seat-selection:changed", evaluate);
         form.addEventListener("submit", (event) => {
+            userInteracted = true;
             evaluate();
             if (form.dataset.seatGapInvalid === "true") {
                 event.preventDefault();
-                revealError(hint);
+                revealError(error);
             }
         });
 

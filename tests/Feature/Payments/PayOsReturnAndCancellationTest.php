@@ -144,6 +144,58 @@ class PayOsReturnAndCancellationTest extends PayOsPaymentTestCase
             && str_ends_with($request->url(), '/v2/payment-requests/'.$payment->order_code.'/cancel'));
     }
 
+    public function test_explicit_post_timeout_and_rate_limit_retain_booking_and_seats(): void
+    {
+        $this->seedRbac();
+        $user = $this->userWithRole('user');
+
+        foreach (['timeout', 'rate-limit'] as $failure) {
+            $booking = $this->payableBooking(['user_id' => $user->id]);
+            $payment = $this->payOsPayment($booking);
+            Http::fake(['*' => $failure === 'timeout'
+                ? fn () => Http::failedConnection('timeout')
+                : fn () => Http::response([], 429)]);
+
+            $this->actingAs($user)
+                ->from(route('user.bookings.history'))
+                ->post(route('payments.payos.cancel-attempt', $booking))
+                ->assertRedirect(route('user.bookings.history'))
+                ->assertSessionHas('warning', 'Chưa thể xác minh việc hủy với payOS. Ghế vẫn được giữ an toàn và bạn có thể kiểm tra lại sau.');
+
+            $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+            $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+            $this->assertSame(1, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        }
+    }
+
+    public function test_explicit_post_pending_and_processing_responses_retain_booking_and_seats(): void
+    {
+        $this->seedRbac();
+        $user = $this->userWithRole('user');
+
+        foreach (['PENDING', 'PROCESSING'] as $providerStatus) {
+            $booking = $this->payableBooking(['user_id' => $user->id]);
+            $payment = $this->payOsPayment($booking);
+            Http::fake(fn () => Http::response($this->providerEnvelope(
+                $this->queryData($payment, $providerStatus),
+            )));
+
+            $this->actingAs($user)
+                ->from(route('user.bookings.history'))
+                ->post(route('payments.payos.cancel-attempt', $booking))
+                ->assertRedirect(route('user.bookings.history'))
+                ->assertSessionHas('warning', 'payOS chưa xác nhận hủy. Đơn đặt vé được giữ nguyên.');
+
+            $this->assertContains($payment->fresh()->status, [
+                Payment::STATUS_PENDING,
+                Payment::STATUS_PROCESSING,
+                Payment::STATUS_REVIEW,
+            ]);
+            $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+            $this->assertSame(1, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        }
+    }
+
     public function test_return_requires_attempt_scoped_state_and_wrong_customer_cannot_query(): void
     {
         Http::fake();

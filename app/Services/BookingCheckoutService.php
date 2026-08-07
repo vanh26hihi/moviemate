@@ -128,6 +128,9 @@ class BookingCheckoutService
                         ->get();
 
                     $this->assertSeatsCanBeReserved($seats, $normalizedSeatIds, $layout);
+                    if ($salesChannel === Booking::SALES_CHANNEL_ONLINE) {
+                        $this->assertLogicalSeatLimit($seats);
+                    }
 
                     // Final authoritative gap check inside the showtime transaction. The shared
                     // showtime lock serializes checkout writers, selected Seat rows are locked,
@@ -230,14 +233,25 @@ class BookingCheckoutService
     {
         $snapshot = SeatAvailabilitySnapshot::for($showtime, $layout, lockHolds: true);
 
-        if ($this->seatSelectionPolicy->violates(
+        $message = $this->seatSelectionPolicy->violationMessage(
             $layout,
             $snapshot->unavailableSeatIds,
             $seatIds,
             $snapshot->cells,
-        )) {
+        );
+        if ($message !== null) {
             throw ValidationException::withMessages([
-                'seat_ids' => SeatSelectionPolicy::MESSAGE_ISOLATED_SEAT,
+                'seat_ids' => $message,
+            ]);
+        }
+    }
+
+    private function assertLogicalSeatLimit(Collection $seats): void
+    {
+        $maximum = max(1, (int) config('booking.max_logical_seat_units', 8));
+        if (SeatPresentation::groups($seats)->count() > $maximum) {
+            throw ValidationException::withMessages([
+                'seat_ids' => "Mỗi đơn chỉ được chọn tối đa {$maximum} ghế hoặc cặp ghế đôi.",
             ]);
         }
     }

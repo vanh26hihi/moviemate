@@ -7,6 +7,7 @@ use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\VnpaySigner;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Services\BookingCancellationService;
 use App\Services\Payments\VerifiedPaymentService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class VnpayIpnService
         private readonly VnpayConfig $config,
         private readonly VnpaySigner $signer,
         private readonly VerifiedPaymentService $verifiedPayments,
+        private readonly BookingCancellationService $cancellations,
     ) {}
 
     /** @return array{RspCode:string,Message:string} */
@@ -95,6 +97,17 @@ class VnpayIpnService
             'ipn_status_'.$parameters['vnp_TransactionStatus'],
             $payloadHash,
         );
+
+        if ($current === Payment::STATUS_FAILED) {
+            $reason = $parameters['vnp_ResponseCode'] === '24'
+                ? 'vnpay_customer_cancelled'
+                : 'vnpay_terminal_failed';
+            $this->cancellations->cancel(
+                $payment->booking_id,
+                $reason,
+                'booking.payment_cancelled',
+            );
+        }
 
         return $current === Payment::STATUS_SUCCESS
             ? $this->response('02', 'Order already confirmed')

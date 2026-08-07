@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Chọn ghế - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
@@ -116,6 +117,7 @@
                                             class="checkout-seat seat-button flex items-center justify-center rounded-lg border px-1 text-[10px] font-extrabold transition {{ $isMergedCouple ? 'checkout-seat-couple col-span-2' : '' }} {{ $seatClass }}"
                                             data-seat-ids="{{ $seatIds }}"
                                             data-seat-code="{{ $seatCode }}"
+                                            data-seat-row-label="{{ $seat->row }}"
                                             data-seat-type="{{ $type }}"
                                             data-pair-code="{{ $seat->pair_code }}"
                                             data-seat-row="{{ $y }}"
@@ -163,6 +165,14 @@
                         <div class="flex justify-between gap-4 border-t pt-4 app-border"><dt class="app-muted">Tạm tính tiền ghế</dt><dd id="totalAmountDisplay" class="text-2xl font-extrabold text-brand-start" aria-live="polite">0 VNĐ</dd></div>
                     </dl>
                     <button id="continueBookingButton" type="submit" form="seatForm" disabled class="btn-primary mt-5 w-full">Tiếp tục chọn đồ ăn</button>
+                    <p
+                        id="seatSelectionError"
+                        class="mt-3 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm font-semibold leading-relaxed text-error"
+                        role="alert"
+                        aria-live="polite"
+                        data-server-error="{{ $errors->has('seat_ids') ? 'true' : 'false' }}"
+                        @if(! $errors->has('seat_ids')) hidden @endif
+                    >{{ $errors->first('seat_ids') }}</p>
                     <p id="seatSelectionHint" class="mt-3 text-xs leading-relaxed app-muted">Ghế đôi sẽ được chọn hoặc bỏ chọn cả cặp. Giá và tình trạng ghế sẽ được máy chủ kiểm tra lại.</p>
                 </div>
             </aside>

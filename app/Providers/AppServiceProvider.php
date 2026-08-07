@@ -36,6 +36,28 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('booking-hold-creation', function (Request $request): array {
+            $keys = app(BookingCheckoutDraftService::class)->holdCreationRateLimitKeys($request);
+            $message = 'Bạn đã tạo quá nhiều lượt giữ ghế trong thời gian ngắn. Vui lòng chờ một chút rồi thử lại.';
+            $response = function (Request $request, array $headers) use ($message) {
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => $message], 429, $headers);
+                }
+
+                return response($message, 429, $headers);
+            };
+            $window = max(1, (int) config('booking.hold_creation_window_minutes', 10));
+
+            return [
+                Limit::perMinutes($window, max(1, (int) config('booking.hold_creation_max_attempts', 4)))
+                    ->by($keys['primary'])->response($response),
+                Limit::perMinutes($window, max(1, (int) config('booking.hold_creation_max_attempts', 4)))
+                    ->by($keys['session'])->response($response),
+                Limit::perMinutes($window, max(1, (int) config('booking.hold_creation_network_max_attempts', 20)))
+                    ->by($keys['network'])->response($response),
+            ];
+        });
+
         RateLimiter::for('booking-food-mutation', function (Request $request): Limit {
             $drafts = app(BookingCheckoutDraftService::class);
             $message = 'Bạn thao tác quá nhanh. Vui lòng chờ vài giây rồi thử lại.';

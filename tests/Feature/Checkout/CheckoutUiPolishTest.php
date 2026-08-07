@@ -89,9 +89,9 @@ class CheckoutUiPolishTest extends PaymentTestCase
         $cases = [
             ['pending', Payment::STATUS_PENDING, 'pending_payment', 'unpaid', 'Đang xác minh kết quả thanh toán', 'user.bookings.pending'],
             ['review', Payment::STATUS_REVIEW, 'pending_payment', 'unpaid', 'Giao dịch cần được hỗ trợ', 'user.bookings.payment-review'],
-            ['failed', Payment::STATUS_FAILED, 'pending_payment', 'unpaid', 'Thanh toán không thành công', 'user.bookings.failed'],
+            ['pending', Payment::STATUS_FAILED, 'pending_payment', 'unpaid', 'Đang xác minh kết quả thanh toán', 'user.bookings.failed'],
             ['expired', Payment::STATUS_EXPIRED, 'expired', 'unpaid', 'Đơn đặt vé đã hết hạn', 'user.bookings.expired'],
-            ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Đơn đặt vé đã bị hủy', 'user.bookings.success'],
+            ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Thanh toán đã được hủy', 'user.bookings.success'],
             ['used', Payment::STATUS_SUCCESS, 'used', 'paid', 'Vé đã được sử dụng', 'user.bookings.success'],
         ];
 

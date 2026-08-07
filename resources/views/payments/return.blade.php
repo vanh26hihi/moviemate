@@ -16,6 +16,10 @@
     $stateStatus = $payment->status === \App\Models\Payment::STATUS_SUCCESS && ! $isVerifiedPaid
         ? \App\Models\Payment::STATUS_REVIEW
         : $payment->status;
+    if ($booking->booking_status === 'pending_payment'
+        && $stateStatus === \App\Models\Payment::STATUS_FAILED) {
+        $stateStatus = \App\Models\Payment::STATUS_PENDING;
+    }
     $states = [
         \App\Models\Payment::STATUS_PENDING => [
             'title' => 'Đang xác minh kết quả thanh toán',
@@ -50,12 +54,23 @@
     ];
     $states[\App\Models\Payment::STATUS_UNRESOLVED] = $states[\App\Models\Payment::STATUS_PENDING];
     $states[\App\Models\Payment::STATUS_PROCESSING] = $states[\App\Models\Payment::STATUS_PENDING];
-    if (($payOsCancelReturn ?? false) && $payment->failure_reason === 'payos_cancelled') {
+    $isConfirmedCancellation = $booking->booking_status === 'cancelled'
+        && $payment->status === \App\Models\Payment::STATUS_FAILED;
+    if ($isConfirmedCancellation) {
         $states[\App\Models\Payment::STATUS_FAILED] = [
             'title' => 'Thanh toán đã được hủy',
-            'message' => 'payOS đã xác nhận hủy giao dịch. Ghế của đơn đủ điều kiện đã được giải phóng an toàn.',
+            'message' => 'Các ghế đã giữ cho đơn này đã được giải phóng.',
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
+        ];
+    }
+    if (($cancelRequested ?? false) && ! $isConfirmedCancellation
+        && in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_PROCESSING], true)) {
+        $states[$stateStatus] = [
+            'title' => 'Đang xác minh việc hủy thanh toán',
+            'message' => 'Ghế của bạn vẫn được giữ tạm thời để tránh mất vé trong khi hệ thống xác minh trạng thái giao dịch.',
+            'icon' => 'ph-hourglass-medium',
+            'colour' => 'text-warning',
         ];
     }
     $state = $states[$stateStatus] ?? [
@@ -64,6 +79,7 @@
         'icon' => 'ph-spinner-gap',
         'colour' => 'text-slate-500',
     ];
+    $holdExpiresAt = $booking->expires_at ?? $payment->expires_at;
 @endphp
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
@@ -78,10 +94,10 @@
             <h1 id="payment-state-title" class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">{{ $state['title'] }}</h1>
             <p class="mx-auto mt-3 max-w-xl leading-relaxed app-muted">{{ $state['message'] }}</p>
 
-            @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED], true) && $payment->expires_at)
+            @if(in_array($stateStatus, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_PROCESSING], true) && $holdExpiresAt)
                 <div class="mx-auto mt-6 max-w-md rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4" data-countdown-wrapper>
                     <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian lần thanh toán còn lại</p>
-                    <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $payment->expires_at->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
+                    <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $holdExpiresAt->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
                 </div>
             @endif
 
@@ -101,7 +117,7 @@
                 và không thể tự đánh dấu giao dịch là đã thanh toán.
             </p>
 
-            @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_REVIEW], true))
+            @if(in_array($stateStatus, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_PROCESSING, \App\Models\Payment::STATUS_REVIEW], true))
                 <div class="mx-auto mt-5 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-left text-sm leading-relaxed text-warning" role="note">
                     <strong>Không tạo lại thanh toán khi chưa rõ kết quả.</strong> Nếu {{ $providerLabel }} đã trừ tiền, hãy giữ mã đặt vé và chờ MovieMate xác minh hoặc đối soát giao dịch hiện tại.
                 </div>

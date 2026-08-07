@@ -38,6 +38,7 @@ class BookingCheckoutConfirmController extends Controller
         $provider = (string) $request->input('payment_method', config('payment.driver', 'vnpay'));
 
         try {
+            $drafts->assertMayCreateHold($request, $draft);
             $previews->preview($draft);
             $result = $checkout->confirm(
                 $draft,
@@ -45,6 +46,7 @@ class BookingCheckoutConfirmController extends Controller
                 $provider,
                 $request->ip(),
             );
+            $drafts->rememberActiveHold($request, $result->checkout->booking);
         } catch (FoodSelectionValidationException $exception) {
             return redirect()
                 ->route('user.bookings.review')

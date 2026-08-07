@@ -5,11 +5,15 @@ namespace Tests\Feature\Payments;
 use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\VnpaySigner;
 use App\Exceptions\PaymentInitiationException;
+use App\Models\ActivityLog;
 use App\Models\BookingTicketDelivery;
 use App\Models\Payment;
+use App\Services\BookingCheckoutService;
+use App\Services\BookingTokenService;
 use App\Services\Payments\PaymentInitiationService;
 use App\Services\Payments\PaymentReturnTokenService;
 use App\Services\Vnpay\VnpayPaymentUrlBuilder;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class VnpayPaymentFlowTest extends VnpayPaymentTestCase
@@ -280,6 +284,8 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
             ['vnp_TransactionStatus' => '02'],
         )))->assertJsonPath('RspCode', '00');
         $this->assertSame(Payment::STATUS_FAILED, $responseOnly->fresh()->status);
+        $this->assertSame('cancelled', $responseOnly->booking->fresh()->booking_status);
+        $this->assertSame(0, $responseOnly->booking->bookingSeats()->whereNotNull('active_lock_key')->count());
 
         $statusOnly = $this->vnpayPayment();
         $this->getJson(route('payments.vnpay.ipn', $this->signedParameters(
@@ -288,6 +294,132 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         )))->assertJsonPath('RspCode', '00');
         $this->assertSame(Payment::STATUS_REVIEW, $statusOnly->fresh()->status);
         $this->assertSame(0, BookingTicketDelivery::query()->count());
+    }
+
+    public function test_signed_code_24_requires_terminal_query_then_releases_for_another_customer(): void
+    {
+        $this->seedRbac();
+        $user = $this->userWithRole('user');
+        $payment = $this->vnpayPayment($this->payableBooking(['user_id' => $user->id]));
+        $this->actingAs($user);
+        $seatId = $payment->booking->bookingSeats()->sole()->seat_id;
+        Http::fake(fn () => Http::response($this->queryResponse(
+            $payment,
+            ['vnp_TransactionStatus' => '02'],
+        )));
+        $state = app(PaymentReturnTokenService::class)->issue($payment);
+
+        $response = $this->get(route('payments.vnpay.return', $this->signedParameters($payment, [
+            'vnp_ResponseCode' => '24',
+            'vnp_TransactionStatus' => '02',
+        ]) + ['state' => $state]));
+
+        $response->assertRedirect(route('payments.vnpay.return', ['ref' => $payment->order_code]));
+        $this->followRedirects($response)
+            ->assertOk()
+            ->assertSee('Thanh toán đã được hủy')
+            ->assertSee('Các ghế đã giữ cho đơn này đã được giải phóng.');
+        $this->assertSame(Payment::STATUS_FAILED, $payment->fresh()->status);
+        $this->assertSame('cancelled', $payment->booking->fresh()->booking_status);
+        $this->assertSame(0, $payment->booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+
+        $this->get(route('user.bookings.success', $payment->booking))
+            ->assertOk()
+            ->assertSee('Thanh toán đã được hủy')
+            ->assertSee('Đặt vé lại')
+            ->assertDontSee('Thanh toán tiếp')
+            ->assertDontSee('Hủy đơn');
+
+        $replacement = app(BookingCheckoutService::class)->createPendingBooking(
+            $payment->booking->showtime_id,
+            [$seatId],
+            null,
+            'next-customer@example.test',
+            app(BookingTokenService::class)->issueCheckoutToken(),
+        )->booking;
+        $this->assertSame(1, $replacement->bookingSeats()->whereNotNull('active_lock_key')->count());
+    }
+
+    public function test_code_24_query_timeout_retains_hold_and_shows_verification_state(): void
+    {
+        $payment = $this->vnpayPayment();
+        Http::fake(['*' => fn () => Http::failedConnection('timeout')]);
+        $state = app(PaymentReturnTokenService::class)->issue($payment);
+
+        $response = $this->get(route('payments.vnpay.return', $this->signedParameters($payment, [
+            'vnp_ResponseCode' => '24',
+            'vnp_TransactionStatus' => '02',
+        ]) + ['state' => $state]));
+
+        $this->followRedirects($response)
+            ->assertOk()
+            ->assertSee('Đang xác minh việc hủy thanh toán')
+            ->assertSee('Ghế của bạn vẫn được giữ tạm thời')
+            ->assertSee('data-countdown=', false);
+        $this->assertSame(Payment::STATUS_UNRESOLVED, $payment->fresh()->status);
+        $this->assertSame('pending_payment', $payment->booking->fresh()->booking_status);
+        $this->assertSame(1, $payment->booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+    }
+
+    public function test_code_24_query_reporting_paid_enters_review_and_return_never_fulfils(): void
+    {
+        $payment = $this->vnpayPayment();
+        Http::fake(fn () => Http::response($this->queryResponse($payment)));
+        $state = app(PaymentReturnTokenService::class)->issue($payment);
+
+        $this->get(route('payments.vnpay.return', $this->signedParameters($payment, [
+            'vnp_ResponseCode' => '24',
+            'vnp_TransactionStatus' => '02',
+        ]) + ['state' => $state]))->assertRedirect();
+
+        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame('cancel_query_reported_paid', $payment->fresh()->failure_reason);
+        $this->assertSame('pending_payment', $payment->booking->fresh()->booking_status);
+        $this->assertSame(1, $payment->booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        $this->assertDatabaseMissing('booking_ticket_deliveries', ['booking_id' => $payment->booking_id]);
+    }
+
+    public function test_signed_code_24_amount_mismatch_is_rejected_without_query_or_release(): void
+    {
+        $payment = $this->vnpayPayment();
+        Http::fake();
+        $state = app(PaymentReturnTokenService::class)->issue($payment);
+        $parameters = $this->signedParameters($payment, [
+            'vnp_Amount' => (string) (($payment->amount + 1) * 100),
+            'vnp_ResponseCode' => '24',
+            'vnp_TransactionStatus' => '02',
+        ]) + ['state' => $state];
+
+        $this->get(route('payments.vnpay.return', $parameters))->assertNotFound();
+
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertSame('pending_payment', $payment->booking->fresh()->booking_status);
+        $this->assertSame(1, $payment->booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        Http::assertNothingSent();
+    }
+
+    public function test_terminal_cancel_duplicate_logs_once_and_late_success_enters_review(): void
+    {
+        $payment = $this->vnpayPayment();
+        $cancel = $this->signedParameters($payment, [
+            'vnp_ResponseCode' => '24',
+            'vnp_TransactionStatus' => '02',
+        ]);
+
+        $this->getJson(route('payments.vnpay.ipn', $cancel))->assertJsonPath('RspCode', '00');
+        $this->getJson(route('payments.vnpay.ipn', $cancel))->assertJsonPath('RspCode', '00');
+
+        $this->assertSame(1, ActivityLog::query()
+            ->where('action', 'booking.payment_cancelled')
+            ->where('subject_id', $payment->booking_id)
+            ->count());
+
+        $this->getJson(route('payments.vnpay.ipn', $this->signedParameters($payment)))
+            ->assertJsonPath('RspCode', '99');
+        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+        $this->assertSame('cancelled', $payment->booking->fresh()->booking_status);
+        $this->assertSame(0, $payment->booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        $this->assertDatabaseMissing('booking_ticket_deliveries', ['booking_id' => $payment->booking_id]);
     }
 
     public function test_late_or_seat_lost_success_moves_to_review_without_ticket(): void
@@ -363,5 +495,34 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
             ->assertRedirect();
 
         $this->get(route('payments.vnpay.return', ['ref' => $other->order_code]))->assertNotFound();
+    }
+
+    /** @param array<string,string> $overrides @return array<string,string> */
+    private function queryResponse(Payment $payment, array $overrides = []): array
+    {
+        $fields = array_merge([
+            'vnp_ResponseId' => 'RESP-CANCEL',
+            'vnp_Command' => 'querydr',
+            'vnp_ResponseCode' => '00',
+            'vnp_Message' => 'Success',
+            'vnp_TmnCode' => 'MOVIE123',
+            'vnp_TxnRef' => $payment->order_code,
+            'vnp_Amount' => (string) ($payment->amount * 100),
+            'vnp_BankCode' => 'NCB',
+            'vnp_PayDate' => now('Asia/Ho_Chi_Minh')->format('YmdHis'),
+            'vnp_TransactionNo' => '987654321',
+            'vnp_TransactionType' => '01',
+            'vnp_TransactionStatus' => '00',
+            'vnp_OrderInfo' => 'MovieMate test booking',
+            'vnp_PromotionCode' => '',
+            'vnp_PromotionAmount' => '0',
+        ], $overrides);
+        $fields['vnp_SecureHash'] = hash_hmac(
+            'sha512',
+            app(VnpaySigner::class)->queryResponseCanonical($fields),
+            (string) config('payment.vnpay.hash_secret'),
+        );
+
+        return $fields;
     }
 }
