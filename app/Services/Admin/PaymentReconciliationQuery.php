@@ -49,6 +49,7 @@ final class PaymentReconciliationQuery
 
         $query = Payment::query()
             ->join('bookings', 'bookings.id', '=', 'payments.booking_id')
+            ->whereIn('payments.provider', Payment::SUPPORTED_PROVIDERS)
             ->where(function (Builder $query) use ($stale): void {
                 $query->whereColumn('payments.amount', '!=', 'bookings.total_amount')
                     ->orWhere(fn (Builder $query) => $query->where('payments.status', Payment::STATUS_SUCCESS)->whereNull('payments.verified_at'))

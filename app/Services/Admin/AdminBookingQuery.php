@@ -31,6 +31,7 @@ final class AdminBookingQuery
         $query = Booking::query()
             ->with([
                 'user:id,name,email',
+                'createdByStaff:id,name,email',
                 'showtime:id,movie_id,room_id,show_date,show_time',
                 'showtime.movie:id,title',
                 'showtime.room:id,code,name',
@@ -40,8 +41,10 @@ final class AdminBookingQuery
                 'ticketPrint:id,booking_id,status,attempts_count,printed_by_user_id,printed_at',
                 'authoritativePayment' => fn ($query) => $query->select([
                     'payments.id', 'payments.booking_id', 'payments.provider', 'payments.amount',
-                    'payments.status', 'payments.verified_at', 'payments.paid_at',
+                    'payments.status', 'payments.verified_at', 'payments.settled_at',
+                    'payments.settled_by_user_id', 'payments.paid_at',
                 ]),
+                'authoritativePayment.settledBy:id,name,email',
             ]);
         $this->cinemaAccess->scope($query, auth()->user(), 'bookings.cinema_id');
         $query
@@ -70,6 +73,7 @@ final class AdminBookingQuery
             ->when($filters['created_to'] ?? null, fn (Builder $query, string $date) => $query->whereDate('created_at', '<=', $date))
             ->when($filters['booking_status'] ?? null, fn (Builder $query, string $status) => $query->where('booking_status', $status))
             ->when($filters['payment_status'] ?? null, fn (Builder $query, string $status) => $query->where('payment_status', $status))
+            ->when($filters['sales_channel'] ?? null, fn (Builder $query, string $channel) => $query->where('sales_channel', $channel))
             ->when($filters['ticket_status'] ?? null, fn (Builder $query, string $status) => $query
                 ->whereHas('ticketDelivery', fn (Builder $query) => $query->where('status', $status)))
             ->when(($filters['checkin_status'] ?? null) === 'used', fn (Builder $query) => $query->where('booking_status', 'used'))

@@ -61,6 +61,9 @@ final class PaymentPresentation
 
     public static function providerCategory(Payment $payment): string
     {
+        if ($payment->provider === Payment::PROVIDER_COUNTER_CASH && $payment->hasAuthoritativeSuccessEvidence()) {
+            return 'Đã thu tiền mặt tại quầy';
+        }
         if ($payment->status === Payment::STATUS_SUCCESS && $payment->verified_at !== null) {
             return 'Kết quả đã được chấp nhận và xác minh';
         }
@@ -90,6 +93,7 @@ final class PaymentPresentation
     public static function providerLabel(?string $provider): string
     {
         return match ($provider) {
+            Payment::PROVIDER_COUNTER_CASH => 'Tiền mặt tại quầy',
             'vnpay' => 'VNPAY',
             'zalopay' => 'ZaloPay',
             'payos' => 'payOS',

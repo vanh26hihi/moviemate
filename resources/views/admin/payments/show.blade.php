@@ -33,6 +33,8 @@
             <div><dt class="text-sm app-muted">Trạng thái provider</dt><dd class="font-bold app-text">{{ $payment->transaction_status ?? 'Chưa có' }}</dd></div>
             <div><dt class="text-sm app-muted">Provider ghi nhận thanh toán</dt><dd class="font-bold app-text">{{ $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? 'Chưa có' }}</dd></div>
             <div><dt class="text-sm app-muted">Hệ thống ghi nhận thanh toán</dt><dd class="font-bold app-text">{{ $payment->paid_at?->format('d/m/Y H:i:s') ?? 'Chưa có' }}</dd></div>
+            <div><dt class="text-sm app-muted">Người thu tiền mặt</dt><dd class="font-bold app-text">{{ $payment->settledBy?->name ?? '—' }}</dd></div>
+            <div><dt class="text-sm app-muted">Thu tiền mặt lúc</dt><dd class="font-bold app-text">{{ $payment->settled_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
             <div><dt class="text-sm app-muted">Callback nhận lúc</dt><dd class="font-bold app-text">{{ $payment->callback_received_at?->format('d/m/Y H:i:s') ?? 'Chưa có' }}</dd></div>
             <div><dt class="text-sm app-muted">Đối soát gần nhất</dt><dd class="font-bold app-text">{{ $payment->last_queried_at?->format('d/m/Y H:i:s') ?? 'Chưa truy vấn' }}</dd></div>
             <div><dt class="text-sm app-muted">Tạo lúc</dt><dd class="font-bold app-text">{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>

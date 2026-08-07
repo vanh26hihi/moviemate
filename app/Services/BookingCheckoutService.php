@@ -7,6 +7,7 @@ use App\Exceptions\PricingConfigurationException;
 use App\Models\Booking;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Models\User;
 use App\Services\Seats\SeatAvailabilitySnapshot;
 use App\Services\Seats\SeatSelectionPolicy;
 use App\Support\SeatPresentation;
@@ -40,7 +41,22 @@ class BookingCheckoutService
         string $customerEmail,
         string $checkoutToken,
         array|Collection|null $foodSelection = null,
+        string $salesChannel = Booking::SALES_CHANNEL_ONLINE,
+        ?User $counterActor = null,
+        ?string $customerName = null,
+        ?string $customerPhone = null,
     ): BookingCheckoutResult {
+        if (! in_array($salesChannel, Booking::SALES_CHANNELS, true)) {
+            throw new InvalidArgumentException('Unsupported booking sales channel.');
+        }
+        if ($salesChannel === Booking::SALES_CHANNEL_COUNTER
+            && (! $counterActor?->isActive() || ! $counterActor->hasPermission('counter_sales.create'))) {
+            throw new LogicException('The authenticated actor cannot create counter bookings.');
+        }
+        if ($salesChannel === Booking::SALES_CHANNEL_ONLINE && $counterActor !== null) {
+            throw new LogicException('Online bookings cannot have a counter creator.');
+        }
+
         if (! $this->tokens->isValidCheckoutToken($checkoutToken)) {
             throw new InvalidArgumentException('The checkout idempotency token was not issued by MovieMate.');
         }
@@ -52,6 +68,8 @@ class BookingCheckoutService
             $customerEmail,
             $userId,
             $foodSelection,
+            $salesChannel,
+            $counterActor?->getKey(),
         );
         $existing = Booking::query()
             ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -75,6 +93,10 @@ class BookingCheckoutService
                     $requestFingerprint,
                     $bookingCode,
                     $foodSelection,
+                    $salesChannel,
+                    $counterActor,
+                    $customerName,
+                    $customerPhone,
                 ): Booking {
                     $existing = Booking::query()
                         ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -121,13 +143,18 @@ class BookingCheckoutService
                         throw ValidationException::withMessages(['pricing' => $exception->getMessage()]);
                     }
 
-                    $guestToken = $userId === null
+                    $guestToken = $userId === null && $salesChannel === Booking::SALES_CHANNEL_ONLINE
                         ? $this->tokens->guestAccessTokenForCheckout($checkoutToken)
                         : null;
 
-                    $booking = Booking::query()->create([
+                    $booking = new Booking;
+                    $booking->forceFill([
                         'user_id' => $userId,
-                        'customer_email' => $customerEmail,
+                        'sales_channel' => $salesChannel,
+                        'created_by_staff_id' => $counterActor?->getKey(),
+                        'customer_name' => $customerName === null ? null : trim($customerName),
+                        'customer_phone' => $customerPhone === null ? null : trim($customerPhone),
+                        'customer_email' => trim($customerEmail) === '' ? null : trim($customerEmail),
                         'guest_access_token_hash' => $guestToken === null ? null : $this->tokens->hash($guestToken),
                         'guest_access_expires_at' => $guestToken === null
                             ? null
@@ -143,7 +170,7 @@ class BookingCheckoutService
                         'payment_status' => 'unpaid',
                         'booking_status' => 'pending_payment',
                         'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
-                    ]);
+                    ])->save();
 
                     $this->seatLocks->acquire(
                         $booking,
@@ -153,6 +180,8 @@ class BookingCheckoutService
                     );
                     $this->food->persist($foodBreakdown, [
                         'booking_id' => $booking->id,
+                        'customer_name' => $booking->customer_name,
+                        'customer_phone' => $booking->customer_phone,
                     ]);
 
                     return $booking;
@@ -228,7 +257,9 @@ class BookingCheckoutService
 
         return new BookingCheckoutResult(
             $booking,
-            $booking->user_id === null ? $this->tokens->guestAccessTokenForCheckout($checkoutToken) : null,
+            $booking->user_id === null && $booking->sales_channel === Booking::SALES_CHANNEL_ONLINE
+                ? $this->tokens->guestAccessTokenForCheckout($checkoutToken)
+                : null,
             $replayed,
         );
     }

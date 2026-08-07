@@ -24,6 +24,7 @@ final class AdminBookingDetailService
     {
         $booking->load([
             'user:id,name,email',
+            'createdByStaff:id,name,email',
             'showtime.movie',
             'showtime.cinema',
             'showtime.room.cinema',
@@ -36,11 +37,10 @@ final class AdminBookingDetailService
             'ticketPrint.retryAuthorizedBy:id,name',
         ]);
 
-        $payments = $booking->payments()->latest('id')->limit(100)->get();
+        $payments = $booking->payments()->with('settledBy:id,name,email')->latest('id')->limit(100)->get();
         $booking->setRelation('payments', $payments);
         $authoritativePayment = $payments
-            ->where('status', Payment::STATUS_SUCCESS)
-            ->filter(fn (Payment $payment): bool => $payment->verified_at !== null)
+            ->filter(fn (Payment $payment): bool => $payment->hasAuthoritativeSuccessEvidence())
             ->sortByDesc('id')
             ->first();
         $seatGroups = SeatPresentation::groups($booking->bookingSeats->pluck('seat')->filter()->values())
@@ -84,9 +84,10 @@ final class AdminBookingDetailService
         return [
             'booking' => $booking,
             'customer' => [
-                'name' => $booking->user?->name ?? 'Khách đặt vé',
+                'name' => $booking->user?->name ?? $booking->customer_name ?? 'Khách đặt vé',
                 'email' => PrivacyMask::email($booking->recipient_email),
-                'kind' => $booking->user_id ? 'Tài khoản MovieMate' : 'Khách đặt vé',
+                'phone' => PrivacyMask::phone($booking->customer_phone),
+                'kind' => $booking->user_id ? 'Tài khoản MovieMate' : ($booking->sales_channel === Booking::SALES_CHANNEL_COUNTER ? 'Khách tại quầy' : 'Khách đặt vé'),
             ],
             'seatGroups' => $seatGroups,
             'payments' => $payments,
@@ -110,7 +111,9 @@ final class AdminBookingDetailService
     private function paymentCategory(Payment $payment): string
     {
         return match ($payment->status) {
-            Payment::STATUS_SUCCESS => $payment->verified_at ? 'Đã xác minh từ nhà cung cấp' : 'Thiếu dấu xác minh',
+            Payment::STATUS_SUCCESS => $payment->provider === Payment::PROVIDER_COUNTER_CASH && $payment->hasAuthoritativeSuccessEvidence()
+                ? 'Đã thu tiền mặt tại quầy'
+                : ($payment->verified_at ? 'Đã xác minh từ nhà cung cấp' : 'Thiếu dấu xác minh'),
             Payment::STATUS_PENDING, Payment::STATUS_PROCESSING => 'Đang chờ nhà cung cấp',
             Payment::STATUS_UNRESOLVED => 'Chưa có kết quả chắc chắn',
             Payment::STATUS_REVIEW => 'Cần đối soát',

@@ -36,9 +36,12 @@ final class BookingCancellationService
         return $this->onlyHasTerminalUnpaidPayments($paymentStatuses);
     }
 
-    public function cancel(int $bookingId): BookingCancellationResult
-    {
-        return DB::transaction(function () use ($bookingId): BookingCancellationResult {
+    public function cancel(
+        int $bookingId,
+        string $reason = 'customer_cancelled_unpaid',
+        string $activity = 'booking.cancelled',
+    ): BookingCancellationResult {
+        return DB::transaction(function () use ($bookingId, $reason, $activity): BookingCancellationResult {
             $booking = Booking::query()->lockForUpdate()->findOrFail($bookingId);
 
             if ($booking->booking_status === 'cancelled') {
@@ -72,7 +75,7 @@ final class BookingCancellationService
             // One audit event per successful cancellation. Seat labels are logical and safe;
             // no capability, token or provider payload is ever recorded here.
             $this->activities->log(
-                'booking.cancelled',
+                $activity,
                 $booking,
                 ['status' => 'pending_payment'],
                 ['status' => 'cancelled'],
@@ -81,7 +84,7 @@ final class BookingCancellationService
                     'showtime_id' => $booking->showtime_id,
                     'seat_units' => $releasedSeatLabels,
                     'seat_count' => $released,
-                    'reason' => 'customer_cancelled_unpaid',
+                    'reason' => $reason,
                 ],
             );
 

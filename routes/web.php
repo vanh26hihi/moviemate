@@ -36,6 +36,7 @@ use App\Http\Controllers\Payments\VnpayIpnController;
 use App\Http\Controllers\Payments\VnpayReturnController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
+use App\Http\Controllers\Staff\CounterSaleController as StaffCounterSaleController;
 use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
@@ -479,6 +480,22 @@ Route::prefix('staff')->name('staff.')
             ->middleware('permission:tickets.checkin')->name('tickets.check');
         Route::post('/tickets/check', [StaffTicketCheckinController::class, 'store'])
             ->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume');
-        Route::get('/sales/counter', fn () => view('staff.sales.counter'))
-            ->middleware('permission:bookings.operate')->name('sales.counter');
+        Route::get('/counter', [StaffCounterSaleController::class, 'index'])
+            ->middleware('permission:counter_sales.view')->name('counter.index');
+        Route::post('/counter/cinema', [StaffCounterSaleController::class, 'selectCinema'])
+            ->middleware('permission:counter_sales.view')->name('counter.cinema');
+        Route::get('/counter/showtimes/{showtime}/seats', [StaffCounterSaleController::class, 'seats'])
+            ->whereNumber('showtime')->middleware('permission:counter_sales.create')->name('counter.seats');
+        Route::post('/counter/showtimes/{showtime}/hold', [StaffCounterSaleController::class, 'hold'])
+            ->whereNumber('showtime')->middleware(['permission:counter_sales.create', 'throttle:20,1'])->name('counter.hold');
+        Route::get('/counter/bookings/{booking}/food', [StaffCounterSaleController::class, 'food'])
+            ->whereNumber('booking')->middleware('permission:counter_sales.create')->name('counter.food');
+        Route::post('/counter/bookings/{booking}/food', [StaffCounterSaleController::class, 'updateFood'])
+            ->whereNumber('booking')->middleware('permission:counter_sales.create')->name('counter.food.update');
+        Route::get('/counter/bookings/{booking}/review', [StaffCounterSaleController::class, 'review'])
+            ->whereNumber('booking')->middleware('permission:counter_sales.view')->name('counter.review');
+        Route::post('/counter/bookings/{booking}/cash', [StaffCounterSaleController::class, 'cash'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.cash');
+        Route::post('/counter/bookings/{booking}/cancel', [StaffCounterSaleController::class, 'cancel'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.cancel', 'throttle:12,1'])->name('counter.cancel');
     });

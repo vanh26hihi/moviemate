@@ -13,12 +13,20 @@ use Illuminate\Support\Collection;
 
 class Booking extends Model
 {
+    public const SALES_CHANNEL_ONLINE = 'online';
+
+    public const SALES_CHANNEL_COUNTER = 'counter';
+
+    public const SALES_CHANNELS = [self::SALES_CHANNEL_ONLINE, self::SALES_CHANNEL_COUNTER];
+
     public const STATUSES = ['pending_payment', 'paid', 'used', 'cancelled', 'expired'];
 
     public const PAYMENT_STATUSES = ['unpaid', 'paid', 'failed', 'refunded'];
 
     protected $fillable = [
         'user_id',
+        'customer_name',
+        'customer_phone',
         'customer_email',
         'guest_access_token_hash',
         'guest_access_expires_at',
@@ -63,6 +71,11 @@ class Booking extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function createdByStaff(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_staff_id');
+    }
+
     public function showtime(): BelongsTo
     {
         return $this->belongsTo(Showtime::class);
@@ -76,11 +89,26 @@ class Booking extends Model
     protected static function booted(): void
     {
         static::creating(function (Booking $booking): void {
+            $booking->sales_channel ??= self::SALES_CHANNEL_ONLINE;
+            if (! in_array($booking->sales_channel, self::SALES_CHANNELS, true)) {
+                throw new \LogicException('Unsupported booking sales channel.');
+            }
+            if ($booking->sales_channel === self::SALES_CHANNEL_ONLINE) {
+                $booking->created_by_staff_id = null;
+            } elseif ($booking->created_by_staff_id === null) {
+                throw new \LogicException('Counter bookings require an authenticated creator.');
+            }
             $showtime = Showtime::query()->with('room')->findOrFail($booking->showtime_id);
             if ((int) $showtime->cinema_id !== (int) $showtime->room?->cinema_id) {
                 throw new \LogicException('Showtime and room cinema ownership are inconsistent.');
             }
             $booking->cinema_id = $showtime->cinema_id;
+        });
+
+        static::updating(function (Booking $booking): void {
+            if ($booking->isDirty(['sales_channel', 'created_by_staff_id'])) {
+                throw new \LogicException('Booking channel and creator attribution are immutable.');
+            }
         });
     }
 
@@ -104,7 +132,8 @@ class Booking extends Model
     {
         return $this->hasOne(Payment::class)->ofMany(
             ['id' => 'max'],
-            fn ($query) => $query->where('status', Payment::STATUS_SUCCESS)->whereNotNull('verified_at'),
+            fn ($query) => $query->where('status', Payment::STATUS_SUCCESS)
+                ->where(fn ($evidence) => $evidence->whereNotNull('verified_at')->orWhereNotNull('settled_at')),
         );
     }
 

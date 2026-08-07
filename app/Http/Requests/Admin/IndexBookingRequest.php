@@ -34,6 +34,7 @@ class IndexBookingRequest extends FormRequest
             'created_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:created_from'],
             'booking_status' => ['nullable', Rule::in(Booking::STATUSES)],
             'payment_status' => ['nullable', Rule::in(Booking::PAYMENT_STATUSES)],
+            'sales_channel' => ['nullable', Rule::in(Booking::SALES_CHANNELS)],
             'ticket_status' => ['nullable', Rule::in(BookingTicketDelivery::STATUSES)],
             'checkin_status' => ['nullable', Rule::in(['used', 'not_used'])],
             'include_drafts' => ['nullable', 'boolean'],

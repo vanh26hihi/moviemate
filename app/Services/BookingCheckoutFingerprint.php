@@ -20,6 +20,8 @@ class BookingCheckoutFingerprint
         string $customerEmail,
         ?int $userId,
         array|Collection|null $foodSelection = null,
+        string $salesChannel = 'online',
+        ?int $creatorStaffId = null,
     ): string {
         $normalizedSeats = collect($seatIds)
             ->map(fn ($id): int => (int) $id)
@@ -38,6 +40,8 @@ class BookingCheckoutFingerprint
             'customer_email' => $normalizedEmail,
             'actor_type' => $actorType,
             'actor_identity' => $actorIdentity,
+            'sales_channel' => $salesChannel,
+            'creator_staff_id' => $creatorStaffId,
             'food' => $this->foodSelections->canonicalize($foodSelection),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 

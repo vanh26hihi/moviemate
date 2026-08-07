@@ -40,8 +40,9 @@ final class TicketWorkspaceController extends Controller
 
     private function operationsView(Booking $booking): View
     {
-        $verified = $booking->payments
-            ->where('status', 'success')->filter(fn ($payment) => $payment->verified_at !== null)->isNotEmpty();
+        $verified = $booking->payments->contains(
+            fn ($payment): bool => $payment->hasAuthoritativeSuccessEvidence()
+        );
         $eligibility = match (true) {
             $booking->payment_status === 'refunded' => 'Vé đã được hoàn tiền và không còn hiệu lực.',
             $booking->booking_status === 'cancelled' => 'Đơn đã hủy.',
