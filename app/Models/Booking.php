@@ -166,7 +166,9 @@ class Booking extends Model
 
     public function getRecipientEmailAttribute(): ?string
     {
-        return $this->customer_email ?: $this->user?->email;
+        $email = is_string($this->customer_email) ? trim($this->customer_email) : '';
+
+        return $email !== '' ? $email : null;
     }
 
     public function getSeatCodesAttribute(): string

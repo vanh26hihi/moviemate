@@ -5,7 +5,7 @@ namespace Tests\Feature\Bookings;
 use App\Models\BookingTicketPrint;
 use App\Models\BookingTicketPrintEvent;
 use App\Models\UserCinemaAssignment;
-use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -39,7 +39,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
     {
         $booking = $this->verifiedBooking();
         $staff = $this->userWithRole('staff');
-        $capability = app(TicketCheckinCapability::class)->issue($booking);
+        $capability = app(TicketQrPayload::class)->url($booking);
 
         $this->actingAs($staff)->post(route('staff.tickets.resolve'), ['ticket' => $capability])
             ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé hợp lệ và đã thanh toán.')
@@ -57,7 +57,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
     {
         $booking = $this->verifiedBooking();
         $staff = $this->userWithRole('staff');
-        $capability = app(TicketCheckinCapability::class)->issue($booking);
+        $capability = app(TicketQrPayload::class)->url($booking);
         $tampered = substr($capability, 0, -1).($capability[-1] === 'A' ? 'B' : 'A');
 
         $this->actingAs($staff)->post(route('staff.tickets.resolve'), ['ticket' => $tampered])->assertNotFound();
@@ -217,7 +217,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $booking = $booking->fresh();
         $staff = $this->userWithRole('staff');
         $manager = $this->userWithRole('manager');
-        $capability = app(TicketCheckinCapability::class)->issue($booking);
+        $capability = app(TicketQrPayload::class)->url($booking);
 
         $counts = [
             'customer_ticket' => $this->queryCount(fn () => $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))->assertOk()),

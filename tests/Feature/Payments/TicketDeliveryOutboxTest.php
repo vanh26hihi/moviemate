@@ -2,15 +2,19 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Jobs\Payments\SendBookingTicket;
 use App\Mail\BookingTicketMail;
 use App\Models\ActivityLog;
 use App\Models\BookingTicketDelivery;
 use App\Services\BookingTokenService;
+use App\Services\Tickets\TicketQrCode;
+use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Mail\PendingMail;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -33,6 +37,7 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $payment = $this->verifiedPayment();
 
         $this->assertNull($payment->booking->fresh()->ticket_emailed_at);
+        Queue::assertPushed(SendBookingTicket::class, fn (SendBookingTicket $job): bool => $job->bookingId === $payment->booking_id);
         $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
 
         $delivery = BookingTicketDelivery::query()->sole();
@@ -62,6 +67,8 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
             $this->assertStringContainsString('&destination=ticket', $mail->ticketAccessUrl);
             $this->assertStringNotContainsString('guest_token=', $mail->ticketAccessUrl);
             $this->assertNull(parse_url($mail->ticketAccessUrl, PHP_URL_QUERY));
+            $expectedPayload = app(TicketQrPayload::class)->url($payment->booking->fresh());
+            $this->assertSame(app(TicketQrCode::class)->png($expectedPayload), $mail->ticketQrPng);
 
             return true;
         });

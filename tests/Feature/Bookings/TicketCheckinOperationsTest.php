@@ -5,6 +5,7 @@ namespace Tests\Feature\Bookings;
 use App\Models\ActivityLog;
 use App\Models\TicketCheckinEvent;
 use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -188,11 +189,15 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     {
         [$owner, $payment] = $this->verifiedOwnerPayment();
         $booking = $payment->booking->fresh();
-        $capability = app(TicketCheckinCapability::class)->issue($booking);
+        $capability = app(TicketQrPayload::class)->url($booking);
 
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
             ->assertOk()->assertSee('data-qr-value="'.$capability.'"', false)
             ->assertDontSee('data-qr-value="'.$booking->booking_code.'"', false);
+
+        $this->get($capability)->assertOk()
+            ->assertSee($booking->booking_code)
+            ->assertSee('QR dùng để xác minh vé.');
 
         $booking->forceFill(['booking_status' => 'used', 'used_at' => now()])->save();
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))

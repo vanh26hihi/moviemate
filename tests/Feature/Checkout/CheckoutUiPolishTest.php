@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\RoomLayoutCell;
 use App\Models\Seat;
+use App\Services\Tickets\TicketCheckinCapability;
 use Tests\Feature\Payments\PaymentTestCase;
 
 class CheckoutUiPolishTest extends PaymentTestCase
@@ -169,7 +170,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
         $this->actingAs($user)->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertSee('data-ticket-state="usable"', false)
-            ->assertSee('data-qr-value="v1.', false)
+            ->assertSee('data-qr-value="'.route('tickets.verify', ['capability' => app(TicketCheckinCapability::class)->issue($booking)]).'"', false)
             ->assertDontSee('data-print-ticket', false)
             ->assertSee('A1')
             ->assertSee('Bắp rang caramel')

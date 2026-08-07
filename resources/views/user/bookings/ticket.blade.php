@@ -13,6 +13,7 @@
         : route('user.bookings.success', $booking));
     $backLabel = $backLabel ?? 'Về vé của tôi';
     $ticketRecipient = $ticketRecipient ?? $booking->recipient_email;
+    $ticketCustomer = $ticketCustomer ?? ($booking->user?->name ?? 'Khách MovieMate');
 @endphp
 
 @section('content')
@@ -49,7 +50,7 @@
         <div class="cinema-ticket-body">
             <section class="cinema-ticket-main" aria-labelledby="ticket-movie-title">
                 <div class="cinema-ticket-code-block">
-                    <p>Mã đặt vé / soát vé</p>
+                    <p>Mã vé</p>
                     <strong>{{ $booking->booking_code }}</strong>
                 </div>
 
@@ -77,7 +78,7 @@
                 <dl class="cinema-ticket-details">
                     <div><dt>Chi nhánh</dt><dd>{{ $booking->showtime?->cinema?->name ?? 'Đang cập nhật' }}</dd></div>
                     <div><dt>Địa chỉ</dt><dd>{{ $booking->showtime?->cinema?->address ?? 'Đang cập nhật' }}</dd></div>
-                    <div><dt>Khách hàng</dt><dd>{{ $booking->user?->name ?? 'Khách MovieMate' }}</dd></div>
+                    <div><dt>Khách hàng</dt><dd>{{ $ticketCustomer }}</dd></div>
                     <div><dt>Email</dt><dd class="ticket-break">{{ $ticketRecipient }}</dd></div>
                     <div><dt>Thanh toán</dt><dd>{{ $verifiedPayment ? 'Đã thanh toán và xác minh' : $booking->payment_status_label }}</dd></div>
                     <div><dt>Trạng thái vé</dt><dd>{{ match($ticketState) { 'valid' => 'Vé hợp lệ', 'used' => 'Vé đã được sử dụng', 'cancelled' => 'Vé đã hủy', 'refunded' => 'Vé đã hoàn tiền', 'expired' => 'Vé đã hết hạn', default => 'Vé không hợp lệ' } }}</dd></div>
@@ -116,12 +117,12 @@
 
             <aside class="cinema-ticket-stub" aria-label="Cuống vé check-in">
                 <p class="cinema-ticket-stub-label">SOÁT VÉ</p>
-                @if($checkinCapability)
+                @if($ticketQrPayload)
                     <div class="cinema-ticket-qr">
-                        <canvas data-qr-value="{{ $checkinCapability }}" data-qr-size="240" width="240" height="240" aria-label="Mã QR soát vé MovieMate"></canvas>
+                        <canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="240" width="240" height="240" aria-label="Mã QR xác minh vé MovieMate"></canvas>
                         <span data-qr-fallback class="hidden">QR chưa tải</span>
                     </div>
-                    <p class="cinema-ticket-instruction">{{ $ticketState === 'used' ? 'Mã vé này đã được sử dụng và không thể kích hoạt lại.' : 'Đưa mã QR cho nhân viên soát vé. Vui lòng đến trước giờ chiếu 15 phút.' }}</p>
+                    <p class="cinema-ticket-instruction">{{ $ticketState === 'used' ? 'Mã vé này đã được sử dụng và không thể kích hoạt lại.' : 'QR dùng để xác minh vé. Sau khi quét, MovieMate hiển thị đúng mã vé tương ứng. Vui lòng đến trước giờ chiếu 15 phút.' }}</p>
                 @else
                     <div class="cinema-ticket-inactive">
                         <i class="ph-bold ph-qr-code" aria-hidden="true"></i>

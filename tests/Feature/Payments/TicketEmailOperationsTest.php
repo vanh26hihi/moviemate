@@ -174,7 +174,7 @@ class TicketEmailOperationsTest extends PaymentTestCase
         $this->assertStringContainsString('MAILER_IS_LOG_ONLY', $output);
         $this->assertStringNotContainsString($secret, $output);
         $this->assertStringNotContainsString(hash('sha256', $secret), $output);
-        $this->assertStringContainsString('no (mailer sends synchronously in scheduled command)', $output);
+        $this->assertStringContainsString('no (sync job runs after the HTTP response)', $output);
         $this->assertSame($before, BookingTicketDelivery::query()->sole()->getRawOriginal());
     }
 
@@ -192,7 +192,7 @@ class TicketEmailOperationsTest extends PaymentTestCase
                 && str_contains($html, 'Test booking room')
                 && str_contains($html, '50.000 VNĐ')
                 && str_contains($html, 'Xem vé điện tử')
-                && str_contains($html, 'Mã QR vé MovieMate')
+                && str_contains($html, 'Mã QR xác minh vé MovieMate')
                 && ! str_contains($html, 'Lưu PDF')
                 && ! str_contains($html, 'tracking')
                 && ! str_contains($html, 'VNPAY_HASH_SECRET')

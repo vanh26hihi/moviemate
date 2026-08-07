@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\CinemaAccessService;
 use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\TicketQrPayload;
 use App\Services\Tickets\TicketResolutionService;
 use App\Support\PrivacyMask;
 use Illuminate\Http\Request;
@@ -22,15 +23,17 @@ final class TicketWorkspaceController extends Controller
     public function resolve(
         Request $request,
         TicketCheckinCapability $capabilities,
+        TicketQrPayload $payloads,
         TicketResolutionService $tickets,
     ): View {
         $validated = $request->validate(['ticket' => ['required', 'string', 'max:512']]);
-        $bookingId = $capabilities->bookingId($validated['ticket']);
+        $capability = $payloads->capabilityFrom($validated['ticket']);
+        $bookingId = $capabilities->bookingId($capability);
         $key = 'staff-ticket-resolve:'.$request->user()->id.':'.($bookingId ?? 'invalid');
         abort_if(RateLimiter::tooManyAttempts($key, 12), 429);
         RateLimiter::hit($key, 60);
 
-        return $this->operationsView($tickets->resolve($validated['ticket'], $request->user()));
+        return $this->operationsView($tickets->resolve((string) $capability, $request->user()));
     }
 
     public function operations(Request $request, Booking $booking, TicketResolutionService $tickets): View

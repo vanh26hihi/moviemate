@@ -22,7 +22,7 @@ class BookingPresentationTest extends TestCase
         $this->assertFalse(method_exists($booking, 'getQrCodeUrlAttribute'));
     }
 
-    public function test_it_prefers_checkout_email_and_falls_back_to_user_email(): void
+    public function test_it_uses_the_checkout_email_snapshot_and_never_follows_account_changes(): void
     {
         $booking = new Booking(['customer_email' => 'checkout@example.com']);
         $booking->setRelation('user', new User(['email' => 'account@example.com']));
@@ -31,7 +31,7 @@ class BookingPresentationTest extends TestCase
 
         $booking->customer_email = null;
 
-        $this->assertSame('account@example.com', $booking->recipient_email);
+        $this->assertNull($booking->recipient_email);
     }
 
     public function test_it_formats_showtime_and_seat_codes_for_ticket_views(): void

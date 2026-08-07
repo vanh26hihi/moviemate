@@ -8,7 +8,8 @@
     <header class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
             <a href="{{ route('staff.tickets.index') }}" class="mb-3 inline-flex items-center gap-2 text-sm font-bold text-brand-start"><i class="ph ph-arrow-left"></i>Quét vé khác</a>
-            <h1 class="text-3xl font-extrabold app-heading">{{ $booking->booking_code }}</h1>
+            <p class="text-sm font-bold uppercase tracking-widest app-muted">Mã vé</p>
+            <h1 class="mt-1 text-3xl font-extrabold app-heading" data-resolved-booking-code>{{ $booking->booking_code }}</h1>
             <p class="mt-2 app-muted">{{ $eligibilityMessage }}</p>
         </div>
         <span class="status-badge {{ $booking->booking_status === 'paid' && $booking->payment_status === 'paid' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">

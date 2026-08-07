@@ -5,6 +5,7 @@ namespace Tests\Feature\Bookings;
 use App\Mail\BookingTicketMail;
 use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketQrCode;
+use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Support\Facades\Route;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -24,7 +25,7 @@ class PrintableTicketTest extends PaymentTestCase
 
         $response->assertOk()->assertSee('VÉ ĐIỆN TỬ')->assertSee('VÉ HỢP LỆ')
             ->assertSee($booking->booking_code)->assertSee('Booking Foundation Movie')
-            ->assertSee('data-qr-value="v1.', false)
+            ->assertSee('data-qr-value="'.route('tickets.verify', ['capability' => app(TicketCheckinCapability::class)->issue($booking)]).'"', false)
             ->assertDontSee('data-qr-value="'.$booking->booking_code.'"', false)
             ->assertDontSee('In vé')->assertDontSee('Lưu PDF')->assertDontSee('Lưu ảnh')
             ->assertDontSee('data-print-ticket', false)->assertDontSee('api.qrserver.com', false);
@@ -44,7 +45,7 @@ class PrintableTicketTest extends PaymentTestCase
     public function test_used_ticket_remains_readable_with_first_checkin_time_and_stable_qr(): void
     {
         [$owner, $booking] = $this->paidOwnerBooking();
-        $capability = app(TicketCheckinCapability::class)->issue($booking);
+        $capability = app(TicketQrPayload::class)->url($booking);
         $booking->forceFill(['booking_status' => 'used', 'used_at' => now()->subMinute()])->save();
 
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
@@ -100,14 +101,14 @@ class PrintableTicketTest extends PaymentTestCase
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
             ->assertOk()->assertSee('Ghế đôi B1–B2')->assertDontSee('Ghế B1 ·')->assertDontSee('Ghế B2 ·');
 
-        $capability = app(TicketCheckinCapability::class)->issue($booking);
+        $capability = app(TicketQrPayload::class)->url($booking);
         $email = (new BookingTicketMail(
             $booking,
             'https://example.test/ticket',
-            app(TicketQrCode::class)->svg($capability),
+            app(TicketQrCode::class)->png($capability),
         ))->render();
         $this->assertStringContainsString('Ghế đôi B1–B2', $email);
-        $this->assertStringContainsString('Mã QR vé MovieMate', $email);
+        $this->assertStringContainsString('Mã QR xác minh vé MovieMate', $email);
         $this->assertStringNotContainsString('Ghế B1, Ghế B2', $email);
     }
 

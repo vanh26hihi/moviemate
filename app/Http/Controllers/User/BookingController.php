@@ -18,7 +18,7 @@ use App\Services\Payments\BookingPaymentActionPolicy;
 use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
 use App\Services\Tickets\BookingTicketEligibility;
-use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\TicketQrPayload;
 use App\Support\SeatPresentation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +33,7 @@ class BookingController extends Controller
         private readonly BookingCheckoutDraftService $drafts,
         private readonly BookingCheckoutPreviewService $previews,
         private readonly BookingTicketEligibility $ticketEligibility,
-        private readonly TicketCheckinCapability $checkinCapabilities,
+        private readonly TicketQrPayload $ticketQrPayloads,
         private readonly TicketMailConfigurationInspector $mailConfiguration,
         private readonly PublicShowtimeCatalog $showtimeCatalog,
         private readonly BookingExpirationService $expiration,
@@ -224,7 +224,7 @@ class BookingController extends Controller
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $isDeliverable = $this->ticketEligibility->isDeliverable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
-        $checkinCapability = $isDeliverable ? $this->checkinCapabilities->issue($booking) : null;
+        $ticketQrPayload = $isDeliverable ? $this->ticketQrPayloads->url($booking) : null;
         $ticketState = match (true) {
             $booking->payment_status === 'refunded' => 'refunded',
             $booking->booking_status === 'cancelled' => 'cancelled',
@@ -235,7 +235,7 @@ class BookingController extends Controller
         };
 
         return response()->view('user.bookings.ticket', compact(
-            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'checkinCapability', 'ticketState'
+            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'ticketQrPayload', 'ticketState'
         ))->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache');
     }

@@ -2,18 +2,14 @@
 
 namespace App\Jobs\Payments;
 
-use App\Models\BookingTicketDelivery;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Artisan;
 
-/**
- * Compatibility shim for old queued jobs. Delivery itself is performed only by
- * the leased durable-outbox command.
- */
 class SendBookingTicket implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -32,13 +28,9 @@ class SendBookingTicket implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        BookingTicketDelivery::query()->firstOrCreate(
-            ['booking_id' => $this->bookingId],
-            [
-                'status' => BookingTicketDelivery::STATUS_PENDING,
-                'attempts' => 0,
-                'available_at' => now(),
-            ],
-        );
+        Artisan::call('bookings:send-pending-tickets', [
+            '--booking' => $this->bookingId,
+            '--batch' => 1,
+        ]);
     }
 }

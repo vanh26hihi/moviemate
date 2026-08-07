@@ -49,7 +49,7 @@ final class TicketMailDiagnostics extends Command
         $recipientValid = is_string($recipient)
             && filter_var($recipient, FILTER_VALIDATE_EMAIL) !== false;
         $queueConnection = (string) config('queue.default', 'missing');
-        $queueWorkerRequired = false;
+        $queueWorkerRequired = $queueConnection !== 'sync';
         $rootCauses = $this->rootCauses($mail, $booking, $delivery, $recipientValid);
 
         $this->table(['Check', 'Safe result'], [
@@ -65,7 +65,7 @@ final class TicketMailDiagnostics extends Command
             ['Encryption mode', $mail['encryption']],
             ['From address present', $mail['from_present'] ? 'yes' : 'no'],
             ['Queue connection', $queueConnection],
-            ['Queue worker required by ticket outbox', $queueWorkerRequired ? 'yes' : 'no (mailer sends synchronously in scheduled command)'],
+            ['Queue worker required for immediate delivery', $queueWorkerRequired ? 'yes (scheduler remains recovery fallback)' : 'no (sync job runs after the HTTP response)'],
             ['Jobs table / queued count', $jobsAvailable ? 'yes / '.$queuedJobs : 'no / n/a'],
             ['Failed jobs table / count', $failedJobsAvailable ? 'yes / '.$failedJobs : 'no / n/a'],
             ['Delivery row ID', $delivery?->getKey() ?? 'missing'],

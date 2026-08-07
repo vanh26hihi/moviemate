@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Staff\CheckinTicketRequest;
 use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketCheckinService;
+use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
@@ -20,15 +21,16 @@ final class TicketCheckinController extends Controller
     public function store(
         CheckinTicketRequest $request,
         TicketCheckinCapability $capabilities,
+        TicketQrPayload $payloads,
         TicketCheckinService $checkins,
     ): RedirectResponse {
-        $capability = (string) $request->validated('ticket');
+        $capability = $payloads->capabilityFrom((string) $request->validated('ticket'));
         $bookingId = $capabilities->bookingId($capability);
         $key = implode(':', ['staff-ticket-checkin', $request->user()->id, $bookingId ?? 'invalid']);
         abort_if(RateLimiter::tooManyAttempts($key, 12), 429);
         RateLimiter::hit($key, 60);
 
-        $result = $checkins->checkIn($capability, $request->user());
+        $result = $checkins->checkIn((string) $capability, $request->user());
 
         return redirect()->route('staff.tickets.check')->with('checkin_result', [
             'result' => $result->result,
