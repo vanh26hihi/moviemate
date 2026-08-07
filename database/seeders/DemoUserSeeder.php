@@ -23,6 +23,10 @@ final class DemoUserSeeder extends Seeder
             'name' => 'MovieMate Global Admin', 'password' => $password,
             'role_id' => $roles['admin'], 'status' => 'active', 'email_verified_at' => now(),
         ]);
+        User::query()->updateOrCreate(['email' => 'customer@moviemate.test'], [
+            'name' => 'MovieMate Demo Customer', 'password' => $password,
+            'role_id' => $roles['user'], 'status' => 'active', 'email_verified_at' => now(),
+        ]);
 
         foreach (Cinema::query()->active()->orderBy('code')->get() as $cinema) {
             $manager = $this->demoUser('manager.'.$cinema->code.'@moviemate.test', 'Manager '.$cinema->code, $roles['manager'], $password);

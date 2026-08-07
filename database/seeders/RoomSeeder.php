@@ -10,14 +10,22 @@ final class RoomSeeder extends Seeder
 {
     public function run(): void
     {
+        $includeDefenseData = app()->environment(['local', 'testing']);
+
         foreach (Cinema::query()->active()->get() as $cinema) {
-            $codes = $cinema->code === 'CG' ? ['P01', 'P02', 'P03'] : [$cinema->code.'01'];
-            foreach ($codes as $index => $code) {
+            $rooms = $cinema->code === 'CG'
+                ? [['P01', '2D'], ['P02', $includeDefenseData ? '3D' : '2D'], ['P03', $includeDefenseData ? 'IMAX' : '2D']]
+                : [[$cinema->code.'01', '2D']];
+            if ($cinema->code === 'CG' && $includeDefenseData) {
+                $rooms[] = ['DEMO', '3D'];
+            }
+
+            foreach ($rooms as $index => [$code, $roomType]) {
                 Room::query()->updateOrCreate(
                     ['cinema_id' => $cinema->id, 'code' => $code],
                     [
-                        'name' => 'Phòng '.($index + 1),
-                        'room_type' => '2D',
+                        'name' => $code === 'DEMO' ? 'Phòng demo bảo vệ' : 'Phòng '.($index + 1),
+                        'room_type' => $roomType,
                         'total_seats' => 0,
                         'status' => 'active',
                     ],

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Exceptions\ShowtimeScheduleException;
 use App\Models\Cinema;
 use App\Models\Movie;
+use App\Models\Room;
 use App\Services\ShowtimeScheduleService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
@@ -43,6 +44,32 @@ final class ShowtimeSeeder extends Seeder
                         }
                     }
                 }
+            }
+        }
+
+        if (! app()->environment(['local', 'testing'])) {
+            return;
+        }
+
+        $defenseRoom = Room::query()->operational()->where('code', 'DEMO')
+            ->whereHas('latestPublishedLayout')->with('cinema')->first();
+        if (! $defenseRoom || $defenseRoom->showtimes()->where('status', 'active')
+            ->where('show_date', '>=', CarbonImmutable::now($defenseRoom->cinema->timezone)->toDateString())->exists()) {
+            return;
+        }
+
+        $date = CarbonImmutable::now($defenseRoom->cinema->timezone)->addDays(4)->toDateString();
+        foreach ([10, 14, 18, 21] as $hour) {
+            try {
+                $schedule->schedule([
+                    'movie_id' => $movies->first()->id, 'room_id' => $defenseRoom->id,
+                    'show_date' => $date, 'show_time' => sprintf('%02d:00', $hour),
+                    'status' => 'active',
+                ]);
+
+                break;
+            } catch (ShowtimeScheduleException) {
+                // The dedicated room is isolated; try another configured operating-hours slot.
             }
         }
     }

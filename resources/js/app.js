@@ -1,11 +1,21 @@
-import QRCode from 'qrcode';
 // Both sides added a distinct entry module: R1 ships the branch-aware calendar and the
 // remote feature branch ships the cinema-finder/showtime filter helpers. They are
 // independent, so the merge keeps both rather than choosing a side.
 import './showtime-calendar';
 import './showtime';
 import './seat-gap-guard';
-import './ticket-scanner';
+
+const ticketScannerWorkspaces = document.querySelectorAll('[data-ticket-scanner]');
+if (ticketScannerWorkspaces.length > 0) {
+    import('./ticket-scanner').catch(() => {
+        ticketScannerWorkspaces.forEach((workspace) => {
+            const error = workspace.querySelector('[data-scanner-error]');
+            if (!error) return;
+            error.textContent = 'Không thể tải trình quét camera. Vui lòng nhập mã vé thủ công.';
+            error.hidden = false;
+        });
+    });
+}
 
 const THEME_KEY = 'theme';
 const LEGACY_THEME_KEY = 'moviemate_theme';
@@ -438,6 +448,9 @@ document.addEventListener('error', (event) => {
 
 async function renderTicketQrCodes() {
     const canvases = document.querySelectorAll('canvas[data-qr-value]');
+    if (canvases.length === 0) return;
+
+    const { default: QRCode } = await import('qrcode');
 
     await Promise.all(Array.from(canvases, async (canvas) => {
         const value = canvas.dataset.qrValue;
