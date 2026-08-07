@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentReconciliationController;
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\PricingRuleController as AdminPricingRuleController;
+use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\RoomLayoutTemplateController as AdminRoomLayoutTemplateController;
@@ -262,6 +263,8 @@ Route::prefix('admin')->name('admin.')
     ->group(function () {
         Route::get('/', AdminDashboardController::class)
             ->middleware('permission:dashboard.view')->name('dashboard');
+        Route::get('/reports', AdminReportController::class)
+            ->middleware('permission:reports.view')->name('reports.index');
 
         Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])
             ->middleware('permission:activity_logs.view')->name('activity-logs.index');

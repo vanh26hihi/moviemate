@@ -67,6 +67,25 @@ final class CinemaAccessService
         return $includeInactiveForGlobal ? $cinemas : ($this->accessible = $cinemas);
     }
 
+    /**
+     * Reporting is history-preserving: an inactive branch remains selectable by Global Admin,
+     * and by a Manager who still has an active assignment to it. This intentionally does not
+     * alter the active-branch behaviour used by operational mutation screens.
+     *
+     * @return Collection<int, Cinema>
+     */
+    public function reportingCinemas(User $user): Collection
+    {
+        $this->syncMemo($user);
+
+        return Cinema::query()
+            ->when(! $this->hasGlobalAccess($user), fn (Builder $query): Builder => $query
+                ->whereHas('activeAssignments', fn (Builder $assignment): Builder => $assignment
+                    ->where('user_id', $user->id)))
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'status', 'timezone', 'archived_at']);
+    }
+
     public function resolve(User $user): ?Cinema
     {
         $this->syncMemo($user);
