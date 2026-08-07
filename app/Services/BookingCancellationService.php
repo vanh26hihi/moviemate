@@ -59,37 +59,151 @@ final class BookingCancellationService
                 return BookingCancellationResult::notCancellable();
             }
 
-            $lockedSeatRows = BookingSeat::query()
+            return $this->transitionLockedBooking(
+                $booking,
+                $this->lockActiveSeats($booking),
+                $reason,
+                $activity,
+            );
+        });
+    }
+
+    public function cancelVerifiedPayment(
+        int $paymentId,
+        string $provider,
+        string $merchantReference,
+        int $amount,
+        string $reason,
+        array $paymentOutcome = [],
+        array $activityContext = [],
+    ): BookingCancellationResult {
+        $bookingId = Payment::query()->whereKey($paymentId)->value('booking_id');
+        if (! is_numeric($bookingId)) {
+            return BookingCancellationResult::notCancellable();
+        }
+
+        return DB::transaction(function () use (
+            $paymentId,
+            $provider,
+            $merchantReference,
+            $amount,
+            $reason,
+            $paymentOutcome,
+            $activityContext,
+            $bookingId,
+        ): BookingCancellationResult {
+            $booking = Booking::query()->lockForUpdate()->findOrFail((int) $bookingId);
+            $payments = Payment::query()
                 ->where('booking_id', $booking->id)
-                ->where('active_lock_key', BookingSeat::ACTIVE_LOCK_KEY)
                 ->orderBy('id')
                 ->lockForUpdate()
-                ->with('seat:id,seat_code,type,pair_code,pair_position,row,number,x_position,y_position')
                 ->get();
-            $releasedSeatLabels = $this->activeSeatLabels($lockedSeatRows);
+            $payment = $payments->firstWhere('id', $paymentId);
 
-            $booking->forceFill(['booking_status' => 'cancelled'])->save();
-            $released = $this->seatLocks->release($booking);
-            $this->food->transitionForBooking($booking, 'cancelled');
+            if (! $payment
+                || $payment->provider !== $provider
+                || ! hash_equals($payment->order_code, $merchantReference)
+                || $payment->amount !== $amount
+                || $payments->contains(fn (Payment $candidate): bool => $candidate->hasAuthoritativeSuccessEvidence())
+                || $booking->payment_status === 'paid'
+                || in_array($booking->booking_status, ['paid', 'used'], true)) {
+                return BookingCancellationResult::notCancellable();
+            }
 
-            // One audit event per successful cancellation. Seat labels are logical and safe;
-            // no capability, token or provider payload is ever recorded here.
-            $this->activities->log(
-                $activity,
+            if ($booking->booking_status === 'cancelled'
+                && $payment->status === Payment::STATUS_FAILED
+                && $payment->failure_reason === $reason) {
+                return BookingCancellationResult::alreadyCancelled();
+            }
+
+            $otherPaymentStatuses = $payments
+                ->where('id', '!=', $payment->id)
+                ->pluck('status');
+            $eligiblePayment = in_array($payment->status, Payment::RECONCILABLE_STATUSES, true)
+                || ($payment->status === Payment::STATUS_FAILED && $payment->failure_reason === $reason);
+            if ($booking->booking_status !== 'pending_payment'
+                || $booking->payment_status !== 'unpaid'
+                || ! $eligiblePayment
+                || ! $this->onlyHasTerminalUnpaidPayments($otherPaymentStatuses)) {
+                return BookingCancellationResult::notCancellable();
+            }
+
+            $lockedSeatRows = $this->lockActiveSeats($booking);
+            $allowedOutcome = array_intersect_key($paymentOutcome, array_flip([
+                'response_code',
+                'transaction_status',
+                'bank_code',
+                'card_type',
+                'callback_received_at',
+                'callback_payload_hash',
+            ]));
+            $payment->forceFill([
+                ...$allowedOutcome,
+                'status' => Payment::STATUS_FAILED,
+                'failure_reason' => $reason,
+                'failed_at' => now(),
+            ])->save();
+
+            return $this->transitionLockedBooking(
                 $booking,
-                ['status' => 'pending_payment'],
-                ['status' => 'cancelled'],
+                $lockedSeatRows,
+                $reason,
+                'booking.payment_cancelled',
                 [
-                    'booking_code' => $booking->booking_code,
-                    'showtime_id' => $booking->showtime_id,
-                    'seat_units' => $releasedSeatLabels,
-                    'seat_count' => $released,
-                    'reason' => $reason,
+                    ...$activityContext,
+                    'payment_id' => $payment->id,
+                    'provider' => $payment->provider,
+                    'result' => 'customer_cancelled',
+                    'cinema_id' => $booking->cinema_id,
                 ],
             );
-
-            return BookingCancellationResult::cancelled();
         });
+    }
+
+    private function transitionLockedBooking(
+        Booking $booking,
+        Collection $lockedSeatRows,
+        string $reason,
+        string $activity,
+        array $activityContext = [],
+    ): BookingCancellationResult {
+        $releasedSeatLabels = $this->activeSeatLabels($lockedSeatRows);
+
+        $booking->forceFill(['booking_status' => 'cancelled'])->save();
+        $released = $this->seatLocks->release($booking);
+        $this->food->transitionForBooking($booking, 'cancelled');
+
+        // One audit event per successful cancellation. Seat labels are logical and safe;
+        // no capability, token or provider payload is ever recorded here.
+        $this->activities->log(
+            $activity,
+            $booking,
+            ['status' => 'pending_payment'],
+            ['status' => 'cancelled'],
+            [
+                ...$activityContext,
+                'booking_id' => $booking->id,
+                'booking_code' => $booking->booking_code,
+                'showtime_id' => $booking->showtime_id,
+                'seat_units' => $releasedSeatLabels,
+                'seat_count' => $released,
+                'reason' => $reason,
+            ],
+        );
+
+        return BookingCancellationResult::cancelled();
+    }
+
+    /** @return Collection<int, BookingSeat> */
+    private function lockActiveSeats(Booking $booking): Collection
+    {
+        return BookingSeat::query()
+            ->where('booking_id', $booking->id)
+            ->where('active_lock_key', BookingSeat::ACTIVE_LOCK_KEY)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->with('seat:id,seat_code,type,pair_code,pair_position,row,number,x_position,y_position')
+            ->get();
     }
 
     /** @return list<string> */

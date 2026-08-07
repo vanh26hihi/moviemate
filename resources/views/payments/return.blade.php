@@ -59,7 +59,9 @@
     if ($isConfirmedCancellation) {
         $states[\App\Models\Payment::STATUS_FAILED] = [
             'title' => 'Thanh toán đã được hủy',
-            'message' => 'Các ghế đã giữ cho đơn này đã được giải phóng.',
+            'message' => $payment->provider === 'vnpay' && $payment->failure_reason === 'vnpay_customer_cancelled'
+                ? 'Bạn đã hủy giao dịch VNPAY. Các ghế đã giữ cho đơn này đã được giải phóng.'
+                : 'Các ghế đã giữ cho đơn này đã được giải phóng.',
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
         ];
