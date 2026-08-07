@@ -22,6 +22,7 @@ class BookingCheckoutPreviewService
         private readonly BookingFoodService $food,
         private readonly SeatSelectionPolicy $seatSelectionPolicy,
         private readonly BookingTokenService $tokens,
+        private readonly BookingExpirationService $expiration,
     ) {}
 
     public function preview(array $draft): BookingCheckoutPreview
@@ -36,6 +37,8 @@ class BookingCheckoutPreviewService
             ->unique()
             ->sort()
             ->values();
+        $this->expiration->expireStaleForSeats($showtime->id, $seatIds);
+
         $layout = $this->layouts->resolveForShowtime($showtime);
         $seats = Seat::query()
             ->where('room_id', $showtime->room_id)

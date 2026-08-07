@@ -11,6 +11,7 @@ use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
+use App\Services\BookingExpirationService;
 use App\Services\GuestBookingAccessService;
 use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\PublicShowtimeCatalog;
@@ -34,6 +35,7 @@ class BookingController extends Controller
         private readonly TicketCheckinCapability $checkinCapabilities,
         private readonly TicketMailConfigurationInspector $mailConfiguration,
         private readonly PublicShowtimeCatalog $showtimeCatalog,
+        private readonly BookingExpirationService $expiration,
     ) {}
 
     /**
@@ -51,6 +53,7 @@ class BookingController extends Controller
         }
 
         $layout = $this->layouts->resolveForShowtime($showtime);
+        $this->expiration->expireStaleForShowtime($showtime->id);
         $layoutCells = $layout->cells->sortBy(fn ($cell) => sprintf('%03d:%03d', $cell->y_position, $cell->x_position))->values();
         $seats = $layoutCells->where('cell_type', 'seat')->pluck('seat')->filter()->values();
         try {
@@ -113,6 +116,7 @@ class BookingController extends Controller
         }
 
         $layout = $this->layouts->resolveForShowtime($showtime);
+        $this->expiration->expireStaleForShowtime($showtime->id);
         $seats = Seat::where('room_id', $showtime->room_id)
             ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layout->id))
             ->whereIn('id', $seatIds)
@@ -169,6 +173,8 @@ class BookingController extends Controller
     public function success(Request $request, Booking $booking)
     {
         $this->authorizeBookingView($request, $booking);
+        $this->expiration->expire($booking->id);
+        $booking->refresh();
 
         $booking->load([
             'user',

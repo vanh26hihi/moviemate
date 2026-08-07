@@ -13,6 +13,11 @@
         && $booking->booking_status !== 'pending_payment';
     $isPending = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview && ! $isFailed
         && $booking->booking_status === 'pending_payment';
+    $canAutoReconcileExpiry = $isPending && ! in_array($paymentState, [
+        \App\Models\Payment::STATUS_PROCESSING,
+        \App\Models\Payment::STATUS_UNRESOLVED,
+        \App\Models\Payment::STATUS_REVIEW,
+    ], true);
 
     $stateKey = match (true) {
         $isPaid => 'paid',
@@ -162,7 +167,10 @@
             @if(($isPending || $isReview) && $booking->expires_at)
                 <div class="mx-auto mt-6 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-center" data-countdown-wrapper>
                     <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian giữ ghế còn lại</p>
-                    <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $booking->expires_at->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
+                    <p class="mt-1 text-3xl font-extrabold app-text"
+                        data-countdown="{{ $booking->expires_at->toIso8601String() }}"
+                        data-expired-label="Thời gian giữ ghế đã hết."
+                        @if($canAutoReconcileExpiry) data-expiry-reload="true" @endif>--:--</p>
                     <p class="mt-2 text-xs leading-relaxed app-muted">Đừng tạo thêm đơn đặt vé hoặc yêu cầu thanh toán mới khi giao dịch hiện tại chưa có kết quả rõ ràng.</p>
                 </div>
             @endif
@@ -241,7 +249,7 @@
                 @elseif($isPending)
                     <form method="POST" action="{{ route('payments.zalopay.initiate', $booking) }}" data-submit-once>
                         @csrf
-                        <button type="submit" class="btn-primary w-full" data-loading-label="Đang kiểm tra lần thanh toán…">Kiểm tra / tiếp tục lần hiện tại</button>
+                        <button type="submit" class="btn-primary w-full" data-expiry-action data-loading-label="Đang kiểm tra lần thanh toán…">Kiểm tra / tiếp tục lần hiện tại</button>
                         <p class="mt-2 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>
                     </form>
                 @elseif($isCancelled)

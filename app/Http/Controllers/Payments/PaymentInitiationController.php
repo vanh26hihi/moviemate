@@ -36,6 +36,13 @@ class PaymentInitiationController extends Controller
                 $request->ip(),
             );
         } catch (PaymentInitiationException|PayOsResponseException|PayOsTransportException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
+            $booking->refresh();
+            if ($booking->booking_status === 'expired') {
+                return redirect()
+                    ->route('user.bookings.expired', $booking)
+                    ->with('warning', 'Thời gian giữ ghế đã hết. Vui lòng chọn ghế lại.');
+            }
+
             $paymentStatus = $booking->payments()->latest('id')->value('status');
             $statusRoute = match ($paymentStatus) {
                 Payment::STATUS_SUCCESS => 'user.bookings.success',
