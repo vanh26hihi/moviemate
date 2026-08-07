@@ -119,4 +119,9 @@ class Booking extends Model
     {
         return number_format((float) $this->total_amount, 0, ',', '.').'đ';
     }
+
+    public function getMovieTitleAttribute(): string
+    {
+        return $this->showtime?->movie?->title ?: 'Phim đang cập nhật';
+    }
 }
