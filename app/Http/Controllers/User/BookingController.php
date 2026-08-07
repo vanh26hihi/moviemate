@@ -21,6 +21,7 @@ use App\Support\SeatPresentation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
@@ -150,7 +151,13 @@ class BookingController extends Controller
         }
 
         $draft = $this->drafts->start($request, $showtime->id, $seatIds);
-        $preview = $this->previews->preview($draft);
+        try {
+            $preview = $this->previews->preview($draft);
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('user.bookings.selectSeat', $showtime)
+                ->withErrors($exception->errors());
+        }
         $foods = FoodItem::query()->where('active', true)->orderBy('name')->get();
 
         return view('user.bookings.food', compact('draft', 'preview', 'foods'));

@@ -9,7 +9,8 @@
     $isReview = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired
         && $paymentState === \App\Models\Payment::STATUS_REVIEW;
     $isFailed = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview
-        && $paymentState === \App\Models\Payment::STATUS_FAILED;
+        && $paymentState === \App\Models\Payment::STATUS_FAILED
+        && $booking->booking_status !== 'pending_payment';
     $isPending = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview && ! $isFailed
         && $booking->booking_status === 'pending_payment';
 
@@ -59,8 +60,8 @@
             'badge' => 'Hết hạn',
         ],
         'cancelled' => [
-            'title' => 'Đơn đặt vé đã bị hủy',
-            'message' => 'Đơn đặt vé này đã được hủy và không còn giữ ghế. Không có mã QR hoặc vé để tải xuống.',
+            'title' => 'Thanh toán đã được hủy',
+            'message' => 'Các ghế đã giữ cho đơn này đã được giải phóng.',
             'icon' => 'ph-prohibit',
             'colour' => 'text-error',
             'badge' => 'Đã hủy',
@@ -243,6 +244,8 @@
                         <button type="submit" class="btn-primary w-full" data-loading-label="Đang kiểm tra lần thanh toán…">Kiểm tra / tiếp tục lần hiện tại</button>
                         <p class="mt-2 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>
                     </form>
+                @elseif($isCancelled)
+                    <a href="{{ route('user.movies.show', $booking->showtime->movie->slug) }}" class="btn-primary">Đặt vé lại</a>
                 @endif
                 <a href="{{ route('home') }}" class="btn-secondary">Về trang chủ</a>
             </div>

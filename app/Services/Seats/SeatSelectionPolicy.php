@@ -21,7 +21,7 @@ use Illuminate\Support\Collection;
  */
 final class SeatSelectionPolicy
 {
-    public const MESSAGE_ISOLATED_SEAT = 'Vui lòng không để lại một ghế trống riêng lẻ giữa các ghế đã chọn hoặc ở cuối hàng.';
+    public const MESSAGE_ISOLATED_SEAT = 'Không thể chọn ghế này vì lựa chọn hiện tại sẽ để trống một ghế đơn trong hàng. Vui lòng chọn các ghế liền nhau.';
 
     /**
      * @param  Collection<int, RoomLayoutCell>|null  $cells  pre-loaded layout cells, when available
@@ -35,6 +35,35 @@ final class SeatSelectionPolicy
         ?Collection $cells = null,
     ): bool {
         return $this->newlyIsolatedSeatIds($layout, $unavailableSeatIds, $selectedSeatIds, $cells) !== [];
+    }
+
+    public function violationMessage(
+        RoomLayout $layout,
+        iterable $unavailableSeatIds,
+        iterable $selectedSeatIds,
+        ?Collection $cells = null,
+    ): ?string {
+        $orphanId = $this->newlyIsolatedSeatIds(
+            $layout,
+            $unavailableSeatIds,
+            $selectedSeatIds,
+            $cells,
+        )[0] ?? null;
+
+        if ($orphanId === null) {
+            return null;
+        }
+
+        $cells ??= $layout->relationLoaded('cells')
+            ? $layout->cells
+            : $layout->cells()->with('seat')->get();
+        $seat = $cells->firstWhere('seat_id', $orphanId)?->seat;
+        $seatCode = is_string($seat?->seat_code) ? trim($seat->seat_code) : '';
+        $row = is_string($seat?->row) ? trim($seat->row) : '';
+
+        return $seatCode !== '' && $row !== ''
+            ? "Không thể tiếp tục vì ghế {$seatCode} sẽ bị bỏ trống một mình trong hàng {$row}."
+            : self::MESSAGE_ISOLATED_SEAT;
     }
 
     /**

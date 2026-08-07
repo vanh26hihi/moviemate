@@ -158,6 +158,7 @@ class PaymentReviewResolutionService
             in_array($fresh->failure_reason, [
                 'amount_mismatch',
                 'query_amount_invalid',
+                'query_amount_mismatch',
                 'query_identity_mismatch',
                 'provider_transaction_id_mismatch',
                 'duplicate_provider_transaction_id',
@@ -165,7 +166,7 @@ class PaymentReviewResolutionService
                 'seat_ownership_lost',
                 'booking_not_payable',
             ], true) => 'validation_rejected',
-            $fresh->failure_reason === 'query_failed' => 'not_successful',
+            in_array($fresh->failure_reason, ['query_failed', 'vnpay_terminal_failed'], true) => 'not_successful',
             default => 'uncertain',
         };
         $code = collect([$fresh->response_code, $fresh->transaction_status])

@@ -47,6 +47,7 @@ class BookingCheckoutPreviewService
 
         $ownBookingId = $this->ownActiveBookingId($draft, $showtime);
         $this->assertSeatsAvailable($showtime, $seats, $seatIds, $layout, $ownBookingId);
+        $this->assertLogicalSeatLimit($seats);
         $this->assertNoIsolatedSeat($showtime, $layout, $seatIds, $ownBookingId);
         $food = $this->food->calculate($draft['food_items'] ?? [], (int) $showtime->cinema_id);
         try {
@@ -135,14 +136,25 @@ class BookingCheckoutPreviewService
             excludeBookingId: $ownBookingId,
         );
 
-        if ($this->seatSelectionPolicy->violates(
+        $message = $this->seatSelectionPolicy->violationMessage(
             $layout,
             $snapshot->unavailableSeatIds,
             $seatIds,
             $snapshot->cells,
-        )) {
+        );
+        if ($message !== null) {
             throw ValidationException::withMessages([
-                'seat_ids' => SeatSelectionPolicy::MESSAGE_ISOLATED_SEAT,
+                'seat_ids' => $message,
+            ]);
+        }
+    }
+
+    private function assertLogicalSeatLimit(Collection $seats): void
+    {
+        $maximum = max(1, (int) config('booking.max_logical_seat_units', 8));
+        if (SeatPresentation::groups($seats)->count() > $maximum) {
+            throw ValidationException::withMessages([
+                'seat_ids' => "Mỗi đơn chỉ được chọn tối đa {$maximum} ghế hoặc cặp ghế đôi.",
             ]);
         }
     }

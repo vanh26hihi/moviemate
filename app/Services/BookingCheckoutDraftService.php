@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\BookingCheckoutConflictException;
+use App\Models\Booking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +13,8 @@ class BookingCheckoutDraftService
     private const SESSION_KEY = 'booking_checkout_draft';
 
     private const GUEST_ACTOR_KEY = 'booking_checkout_guest_actor';
+
+    private const ACTIVE_HOLDS_KEY = 'booking_checkout_active_holds';
 
     public function __construct(
         private readonly BookingTokenService $tokens,
@@ -99,6 +102,74 @@ class BookingCheckoutDraftService
             : 'no-checkout-draft';
 
         return hash('sha256', $actorScope.'|checkout:'.$checkoutScope);
+    }
+
+    /** @return array{primary:string,session:string,network:string} */
+    public function holdCreationRateLimitKeys(Request $request): array
+    {
+        $draft = $request->session()->get(self::SESSION_KEY);
+        $showtime = is_array($draft) ? (int) ($draft['showtime_id'] ?? 0) : 0;
+        $actor = is_array($draft) && is_string($draft['actor_identity'] ?? null)
+            ? $draft['actor_identity']
+            : $this->actorIdentity($request);
+        $session = $request->session()->getId();
+        $network = is_string($request->ip()) ? $request->ip() : 'unknown-network';
+        $secret = (string) config('app.key', 'moviemate');
+
+        return [
+            'primary' => hash_hmac('sha256', $actor.'|showtime:'.$showtime, $secret),
+            'session' => hash_hmac('sha256', 'session:'.$session.'|showtime:'.$showtime, $secret),
+            'network' => hash_hmac('sha256', $network.'|showtime:'.$showtime, $secret),
+        ];
+    }
+
+    public function assertMayCreateHold(Request $request, array $draft): void
+    {
+        $showtimeId = (int) $draft['showtime_id'];
+        $checkoutHash = $this->tokens->hash((string) $draft['checkout_token']);
+        $active = null;
+
+        if ($request->user() !== null) {
+            $active = Booking::query()
+                ->where('user_id', $request->user()->getAuthIdentifier())
+                ->where('showtime_id', $showtimeId)
+                ->where('booking_status', 'pending_payment')
+                ->where('payment_status', 'unpaid')
+                ->where('expires_at', '>', now())
+                ->latest('id')
+                ->first();
+        } else {
+            $activeHolds = $request->session()->get(self::ACTIVE_HOLDS_KEY, []);
+            $bookingId = is_array($activeHolds) ? ($activeHolds[$showtimeId] ?? null) : null;
+            if (is_numeric($bookingId)) {
+                $active = Booking::query()
+                    ->whereKey((int) $bookingId)
+                    ->where('showtime_id', $showtimeId)
+                    ->where('booking_status', 'pending_payment')
+                    ->where('payment_status', 'unpaid')
+                    ->where('expires_at', '>', now())
+                    ->first();
+            }
+        }
+
+        if ($active !== null
+            && ! hash_equals((string) $active->checkout_idempotency_key_hash, $checkoutHash)) {
+            throw ValidationException::withMessages([
+                'checkout' => 'Bạn đang có một lượt giữ ghế chưa thanh toán cho suất chiếu này. Vui lòng hoàn tất hoặc hủy lượt giữ hiện tại trước khi chọn lại.',
+            ]);
+        }
+    }
+
+    public function rememberActiveHold(Request $request, Booking $booking): void
+    {
+        if ($request->user() !== null) {
+            return;
+        }
+
+        $activeHolds = $request->session()->get(self::ACTIVE_HOLDS_KEY, []);
+        $activeHolds = is_array($activeHolds) ? $activeHolds : [];
+        $activeHolds[(int) $booking->showtime_id] = (int) $booking->id;
+        $request->session()->put(self::ACTIVE_HOLDS_KEY, array_slice($activeHolds, -20, null, true));
     }
 
     private function actorIdentity(Request $request): string

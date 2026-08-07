@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Payments;
 
 use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\VnpaySigner;
+use App\Exceptions\VnpayResponseException;
+use App\Exceptions\VnpayTransportException;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\GuestBookingAccessService;
 use App\Services\Payments\PaymentReturnTokenService;
+use App\Services\Payments\VnpayQueryService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +26,7 @@ class VnpayReturnController extends Controller
         VnpaySigner $signer,
         PaymentReturnTokenService $returnTokens,
         GuestBookingAccessService $guestAccess,
+        VnpayQueryService $queries,
     ): Response|View {
         if ($request->query->has('vnp_TxnRef')) {
             try {
@@ -40,6 +44,17 @@ class VnpayReturnController extends Controller
             $payment = Payment::query()->with('booking')
                 ->where('provider', 'vnpay')->where('order_code', $reference)->firstOrFail();
             $this->authorizePayment($request, $payment, $returnTokens, true);
+            $cancelRequested = ($parameters['vnp_ResponseCode'] ?? null) === '24';
+            if ($cancelRequested) {
+                abort_unless($this->amountMatches($payment, $parameters['vnp_Amount'] ?? null), 404);
+                try {
+                    $queries->reconcileCancellation($payment);
+                } catch (VnpayTransportException|VnpayResponseException) {
+                    // A browser cancellation hint is not enough when QueryDr is unavailable.
+                    // The unresolved payment and its seat hold remain protected until TTL/reconciliation.
+                }
+                $request->session()->flash('payment_return_cancel_requested.'.$payment->id, true);
+            }
             $request->session()->flash('payment_return_integrity.'.$payment->id, true);
 
             return redirect()->route('payments.vnpay.return', ['ref' => $payment->order_code]);
@@ -51,6 +66,7 @@ class VnpayReturnController extends Controller
             ->where('provider', 'vnpay')->where('order_code', $reference)->firstOrFail();
         $this->authorizePayment($request, $payment, $returnTokens, false);
         $integrityVerified = (bool) $request->session()->pull('payment_return_integrity.'.$payment->id, false);
+        $cancelRequested = (bool) $request->session()->pull('payment_return_cancel_requested.'.$payment->id, false);
         $payment->refresh()->load('booking');
         $canViewBooking = Auth::check() || $guestAccess->allows($request, $payment->booking);
 
@@ -60,7 +76,20 @@ class VnpayReturnController extends Controller
             'integrityVerified' => $integrityVerified,
             'canViewTicket' => $canViewBooking,
             'canViewBooking' => $canViewBooking,
+            'cancelRequested' => $cancelRequested,
         ]);
+    }
+
+    private function amountMatches(Payment $payment, mixed $providerAmount): bool
+    {
+        if (! is_string($providerAmount)
+            || preg_match('/^[0-9]{3,15}$/D', $providerAmount) !== 1
+            || $payment->amount <= 0
+            || $payment->amount > intdiv(PHP_INT_MAX, 100)) {
+            return false;
+        }
+
+        return hash_equals((string) ($payment->amount * 100), $providerAmount);
     }
 
     private function authorizePayment(Request $request, Payment $payment, PaymentReturnTokenService $tokens, bool $exchange): void

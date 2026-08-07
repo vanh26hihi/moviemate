@@ -9,6 +9,7 @@ use App\Exceptions\VnpayResponseException;
 use App\Exceptions\VnpayTransportException;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Services\BookingCancellationService;
 use App\Services\Vnpay\VnpayGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class VnpayQueryService
         private readonly VnpayGateway $gateway,
         private readonly VnpayConfig $config,
         private readonly VerifiedPaymentService $verifiedPayments,
+        private readonly BookingCancellationService $cancellations,
     ) {}
 
     public function reconcile(Payment $payment): string
@@ -31,8 +33,22 @@ class VnpayQueryService
         return $this->reconcileEligiblePayment($payment, true);
     }
 
-    private function reconcileEligiblePayment(Payment $payment, bool $allowReview): string
+    public function reconcileCancellation(Payment $payment): string
     {
+        return $this->reconcileEligiblePayment(
+            $payment,
+            false,
+            'vnpay_customer_cancelled',
+            cancellationOnly: true,
+        );
+    }
+
+    private function reconcileEligiblePayment(
+        Payment $payment,
+        bool $allowReview,
+        string $terminalReason = 'vnpay_terminal_failed',
+        bool $cancellationOnly = false,
+    ): string {
         if (! $this->beginQuery($payment, $allowReview)) {
             return $payment->fresh()->status;
         }
@@ -61,10 +77,21 @@ class VnpayQueryService
             return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_response_schema_invalid', $payload, $response->hash, $allowReview);
         }
 
+        $amount = $this->providerAmount($payload['vnp_Amount'] ?? null);
+        if ($amount === null || $amount !== (int) $payment->amount) {
+            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_amount_mismatch', $payload, $response->hash, $allowReview);
+        }
+
         if ($responseCode === '00' && $transactionStatus === '00') {
-            $amount = $this->providerAmount($payload['vnp_Amount'] ?? null);
-            if ($amount === null) {
-                return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_amount_invalid', $payload, $response->hash, $allowReview);
+            if ($cancellationOnly) {
+                return $this->applyOutcome(
+                    $payment,
+                    Payment::STATUS_REVIEW,
+                    'cancel_query_reported_paid',
+                    $payload,
+                    $response->hash,
+                    $allowReview,
+                );
             }
 
             $verifiedData = new VerifiedPaymentData(
@@ -88,10 +115,38 @@ class VnpayQueryService
 
         return match ($transactionStatus) {
             '01' => $this->storePending($payment, $payload, $response->hash, $allowReview),
-            '02' => $this->applyOutcome($payment, Payment::STATUS_FAILED, 'query_failed', $payload, $response->hash, $allowReview),
+            '02' => $this->applyTerminalFailure($payment, $terminalReason, $payload, $response->hash, $allowReview),
             '04', '07' => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_requires_review', $payload, $response->hash, $allowReview),
             default => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_unknown_status', $payload, $response->hash, $allowReview),
         };
+    }
+
+    /** @param array<string, string> $payload */
+    private function applyTerminalFailure(
+        Payment $payment,
+        string $reason,
+        array $payload,
+        string $hash,
+        bool $allowReview,
+    ): string {
+        $status = $this->applyOutcome(
+            $payment,
+            Payment::STATUS_FAILED,
+            $reason,
+            $payload,
+            $hash,
+            $allowReview,
+        );
+
+        if ($status === Payment::STATUS_FAILED) {
+            $this->cancellations->cancel(
+                $payment->booking_id,
+                $reason,
+                'booking.payment_cancelled',
+            );
+        }
+
+        return $status;
     }
 
     private function beginQuery(Payment $payment, bool $allowReview): bool

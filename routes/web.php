@@ -176,7 +176,7 @@ Route::get('/booking/review', BookingReviewController::class)
     ->name('user.bookings.review');
 
 Route::post('/booking/confirm', BookingCheckoutConfirmController::class)
-    ->middleware([ProtectBookingResponses::class, 'throttle:10,1'])
+    ->middleware([ProtectBookingResponses::class, 'throttle:booking-hold-creation'])
     ->name('user.bookings.confirm');
 
 Route::post('/booking/store', RetiredBookingStoreController::class)
