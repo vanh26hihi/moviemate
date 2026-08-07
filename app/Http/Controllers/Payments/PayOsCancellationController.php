@@ -21,7 +21,7 @@ final class PayOsCancellationController extends Controller
         $payment = Payment::query()
             ->where('booking_id', $booking->id)
             ->where('provider', 'payos')
-            ->whereIn('status', Payment::RECONCILABLE_STATUSES)
+            ->where('status', Payment::STATUS_PENDING)
             ->latest('id')->firstOrFail();
 
         try {

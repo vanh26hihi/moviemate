@@ -14,6 +14,7 @@ use App\Services\BookingCheckoutPreviewService;
 use App\Services\BookingExpirationService;
 use App\Services\GuestBookingAccessService;
 use App\Services\Mail\TicketMailConfigurationInspector;
+use App\Services\Payments\BookingPaymentActionPolicy;
 use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
 use App\Services\Tickets\BookingTicketEligibility;
@@ -36,6 +37,7 @@ class BookingController extends Controller
         private readonly TicketMailConfigurationInspector $mailConfiguration,
         private readonly PublicShowtimeCatalog $showtimeCatalog,
         private readonly BookingExpirationService $expiration,
+        private readonly BookingPaymentActionPolicy $paymentActions,
     ) {}
 
     /**
@@ -192,12 +194,14 @@ class BookingController extends Controller
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
         $mailDeliveryReady = $this->mailConfiguration->inspect()['ready'];
+        $paymentAction = $this->paymentActions->evaluate($booking);
 
         return view('user.bookings.success', compact(
             'booking',
             'isUsable',
             'verifiedPayment',
             'mailDeliveryReady',
+            'paymentAction',
         ));
     }
 

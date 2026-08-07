@@ -246,10 +246,10 @@
                         <i class="ph-fill ph-ticket" aria-hidden="true"></i>
                         Xem vé
                     </a>
-                @elseif($isPending)
-                    <form method="POST" action="{{ route('payments.zalopay.initiate', $booking) }}" data-submit-once>
+                @elseif($isPending && $paymentAction['can_resume'])
+                    <form method="POST" action="{{ route('payments.resume', $booking) }}" data-submit-once>
                         @csrf
-                        <button type="submit" class="btn-primary w-full" data-expiry-action data-loading-label="Đang kiểm tra lần thanh toán…">Kiểm tra / tiếp tục lần hiện tại</button>
+                        <button type="submit" class="btn-primary w-full" data-expiry-action data-loading-label="Đang chuyển đến cổng thanh toán…">Tiếp tục thanh toán</button>
                         <p class="mt-2 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>
                     </form>
                 @elseif($isCancelled)

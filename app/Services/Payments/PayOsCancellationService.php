@@ -16,7 +16,7 @@ final class PayOsCancellationService
     public function cancel(Payment $payment): string
     {
         if ($payment->provider !== 'payos'
-            || ! in_array($payment->status, Payment::RECONCILABLE_STATUSES, true)) {
+            || $payment->status !== Payment::STATUS_PENDING) {
             throw new PaymentInitiationException('The payOS attempt is not eligible for provider cancellation.');
         }
 

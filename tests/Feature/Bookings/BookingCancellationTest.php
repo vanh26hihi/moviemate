@@ -80,7 +80,7 @@ class BookingCancellationTest extends TestCase
         $this->actingAs($owner)
             ->delete(route('user.bookings.cancel', $booking))
             ->assertRedirect(route('user.bookings.history'))
-            ->assertSessionHas('success', 'Đơn đặt vé đã được hủy.');
+            ->assertSessionHas('success', 'Đã hủy đơn đặt vé và giải phóng các ghế đang giữ.');
 
         $this->assertDatabaseHas('bookings', [
             'id' => $booking->id,
@@ -118,7 +118,7 @@ class BookingCancellationTest extends TestCase
         $booking = $this->pendingBooking($owner->id);
 
         $this->actingAs($owner)->delete(route('user.bookings.cancel', $booking))
-            ->assertSessionHas('success', 'Đơn đặt vé đã được hủy.');
+            ->assertSessionHas('success', 'Đã hủy đơn đặt vé và giải phóng các ghế đang giữ.');
         $this->actingAs($owner)->delete(route('user.bookings.cancel', $booking))
             ->assertSessionHas('warning', 'Đơn đặt vé đã được hủy trước đó.');
 
@@ -137,18 +137,63 @@ class BookingCancellationTest extends TestCase
 
             $this->actingAs($owner)
                 ->delete(route('user.bookings.cancel', $booking))
-                ->assertSessionHas('success', 'Đơn đặt vé đã được hủy.');
+                ->assertSessionHas('success', 'Đã hủy đơn đặt vé và giải phóng các ghế đang giữ.');
 
             $this->assertSame('cancelled', $booking->fresh()->booking_status);
             $this->assertNull($booking->bookingSeats()->sole()->active_lock_key);
         }
     }
 
-    public function test_non_terminal_or_successful_payment_attempts_refuse_cancellation(): void
+    public function test_pending_vnpay_and_zalopay_attempts_allow_customer_cancellation(): void
+    {
+        $owner = $this->userWithRole('user');
+
+        foreach (['vnpay', 'zalopay'] as $provider) {
+            $booking = $this->pendingBooking($owner->id);
+            $payment = $this->paymentFor($booking->id, Payment::STATUS_PENDING, $provider);
+
+            $this->actingAs($owner)
+                ->delete(route('user.bookings.cancel', $booking))
+                ->assertSessionHas('success', 'Đã hủy đơn đặt vé và giải phóng các ghế đang giữ.');
+
+            $this->assertSame('cancelled', $booking->fresh()->booking_status);
+            $this->assertSame(Payment::STATUS_FAILED, $payment->fresh()->status);
+            $this->assertSame('customer_cancelled_pending_payment', $payment->fresh()->failure_reason);
+            $this->assertNull($booking->bookingSeats()->sole()->active_lock_key);
+        }
+    }
+
+    public function test_protected_successful_and_payos_attempts_refuse_local_cancellation(): void
+    {
+        $owner = $this->userWithRole('user');
+        $unsafeStates = [
+            ['status' => Payment::STATUS_PROCESSING, 'provider' => 'vnpay'],
+            ['status' => Payment::STATUS_UNRESOLVED, 'provider' => 'vnpay'],
+            ['status' => Payment::STATUS_REVIEW, 'provider' => 'vnpay'],
+            ['status' => Payment::STATUS_SUCCESS, 'provider' => 'vnpay'],
+            ['status' => Payment::STATUS_PENDING, 'provider' => 'payos'],
+        ];
+
+        foreach ($unsafeStates as $state) {
+            $booking = $this->pendingBooking($owner->id);
+            $this->paymentFor($booking->id, $state['status'], $state['provider']);
+
+            $this->actingAs($owner)
+                ->delete(route('user.bookings.cancel', $booking))
+                ->assertSessionHas('warning', 'Đơn đặt vé này không thể hủy ở trạng thái hiện tại.');
+
+            $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+            $this->assertSame(
+                BookingSeat::ACTIVE_LOCK_KEY,
+                $booking->bookingSeats()->sole()->active_lock_key,
+            );
+        }
+    }
+
+    public function test_non_terminal_or_successful_payment_attempts_refuse_legacy_cancellation(): void
     {
         $owner = $this->userWithRole('user');
         $unsafeStatuses = [
-            Payment::STATUS_PENDING,
             Payment::STATUS_PROCESSING,
             Payment::STATUS_UNRESOLVED,
             Payment::STATUS_REVIEW,
@@ -201,6 +246,7 @@ class BookingCancellationTest extends TestCase
     {
         $owner = $this->userWithRole('user');
         $pending = $this->pendingBooking($owner->id);
+        $this->paymentFor($pending->id, Payment::STATUS_PENDING);
         $paid = $this->pendingBooking($owner->id);
         $paid->forceFill(['booking_status' => 'paid', 'payment_status' => 'paid'])->save();
         $this->paymentFor($paid->id, Payment::STATUS_SUCCESS);
@@ -209,9 +255,12 @@ class BookingCancellationTest extends TestCase
             ->assertOk()
             ->assertSee($pending->booking_code)
             ->assertSee($paid->booking_code)
+            ->assertSee('Chờ thanh toán')
+            ->assertSee('Tiếp tục thanh toán')
+            ->assertSee('Hủy đơn')
+            ->assertSee('action="'.route('payments.resume', $pending).'"', false)
             ->assertSee('action="'.route('user.bookings.cancel', $pending).'"', false)
             ->assertDontSee('action="'.route('user.bookings.cancel', $paid).'"', false)
-            ->assertSee(route('user.bookings.pending', $pending), false)
             ->assertSee(route('user.bookings.ticket', $paid), false)
             ->assertSee(route('user.bookings.ticket-email.resend', $paid), false);
 
@@ -221,11 +270,11 @@ class BookingCancellationTest extends TestCase
             ->assertDontSee($paid->booking_code);
     }
 
-    private function paymentFor(int $bookingId, string $status): Payment
+    private function paymentFor(int $bookingId, string $status, string $provider = 'vnpay'): Payment
     {
-        return Payment::createForProvider('vnpay', [
+        return Payment::createForProvider($provider, [
             'booking_id' => $bookingId,
-            'payment_method' => 'vnpay',
+            'payment_method' => $provider,
             'order_code' => 'CANCEL-'.str()->upper(str()->random(20)),
             'amount' => 50_000,
             'currency' => 'VND',

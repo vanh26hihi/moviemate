@@ -64,22 +64,14 @@
             <div class="space-y-5">
                 @forelse($bookings as $booking)
                     @php
-                        $statusClass = match($booking->booking_status) {
-                            'pending_payment' => 'bg-yellow-100 text-yellow-700',
-                            'paid' => 'bg-brand-start text-white',
-                            'used' => 'bg-blue-100 text-blue-700',
-                            'cancelled' => 'bg-red-100 text-red-700',
-                            default => 'bg-gray-100 text-gray-700',
-                        };
+                        $actions = $bookingActions[$booking->id];
                         $poster = $booking->showtime->movie->poster_url;
-                        $canCancel = in_array($booking->id, $cancellableBookingIds, true);
-                        $canCancelPayOs = in_array($booking->id, $payOsCancellableBookingIds, true);
                         $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
                     @endphp
 
                     <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
-                        <div class="absolute top-0 right-0 {{ $statusClass }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
-                            {{ $booking->status_label }}
+                        <div class="absolute top-0 right-0 {{ $actions['badge_class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
+                            {{ $actions['badge_label'] }}
                         </div>
 
                         <div class="flex flex-col sm:flex-row gap-5">
@@ -116,10 +108,13 @@
                                         @endif
                                     </div>
                                     <div class="flex flex-wrap gap-2">
-                                        @if($booking->booking_status === 'pending_payment')
-                                            <a href="{{ route('user.bookings.pending', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
-                                                Thanh toán tiếp
-                                            </a>
+                                        @if($actions['can_resume'])
+                                            <form method="POST" action="{{ route('payments.resume', $booking) }}" class="inline" data-submit-once>
+                                                @csrf
+                                                <button type="submit" data-loading-label="Đang chuyển đến cổng thanh toán…" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
+                                                    Tiếp tục thanh toán
+                                                </button>
+                                            </form>
                                         @endif
 
                                         @if($canUseTicket)
@@ -134,26 +129,40 @@
                                             </form>
                                         @endif
 
-                                        @if($canCancel)
-                                            <form method="POST" action="{{ route('user.bookings.cancel', $booking) }}" class="inline" data-submit-once>
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" data-loading-label="Đang hủy…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('Bạn chắc chắn muốn hủy đơn đặt vé này?')">
-                                                    Hủy đơn
-                                                </button>
-                                            </form>
-                                        @elseif($canCancelPayOs)
-                                            <form method="POST" action="{{ route('payments.payos.cancel-attempt', $booking) }}" class="inline" data-submit-once>
-                                                @csrf
-                                                <button type="submit" data-loading-label="Đang xác minh hủy…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('MovieMate sẽ yêu cầu payOS hủy liên kết trước khi giải phóng ghế. Tiếp tục?')">
-                                                    Hủy qua payOS
-                                                </button>
-                                            </form>
+                                        @if($actions['can_cancel_local'])
+                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" onclick="document.getElementById('cancel-booking-{{ $booking->id }}').showModal()">
+                                                Hủy đơn
+                                            </button>
+                                        @elseif($actions['can_cancel_payos'])
+                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" onclick="document.getElementById('cancel-booking-{{ $booking->id }}').showModal()">
+                                                Hủy đơn
+                                            </button>
                                         @endif
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        @if($actions['can_cancel_local'] || $actions['can_cancel_payos'])
+                            <dialog id="cancel-booking-{{ $booking->id }}" class="app-card app-text w-[min(28rem,calc(100%-2rem))] rounded-3xl border app-border p-0 shadow-2xl backdrop:bg-black/60">
+                                <div class="p-6">
+                                    <h3 class="text-lg font-bold">Hủy đơn đặt vé?</h3>
+                                    <p class="app-muted mt-2 text-sm">Nếu tiếp tục, các ghế đang giữ sẽ được giải phóng và đơn này không thể tiếp tục thanh toán.</p>
+                                    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                        <form method="dialog">
+                                            <button type="submit" class="w-full px-4 py-2 border app-border app-muted hover:app-text rounded-xl text-sm font-semibold transition-colors">Giữ đơn</button>
+                                        </form>
+                                        <form method="POST" action="{{ $actions['can_cancel_payos'] ? route('payments.payos.cancel-attempt', $booking) : route('user.bookings.cancel', $booking) }}" data-submit-once>
+                                            @csrf
+                                            @unless($actions['can_cancel_payos'])
+                                                @method('DELETE')
+                                            @endunless
+                                            <button type="submit" data-loading-label="Đang xác minh hủy…" class="w-full px-4 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-sm font-bold transition-colors">Hủy đơn</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </dialog>
+                        @endif
                     </article>
                 @empty
                     <div class="app-card border app-border rounded-3xl p-10 text-center">
