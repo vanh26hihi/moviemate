@@ -12,10 +12,9 @@
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:14px">
             @foreach([
-                'Phim' => $booking->showtime?->movie?->title,
-                'Rạp' => $booking->showtime?->cinema?->name,
-                'Địa chỉ' => $booking->showtime?->cinema?->address,
-                'Phòng' => $booking->showtime?->room?->name,
+                'Phim' => $booking->movie_title,
+                'Rạp' => $booking->cinema_label,
+                'Phòng' => $booking->room_label,
                 'Suất chiếu' => $booking->showtime_label,
                 'Ghế' => $booking->seat_codes,
             ] as $label => $value)
