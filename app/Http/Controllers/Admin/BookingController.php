@@ -17,6 +17,7 @@ final class BookingController extends Controller
 
         return view('admin.bookings.index', [
             'bookings' => $bookings->paginate($filters),
+            'summary' => $bookings->summary($filters),
             'filters' => $filters,
             ...$bookings->filterOptions(),
         ]);

@@ -54,7 +54,7 @@ class AdminRouteAccessTest extends TestCase
             'admin.cinema.show', 'admin.rooms.index', 'admin.bookings.index',
             'admin.showtimes.index', 'admin.foods.index', 'admin.food-orders.index',
             'admin.payments.index', 'admin.payment-reconciliation.index', 'admin.payment-reviews.index',
-            'admin.ticket-deliveries.index', 'admin.ticket-checkins.index',
+            'admin.ticket-checkins.index',
         ];
 
         foreach ($allowedRoutes as $route) {

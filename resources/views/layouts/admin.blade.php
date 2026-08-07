@@ -30,10 +30,14 @@
             $adminNavigation = [
                 ['label' => 'Tổng quan', 'items' => [
                     ['route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'permission' => 'dashboard.view', 'label' => 'Tổng quan', 'icon' => 'ph-squares-four'],
+                    ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
                 ]],
-                ['label' => 'Vận hành & phim', 'items' => [
+                ['label' => 'Nội dung', 'items' => [
                     ['route' => 'admin.movies.index', 'active' => 'admin.movies.*', 'permission' => 'movies.view', 'label' => 'Phim', 'icon' => 'ph-film-slate'],
                     ['route' => 'admin.genres.index', 'active' => 'admin.genres.*', 'permission' => 'genres.view', 'label' => 'Thể loại', 'icon' => 'ph-tag'],
+                    ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
+                ]],
+                ['label' => 'Rạp & lịch chiếu', 'items' => [
                     ['route' => 'admin.cinemas.index', 'active' => ['admin.cinema.*', 'admin.cinemas.*'], 'permission' => 'cinemas.view', 'label' => 'Chi nhánh', 'icon' => 'ph-buildings'],
                     ['route' => 'admin.rooms.index', 'active' => ['admin.rooms.*', 'admin.seats.*'], 'permission' => 'rooms.view', 'label' => 'Phòng chiếu', 'icon' => 'ph-projector-screen'],
                     ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ phòng', 'icon' => 'ph-grid-four'],
@@ -45,18 +49,13 @@
                     ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
                     ['route' => 'admin.payment-reconciliation.index', 'active' => ['admin.payment-reconciliation.*', 'admin.payment-reviews.*'], 'permission' => 'payments.reconcile', 'label' => 'Đối soát giao dịch', 'icon' => 'ph-arrows-clockwise', 'badge' => $paymentReconciliationBadge ?? null],
                     ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Mã giảm giá', 'icon' => 'ph-ticket-percent'],
-                    ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
-                    ['route' => 'admin.food-orders.index', 'active' => 'admin.food-orders.*', 'permission' => 'food-orders.view', 'label' => 'Đơn đồ ăn', 'icon' => 'ph-shopping-bag'],
-                    ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
-                ]],
-                ['label' => 'Vé điện tử', 'items' => [
-                    ['route' => 'admin.ticket-deliveries.index', 'active' => 'admin.ticket-deliveries.*', 'permission' => 'ticket_deliveries.view', 'label' => 'Gửi vé điện tử', 'icon' => 'ph-envelope-simple', 'badge' => $ticketDeliveryBadge ?? null],
                     ['route' => 'admin.ticket-checkins.index', 'active' => 'admin.ticket-checkins.*', 'permission' => 'ticket_checkins.view', 'label' => 'Lịch sử soát vé', 'icon' => 'ph-qr-code'],
                 ]],
-                ['label' => 'Nội dung khách hàng', 'items' => [
-                    ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
+                ['label' => 'Dịch vụ', 'items' => [
+                    ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
+                    ['route' => 'admin.food-orders.index', 'active' => 'admin.food-orders.*', 'permission' => 'food-orders.view', 'label' => 'Đơn đồ ăn', 'icon' => 'ph-shopping-bag'],
                 ]],
-                ['label' => 'Bảo mật', 'items' => [
+                ['label' => 'Hệ thống', 'items' => [
                     ['route' => 'admin.users.index', 'active' => 'admin.users.*', 'permission' => 'users.view', 'label' => 'Người dùng', 'icon' => 'ph-users'],
                     ['route' => 'admin.roles.index', 'active' => 'admin.roles.*', 'permission' => 'roles.view', 'label' => 'Vai trò và quyền', 'icon' => 'ph-shield-check'],
                     ['route' => 'admin.activity-logs.index', 'active' => 'admin.activity-logs.*', 'permission' => 'activity_logs.view', 'label' => 'Nhật ký hoạt động', 'icon' => 'ph-list-magnifying-glass'],

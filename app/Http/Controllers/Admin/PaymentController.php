@@ -17,7 +17,9 @@ final class PaymentController extends Controller
 
         return view('admin.payments.index', [
             'payments' => $payments->paginate($filters),
+            'summary' => $payments->summary($filters),
             'filters' => $filters,
+            ...$payments->filterOptions(),
         ]);
     }
 

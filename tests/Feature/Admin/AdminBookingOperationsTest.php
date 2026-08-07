@@ -3,7 +3,9 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\ActivityLog;
+use App\Models\Booking;
 use App\Models\BookingSeat;
+use App\Models\BookingTicketDelivery;
 use App\Models\FoodItem;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -40,7 +42,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
         $this->actingAs($manager)->get(route('admin.bookings.show', $booking))->assertOk();
     }
 
-    public function test_index_filters_masks_guests_and_merges_couple_seats_without_payment_inflation(): void
+    public function test_success_index_filters_masks_guests_and_merges_couple_seats_without_payment_inflation(): void
     {
         $scenario = $this->bookingScenario();
         $couple = $scenario['seats']->where('type', 'couple')->values();
@@ -49,13 +51,15 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'customer_email' => 'guest.operations@example.test',
             'guest_access_token_hash' => hash('sha256', 'never-show-this-capability'),
         ])->save();
-        $this->pendingPayment($booking, ['status' => Payment::STATUS_FAILED, 'amount' => (int) $booking->total_amount]);
-        $this->pendingPayment($booking, ['status' => Payment::STATUS_EXPIRED, 'amount' => (int) $booking->total_amount]);
+        $payment = $this->pendingPayment($booking, ['amount' => (int) $booking->total_amount]);
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))->assertJsonPath('return_code', 1);
         $other = $this->payableBooking(['booking_status' => 'expired']);
 
         $response = $this->actingAs($this->userWithRole('manager'))->get(route('admin.bookings.index', [
-            'booking_code' => $booking->booking_code,
-            'booking_status' => 'pending_payment',
+            'search' => $booking->booking_code,
+            'sales_channel' => 'online',
+            'date_from' => today()->toDateString(),
+            'date_to' => today()->toDateString(),
             'sort' => 'total_amount',
             'direction' => 'asc',
         ]));
@@ -80,9 +84,10 @@ class AdminBookingOperationsTest extends PaymentTestCase
     {
         $scenario = $this->bookingScenario(false);
         for ($index = 0; $index < 27; $index++) {
-            $this->bookingForScenario($scenario, [
+            $booking = $this->bookingForScenario($scenario, [
                 'booking_code' => 'PAGE-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT),
             ]);
+            $this->recordSuccessfulPayment($booking);
         }
         $manager = $this->userWithRole('manager');
 
@@ -90,7 +95,6 @@ class AdminBookingOperationsTest extends PaymentTestCase
         DB::enableQueryLog();
         $response = $this->actingAs($manager)->get(route('admin.bookings.index', [
             'per_page' => 15,
-            'include_drafts' => 1,
         ]));
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
@@ -99,7 +103,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
         $this->assertLessThanOrEqual(20, $queryCount, 'Danh sách booking có dấu hiệu N+1.');
     }
 
-    public function test_default_index_hides_technical_drafts_and_keeps_operational_attention_rows(): void
+    public function test_index_only_shows_authoritatively_paid_or_used_bookings_and_summary_is_exact(): void
     {
         $scenario = $this->bookingScenario(false);
         $draft = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-DRAFT']);
@@ -107,6 +111,11 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'booking_code' => 'VIS-EXPIRED',
             'booking_status' => 'expired',
             'expires_at' => now()->subMinute(),
+        ]);
+        $paidWithoutEvidence = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-PAID-NO-EVIDENCE',
+            'booking_status' => 'paid',
+            'payment_status' => 'paid',
         ]);
         $paid = $this->bookingForScenario($scenario, [
             'booking_code' => 'VIS-PAID',
@@ -123,54 +132,28 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'booking_status' => 'cancelled',
             'payment_status' => 'refunded',
         ]);
-        $unresolved = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-UNRESOLVED']);
-        $review = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-REVIEW']);
-        $processing = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-PROCESSING']);
-        $meaningfulCancelled = $this->bookingForScenario($scenario, [
-            'booking_code' => 'VIS-CANCELLED-EVIDENCE',
-            'booking_status' => 'cancelled',
+        $unverifiedSuccess = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-UNVERIFIED-SUCCESS',
+            'booking_status' => 'paid',
+            'payment_status' => 'paid',
         ]);
-        $technicalCancelled = $this->bookingForScenario($scenario, [
-            'booking_code' => 'VIS-CANCELLED-TECHNICAL',
-            'booking_status' => 'cancelled',
-        ]);
-
-        $this->pendingPayment($unresolved, ['status' => Payment::STATUS_UNRESOLVED]);
-        $this->pendingPayment($review, ['status' => Payment::STATUS_REVIEW]);
-        $this->pendingPayment($processing, ['status' => Payment::STATUS_PROCESSING]);
-        $this->pendingPayment($meaningfulCancelled, [
-            'status' => Payment::STATUS_FAILED,
-            'callback_received_at' => now(),
-        ]);
-        $this->pendingPayment($technicalCancelled, ['status' => Payment::STATUS_FAILED]);
+        $this->recordSuccessfulPayment($paid, 50_000);
+        $this->recordSuccessfulPayment($used, 50_000);
+        $this->pendingPayment($unverifiedSuccess, ['status' => Payment::STATUS_SUCCESS, 'verified_at' => null]);
+        $refundedPayment = $this->recordSuccessfulPayment($refunded, 50_000);
+        $refundedPayment->booking->forceFill(['booking_status' => 'cancelled', 'payment_status' => 'refunded'])->save();
 
         $response = $this->actingAs($this->userWithRole('manager'))
             ->get(route('admin.bookings.index'))
             ->assertOk()
-            ->assertSee('Trạng thái đơn')
-            ->assertSee('Trạng thái thanh toán')
-            ->assertSee('Trạng thái in vé')
-            ->assertSee('Trạng thái soát vé');
+            ->assertSee('Đơn thành công')->assertSee('Doanh thu')->assertSee('Chỗ đã bán')->assertSee('Đã soát vé')
+            ->assertSee($paid->booking_code)->assertSee($used->booking_code)
+            ->assertSee('100.000 VNĐ');
 
-        foreach ([$paid, $used, $refunded, $unresolved, $review, $processing, $meaningfulCancelled] as $visible) {
-            $response->assertSee($visible->booking_code);
-        }
-        foreach ([$draft, $expired, $technicalCancelled] as $hidden) {
+        foreach ([$draft, $expired, $paidWithoutEvidence, $refunded, $unverifiedSuccess] as $hidden) {
             $response->assertDontSee($hidden->booking_code);
         }
-
-        $this->actingAs($this->userWithRole('manager'))
-            ->get(route('admin.bookings.index', ['include_drafts' => 1]))
-            ->assertOk()
-            ->assertSee($draft->booking_code)
-            ->assertSee($expired->booking_code)
-            ->assertSee($technicalCancelled->booking_code);
-
-        $this->actingAs($this->userWithRole('manager'))
-            ->get(route('admin.bookings.index', ['booking_status' => 'expired']))
-            ->assertOk()
-            ->assertSee($expired->booking_code)
-            ->assertDontSee($paid->booking_code);
+        $response->assertDontSee('include_drafts', false)->assertDontSee('Hiển thị đơn tạm');
     }
 
     public function test_detail_renders_authoritative_sections_and_hides_secrets_and_activity_by_permission(): void
@@ -189,6 +172,12 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'ticket_email_token_hash' => hash('sha256', 'ticket-secret-value'),
         ])->save();
         $payment->forceFill(['amount' => 85000, 'payment_url' => 'https://provider.test/secret-signed-url'])->save();
+        BookingTicketDelivery::query()->where('booking_id', $booking->id)->update([
+            'status' => BookingTicketDelivery::STATUS_FAILED,
+            'attempts' => 2,
+            'last_error_code' => 'smtp_connection_failed',
+            'available_at' => now()->addHour(),
+        ]);
         $order = Order::query()->create([
             'booking_id' => $booking->id,
             'customer_name' => 'Khách thử nghiệm',
@@ -226,6 +215,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
             ->assertSee('Bắp rang snapshot')
             ->assertSee($failedPayment->status_label)
             ->assertSee('Đã soát vé')
+            ->assertSee('Gửi lỗi')->assertSee('Không thể kết nối máy chủ email')->assertSee('Gửi lại vé')
             ->assertSee(number_format((int) $payment->amount, 0, ',', '.').' VNĐ')
             ->assertDontSee('Lịch sử hoạt động')
             ->assertDontSee('guest-secret-value')
@@ -250,6 +240,12 @@ class AdminBookingOperationsTest extends PaymentTestCase
     public function test_resend_uses_stored_recipient_one_outbox_row_one_notification_and_one_safe_audit(): void
     {
         [$booking] = $this->verifiedBooking();
+        BookingTicketDelivery::query()->where('booking_id', $booking->id)->update([
+            'status' => BookingTicketDelivery::STATUS_FAILED,
+            'attempts' => 2,
+            'last_error_code' => 'smtp_connection_failed',
+            'available_at' => now()->addHour(),
+        ]);
         $manager = $this->userWithRole('manager');
         $response = $this->actingAs($manager)->post(route('admin.bookings.ticket-email.resend', $booking), [
             'email' => 'attacker@example.test',
@@ -352,5 +348,17 @@ class AdminBookingOperationsTest extends PaymentTestCase
             ->assertJsonPath('return_code', 1);
 
         return [$booking->fresh(), $payment->fresh()];
+    }
+
+    private function recordSuccessfulPayment(Booking $booking, ?int $amount = null): Payment
+    {
+        $booking->forceFill(['booking_status' => 'paid', 'payment_status' => 'paid', 'paid_at' => now()])->save();
+
+        return $this->pendingPayment($booking, [
+            'status' => Payment::STATUS_SUCCESS,
+            'verified_at' => now(),
+            'paid_at' => now(),
+            'amount' => $amount ?? (int) $booking->total_amount,
+        ]);
     }
 }
