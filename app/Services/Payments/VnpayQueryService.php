@@ -33,21 +33,9 @@ class VnpayQueryService
         return $this->reconcileEligiblePayment($payment, true);
     }
 
-    public function reconcileCancellation(Payment $payment): string
-    {
-        return $this->reconcileEligiblePayment(
-            $payment,
-            false,
-            'vnpay_customer_cancelled',
-            cancellationOnly: true,
-        );
-    }
-
     private function reconcileEligiblePayment(
         Payment $payment,
         bool $allowReview,
-        string $terminalReason = 'vnpay_terminal_failed',
-        bool $cancellationOnly = false,
     ): string {
         if (! $this->beginQuery($payment, $allowReview)) {
             return $payment->fresh()->status;
@@ -83,17 +71,6 @@ class VnpayQueryService
         }
 
         if ($responseCode === '00' && $transactionStatus === '00') {
-            if ($cancellationOnly) {
-                return $this->applyOutcome(
-                    $payment,
-                    Payment::STATUS_REVIEW,
-                    'cancel_query_reported_paid',
-                    $payload,
-                    $response->hash,
-                    $allowReview,
-                );
-            }
-
             $verifiedData = new VerifiedPaymentData(
                 provider: 'vnpay',
                 merchantReference: $payment->order_code,
@@ -115,7 +92,7 @@ class VnpayQueryService
 
         return match ($transactionStatus) {
             '01' => $this->storePending($payment, $payload, $response->hash, $allowReview),
-            '02' => $this->applyTerminalFailure($payment, $terminalReason, $payload, $response->hash, $allowReview),
+            '02' => $this->applyTerminalFailure($payment, 'vnpay_terminal_failed', $payload, $response->hash, $allowReview),
             '04', '07' => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_requires_review', $payload, $response->hash, $allowReview),
             default => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_unknown_status', $payload, $response->hash, $allowReview),
         };

@@ -4,13 +4,11 @@ namespace App\Http\Controllers\Payments;
 
 use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\VnpaySigner;
-use App\Exceptions\VnpayResponseException;
-use App\Exceptions\VnpayTransportException;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\GuestBookingAccessService;
 use App\Services\Payments\PaymentReturnTokenService;
-use App\Services\Payments\VnpayQueryService;
+use App\Services\Payments\VnpayExplicitCancellationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +24,7 @@ class VnpayReturnController extends Controller
         VnpaySigner $signer,
         PaymentReturnTokenService $returnTokens,
         GuestBookingAccessService $guestAccess,
-        VnpayQueryService $queries,
+        VnpayExplicitCancellationService $cancellations,
     ): Response|View {
         if ($request->query->has('vnp_TxnRef')) {
             try {
@@ -47,12 +45,7 @@ class VnpayReturnController extends Controller
             $cancelRequested = ($parameters['vnp_ResponseCode'] ?? null) === '24';
             if ($cancelRequested) {
                 abort_unless($this->amountMatches($payment, $parameters['vnp_Amount'] ?? null), 404);
-                try {
-                    $queries->reconcileCancellation($payment);
-                } catch (VnpayTransportException|VnpayResponseException) {
-                    // A browser cancellation hint is not enough when QueryDr is unavailable.
-                    // The unresolved payment and its seat hold remain protected until TTL/reconciliation.
-                }
+                $cancellations->finalizeVerified($payment, $parameters, 'return');
                 $request->session()->flash('payment_return_cancel_requested.'.$payment->id, true);
             }
             $request->session()->flash('payment_return_integrity.'.$payment->id, true);

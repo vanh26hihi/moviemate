@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\BookingCancellationService;
 use App\Services\Payments\VerifiedPaymentService;
+use App\Services\Payments\VnpayExplicitCancellationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class VnpayIpnService
         private readonly VnpayConfig $config,
         private readonly VnpaySigner $signer,
         private readonly VerifiedPaymentService $verifiedPayments,
+        private readonly VnpayExplicitCancellationService $explicitCancellations,
         private readonly BookingCancellationService $cancellations,
     ) {}
 
@@ -57,6 +59,18 @@ class VnpayIpnService
             $this->storeOutcome($payment, $parameters, Payment::STATUS_REVIEW, 'ipn_amount_mismatch', $payloadHash);
 
             return $this->response('04', 'Invalid amount');
+        }
+
+        if ($parameters['vnp_ResponseCode'] === '24'
+            && $parameters['vnp_TransactionStatus'] === '02') {
+            $this->explicitCancellations->finalizeVerified($payment, $parameters, 'ipn', $payloadHash);
+            $status = $payment->fresh()->status;
+
+            return match ($status) {
+                Payment::STATUS_SUCCESS => $this->response('02', 'Order already confirmed'),
+                Payment::STATUS_FAILED => $this->response('00', 'Confirm success'),
+                default => $this->response('99', 'Order cannot be cancelled'),
+            };
         }
 
         if ($parameters['vnp_ResponseCode'] === '00' && $parameters['vnp_TransactionStatus'] === '00') {
@@ -99,12 +113,9 @@ class VnpayIpnService
         );
 
         if ($current === Payment::STATUS_FAILED) {
-            $reason = $parameters['vnp_ResponseCode'] === '24'
-                ? 'vnpay_customer_cancelled'
-                : 'vnpay_terminal_failed';
             $this->cancellations->cancel(
                 $payment->booking_id,
-                $reason,
+                'vnpay_terminal_failed',
                 'booking.payment_cancelled',
             );
         }
