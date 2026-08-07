@@ -16,11 +16,11 @@ final class BookingCancellationController extends Controller
     ): RedirectResponse {
         Gate::authorize('cancel', $booking);
 
-        $result = $cancellations->cancel($booking->id);
+        $result = $cancellations->cancelCustomer($booking->id);
 
         if ($result->cancelled) {
             return to_route('user.bookings.history')
-                ->with('success', 'Đơn đặt vé đã được hủy.');
+                ->with('success', 'Đã hủy đơn đặt vé và giải phóng các ghế đang giữ.');
         }
 
         if ($result->alreadyCancelled) {

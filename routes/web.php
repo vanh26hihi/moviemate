@@ -29,6 +29,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CinemaContextController;
 use App\Http\Controllers\Payments\PaymentInitiationController;
+use App\Http\Controllers\Payments\PaymentResumeController;
 use App\Http\Controllers\Payments\PayOsCancellationController;
 use App\Http\Controllers\Payments\PayOsReturnController;
 use App\Http\Controllers\Payments\PayOsWebhookController;
@@ -127,6 +128,10 @@ Route::post('/payments/payos/bookings/{booking}', PaymentInitiationController::c
     ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
     ->defaults('payment_provider', 'payos')
     ->name('payments.payos.initiate');
+
+Route::post('/payments/bookings/{booking}/resume', PaymentResumeController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->name('payments.resume');
 
 Route::post('/payments/payos/bookings/{booking}/cancel', PayOsCancellationController::class)
     ->middleware(['auth', 'active', 'throttle:10,1'])

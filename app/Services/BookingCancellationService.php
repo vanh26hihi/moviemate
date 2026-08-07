@@ -68,6 +68,63 @@ final class BookingCancellationService
         });
     }
 
+    public function cancelCustomer(int $bookingId): BookingCancellationResult
+    {
+        return DB::transaction(function () use ($bookingId): BookingCancellationResult {
+            $booking = Booking::query()->lockForUpdate()->findOrFail($bookingId);
+
+            if ($booking->booking_status === 'cancelled') {
+                return BookingCancellationResult::alreadyCancelled();
+            }
+
+            $payments = Payment::query()
+                ->where('booking_id', $booking->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            if (! $this->hasCancellableBookingState($booking)
+                || $payments->contains(fn (Payment $payment): bool => $payment->hasAuthoritativeSuccessEvidence())) {
+                return BookingCancellationResult::notCancellable();
+            }
+
+            $activeAttempts = $payments
+                ->filter(fn (Payment $payment): bool => in_array($payment->status, Payment::UNSAFE_RETRY_STATUSES, true))
+                ->values();
+            if ($activeAttempts->count() > 1) {
+                return BookingCancellationResult::notCancellable();
+            }
+
+            /** @var Payment|null $activeAttempt */
+            $activeAttempt = $activeAttempts->first();
+            if ($activeAttempt !== null
+                && ($activeAttempt->status !== Payment::STATUS_PENDING
+                    || ! in_array($activeAttempt->provider, ['vnpay', 'zalopay'], true))) {
+                return BookingCancellationResult::notCancellable();
+            }
+
+            $lockedSeatRows = $this->lockActiveSeats($booking);
+            if ($activeAttempt !== null) {
+                $activeAttempt->forceFill([
+                    'status' => Payment::STATUS_FAILED,
+                    'failure_reason' => 'customer_cancelled_pending_payment',
+                    'failed_at' => now(),
+                ])->save();
+            }
+
+            return $this->transitionLockedBooking(
+                $booking,
+                $lockedSeatRows,
+                'customer_cancelled_unpaid',
+                'booking.cancelled',
+                $activeAttempt === null ? [] : [
+                    'payment_id' => $activeAttempt->id,
+                    'provider' => $activeAttempt->provider,
+                    'result' => 'customer_cancelled',
+                ],
+            );
+        });
+    }
+
     public function cancelVerifiedPayment(
         int $paymentId,
         string $provider,

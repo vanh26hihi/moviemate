@@ -29,6 +29,9 @@ final class BookingExpiryHotfixTest extends PaymentTestCase
             'total_amount' => 0,
             'status' => 'pending',
         ]);
+        $this->pendingPayment($booking, [
+            'order_url' => 'https://zalopay.example.test/expiry-hotfix',
+        ]);
 
         $this->withoutVite();
         $this->actingAs($customerB)
@@ -40,7 +43,7 @@ final class BookingExpiryHotfixTest extends PaymentTestCase
             ->get(route('user.bookings.history'))
             ->assertOk()
             ->assertSee('Chờ thanh toán')
-            ->assertSee('Thanh toán tiếp')
+            ->assertSee('Tiếp tục thanh toán')
             ->assertSee('Hủy đơn');
 
         $this->travel(15)->minutes();
