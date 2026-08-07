@@ -47,44 +47,51 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         $this->actingAs($manager)->post(route('admin.payments.query-provider', $payment))->assertForbidden();
     }
 
-    public function test_index_keeps_attempts_separate_filters_and_never_renders_secret_payloads(): void
+    public function test_index_only_displays_authoritative_successes_with_exact_summary_and_safe_output(): void
     {
-        $booking = $this->payableBooking();
-        $failed = $this->pendingPayment($booking, [
-            'status' => Payment::STATUS_FAILED,
-            'amount' => (int) $booking->total_amount,
+        $vnpay = $this->successfulPayment('vnpay', 50_000, [
             'raw_request' => ['secret' => 'raw-request-must-stay-hidden'],
             'raw_response' => ['secret' => 'raw-response-must-stay-hidden'],
             'payment_url' => 'https://provider.example.test/signed-secret',
         ]);
-        $review = $this->pendingPayment($booking, [
-            'status' => Payment::STATUS_REVIEW,
-            'amount' => (int) $booking->total_amount + 1000,
-        ]);
+        $zalopay = $this->successfulPayment('zalopay', 60_000);
+        $payos = $this->successfulPayment('payos', 70_000);
+        $counter = $this->successfulCounterPayment(80_000);
+        $pending = $this->paymentMatchingBooking(['status' => Payment::STATUS_PENDING]);
+        $processing = $this->paymentMatchingBooking(['status' => Payment::STATUS_PROCESSING]);
+        $unresolved = $this->paymentMatchingBooking(['status' => Payment::STATUS_UNRESOLVED]);
+        $review = $this->paymentMatchingBooking(['status' => Payment::STATUS_REVIEW]);
+        $failed = $this->paymentMatchingBooking(['status' => Payment::STATUS_FAILED]);
+        $expired = $this->paymentMatchingBooking(['status' => Payment::STATUS_EXPIRED]);
+        $staleSuccess = $this->paymentMatchingBooking(['status' => Payment::STATUS_SUCCESS, 'verified_at' => null]);
 
-        $response = $this->actingAs($this->userWithRole('manager'))->get(route('admin.payments.index', [
-            'booking_code' => $booking->booking_code,
-            'review' => 'yes',
-            'amount_mismatch' => 'yes',
-            'sort' => 'amount',
-            'direction' => 'desc',
-        ]));
+        $response = $this->actingAs($this->userWithRole('manager'))->get(route('admin.payments.index'));
 
-        $response->assertOk()->assertSee('#'.$review->id)->assertDontSee('#'.$failed->id)
+        $response->assertOk()
+            ->assertSee($vnpay->booking->booking_code)->assertSee($zalopay->booking->booking_code)
+            ->assertSee($payos->booking->booking_code)->assertSee($counter->booking->booking_code)
+            ->assertSee('260.000 VNĐ')->assertSee('Tổng giao dịch')->assertSee('Tổng doanh thu')
             ->assertDontSee('raw-request-must-stay-hidden')->assertDontSee('raw-response-must-stay-hidden')
-            ->assertDontSee('signed-secret');
+            ->assertDontSee('signed-secret')->assertDontSee('name="status"', false)
+            ->assertDontSee('name="review"', false)->assertDontSee('name="reconciled"', false);
+        foreach ([$pending, $processing, $unresolved, $review, $failed, $expired, $staleSuccess] as $hidden) {
+            $response->assertDontSee($hidden->booking->booking_code);
+        }
 
         $this->actingAs($this->userWithRole('manager'))
             ->get(route('admin.payments.index', ['sort' => 'drop table payments']))
             ->assertSessionHasErrors('sort');
 
-        $maximum = $this->paymentMatchingBooking(['amount' => 49000]);
-        $aboveMaximum = $this->paymentMatchingBooking(['amount' => 51000]);
         $this->actingAs($this->userWithRole('manager'))
-            ->get(route('admin.payments.index', ['amount_max' => 50000]))
-            ->assertOk()
-            ->assertSee('#'.$maximum->id)
-            ->assertDontSee('#'.$aboveMaximum->id);
+            ->get(route('admin.payments.index', [
+                'provider' => 'payos',
+                'sales_channel' => 'online',
+                'search' => $payos->booking->booking_code,
+                'date_from' => today()->toDateString(),
+                'date_to' => today()->toDateString(),
+            ]))
+            ->assertOk()->assertSee($payos->booking->booking_code)
+            ->assertDontSee($vnpay->booking->booking_code)->assertDontSee($counter->booking->booking_code);
     }
 
     public function test_detail_marks_authoritative_payment_and_exposes_only_safe_evidence(): void
@@ -107,7 +114,7 @@ class AdminPaymentOperationsTest extends PaymentTestCase
             ->assertDontSee('Đánh dấu đã thanh toán')->assertDontSee('Sửa số tiền')
             ->assertDontSee('Xóa giao dịch');
         $this->actingAs($this->userWithRole('manager'))->get(route('admin.payments.index'))
-            ->assertOk()->assertSee('Có thẩm quyền');
+            ->assertOk()->assertSee($booking->booking_code)->assertSee('Nhà cung cấp xác minh');
     }
 
     public function test_queue_has_deterministic_priority_and_excludes_fresh_matching_pending_attempt(): void
@@ -386,7 +393,7 @@ class AdminPaymentOperationsTest extends PaymentTestCase
     public function test_payment_index_query_count_is_bounded(): void
     {
         for ($index = 0; $index < 18; $index++) {
-            $this->paymentMatchingBooking(['status' => Payment::STATUS_FAILED]);
+            $this->successfulPayment('zalopay', 50_000);
         }
         $manager = $this->userWithRole('manager');
 
@@ -468,5 +475,52 @@ class AdminPaymentOperationsTest extends PaymentTestCase
             'amount' => (int) $booking->total_amount,
             ...$overrides,
         ]);
+    }
+
+    private function successfulPayment(string $provider, int $amount, array $overrides = []): Payment
+    {
+        $booking = $this->payableBooking([
+            'total_amount' => $amount,
+            'payment_status' => 'paid',
+            'booking_status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        return $this->pendingPayment($booking, [
+            'provider' => $provider,
+            'amount' => $amount,
+            'status' => Payment::STATUS_SUCCESS,
+            'verified_at' => now(),
+            'paid_at' => now(),
+            ...$overrides,
+        ]);
+    }
+
+    private function successfulCounterPayment(int $amount): Payment
+    {
+        $booking = $this->payableBooking(['total_amount' => $amount]);
+        $settler = $this->userWithRole('staff');
+        DB::table('bookings')->where('id', $booking->id)->update([
+            'sales_channel' => 'counter',
+            'created_by_staff_id' => $settler->id,
+            'payment_status' => 'paid',
+            'booking_status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        $payment = new Payment;
+        $payment->forceFill([
+            'booking_id' => $booking->id,
+            'provider' => Payment::PROVIDER_COUNTER_CASH,
+            'payment_method' => Payment::PROVIDER_COUNTER_CASH,
+            'amount' => $amount,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_SUCCESS,
+            'settled_by_user_id' => $settler->id,
+            'settled_at' => now(),
+            'paid_at' => now(),
+        ])->save();
+
+        return $payment;
     }
 }

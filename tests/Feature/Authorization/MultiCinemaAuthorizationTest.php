@@ -82,7 +82,6 @@ final class MultiCinemaAuthorizationTest extends TestCase
             route('admin.showtimes.edit', $scenario['showtime']),
             route('admin.bookings.show', $scenario['booking']),
             route('admin.payments.show', $scenario['payment']),
-            route('admin.ticket-deliveries.show', $scenario['delivery']),
             route('admin.ticket-checkins.show', $scenario['checkin']),
         ] as $url) {
             $this->actingAs($manager)->get($url)->assertNotFound();

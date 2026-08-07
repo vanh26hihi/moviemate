@@ -66,7 +66,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             ->assertNotFound();
 
         $this->actingAs($manager)
-            ->post(route('admin.ticket-deliveries.retry', $foreign['delivery']))
+            ->post(route('admin.bookings.ticket-email.resend', $foreign['booking']))
             ->assertNotFound();
     }
 
@@ -79,10 +79,9 @@ final class MultiCinemaMutationIsolationTest extends TestCase
         $pages = [
             route('admin.rooms.index'),
             route('admin.showtimes.index'),
-            route('admin.bookings.index', ['include_drafts' => 1]),
+            route('admin.bookings.index'),
             route('admin.payments.index'),
             route('admin.payment-reconciliation.index'),
-            route('admin.ticket-deliveries.index'),
             route('admin.ticket-checkins.index'),
             route('admin.food-orders.index'),
         ];
@@ -96,7 +95,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             );
         }
 
-        $this->actingAs($manager)->get(route('admin.bookings.index', ['include_drafts' => 1]))
+        $this->actingAs($manager)->get(route('admin.bookings.index'))
             ->assertOk()->assertSee($own['booking']->booking_code);
     }
 
@@ -190,8 +189,9 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'booking_code' => 'FORGED-'.str()->upper(str()->random(6)),
             'customer_email' => 'forge@example.test',
             'total_amount' => 50000,
-            'payment_status' => 'unpaid',
-            'booking_status' => 'pending_payment',
+            'payment_status' => 'paid',
+            'booking_status' => 'paid',
+            'paid_at' => now(),
         ]);
 
         $this->assertSame($this->primary->id, (int) $booking->cinema_id);
@@ -264,8 +264,9 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'booking_code' => 'BR-'.str()->upper(str()->random(10)),
             'customer_email' => 'branch@example.test',
             'total_amount' => 50000,
-            'payment_status' => 'unpaid',
-            'booking_status' => 'pending_payment',
+            'payment_status' => 'paid',
+            'booking_status' => 'paid',
+            'paid_at' => now(),
         ]);
         $payment = Payment::createForProvider('vnpay', [
             'booking_id' => $booking->id,
@@ -273,7 +274,9 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'order_code' => 'PAY-'.str()->upper(str()->random(10)),
             'amount' => 50000,
             'currency' => 'VND',
-            'status' => Payment::STATUS_PENDING,
+            'status' => Payment::STATUS_SUCCESS,
+            'verified_at' => now(),
+            'paid_at' => now(),
         ]);
         $delivery = BookingTicketDelivery::query()->create([
             'booking_id' => $booking->id,

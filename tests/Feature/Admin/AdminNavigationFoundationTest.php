@@ -110,9 +110,13 @@ class AdminNavigationFoundationTest extends TestCase
         $this->assertStringContainsString('admin.bookings.index', $managerNavigation);
         $this->assertStringContainsString('admin.payments.index', $managerNavigation);
         $this->assertStringContainsString('admin.payment-reconciliation.index', $managerNavigation);
-        $this->assertStringContainsString('admin.ticket-deliveries.index', $managerNavigation);
+        $this->assertStringNotContainsString('admin.ticket-deliveries.index', $managerNavigation);
+        $this->assertStringNotContainsString('Gửi vé điện tử', $managerNavigation);
         $this->assertStringContainsString('admin.ticket-checkins.index', $managerNavigation);
         $this->assertStringContainsString('admin.reports.index', $managerNavigation);
+        foreach (['Tổng quan', 'Nội dung', 'Rạp &amp; lịch chiếu', 'Kinh doanh', 'Dịch vụ', 'Hệ thống'] as $group) {
+            $this->assertStringContainsString($group, $managerNavigation);
+        }
         foreach (['admin.discounts.index', 'admin.reviews.index'] as $missingRoute) {
             $this->assertStringNotContainsString($missingRoute, $managerNavigation);
         }
@@ -133,6 +137,27 @@ class AdminNavigationFoundationTest extends TestCase
             ->getContent();
 
         $this->assertSame(1, substr_count(strip_tags($html), $message));
+    }
+
+    public function test_success_lists_keep_a_compact_allowlisted_filter_contract(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $bookings = $this->actingAs($admin)->get(route('admin.bookings.index'))->assertOk();
+
+        foreach (['search', 'cinema_id', 'sales_channel', 'date_from', 'date_to', 'ticket_status', 'checkin_status', 'sort', 'direction', 'per_page'] as $name) {
+            $bookings->assertSee('name="'.$name.'"', false);
+        }
+        foreach (['include_drafts', 'booking_status', 'payment_status', 'provider', 'amount_min', 'amount_max', 'movie_id', 'room_id', 'customer_email', 'created_by'] as $name) {
+            $bookings->assertDontSee('name="'.$name.'"', false);
+        }
+
+        $payments = $this->actingAs($admin)->get(route('admin.payments.index'))->assertOk();
+        foreach (['search', 'cinema_id', 'provider', 'sales_channel', 'date_from', 'date_to', 'sort', 'direction', 'per_page'] as $name) {
+            $payments->assertSee('name="'.$name.'"', false);
+        }
+        foreach (['status', 'review', 'mismatch', 'reconciled', 'verified', 'amount_min', 'amount_max', 'include_drafts', 'response_code', 'transaction_status'] as $name) {
+            $payments->assertDontSee('name="'.$name.'"', false);
+        }
     }
 
     private function navigationHtml(string $html): string

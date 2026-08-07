@@ -302,7 +302,7 @@ final class CounterSalesR8Test extends TestCase
         $admin = $this->userWithRole('admin');
 
         $this->actingAs($admin)->get(route('admin.bookings.index', ['sales_channel' => 'counter']))
-            ->assertOk()->assertSee($booking->booking_code)->assertSee('Tại quầy')->assertSee($creator->name);
+            ->assertOk()->assertSee($booking->booking_code)->assertSee('Tại quầy');
         $this->get(route('admin.bookings.index', ['sales_channel' => 'online']))
             ->assertOk()->assertDontSee($booking->booking_code);
         $this->get(route('admin.bookings.show', $booking))->assertOk()

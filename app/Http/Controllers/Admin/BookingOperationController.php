@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\BookingTicketDelivery;
 use App\Models\Payment;
 use App\Services\ActivityLogger;
 use App\Services\Admin\AdminTicketDeliveryQuery;
@@ -11,13 +12,12 @@ use App\Services\BookingCancellationService;
 use App\Services\CinemaAccessService;
 use App\Services\Payments\PaymentReconciliationService;
 use App\Services\Tickets\BookingTicketEligibility;
-use App\Services\Tickets\TicketDeliveryOutbox;
+use App\Services\Tickets\TicketDeliveryRetryService;
 use App\Services\Tickets\TicketPrintService;
 use App\Support\PrivacyMask;
 use App\Support\StatusLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
@@ -27,27 +27,40 @@ final class BookingOperationController extends Controller
         Request $request,
         Booking $booking,
         BookingTicketEligibility $eligibility,
-        TicketDeliveryOutbox $deliveries,
+        TicketDeliveryRetryService $retries,
         ActivityLogger $activities,
         AdminTicketDeliveryQuery $deliveryQuery,
     ): RedirectResponse {
-        $booking->load('payments');
+        $booking->load(['payments', 'ticketDelivery']);
         abort_unless($eligibility->isDeliverable($booking), 404);
+        abort_unless($booking->ticketDelivery, 404);
+        if ($booking->ticketDelivery->status !== BookingTicketDelivery::STATUS_FAILED) {
+            return back()->with('warning', 'Chỉ vé gửi lỗi mới có thể được đưa lại vào hàng đợi.');
+        }
         $this->assertRateLimit('ticket-resend', $request, $booking->id, 3);
 
-        DB::transaction(function () use ($request, $booking, $deliveries, $activities): void {
-            $before = $booking->ticketDelivery()->value('status');
-            $delivery = $deliveries->requestResend($booking, $request->user()->id);
-            $activities->log('booking.ticket_resend_requested', $booking, [
-                'delivery_status' => $before,
-            ], [
-                'delivery_status' => $delivery->status,
-            ], [
-                'booking_id' => $booking->id,
-                'booking_code' => $booking->booking_code,
-                'recipient_mask' => PrivacyMask::email($booking->recipient_email),
-            ]);
-        });
+        $before = $booking->ticketDelivery->status;
+        $result = $retries->retry($booking->ticketDelivery);
+        if (! $result->changed) {
+            $message = match ($result->category) {
+                'sent' => 'Vé đã được gửi thành công; hệ thống không tạo lượt gửi trùng.',
+                'active_claim' => 'Vé đang được tiến trình khác gửi.',
+                'already_queued' => 'Vé đã nằm trong hàng đợi gửi.',
+                default => 'Đơn không còn đủ điều kiện gửi lại vé.',
+            };
+
+            return back()->with('warning', $message);
+        }
+
+        $activities->log('booking.ticket_resend_requested', $booking, [
+            'delivery_status' => $before,
+        ], [
+            'delivery_status' => $result->delivery->status,
+        ], [
+            'booking_id' => $booking->id,
+            'booking_code' => $booking->booking_code,
+            'recipient_mask' => PrivacyMask::email($booking->recipient_email),
+        ]);
         $deliveryQuery->forgetBadge();
 
         return back()->with('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');

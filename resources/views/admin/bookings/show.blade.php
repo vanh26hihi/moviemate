@@ -24,13 +24,6 @@
             @can('tickets.print')
                 @if($ticketEligible)<a href="{{ route('staff.tickets.operations', $booking) }}" class="btn-secondary"><i class="ph ph-printer" aria-hidden="true"></i>Vận hành in vé</a>@endif
             @endcan
-            @can('ticket_deliveries.retry')
-                @if($ticketEligible)
-                    <form method="POST" action="{{ route('admin.bookings.ticket-email.resend', $booking) }}" onsubmit="return confirm('Gửi lại vé tới email đã lưu của đơn này?');">@csrf
-                        <button class="btn-secondary" type="submit"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Gửi lại vé</button>
-                    </form>
-                @endif
-            @endcan
             @can('payments.reconcile')
                 @if($hasReconcilablePayment)
                     <form method="POST" action="{{ route('admin.bookings.payment-query', $booking) }}" onsubmit="return confirm('Truy vấn trạng thái mới nhất trực tiếp từ nhà cung cấp?');">@csrf
@@ -188,13 +181,19 @@
             <h2 class="text-xl font-extrabold app-heading">Vé điện tử</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Người nhận</dt><dd class="font-bold app-text">{{ $customer['email'] }}</dd></div>
-                <div><dt class="text-sm app-muted">Trạng thái</dt><dd class="font-bold app-text">{{ $booking->ticketDelivery?->status_label ?? 'Chưa có yêu cầu gửi' }}</dd></div>
+                <div><dt class="text-sm app-muted">Trạng thái gửi email</dt><dd class="font-bold app-text">{{ match($booking->ticketDelivery?->status) { 'sent' => 'Đã gửi', 'pending' => 'Đang chờ gửi', 'processing' => 'Đang gửi', 'failed' => 'Gửi lỗi', default => $booking->recipient_email ? 'Chưa có yêu cầu gửi' : 'Không có email' } }}</dd></div>
                 <div><dt class="text-sm app-muted">Số lần thử</dt><dd class="font-bold app-text">{{ $booking->ticketDelivery?->attempts ?? 0 }}</dd></div>
-                <div><dt class="text-sm app-muted">Tiếp nhận lúc</dt><dd class="font-bold app-text">{{ $booking->ticketDelivery?->processing_started_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Gửi lúc</dt><dd class="font-bold app-text">{{ $booking->ticketDelivery?->sent_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Lần thử tiếp theo</dt><dd class="font-bold app-text">{{ $booking->ticketDelivery?->available_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                @if($booking->ticketDelivery?->status === 'failed')<div><dt class="text-sm app-muted">Phân loại lỗi</dt><dd class="font-bold text-error">Gửi thư không thành công</dd></div>@endif
+                <div><dt class="text-sm app-muted">Lần gửi gần nhất</dt><dd class="font-bold app-text">{{ $booking->ticketDelivery?->updated_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Gửi thành công lúc</dt><dd class="font-bold app-text">{{ $booking->ticketDelivery?->sent_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                @if($booking->ticketDelivery?->last_error_code)<div class="sm:col-span-2"><dt class="text-sm app-muted">Lỗi gần nhất</dt><dd class="font-bold text-error">{{ \App\Support\TicketDeliveryPresentation::error($booking->ticketDelivery->last_error_code) }}</dd></div>@endif
             </dl>
+            @can('ticket_deliveries.retry')
+                @if($deliveryRetryAllowed)
+                    <form method="POST" action="{{ route('admin.bookings.ticket-email.resend', $booking) }}" class="mt-5" onsubmit="return confirm('Gửi lại vé tới email đã lưu của đơn này?');">@csrf
+                        <button class="btn-primary" type="submit"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Gửi lại vé</button>
+                    </form>
+                @endif
+            @endcan
         </section>
 
         <section class="cinema-card p-6">

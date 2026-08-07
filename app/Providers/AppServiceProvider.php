@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Policies\BookingPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
-use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\Admin\PaymentReconciliationQuery;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\CinemaAccessService;
@@ -80,14 +79,8 @@ class AppServiceProvider extends ServiceProvider
             $badge = auth()->check() && auth()->user()->can('payments.reconcile')
                 ? app(PaymentReconciliationQuery::class)->badgeLabel()
                 : null;
-            $ticketDeliveryBadge = auth()->check()
-                && auth()->user()->can('ticket_deliveries.view')
-                && Schema::hasTable('booking_ticket_deliveries')
-                ? app(AdminTicketDeliveryQuery::class)->badgeLabel()
-                : null;
             $view->with([
                 'paymentReconciliationBadge' => $badge,
-                'ticketDeliveryBadge' => $ticketDeliveryBadge,
                 'adminAccessibleCinemas' => $adminCinemas,
                 'adminCurrentCinema' => $adminCurrentCinema,
                 'adminHasGlobalCinemaAccess' => $user ? $access->hasGlobalAccess($user) : false,

@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\TicketCheckinEvent;
 use App\Services\BookingCancellationService;
 use App\Services\Tickets\BookingTicketEligibility;
+use App\Services\Tickets\TicketDeliveryRetryService;
 use App\Support\PrivacyMask;
 use App\Support\SeatPresentation;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +19,7 @@ final class AdminBookingDetailService
     public function __construct(
         private readonly BookingCancellationService $cancellations,
         private readonly BookingTicketEligibility $ticketEligibility,
+        private readonly TicketDeliveryRetryService $deliveryRetries,
     ) {}
 
     public function get(Booking $booking, bool $includeActivity): array
@@ -99,6 +101,9 @@ final class AdminBookingDetailService
             'includeActivity' => $includeActivity,
             'cancellable' => $this->cancellations->isCancellable($booking),
             'ticketEligible' => $this->ticketEligibility->isUsable($booking),
+            'deliveryRetryAllowed' => $booking->ticketDelivery?->status === 'failed'
+                && $this->ticketEligibility->isDeliverable($booking)
+                && ! $this->deliveryRetries->hasActiveClaim($booking->ticketDelivery),
             'printState' => $printState,
             'printEvents' => $printEvents,
             'checkins' => $checkins,

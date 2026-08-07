@@ -23,7 +23,6 @@ use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\TicketCheckinController as AdminTicketCheckinController;
-use App\Http\Controllers\Admin\TicketDeliveryController as AdminTicketDeliveryController;
 use App\Http\Controllers\Admin\UserCinemaAssignmentController as AdminUserCinemaAssignmentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -416,15 +415,6 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('paymentId')
             ->middleware(['permission:payments.reconcile', 'throttle:6,1'])
             ->name('payment-reviews.resolve');
-
-        Route::get('/ticket-deliveries', [AdminTicketDeliveryController::class, 'index'])
-            ->middleware('permission:ticket_deliveries.view')->name('ticket-deliveries.index');
-        Route::get('/ticket-deliveries/{ticketDelivery}', [AdminTicketDeliveryController::class, 'show'])
-            ->whereNumber('ticketDelivery')
-            ->middleware('permission:ticket_deliveries.view')->name('ticket-deliveries.show');
-        Route::post('/ticket-deliveries/{ticketDelivery}/retry', [AdminTicketDeliveryController::class, 'retry'])
-            ->whereNumber('ticketDelivery')
-            ->middleware(['permission:ticket_deliveries.retry', 'throttle:12,1'])->name('ticket-deliveries.retry');
 
         Route::get('/ticket-checkins', [AdminTicketCheckinController::class, 'index'])
             ->middleware('permission:ticket_checkins.view')->name('ticket-checkins.index');

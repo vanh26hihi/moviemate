@@ -17,6 +17,7 @@ class MovieImageFlowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutVite();
         $this->seedRbac();
         Storage::fake('public');
     }
