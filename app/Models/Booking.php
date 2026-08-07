@@ -137,4 +137,9 @@ class Booking extends Model
             ->filter()
             ->join(' - ');
     }
+
+    public function getRoomLabelAttribute(): string
+    {
+        return $this->showtime?->room?->name ?: 'Phòng đang cập nhật';
+    }
 }
