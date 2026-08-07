@@ -62,7 +62,7 @@
         <section class="cinema-card p-6">
             <h2 class="text-xl font-extrabold app-text">Thống kê sơ đồ ghế</h2>
             @if($published)
-                <p class="mt-1 text-sm app-muted">Phiên bản {{ $published->version }} · {{ $published->status_label }}</p>
+                <p class="mt-1 text-sm app-muted">{{ $published->display_name }} · {{ $published->status_label }}</p>
                 <dl class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div><dt class="text-sm app-muted">{{ __('rooms.fields.normal_seats') }}</dt><dd class="text-2xl font-extrabold app-text">{{ $publishedSeats->where('type', 'normal')->count() }}</dd></div>
                     <div><dt class="text-sm app-muted">{{ __('rooms.fields.vip_seats') }}</dt><dd class="text-2xl font-extrabold app-text">{{ $publishedSeats->where('type', 'vip')->count() }}</dd></div>
@@ -90,5 +90,18 @@
             </form>
         </section>
     @endcan
+
+    @if(isset($templates) && $templates->isNotEmpty() && auth()->user()->hasPermission('room_layouts.apply_template') && ! $room->draftLayout)
+        <section class="cinema-card p-6">
+            <h2 class="text-xl font-extrabold app-text">Tạo phiên bản từ mẫu</h2>
+            <p class="mt-1 app-muted">Tạo một bản nháp độc lập để kiểm tra trước khi phát hành. Ghế lịch sử không bị đổi mã hay xóa.</p>
+            <form method="POST" action="{{ route('admin.rooms.layout.apply-template', $room) }}" class="mt-4 grid gap-4 md:grid-cols-3">@csrf
+                <select name="template_id" class="cinema-input" required><option value="">Chọn mẫu</option>@foreach($templates as $template)<option value="{{ $template->id }}">{{ $template->name }} · {{ $template->rows }}×{{ $template->columns }}</option>@endforeach</select>
+                <input name="layout_name" class="cinema-input" required minlength="5" placeholder="Tên phiên bản có ý nghĩa">
+                <input name="change_note" class="cinema-input" placeholder="Mục đích thay đổi">
+                <button class="btn-primary md:col-span-3">Tạo bản nháp từ mẫu</button>
+            </form>
+        </section>
+    @endif
 </div>
 @endsection

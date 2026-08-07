@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\SaveMovieRequest;
 use App\Models\Genre;
 use App\Models\Movie;
 use App\Services\MovieImageService;
+use App\Services\MovieLifecycleService;
 use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,6 +54,7 @@ class MovieController extends Controller
         $validated = $request->validated();
         $genres = $validated['genres'] ?? [];
         unset($validated['genres'], $validated['poster'], $validated['cover_image']);
+        $validated['status'] = Movie::STATUS_DRAFT;
         $validated['slug'] = $this->uniqueSlug($validated['slug'] ?? null, $validated['title']);
         $stored = [];
 
@@ -81,11 +83,13 @@ class MovieController extends Controller
     /**
      * Display the specified movie.
      */
-    public function show(Movie $movie)
+    public function show(Movie $movie, MovieLifecycleService $lifecycle)
     {
         $movie->load('genres');
 
-        return view('admin.movies.show', compact('movie'));
+        $allowedTransitions = $lifecycle->allowedTransitions($movie);
+
+        return view('admin.movies.show', compact('movie', 'allowedTransitions'));
     }
 
     /**
@@ -93,6 +97,7 @@ class MovieController extends Controller
      */
     public function edit(Movie $movie)
     {
+        abort_if($movie->status === Movie::STATUS_ARCHIVED, 409, 'Phim đã lưu trữ chỉ có thể xem.');
         $genres = Genre::all();
         $movie->load('genres');
 
@@ -104,9 +109,11 @@ class MovieController extends Controller
      */
     public function update(SaveMovieRequest $request, Movie $movie, MovieImageService $images, ShowtimeScheduleService $schedule): RedirectResponse
     {
+        abort_if($movie->status === Movie::STATUS_ARCHIVED, 409, 'Phim đã lưu trữ chỉ có thể xem.');
         $validated = $request->validated();
         $genres = $validated['genres'] ?? [];
         unset($validated['genres'], $validated['poster'], $validated['cover_image']);
+        unset($validated['status']);
         $validated['slug'] = $this->uniqueSlug($validated['slug'] ?? null, $validated['title'], $movie->id);
         $oldPoster = $movie->poster;
         $oldCover = $movie->cover_image;
@@ -149,25 +156,13 @@ class MovieController extends Controller
             ->with('success', 'Đã cập nhật phim thành công.');
     }
 
-    /**
-     * Remove the specified movie from storage.
-     */
-    public function destroy(Movie $movie, MovieImageService $images): RedirectResponse
+    public function lifecycle(Request $request, Movie $movie, MovieLifecycleService $lifecycle): RedirectResponse
     {
-        $poster = $movie->poster;
-        $cover = $movie->cover_image;
+        $validated = $request->validate(['status' => ['required', 'string']]);
+        $movie = $lifecycle->transition($movie, $validated['status'], $request->user());
 
-        DB::transaction(function () use ($movie): void {
-            $movie->genres()->detach();
-            $movie->delete();
-        });
-
-        $images->deleteIfUnreferenced($poster);
-        $images->deleteIfUnreferenced($cover);
-
-        return redirect()
-            ->route('admin.movies.index')
-            ->with('success', 'Đã xóa phim thành công.');
+        return redirect()->route('admin.movies.show', $movie)
+            ->with('success', 'Đã cập nhật vòng đời phim. Dữ liệu suất chiếu và hình ảnh được giữ nguyên.');
     }
 
     private function uniqueSlug(?string $requested, string $title, ?int $excludingMovieId = null): string

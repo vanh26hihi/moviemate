@@ -26,7 +26,7 @@ class MovieController extends Controller
             ->with('genres')
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
-            ->whereIn('status', ['now_showing', 'coming_soon']);
+            ->whereIn('status', Movie::PUBLIC_STATUSES);
 
         $selectedCinema = null;
         if ($request->filled('cinema')) {
@@ -69,7 +69,7 @@ class MovieController extends Controller
         */
         $status = $request->query('status');
 
-        if (in_array($status, ['now_showing', 'coming_soon'], true)) {
+        if (in_array($status, Movie::PUBLIC_STATUSES, true)) {
             $query->where('status', $status);
         }
 
@@ -156,7 +156,7 @@ class MovieController extends Controller
         |--------------------------------------------------------------------------
         */
         $countries = Movie::query()
-            ->whereIn('status', ['now_showing', 'coming_soon'])
+            ->whereIn('status', Movie::PUBLIC_STATUSES)
             ->whereNotNull('country')
             ->where('country', '!=', '')
             ->distinct()

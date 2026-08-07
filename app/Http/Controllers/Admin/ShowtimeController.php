@@ -137,7 +137,7 @@ class ShowtimeController extends Controller
     private function formData(): array
     {
         return [
-            'movies' => Movie::query()->where('status', '!=', 'stopped')->orderBy('title')->get(),
+            'movies' => Movie::query()->whereIn('status', Movie::SCHEDULABLE_STATUSES)->orderBy('title')->get(),
             'rooms' => $this->operationalRooms(),
             'cinema' => $this->cinemaAccess->currentCinema(auth()->user()),
             'cleaningBufferMinutes' => $this->schedule->cleaningBufferMinutes(),

@@ -146,7 +146,7 @@ class SingleCinemaOperationsTest extends TestCase
         ]);
         $legacy = Cinema::factory()->legacy()->create();
         $legacyRoom = Room::factory()->create(['cinema_id' => $legacy->id, 'code' => 'LEG-01']);
-        $movie = Movie::query()->create(['title' => 'Test Movie', 'slug' => 'test-movie']);
+        $movie = Movie::query()->create(['title' => 'Test Movie', 'slug' => 'test-movie', 'status' => Movie::STATUS_NOW_SHOWING]);
         $payload = [
             'movie_id' => $movie->id,
             'show_date' => now()->addDay()->toDateString(),

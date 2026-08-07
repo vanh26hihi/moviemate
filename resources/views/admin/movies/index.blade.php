@@ -5,9 +5,15 @@
 
 @php
     $statusMeta = [
+        'draft' => [
+            'label' => 'Bản nháp',
+            'class' => 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+        ],
         'now_showing' => ['label' => 'Đang chiếu', 'class' => 'bg-success/10 text-success border border-success/20'],
         'coming_soon' => ['label' => 'Sắp chiếu', 'class' => 'bg-warning/10 text-warning border border-warning/20'],
-        'stopped' => ['label' => 'Ngừng chiếu', 'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'],
+        'draft' => ['label' => 'Bản nháp', 'class' => 'bg-blue-500/10 text-blue-400 border border-blue-500/20'],
+        'inactive' => ['label' => 'Ngừng hoạt động', 'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'],
+        'archived' => ['label' => 'Đã lưu trữ', 'class' => 'bg-slate-700/20 text-slate-400 border border-slate-600/20'],
     ];
 @endphp
 
@@ -62,9 +68,13 @@
             'label' => 'Sắp chiếu',
             'class' => 'bg-warning/10 text-warning border border-warning/20',
         ],
-        'stopped' => [
-            'label' => 'Ngừng chiếu',
+        'inactive' => [
+            'label' => 'Ngừng hoạt động',
             'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
+        ],
+        'archived' => [
+            'label' => 'Đã lưu trữ',
+            'class' => 'bg-slate-700/20 text-slate-400 border border-slate-600/20',
         ],
     ];
 @endphp
@@ -106,14 +116,6 @@
                                 @can('movies.update')<a href="{{ route('admin.movies.edit', $movie) }}" class="admin-btn-warning admin-action-btn" title="Sửa" aria-label="Sửa" data-tooltip="Sửa">
                                     <i class="ph ph-pencil-simple"></i>
                                 </a>@endcan
-                                @can('movies.delete')<form action="{{ route('admin.movies.destroy', $movie) }}" method="POST"
-                                      onsubmit="return confirm('Bạn có chắc muốn xóa phim này?');" class="inline">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="admin-btn-danger admin-action-btn" title="Xóa" aria-label="Xóa" data-tooltip="Xóa">
-                                        <i class="ph ph-trash"></i>
-                                    </button>
-                                </form>@endcan
                             </div>
                         </td>
                     </tr>

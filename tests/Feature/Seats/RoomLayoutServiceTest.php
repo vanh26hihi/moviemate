@@ -351,7 +351,7 @@ class RoomLayoutServiceTest extends TestCase
     {
         $draft = $this->service->createBlankDraft($this->room, null, 1, 1);
         $this->service->saveDraft($draft, [
-            'name' => 'Version 1', 'rows' => 1, 'columns' => 1, 'screen_position' => 'top',
+            'name' => 'Sơ đồ kiểm thử một ghế', 'rows' => 1, 'columns' => 1, 'screen_position' => 'top',
             'cells' => [['kind' => 'normal', 'x' => 1, 'y' => 1, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'status' => 'active']],
         ]);
 

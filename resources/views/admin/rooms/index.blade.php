@@ -141,17 +141,6 @@
                                             </button>
                                         </form>
                                     @endcan
-                                    @can('rooms.delete')
-                                        @if($room->showtimes_count === 0)
-                                            <form action="{{ route('admin.rooms.destroy', $room) }}" method="POST" onsubmit="return confirm(@js(__('rooms.confirm.delete')));">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="inline-flex h-9 items-center justify-center rounded-xl border app-border px-3 text-xs app-muted transition-colors hover:border-error hover:bg-error hover:text-white" title="{{ __('rooms.actions.delete') }}" aria-label="{{ __('rooms.actions.delete') }} {{ $room->name }}">
-                                                    <i class="ph ph-trash" aria-hidden="true"></i> <span class="ml-1">{{ __('rooms.actions.delete') }}</span>
-                                                </button>
-                                            </form>
-                                        @endif
-                                    @endcan
                                 </div>
                             </td>
                         </tr>

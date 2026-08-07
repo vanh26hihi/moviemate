@@ -60,6 +60,9 @@ class SaveRoomRequest extends FormRequest
             'room_type' => ['required', Rule::in(['2D', '3D', 'IMAX'])],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'cleaning_buffer_minutes' => ['nullable', 'integer', 'between:0,180'],
+            'template_id' => [$room instanceof Room ? 'prohibited' : 'nullable', 'integer', Rule::exists('room_layout_templates', 'id')->where('status', 'active')],
+            'layout_name' => ['nullable', 'required_with:template_id', 'string', 'min:5', 'max:255'],
+            'change_note' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -72,6 +75,8 @@ class SaveRoomRequest extends FormRequest
             'room_type' => 'loại phòng',
             'status' => 'trạng thái',
             'cleaning_buffer_minutes' => 'thời gian vệ sinh phòng',
+            'template_id' => 'mẫu sơ đồ phòng',
+            'layout_name' => 'tên phiên bản sơ đồ',
         ];
     }
 }

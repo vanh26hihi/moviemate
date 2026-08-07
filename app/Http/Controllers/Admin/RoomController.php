@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveRoomRequest;
 use App\Models\Cinema;
 use App\Models\Room;
+use App\Models\RoomLayoutTemplate;
 use App\Services\ActivityLogger;
+use App\Services\ApplyRoomLayoutTemplateService;
 use App\Services\CinemaAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -21,6 +23,7 @@ class RoomController extends Controller
     public function __construct(
         private readonly CinemaAccessService $cinemaAccess,
         private readonly ActivityLogger $activityLogger,
+        private readonly ApplyRoomLayoutTemplateService $templateApplicator,
     ) {}
 
     public function index(Request $request): View
@@ -54,8 +57,9 @@ class RoomController extends Controller
     {
         $cinema = $this->cinemaAccess->currentCinema(auth()->user());
         $cinemas = $this->cinemaAccess->accessibleCinemas(auth()->user());
+        $templates = RoomLayoutTemplate::query()->active()->orderBy('name')->get();
 
-        return view('admin.rooms.create', compact('cinema', 'cinemas'));
+        return view('admin.rooms.create', compact('cinema', 'cinemas', 'templates'));
     }
 
     public function store(SaveRoomRequest $request): RedirectResponse
@@ -64,19 +68,27 @@ class RoomController extends Controller
         $cinemaId = $this->targetCinemaId($request, $validated);
         $this->ensureOperationalNameIsUnique($validated, cinemaId: $cinemaId);
 
-        $room = Room::query()->create([
-            ...$validated,
-            'total_seats' => 0,
-            'cinema_id' => $cinemaId,
-        ]);
+        $templateId = $validated['template_id'] ?? null;
+        $layoutName = $validated['layout_name'] ?? null;
+        $changeNote = $validated['change_note'] ?? null;
+        unset($validated['template_id'], $validated['layout_name'], $validated['change_note']);
+        $room = DB::transaction(function () use ($validated, $cinemaId, $templateId, $layoutName, $changeNote, $request): Room {
+            $room = Room::query()->create([...$validated, 'total_seats' => 0, 'cinema_id' => $cinemaId]);
+            if ($templateId) {
+                $template = RoomLayoutTemplate::query()->findOrFail($templateId);
+                $this->templateApplicator->apply($room, $template, (string) $layoutName, $changeNote, $request->user(), true);
+            }
 
-        if ($room->status === 'active') {
+            return $room;
+        });
+
+        if ($room->status === 'active' && ! $templateId) {
             return redirect()->route('admin.rooms.layout.show', $room)
                 ->with('success', 'Đã tạo phòng chiếu. Hãy thiết kế và phát hành sơ đồ ghế trước khi tạo suất chiếu.');
         }
 
         return redirect()->route('admin.rooms.show', $room)
-            ->with('success', 'Đã tạo phòng chiếu ở trạng thái ngừng hoạt động.');
+            ->with('success', $templateId ? 'Đã tạo phòng và phát hành sơ đồ độc lập từ mẫu.' : 'Đã tạo phòng chiếu ở trạng thái ngừng hoạt động.');
     }
 
     public function show(Room $room): View
@@ -91,8 +103,26 @@ class RoomController extends Controller
             'showtimes',
             'showtimes as upcoming_showtimes_count' => fn (Builder $query) => $this->futureActiveShowtimes($query),
         ]);
+        $templates = auth()->user()->hasPermission('room_layouts.apply_template')
+            ? RoomLayoutTemplate::query()->active()->orderBy('name')->get()
+            : collect();
 
-        return view('admin.rooms.show', compact('room'));
+        return view('admin.rooms.show', compact('room', 'templates'));
+    }
+
+    public function applyTemplate(Request $request, Room $room): RedirectResponse
+    {
+        $this->assertManagedRoom($room);
+        $validated = $request->validate([
+            'template_id' => ['required', 'integer', Rule::exists('room_layout_templates', 'id')->where('status', 'active')],
+            'layout_name' => ['required', 'string', 'min:5', 'max:255'],
+            'change_note' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $template = RoomLayoutTemplate::query()->findOrFail($validated['template_id']);
+        $layout = $this->templateApplicator->apply($room, $template, $validated['layout_name'], $validated['change_note'] ?? null, $request->user());
+
+        return redirect()->route('admin.rooms.layout.show', $room)
+            ->with('success', "Đã tạo bản nháp {$layout->display_name} từ mẫu. Hãy kiểm tra trước khi phát hành.");
     }
 
     public function edit(Room $room): View
@@ -157,22 +187,10 @@ class RoomController extends Controller
         return back()->with('success', $message);
     }
 
-    public function destroy(Room $room): RedirectResponse
+    public function destroy(Room $room): never
     {
         $this->assertManagedRoom($room);
-        abort_if($room->showtimes()->exists(), 409, 'Không thể xóa phòng đã có lịch sử suất chiếu hoặc đặt vé. Hãy ngừng hoạt động phòng để bảo toàn dữ liệu.');
-
-        DB::transaction(function () use ($room): void {
-            DB::table('room_layout_cells')->whereIn(
-                'room_layout_id',
-                DB::table('room_layouts')->where('room_id', $room->id)->select('id')
-            )->delete();
-            DB::table('room_layouts')->where('room_id', $room->id)->delete();
-            $room->seats()->delete();
-            $room->delete();
-        });
-
-        return redirect()->route('admin.rooms.index')->with('success', 'Đã xóa phòng chiếu chưa từng được sử dụng.');
+        abort(409, 'Không thể xóa phòng. Hãy ngừng hoạt động phòng để bảo toàn ghế, sơ đồ và lịch sử vận hành.');
     }
 
     private function assertManagedRoom(Room $room): void

@@ -68,9 +68,10 @@ final class StatusLabel
             'retry_authorized' => 'Được phép in lại',
         ],
         'movie' => [
+            'draft' => 'Bản nháp',
             'now_showing' => 'Đang chiếu',
             'coming_soon' => 'Sắp chiếu',
-            'stopped' => 'Ngừng chiếu',
+            'inactive' => 'Ngừng hoạt động',
             'archived' => 'Đã lưu trữ',
         ],
         'showtime' => [
@@ -96,6 +97,11 @@ final class StatusLabel
             'draft' => 'Bản nháp',
             'published' => 'Đã phát hành',
             'retired' => 'Đã ngừng sử dụng',
+        ],
+        'layout_template' => [
+            'draft' => 'Bản nháp',
+            'active' => 'Đang sử dụng',
+            'archived' => 'Đã lưu trữ',
         ],
         'seat' => [
             'active' => 'Đang sử dụng',

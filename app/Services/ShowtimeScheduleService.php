@@ -242,7 +242,7 @@ class ShowtimeScheduleService
     {
         $movie = Movie::query()->findOrFail($movieId);
         $this->validateRuntime($movie);
-        if ($movie->status === 'stopped') {
+        if (! in_array($movie->status, Movie::SCHEDULABLE_STATUSES, true)) {
             throw new ShowtimeScheduleException('Phim đã ngừng chiếu không thể xếp lịch.', 'movie_id');
         }
 

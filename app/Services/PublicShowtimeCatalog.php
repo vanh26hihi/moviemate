@@ -17,7 +17,7 @@ final class PublicShowtimeCatalog
 {
     public const WINDOW_DAYS = 14;
 
-    public const MOVIE_STATUSES = ['now_showing', 'coming_soon'];
+    public const MOVIE_STATUSES = Movie::PUBLIC_STATUSES;
 
     public function __construct(
         private readonly TicketPricingService $pricing,

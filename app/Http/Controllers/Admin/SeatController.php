@@ -55,17 +55,19 @@ class SeatController extends Controller
             'rows' => ['nullable', 'integer', 'min:1', 'max:30'],
             'columns' => ['nullable', 'integer', 'min:1', 'max:40'],
             'screen_position' => ['nullable', 'in:top,bottom'],
+            'name' => ['nullable', 'string', 'min:5', 'max:255'],
         ]);
 
         if ($this->layouts->latestPublishedFor($room)) {
-            $this->layouts->clonePublishedToDraft($room, Auth::id());
+            $this->layouts->clonePublishedToDraft($room, Auth::id(), $validated['name'] ?? null);
         } else {
             $this->layouts->createBlankDraft(
                 $room,
                 Auth::id(),
                 (int) ($validated['rows'] ?? 10),
                 (int) ($validated['columns'] ?? 12),
-                (string) ($validated['screen_position'] ?? 'top')
+                (string) ($validated['screen_position'] ?? 'top'),
+                $validated['name'] ?? null,
             );
         }
 
@@ -103,7 +105,7 @@ class SeatController extends Controller
         });
 
         return redirect()->route('admin.rooms.layout.show', $room)
-            ->with('success', "Đã phát hành sơ đồ ghế phiên bản {$published->version}.");
+            ->with('success', "Đã phát hành {$published->display_name}.");
     }
 
     public function preview(Request $request, Room $room)

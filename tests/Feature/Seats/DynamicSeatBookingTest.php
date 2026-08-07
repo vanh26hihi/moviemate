@@ -48,7 +48,7 @@ class DynamicSeatBookingTest extends TestCase
                 'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
             ]);
         }
-        $this->artisan('moviemate:rebuild-seat-layouts', ['--force' => true])->assertSuccessful();
+        $this->artisan('moviemate:rebuild-seat-layouts', ['--initialize-empty' => true])->assertSuccessful();
         $this->rooms = Room::query()->whereIn('code', ['P01', 'P02', 'P03'])->get()->keyBy('code');
         $movieId = DB::table('movies')->insertGetId([
             'title' => 'Booking Movie', 'slug' => 'booking-movie', 'duration' => 100,
@@ -87,11 +87,7 @@ class DynamicSeatBookingTest extends TestCase
             ->cells->where('y_position', 8)->where('cell_type', 'seat')->pluck('seat_id')->sort()->values();
         $draft = $service->clonePublishedToDraft($room)->load('cells.seat');
         $cells = $draft->cells->map(function ($cell): array {
-            $x = match ($cell->y_position) {
-                8 => $cell->x_position + 1,
-                10 => $cell->x_position + 2,
-                default => $cell->x_position,
-            };
+            $x = $cell->x_position;
             if ($cell->cell_type === 'aisle') {
                 return ['kind' => 'aisle', 'x' => $x, 'y' => $cell->y_position];
             }
@@ -104,10 +100,10 @@ class DynamicSeatBookingTest extends TestCase
                 'pair_code' => $cell->seat->pair_code, 'pair_position' => $cell->seat->pair_position,
             ];
         })->push(
-            ['kind' => 'normal', 'x' => 1, 'y' => 8, 'row' => 'H', 'number' => 13, 'seat_code' => 'H13', 'status' => 'active'],
+            ['kind' => 'normal', 'x' => 14, 'y' => 8, 'row' => 'H', 'number' => 13, 'seat_code' => 'H13', 'status' => 'active'],
             ['kind' => 'normal', 'x' => 15, 'y' => 8, 'row' => 'H', 'number' => 14, 'seat_code' => 'H14', 'status' => 'active'],
-            ['kind' => 'vip', 'x' => 1, 'y' => 10, 'row' => 'J', 'number' => 13, 'seat_code' => 'J13', 'status' => 'active'],
-            ['kind' => 'vip', 'x' => 2, 'y' => 10, 'row' => 'J', 'number' => 14, 'seat_code' => 'J14', 'status' => 'active'],
+            ['kind' => 'vip', 'x' => 14, 'y' => 10, 'row' => 'J', 'number' => 13, 'seat_code' => 'J13', 'status' => 'active'],
+            ['kind' => 'vip', 'x' => 15, 'y' => 10, 'row' => 'J', 'number' => 14, 'seat_code' => 'J14', 'status' => 'active'],
             ['kind' => 'vip', 'x' => 16, 'y' => 10, 'row' => 'J', 'number' => 15, 'seat_code' => 'J15', 'status' => 'active'],
             ['kind' => 'vip', 'x' => 17, 'y' => 10, 'row' => 'J', 'number' => 16, 'seat_code' => 'J16', 'status' => 'active'],
         )->all();
@@ -134,8 +130,8 @@ class DynamicSeatBookingTest extends TestCase
         $this->assertSame(14, $v2->cells()->where('y_position', 8)->where('cell_type', 'seat')->count());
         $this->assertSame(16, $v2->cells()->where('y_position', 10)->where('cell_type', 'seat')->count());
         $this->assertSame(12, $v2->cells()->where('y_position', 9)->where('cell_type', 'seat')->count());
-        $this->assertDatabaseHas('room_layout_cells', ['room_layout_id' => $v2->id, 'x_position' => 8, 'y_position' => 8, 'cell_type' => 'aisle']);
-        $this->assertDatabaseHas('room_layout_cells', ['room_layout_id' => $v2->id, 'x_position' => 9, 'y_position' => 10, 'cell_type' => 'aisle']);
+        $this->assertDatabaseHas('room_layout_cells', ['room_layout_id' => $v2->id, 'x_position' => 7, 'y_position' => 8, 'cell_type' => 'aisle']);
+        $this->assertDatabaseHas('room_layout_cells', ['room_layout_id' => $v2->id, 'x_position' => 7, 'y_position' => 10, 'cell_type' => 'aisle']);
         $this->assertDatabaseHas('room_layout_cells', ['room_layout_id' => $v2->id, 'x_position' => 7, 'y_position' => 7, 'cell_type' => 'aisle']);
         $this->assertEquals($hIdsBeforePublish, $v2->cells()->where('y_position', 8)->where('cell_type', 'seat')->pluck('seat_id')->sort()->values());
         $this->assertEquals($originalHIds, $v2->cells->where('y_position', 8)->where('cell_type', 'seat')

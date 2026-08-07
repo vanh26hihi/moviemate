@@ -70,7 +70,7 @@
         <div class="flex flex-wrap gap-2">
             @if($layout)
                 <a class="btn-secondary" href="{{ route('admin.rooms.layout.preview', ['room' => $room, 'version' => $layout->version]) }}">
-                    <i class="ph ph-eye" aria-hidden="true"></i>Xem trước phiên bản {{ $layout->version }}
+                    <i class="ph ph-eye" aria-hidden="true"></i>Xem trước {{ $layout->display_name }}
                 </a>
             @endif
             <a class="btn-secondary" href="{{ route('admin.rooms.index') }}"><i class="ph ph-list-bullets" aria-hidden="true"></i>Danh sách phòng</a>
@@ -83,10 +83,11 @@
 
     @if(!$layout || !$isDraft)
         <div class="cinema-card p-6">
-            <h2 class="text-xl font-bold app-text">{{ $layout ? "Sơ đồ đã phát hành phiên bản {$layout->version}" : 'Phòng chưa có sơ đồ ghế' }}</h2>
+            <h2 class="text-xl font-bold app-text">{{ $layout ? $layout->display_name : 'Phòng chưa có sơ đồ ghế' }}</h2>
             <p class="mt-2 app-muted">{{ $layout ? 'Sao chép sơ đồ này thành bản nháp mới trước khi chỉnh sửa.' : 'Chọn kích thước lưới ban đầu. Các ô trống sẽ không được lưu.' }}</p>
             <form method="POST" action="{{ route('admin.rooms.layout.draft', $room) }}" class="mt-5 flex flex-wrap items-end gap-4">
                 @csrf
+                <label class="cinema-label">Tên sơ đồ mới<input class="cinema-input mt-1" name="name" required minlength="5" value="{{ old('name', $layout ? 'Điều chỉnh từ '.$layout->display_name : 'Sơ đồ phòng '.$room->code) }}"></label>
                 @unless($layout)
                     <label class="cinema-label">Số hàng ghế <input class="cinema-input mt-1 w-28" type="number" name="rows" min="1" max="30" value="{{ old('rows', 10) }}"></label>
                     <label class="cinema-label">Chiều rộng vùng thiết kế <input class="cinema-input mt-1 w-28" type="number" name="columns" min="1" max="40" value="{{ old('columns', 12) }}"><span class="mt-1 block text-xs font-normal app-muted">Đây là chiều rộng vùng bố trí. Mỗi hàng có thể sử dụng số ô khác nhau.</span></label>
@@ -109,7 +110,7 @@
             @if($isDraft)
                 <div class="mt-5 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Điều chỉnh chiều rộng vùng thiết kế">
                     <span class="mr-1 text-xs font-extrabold uppercase tracking-wider app-muted">Vùng thiết kế</span>
-                    <button type="button" data-canvas-action="expand-left" data-amount="1" class="btn-secondary !px-3 !py-2 text-xs" aria-label="Mở rộng bên trái thêm 1 cột"><i class="ph ph-arrow-line-left" aria-hidden="true"></i>Mở rộng trái +1</button>
+                    <button type="button" data-canvas-action="expand-left" data-amount="1" class="btn-secondary !px-3 !py-2 text-xs" aria-label="Mở rộng bên trái thêm 1 cột"><i class="ph ph-arrow-line-left" aria-hidden="true"></i>Mở rộng bên trái +1</button>
                     <button type="button" data-canvas-action="expand-left" data-amount="2" class="btn-secondary !px-3 !py-2 text-xs" aria-label="Mở rộng bên trái thêm 2 cột">+2 trái</button>
                     <button type="button" data-canvas-action="expand-right" data-amount="1" class="btn-secondary !px-3 !py-2 text-xs" aria-label="Mở rộng bên phải thêm 1 cột"><i class="ph ph-arrow-line-right" aria-hidden="true"></i>Mở rộng phải +1</button>
                     <button type="button" data-canvas-action="expand-right" data-amount="2" class="btn-secondary !px-3 !py-2 text-xs" aria-label="Mở rộng bên phải thêm 2 cột">+2 phải</button>
@@ -176,11 +177,11 @@
             </div>
 
             <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t app-border pt-5">
-                <p id="layoutGridHelp" class="text-sm app-muted"><span id="seatCount">0</span> vị trí ghế · Bản nháp phiên bản {{ $layout->version }} · Công cụ ghế đôi ghép ô hiện tại với ô liền bên phải.</p>
+                <p id="layoutGridHelp" class="text-sm app-muted"><span id="seatCount">0</span> vị trí ghế · {{ $layout->display_name }} · Công cụ ghế đôi ghép ô hiện tại với ô liền bên phải.</p>
                 @if($isDraft)
                     <div class="flex flex-wrap gap-2">
                         <form id="saveLayoutForm" method="POST" action="{{ route('admin.rooms.layout.update', $room) }}">@csrf @method('PATCH')<input type="hidden" name="layout" id="layoutPayload"><button class="btn-secondary"><i class="ph ph-floppy-disk" aria-hidden="true"></i>Lưu bản nháp</button></form>
-                        <form id="publishLayoutForm" method="POST" action="{{ route('admin.rooms.layout.publish', $room) }}">@csrf<button class="btn-primary"><i class="ph ph-upload-simple" aria-hidden="true"></i>Phát hành phiên bản {{ $layout->version }}</button></form>
+                        <form id="publishLayoutForm" method="POST" action="{{ route('admin.rooms.layout.publish', $room) }}">@csrf<button class="btn-primary"><i class="ph ph-upload-simple" aria-hidden="true"></i>Phát hành {{ $layout->display_name }}</button></form>
                     </div>
                 @endif
             </div>

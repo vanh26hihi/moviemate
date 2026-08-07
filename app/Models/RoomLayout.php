@@ -19,6 +19,9 @@ class RoomLayout extends Model
         'columns',
         'screen_position',
         'status',
+        'change_note',
+        'source_template_id',
+        'source_template_name_snapshot',
         'published_at',
         'created_by',
         'updated_by',
@@ -52,6 +55,11 @@ class RoomLayout extends Model
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
+    }
+
+    public function sourceTemplate(): BelongsTo
+    {
+        return $this->belongsTo(RoomLayoutTemplate::class, 'source_template_id');
     }
 
     public function cells(): HasMany
@@ -88,7 +96,7 @@ class RoomLayout extends Model
     {
         $name = trim((string) $this->name);
         if ($name === '') {
-            return 'Sơ đồ ghế phiên bản '.$this->version;
+            return 'Sơ đồ lịch sử v'.$this->version;
         }
 
         return (string) preg_replace('/\blayout\b/iu', 'sơ đồ', $name);

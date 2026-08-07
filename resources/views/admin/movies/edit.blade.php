@@ -77,14 +77,7 @@
                 </div>
             </div>
 
-            <div>
-                <label class="admin-label">Trạng thái *</label>
-                <select name="status" required class="admin-input">
-                    <option value="now_showing" {{ old('status', $movie->status) == 'now_showing' ? 'selected' : '' }}>Đang chiếu</option>
-                    <option value="coming_soon" {{ old('status', $movie->status) == 'coming_soon' ? 'selected' : '' }}>Sắp chiếu</option>
-                    <option value="stopped" {{ old('status', $movie->status) == 'stopped' ? 'selected' : '' }}>Ngừng chiếu</option>
-                </select>
-            </div>
+            <div><label class="admin-label">Trạng thái</label><div class="admin-input">{{ $movie->status_label }}</div><p class="admin-help">Trạng thái được quản lý riêng tại trang chi tiết phim.</p></div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="rounded-2xl app-card-soft border app-border p-4">
