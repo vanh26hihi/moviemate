@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Counter;
 
+use App\Domain\Payments\PayOsSigner;
+use App\Domain\Payments\VerifiedPaymentData;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\BookingTicketDelivery;
@@ -17,10 +19,16 @@ use App\Models\Seat;
 use App\Models\Showtime;
 use App\Models\TicketCheckinEvent;
 use App\Models\User;
+use App\Services\Admin\AdminPaymentQuery;
 use App\Services\BookingTokenService;
+use App\Services\Payments\PayOsPaymentStateService;
+use App\Services\Payments\VerifiedPaymentService;
+use App\Services\Payments\VnpayExplicitCancellationService;
 use App\Services\Tickets\TicketCheckinCapability;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -167,7 +175,7 @@ final class CounterSalesR8Test extends TestCase
         ])->assertSessionHasErrors(['amount', 'settled_by_user_id']);
         $this->assertSame('unpaid', $booking->fresh()->payment_status);
 
-        $this->post(route('staff.counter.cash', $booking))->assertRedirect(route('staff.counter.review', $booking));
+        $this->post(route('staff.counter.cash', $booking))->assertRedirect(route('staff.counter.payment-result', $booking));
         $payment = Payment::query()->sole();
         $this->assertSame(Payment::PROVIDER_COUNTER_CASH, $payment->provider);
         $this->assertSame($settler->id, $payment->settled_by_user_id);
@@ -193,6 +201,9 @@ final class CounterSalesR8Test extends TestCase
         $this->post(route('staff.counter.cash', $booking))->assertRedirect();
 
         $this->assertDatabaseCount('booking_ticket_deliveries', 1);
+        $summary = app(AdminPaymentQuery::class)->summary([]);
+        $this->assertSame(0, $summary['online']);
+        $this->assertSame(1, $summary['counter']);
         $this->assertDatabaseHas('booking_ticket_deliveries', [
             'booking_id' => $booking->id, 'status' => BookingTicketDelivery::STATUS_SENT,
         ]);
@@ -296,6 +307,218 @@ final class CounterSalesR8Test extends TestCase
         $this->assertSame($other->id, $booking->fresh()->cinema_id);
     }
 
+    public function test_counter_vnpay_keeps_counter_identity_uses_provider_evidence_and_transitions_to_print(): void
+    {
+        $this->configureVnpay();
+        [$booking, , $staff] = $this->counterHold('counter-vnpay@example.test');
+
+        $this->actingAs($staff)->post(route('staff.counter.payments.initiate', [$booking, 'vnpay']))
+            ->assertRedirectContains('sandbox.vnpayment.vn/paymentv2/vpcpay.html');
+
+        $payment = $booking->payments()->sole();
+        $this->assertSame('vnpay', $payment->provider);
+        $this->assertSame((int) $booking->total_amount, $payment->amount);
+        $this->assertSame(Booking::SALES_CHANNEL_COUNTER, $booking->fresh()->sales_channel);
+        $this->assertSame($staff->id, $booking->fresh()->created_by_staff_id);
+        $this->assertNull($payment->settled_at);
+        $this->assertNull($payment->settled_by_user_id);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'counter.provider_payment_initiated']);
+        $returnedUrl = route('staff.counter.payment-result', ['booking' => $booking, 'returned' => 1]);
+        $this->get(route('payments.vnpay.return', ['ref' => $payment->order_code]))
+            ->assertRedirect($returnedUrl);
+        $this->get($returnedUrl)->assertOk()->assertSee('Đang xác minh thanh toán VNPAY');
+
+        $this->verifyProviderPayment($payment, 'VNPAY-TXN-COUNTER');
+        $payment->refresh();
+        $this->assertNotNull($payment->verified_at);
+        $this->assertNull($payment->settled_at);
+        $this->assertSame('paid', $booking->fresh()->booking_status);
+        $this->assertDatabaseCount('booking_ticket_deliveries', 1);
+
+        $this->get(route('staff.counter.payment-result', $booking))
+            ->assertOk()->assertSee('Thanh toán thành công')->assertSee('VNPAY')
+            ->assertSee('data-auto-print-start', false);
+        $this->get(route('payments.vnpay.return', ['ref' => $payment->order_code]))
+            ->assertRedirect(route('staff.counter.payment-result', ['booking' => $booking, 'returned' => 1]));
+        $this->post(route('staff.tickets.print.start', $booking))->assertRedirect();
+        $this->assertSame(1, BookingTicketPrint::query()->sole()->attempts_count);
+    }
+
+    public function test_counter_payos_keeps_provider_identity_reuses_checkout_and_transitions_to_print(): void
+    {
+        $this->configurePayOs();
+        Http::fake(function (Request $request) {
+            $requestData = $request->data();
+            $data = [
+                'orderCode' => $requestData['orderCode'],
+                'amount' => $requestData['amount'],
+                'currency' => 'VND',
+                'paymentLinkId' => '124c33293c43417ab7879e14c8d9eb18',
+                'status' => 'PENDING',
+                'checkoutUrl' => 'https://pay.payos.vn/web/124c33293c43417ab7879e14c8d9eb18',
+            ];
+
+            return Http::response([
+                'code' => '00',
+                'data' => $data,
+                'signature' => app(PayOsSigner::class)->signData($data, 'payos-counter-checksum-key'),
+            ]);
+        });
+        [$booking, , $staff] = $this->counterHold();
+
+        $this->actingAs($staff)->post(route('staff.counter.payments.initiate', [$booking, 'payos']))
+            ->assertRedirect('https://pay.payos.vn/web/124c33293c43417ab7879e14c8d9eb18');
+        $payment = $booking->payments()->sole();
+        $this->assertSame('payos', $payment->provider);
+        $this->assertSame((int) $booking->total_amount, $payment->amount);
+        $this->assertNotNull($payment->transaction_code);
+        $this->assertNull($payment->settled_at);
+        $this->assertSame($staff->id, $booking->fresh()->created_by_staff_id);
+
+        $this->actingAs($staff)->post(route('staff.counter.payments.initiate', [$booking, 'payos']))
+            ->assertRedirect('https://pay.payos.vn/web/124c33293c43417ab7879e14c8d9eb18');
+        $this->assertDatabaseCount('payments', 1);
+        Http::assertSentCount(1);
+
+        $this->verifyProviderPayment($payment, 'PAYOS-TXN-COUNTER');
+        $payment->refresh();
+        $this->assertNotNull($payment->verified_at);
+        $this->assertNull($payment->settled_at);
+        $this->assertSame('paid', $booking->fresh()->booking_status);
+        $this->get(route('staff.counter.payment-result', $booking))
+            ->assertOk()->assertSee('Thanh toán thành công')->assertSee('payOS')
+            ->assertSee('data-auto-print-start', false);
+        $this->get(route('payments.payos.return', ['attempt' => $payment->id]))
+            ->assertRedirect(route('staff.counter.payment-result', ['booking' => $booking, 'returned' => 1]));
+    }
+
+    public function test_cross_branch_counter_provider_payment_result_resume_and_print_are_denied(): void
+    {
+        $other = Cinema::factory()->create([
+            'code' => 'HD-PROVIDER', 'name' => 'Hà Đông Provider', 'status' => 'active',
+            'archived_at' => null, 'is_primary' => false,
+        ]);
+        $admin = $this->userWithRole('admin');
+        $staff = $this->userWithRole('staff');
+        $booking = $this->counterHoldForScenario($this->normalRowScenario($other, 1), $admin);
+        Payment::createForProvider('vnpay', [
+            'booking_id' => $booking->id,
+            'payment_method' => 'vnpay',
+            'order_code' => 'MMCOUNTERWRONGBRANCH',
+            'amount' => (int) $booking->total_amount,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_PENDING,
+            'expires_at' => now()->addMinutes(10),
+        ]);
+
+        $this->actingAs($staff)->post(route('staff.counter.payments.initiate', [$booking, 'vnpay']))->assertNotFound();
+        $this->post(route('staff.counter.payment.resume', $booking))->assertNotFound();
+        $this->get(route('staff.counter.payment-result', $booking))->assertNotFound();
+        $this->post(route('staff.tickets.print.start', $booking))->assertNotFound();
+    }
+
+    public function test_authoritative_counter_provider_cancellations_release_seats_while_processing_does_not(): void
+    {
+        $this->configureVnpay();
+        [$vnpayBooking] = $this->counterHold();
+        $vnpay = Payment::createForProvider('vnpay', [
+            'booking_id' => $vnpayBooking->id,
+            'payment_method' => 'vnpay',
+            'order_code' => 'MMCOUNTERCANCELVNPAY',
+            'amount' => (int) $vnpayBooking->total_amount,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_PENDING,
+        ]);
+        app(VnpayExplicitCancellationService::class)->finalizeVerified($vnpay, [
+            'vnp_TmnCode' => 'MOVIE123',
+            'vnp_TxnRef' => $vnpay->order_code,
+            'vnp_Amount' => (string) ($vnpay->amount * 100),
+            'vnp_ResponseCode' => '24',
+            'vnp_TransactionStatus' => '02',
+        ], 'return');
+        $this->assertSame(Payment::STATUS_FAILED, $vnpay->fresh()->status);
+        $this->assertSame('cancelled', $vnpayBooking->fresh()->booking_status);
+        $this->assertSame(0, $vnpayBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
+
+        [$payOsBooking] = $this->counterHold();
+        $payOs = Payment::createForProvider('payos', [
+            'booking_id' => $payOsBooking->id,
+            'payment_method' => 'payos',
+            'order_code' => '7654321',
+            'transaction_code' => 'counterPayOsLink123',
+            'amount' => (int) $payOsBooking->total_amount,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_PENDING,
+        ]);
+        $cancelled = [
+            'orderCode' => 7654321,
+            'amount' => $payOs->amount,
+            'currency' => 'VND',
+            'paymentLinkId' => $payOs->transaction_code,
+            'status' => 'CANCELLED',
+        ];
+        app(PayOsPaymentStateService::class)->apply($payOs, $cancelled, 'query', hash('sha256', 'cancelled'));
+        $this->assertSame(Payment::STATUS_FAILED, $payOs->fresh()->status);
+        $this->assertSame('cancelled', $payOsBooking->fresh()->booking_status);
+        $this->assertSame(0, $payOsBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
+
+        [$processingBooking] = $this->counterHold();
+        $processing = Payment::createForProvider('payos', [
+            'booking_id' => $processingBooking->id,
+            'payment_method' => 'payos',
+            'order_code' => '7654322',
+            'transaction_code' => 'counterPayOsLink124',
+            'amount' => (int) $processingBooking->total_amount,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_PENDING,
+        ]);
+        app(PayOsPaymentStateService::class)->apply($processing, [
+            'orderCode' => 7654322,
+            'amount' => $processing->amount,
+            'currency' => 'VND',
+            'paymentLinkId' => $processing->transaction_code,
+            'status' => 'PROCESSING',
+        ], 'query', hash('sha256', 'processing'));
+        $this->assertSame(Payment::STATUS_PROCESSING, $processing->fresh()->status);
+        $this->assertSame('pending_payment', $processingBooking->fresh()->booking_status);
+        $this->assertSame(1, $processingBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        $this->assertDatabaseCount('booking_ticket_prints', 0);
+    }
+
+    public function test_counter_payment_and_print_surfaces_have_bounded_query_counts(): void
+    {
+        $this->configureVnpay();
+        [$booking, , $staff] = $this->counterHold();
+        $counts = [];
+        $counts['counter_review'] = $this->queryCount(fn () => $this->actingAs($staff)
+            ->get(route('staff.counter.review', $booking))->assertOk());
+        $counts['vnpay_initiation'] = $this->queryCount(fn () => $this->post(
+            route('staff.counter.payments.initiate', [$booking, 'vnpay']),
+        )->assertRedirect());
+        $payment = $booking->payments()->sole();
+        $counts['counter_payment_status'] = $this->queryCount(fn () => $this->get(
+            route('staff.counter.payment-result', $booking),
+        )->assertOk());
+        $counts['counter_payment_resume'] = $this->queryCount(fn () => $this->post(
+            route('staff.counter.payment.resume', $booking),
+        )->assertRedirect());
+        $this->verifyProviderPayment($payment, 'VNPAY-QUERY-BUDGET');
+        $counts['post_payment_print_transition'] = $this->queryCount(fn () => $this->get(
+            route('staff.counter.payment-result', $booking),
+        )->assertOk());
+        $this->post(route('staff.tickets.print.start', $booking))->assertRedirect();
+        $counts['print_page'] = $this->queryCount(fn () => $this->get(
+            route('staff.tickets.print.show', $booking),
+        )->assertOk());
+        $this->travel(11)->minutes();
+        $counts['print_recovery'] = $this->queryCount(fn () => $this->get(
+            route('staff.tickets.print.show', $booking),
+        )->assertRedirect());
+        foreach ($counts as $surface => $count) {
+            $this->assertLessThanOrEqual(30, $count, $surface.' has an unexpected query count: '.$count);
+        }
+    }
+
     public function test_admin_filters_and_displays_channel_and_independent_actors(): void
     {
         [$booking, , $creator] = $this->counterHold();
@@ -336,6 +559,66 @@ final class CounterSalesR8Test extends TestCase
         ])->assertRedirect();
 
         return Booking::query()->where('checkout_idempotency_key_hash', hash('sha256', $token))->sole();
+    }
+
+    private function verifyProviderPayment(Payment $payment, string $transactionId): void
+    {
+        app(VerifiedPaymentService::class)->verify($payment, new VerifiedPaymentData(
+            provider: $payment->provider,
+            merchantReference: $payment->order_code,
+            amount: $payment->amount,
+            providerTransactionId: $transactionId,
+            source: $payment->provider === 'vnpay' ? 'ipn' : 'callback',
+            payloadHash: hash('sha256', $transactionId),
+            responseCode: '00',
+            transactionStatus: '00',
+            providerPaidAt: now(),
+        ));
+    }
+
+    private function configureVnpay(): void
+    {
+        $this->app['url']->forceRootUrl('https://merchant.example.test');
+        $this->app['url']->forceScheme('https');
+        config([
+            'app.url' => 'https://merchant.example.test',
+            'payment.public_hosts' => ['merchant.example.test'],
+            'payment.vnpay.environment' => 'sandbox',
+            'payment.vnpay.tmn_code' => 'MOVIE123',
+            'payment.vnpay.hash_secret' => str_repeat('sandbox-secret-', 4),
+            'payment.vnpay.payment_url' => 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+            'payment.vnpay.query_url' => 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
+            'payment.vnpay.bank_code' => 'VNPAYQR',
+            'payment.vnpay.locale' => 'vn',
+            'payment.vnpay.order_type' => 'other',
+            'payment.vnpay.payment_ttl_minutes' => 15,
+            'payment.vnpay.http_timeout_seconds' => 10,
+            'payment.vnpay.query_interval_seconds' => 60,
+            'payment.vnpay.query_ip' => '127.0.0.1',
+        ]);
+    }
+
+    private function configurePayOs(): void
+    {
+        config([
+            'services.payos.client_id' => 'payos-counter-client-id',
+            'services.payos.api_key' => 'payos-counter-api-key',
+            'services.payos.checksum_key' => 'payos-counter-checksum-key',
+            'services.payos.base_url' => 'https://api-merchant.payos.vn',
+            'services.payos.connect_timeout_seconds' => 3,
+            'services.payos.request_timeout_seconds' => 10,
+        ]);
+    }
+
+    private function queryCount(callable $request): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $request();
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
     }
 
     /** @return array{cinema:Cinema,room:Room,movie:Movie,seats:Collection,layout:RoomLayout,showtime:Showtime} */

@@ -66,8 +66,8 @@ final class AdminPaymentQuery
             ->select([])
             ->selectRaw('COUNT(*) AS total')
             ->selectRaw('COALESCE(SUM(payments.amount), 0) AS revenue')
-            ->selectRaw("SUM(CASE WHEN payments.provider = 'counter_cash' THEN 0 ELSE 1 END) AS online_count")
-            ->selectRaw("SUM(CASE WHEN payments.provider = 'counter_cash' THEN 1 ELSE 0 END) AS counter_count")
+            ->selectRaw("SUM(CASE WHEN EXISTS (SELECT 1 FROM bookings summary_bookings WHERE summary_bookings.id = payments.booking_id AND summary_bookings.sales_channel = 'online') THEN 1 ELSE 0 END) AS online_count")
+            ->selectRaw("SUM(CASE WHEN EXISTS (SELECT 1 FROM bookings summary_bookings WHERE summary_bookings.id = payments.booking_id AND summary_bookings.sales_channel = 'counter') THEN 1 ELSE 0 END) AS counter_count")
             ->toBase()
             ->first();
 

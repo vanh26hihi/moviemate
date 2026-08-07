@@ -37,6 +37,7 @@ use App\Http\Controllers\Payments\VnpayIpnController;
 use App\Http\Controllers\Payments\VnpayReturnController;
 use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
+use App\Http\Controllers\Staff\CounterPaymentController as StaffCounterPaymentController;
 use App\Http\Controllers\Staff\CounterSaleController as StaffCounterSaleController;
 use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
@@ -486,6 +487,8 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.succeed');
         Route::post('/tickets/{booking}/print/fail', [StaffTicketPrintController::class, 'fail'])
             ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.fail');
+        Route::post('/tickets/{booking}/print/recover-expired', [StaffTicketPrintController::class, 'recoverExpired'])
+            ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.recover-expired');
         Route::get('/tickets/check', [StaffTicketCheckinController::class, 'show'])
             ->middleware('permission:tickets.checkin')->name('tickets.check');
         Route::post('/tickets/check', [StaffTicketCheckinController::class, 'store'])
@@ -508,6 +511,13 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('booking')->middleware('permission:counter_sales.view')->name('counter.review');
         Route::post('/counter/bookings/{booking}/cash', [StaffCounterSaleController::class, 'cash'])
             ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.cash');
+        Route::post('/counter/bookings/{booking}/payments/{provider}', [StaffCounterPaymentController::class, 'initiate'])
+            ->whereNumber('booking')->whereIn('provider', ['vnpay', 'payos'])
+            ->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payments.initiate');
+        Route::post('/counter/bookings/{booking}/payment/resume', [StaffCounterPaymentController::class, 'resume'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payment.resume');
+        Route::get('/counter/bookings/{booking}/payment-result', [StaffCounterPaymentController::class, 'result'])
+            ->whereNumber('booking')->middleware('permission:counter_sales.view')->name('counter.payment-result');
         Route::post('/counter/bookings/{booking}/cancel', [StaffCounterSaleController::class, 'cancel'])
             ->whereNumber('booking')->middleware(['permission:counter_sales.cancel', 'throttle:12,1'])->name('counter.cancel');
     });

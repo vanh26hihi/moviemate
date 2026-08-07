@@ -12,6 +12,7 @@ use App\Services\BookingTokenService;
 use App\Services\CinemaAccessService;
 use App\Services\Counter\CounterBookingService;
 use App\Services\Counter\CounterCashPaymentService;
+use App\Services\Payments\PaymentInitiationService;
 use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
 use App\Services\Seats\SeatAvailabilitySnapshot;
@@ -153,11 +154,22 @@ final class CounterSaleController extends Controller
         return redirect()->route('staff.counter.review', $booking)->with('success', 'Đã cập nhật đồ ăn.');
     }
 
-    public function review(Request $request, Booking $booking, CounterBookingService $counter): View
-    {
+    public function review(
+        Request $request,
+        Booking $booking,
+        CounterBookingService $counter,
+        PaymentInitiationService $payments,
+    ): View {
         $booking = $counter->authorized($request->user(), $booking);
+        $availability = $payments->availability();
 
-        return view('staff.counter.review', compact('booking'));
+        return view('staff.counter.review', [
+            'booking' => $booking,
+            'providerAvailability' => [
+                'vnpay' => $availability['vnpay'],
+                'payos' => $availability['payos'],
+            ],
+        ]);
     }
 
     public function cash(
@@ -174,7 +186,7 @@ final class CounterSaleController extends Controller
         ]);
         $payments->settle($booking, $request->user());
 
-        return redirect()->route('staff.counter.review', $booking)
+        return redirect()->route('staff.counter.payment-result', $booking)
             ->with('success', 'Đã xác nhận thu tiền mặt.');
     }
 

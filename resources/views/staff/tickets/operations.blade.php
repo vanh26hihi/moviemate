@@ -61,13 +61,32 @@
         <div class="mt-5 flex flex-wrap gap-3">
             @can('tickets.print')
                 @if($booking->booking_status === 'paid' && $booking->payment_status === 'paid' && (!$printState || in_array($printState->status, ['retry_allowed', 'retry_authorized'], true)))
+                    @if($printState?->status === 'retry_allowed')
+                        <p class="w-full rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Được phép in lại do lần in trước gặp lỗi: {{ \App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$printState->last_failure_code] ?? 'Lỗi đã được ghi nhận' }}.</p>
+                    @elseif($printState?->status === 'retry_authorized')
+                        <p class="w-full rounded-xl bg-success/10 px-4 py-3 font-bold text-success">Quản lý đã phê duyệt thêm một lần in.</p>
+                    @endif
                     <form method="POST" action="{{ route('staff.tickets.print.start', $booking) }}" data-submit-once>@csrf
                         <button type="submit" class="btn-primary"><i class="ph ph-printer"></i>In vé cứng</button>
                     </form>
                 @elseif($printState?->status === 'printed')
                     <span class="rounded-xl bg-success/10 px-4 py-3 font-bold text-success">Đã in thành công {{ $printState->printed_at?->format('d/m/Y H:i') }}</span>
+                    <span class="rounded-xl bg-success/10 px-4 py-3 font-bold text-success">Người in: {{ $printState->printedBy?->name ?? '—' }}</span>
+                @elseif($printState?->status === 'printing' && $printState->active_operation_expires_at?->isPast())
+                    @if((int) $printState->active_operator_user_id === (int) auth()->id())
+                        <div class="w-full rounded-xl bg-warning/10 p-4 text-warning">
+                            <p class="font-bold">Phiên in trước đã hết hiệu lực. Vui lòng xác nhận kết quả lần in trước trước khi tiếp tục.</p>
+                            <form method="POST" action="{{ route('staff.tickets.print.recover-expired', $booking) }}" class="mt-3" data-submit-once>@csrf
+                                <button type="submit" class="btn-secondary text-error">Báo lỗi in: Trình duyệt/phiên in bị gián đoạn</button>
+                            </form>
+                        </div>
+                    @else
+                        <span class="rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Phiên in hết hiệu lực phải do nhân viên đã bắt đầu phiên xử lý.</span>
+                    @endif
+                @elseif($printState?->status === 'printing')
+                    <span class="rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Một phiên in đang chờ nhân viên xác nhận kết quả.</span>
                 @elseif($printState?->status === 'retry_requires_authorization')
-                    <span class="rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Cần quản lý cho phép in lại</span>
+                    <span class="rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Đã hết lượt in lại. Vui lòng yêu cầu Quản lý phê duyệt.</span>
                 @endif
             @endcan
             @can('tickets.checkin')
