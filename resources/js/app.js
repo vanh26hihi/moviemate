@@ -302,6 +302,7 @@ function initializeCountdowns() {
     document.querySelectorAll('[data-countdown]').forEach((element) => {
         if (element.dataset.countdownInitialized === 'true') return;
         element.dataset.countdownInitialized = 'true';
+        let expiryReloadScheduled = false;
 
         const deadline = Date.parse(element.dataset.countdown || '');
         if (!Number.isFinite(deadline)) return;
@@ -315,7 +316,18 @@ function initializeCountdowns() {
                 ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
                 : (element.dataset.expiredLabel || 'Đã hết thời gian');
 
-            if (remainingSeconds === 0) window.clearInterval(intervalId);
+            if (remainingSeconds === 0) {
+                window.clearInterval(intervalId);
+
+                if (element.dataset.expiryReload === 'true' && !expiryReloadScheduled) {
+                    expiryReloadScheduled = true;
+                    document.querySelectorAll('[data-expiry-action]').forEach((control) => {
+                        control.disabled = true;
+                        control.setAttribute('aria-disabled', 'true');
+                    });
+                    window.setTimeout(() => window.location.reload(), 750);
+                }
+            }
         }
 
         const intervalId = window.setInterval(refresh, 1000);

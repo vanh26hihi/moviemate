@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\FoodItem;
 use App\Models\Showtime;
+use App\Services\BookingExpirationService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaAccessService;
 use App\Services\Counter\CounterBookingService;
@@ -58,10 +59,12 @@ final class CounterSaleController extends Controller
         RoomLayoutService $layouts,
         TicketPricingService $pricing,
         BookingTokenService $tokens,
+        BookingExpirationService $expiration,
     ): View {
         $cinemas->authorizeCinema($request->user(), (int) $showtime->cinema_id);
         abort_unless($catalog->isSellable($showtime), 404);
         $layout = $layouts->resolveForShowtime($showtime)->load('cells.seat');
+        $expiration->expireStaleForShowtime($showtime->id);
         $snapshot = SeatAvailabilitySnapshot::for($showtime, $layout);
         $seatPrices = $pricing->calculateSeatTypes($showtime, allowLegacySnapshot: false);
         $checkoutToken = $tokens->issueCheckoutToken();

@@ -124,8 +124,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
     {
         $booking = $this->payableBooking(['expires_at' => now()->subMinute()]);
         $seatId = $booking->bookingSeats()->value('seat_id');
-        $payment = $this->reviewPayment($booking);
         $this->assertTrue(app(BookingExpirationService::class)->expire($booking->id));
+        $payment = $this->reviewPayment($booking);
         $replacement = app(BookingCheckoutService::class)->createPendingBooking(
             $booking->showtime_id,
             [$seatId],

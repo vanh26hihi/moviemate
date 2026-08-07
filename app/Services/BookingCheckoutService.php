@@ -32,6 +32,7 @@ class BookingCheckoutService
         private readonly BookingPricingService $pricing,
         private readonly BookingFoodService $food,
         private readonly SeatSelectionPolicy $seatSelectionPolicy,
+        private readonly BookingExpirationService $expiration,
     ) {}
 
     public function createPendingBooking(
@@ -113,11 +114,12 @@ class BookingCheckoutService
                         ->findOrFail($showtimeId);
 
                     $this->assertShowtimeCanBeReserved($showtime);
-
                     $normalizedSeatIds = collect($seatIds)
                         ->map(fn ($id) => (int) $id)
                         ->unique()
                         ->values();
+                    $this->expiration->expireStaleForSeats($showtime->id, $normalizedSeatIds);
+
                     $layout = $this->layouts->resolveForShowtime($showtime);
                     $seats = Seat::query()
                         ->where('room_id', $showtime->room_id)

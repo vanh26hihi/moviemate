@@ -182,7 +182,7 @@ php artisan serve
 php artisan schedule:work
 ```
 
-The scheduled `bookings:send-pending-tickets` command claims and sends mail synchronously from the durable outbox. Therefore, the current ticket-email path does **not** require a queue worker. If other application jobs use an asynchronous queue connection, run a separate worker:
+The scheduler also runs `bookings:expire-pending` every minute so eligible unpaid holds are cleaned proactively. Seat-map reads and hold acquisition independently reconcile bounded stale holds, so delayed scheduler execution cannot leave expired inventory blocked. The scheduled `bookings:send-pending-tickets` command claims and sends mail synchronously from the durable outbox. Therefore, the current ticket-email path does **not** require a queue worker. If other application jobs use an asynchronous queue connection, run a separate worker:
 
 **Terminal C — only for asynchronous queued jobs**
 

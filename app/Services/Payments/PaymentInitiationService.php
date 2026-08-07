@@ -8,14 +8,25 @@ use App\Domain\Payments\ZaloPayConfig;
 use App\Exceptions\PaymentConfigurationException;
 use App\Exceptions\PaymentInitiationException;
 use App\Models\Booking;
+use App\Services\BookingExpirationService;
 
 class PaymentInitiationService
 {
+    public function __construct(
+        private readonly BookingExpirationService $expiration,
+    ) {}
+
     public function initiate(
         Booking $booking,
         ?string $provider = null,
         ?string $clientIp = null,
     ): PaymentInitiationResult {
+        $this->expiration->expire($booking->id);
+        $booking->refresh();
+        if ($booking->booking_status === 'expired') {
+            throw new PaymentInitiationException('Booking is no longer payable.');
+        }
+
         $provider = strtolower(trim($provider ?? (string) config('payment.driver', 'vnpay')));
         $this->assertAvailable($provider);
 

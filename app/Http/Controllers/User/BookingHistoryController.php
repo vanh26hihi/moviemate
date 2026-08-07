@@ -5,6 +5,7 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\BookingCancellationService;
+use App\Services\BookingExpirationService;
 use App\Services\Tickets\BookingTicketEligibility;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -14,8 +15,11 @@ final class BookingHistoryController extends Controller
     public function __invoke(
         Request $request,
         BookingCancellationService $cancellations,
+        BookingExpirationService $expiration,
         BookingTicketEligibility $ticketEligibility,
     ): View {
+        $expiration->expireStaleForUser((int) $request->user()->getAuthIdentifier());
+
         $status = $request->string('status')->toString();
         $statusFilters = [
             'pending' => 'pending_payment',
