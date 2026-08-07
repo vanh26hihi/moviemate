@@ -88,10 +88,12 @@ class Booking extends Model
 
     public function getSeatCodesAttribute(): string
     {
-        return $this->bookingSeats
+        $seatCodes = $this->bookingSeats
             ->pluck('seat.seat_code')
             ->filter()
             ->join(', ');
+
+        return $seatCodes ?: 'Chưa có thông tin ghế';
     }
 
     public function getShowtimeLabelAttribute(): string
