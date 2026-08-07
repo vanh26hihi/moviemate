@@ -4,6 +4,7 @@ namespace Tests\Feature\Bookings;
 
 use App\Models\ActivityLog;
 use App\Models\TicketCheckinEvent;
+use App\Models\UserCinemaAssignment;
 use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Database\QueryException;
@@ -89,6 +90,20 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
             'result' => 'accepted',
         ]);
         $this->assertDatabaseCount('booking_ticket_prints', 0);
+    }
+
+    public function test_revoked_branch_assignment_blocks_secure_qr_and_direct_booking_checkin(): void
+    {
+        $payment = $this->verifiedPayment();
+        $booking = $payment->booking->fresh();
+        $staff = $this->userWithRole('staff');
+        $capability = app(TicketCheckinCapability::class)->issue($booking);
+        UserCinemaAssignment::query()->where('user_id', $staff->id)->update(['status' => 'revoked']);
+
+        $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $capability])->assertNotFound();
+        $this->post(route('staff.tickets.consume-booking', $booking))->assertNotFound();
+        $this->assertSame('paid', $booking->fresh()->booking_status);
+        $this->assertDatabaseCount('ticket_checkin_events', 0);
     }
 
     public function test_invalid_unpaid_cancelled_and_expired_scans_never_become_used(): void

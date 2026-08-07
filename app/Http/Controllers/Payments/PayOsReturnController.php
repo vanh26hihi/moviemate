@@ -6,6 +6,7 @@ use App\Exceptions\PaymentConfigurationException;
 use App\Exceptions\PayOsResponseException;
 use App\Exceptions\PayOsTransportException;
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\GuestBookingAccessService;
 use App\Services\Payments\PaymentReturnTokenService;
@@ -52,6 +53,12 @@ final class PayOsReturnController extends Controller
         $integrityVerified = (bool) $request->session()->pull('payment_return_integrity.'.$payment->id, false);
         $payment->refresh()->load('booking');
         $canViewBooking = Auth::check() || $guestAccess->allows($request, $payment->booking);
+        if ($this->usesStaffCounterResult($payment)) {
+            return redirect()->route('staff.counter.payment-result', [
+                'booking' => $payment->booking,
+                'returned' => 1,
+            ]);
+        }
 
         return view('payments.return', [
             'payment' => $payment,
@@ -61,6 +68,12 @@ final class PayOsReturnController extends Controller
             'canViewBooking' => $canViewBooking,
             'payOsCancelReturn' => $mode === 'cancel',
         ]);
+    }
+
+    private function usesStaffCounterResult(Payment $payment): bool
+    {
+        return $payment->booking?->sales_channel === Booking::SALES_CHANNEL_COUNTER
+            && Auth::user()?->hasPermission('counter_sales.view') === true;
     }
 
     private function authorizePayment(

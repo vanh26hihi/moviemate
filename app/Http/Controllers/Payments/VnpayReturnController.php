@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Payments;
 use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\VnpaySigner;
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\Payment;
 use App\Services\GuestBookingAccessService;
 use App\Services\Payments\PaymentReturnTokenService;
@@ -62,6 +63,12 @@ class VnpayReturnController extends Controller
         $cancelRequested = (bool) $request->session()->pull('payment_return_cancel_requested.'.$payment->id, false);
         $payment->refresh()->load('booking');
         $canViewBooking = Auth::check() || $guestAccess->allows($request, $payment->booking);
+        if ($this->usesStaffCounterResult($payment)) {
+            return redirect()->route('staff.counter.payment-result', [
+                'booking' => $payment->booking,
+                'returned' => 1,
+            ]);
+        }
 
         return view('payments.return', [
             'payment' => $payment,
@@ -71,6 +78,12 @@ class VnpayReturnController extends Controller
             'canViewBooking' => $canViewBooking,
             'cancelRequested' => $cancelRequested,
         ]);
+    }
+
+    private function usesStaffCounterResult(Payment $payment): bool
+    {
+        return $payment->booking?->sales_channel === Booking::SALES_CHANNEL_COUNTER
+            && Auth::user()?->hasPermission('counter_sales.view') === true;
     }
 
     private function amountMatches(Payment $payment, mixed $providerAmount): bool

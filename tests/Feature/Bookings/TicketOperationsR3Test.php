@@ -70,6 +70,25 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->assertDatabaseCount('booking_ticket_prints', 0);
     }
 
+    public function test_revoked_branch_assignment_invalidates_every_active_print_action(): void
+    {
+        $booking = $this->verifiedBooking();
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.tickets.print.start', $booking))->assertRedirect();
+        UserCinemaAssignment::query()->where('user_id', $staff->id)->update(['status' => 'revoked']);
+
+        $this->get(route('staff.tickets.print.show', $booking))->assertNotFound();
+        $this->post(route('staff.tickets.print.succeed', $booking))->assertNotFound();
+        $this->post(route('staff.tickets.print.fail', $booking), ['failure_code' => 'paper_jam'])->assertNotFound();
+        $this->travel(11)->minutes();
+        $this->post(route('staff.tickets.print.recover-expired', $booking))->assertNotFound();
+
+        $state = BookingTicketPrint::query()->sole();
+        $this->assertSame(BookingTicketPrint::STATUS_PRINTING, $state->status);
+        $this->assertSame(1, $state->attempts_count);
+        $this->assertDatabaseCount('booking_ticket_print_events', 1);
+    }
+
     public function test_resolve_rate_limit_does_not_create_operational_history(): void
     {
         $staff = $this->userWithRole('staff');
@@ -160,21 +179,45 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->actingAs($staff)->post(route('admin.bookings.ticket-print.authorize-retry', $booking))->assertForbidden();
     }
 
-    public function test_expired_print_operation_is_released_and_requires_authorization(): void
+    public function test_expired_print_back_navigation_recovers_without_get_mutation(): void
     {
         $booking = $this->verifiedBooking();
         $firstStaff = $this->userWithRole('staff');
         $this->actingAs($firstStaff)->post(route('staff.tickets.print.start', $booking))->assertRedirect();
         $this->travel(11)->minutes();
 
-        $secondStaff = $this->userWithRole('staff');
-        $this->actingAs($secondStaff)->post(route('staff.tickets.print.start', $booking))->assertStatus(409);
+        $this->get(route('staff.tickets.print.show', $booking))
+            ->assertRedirect(route('staff.tickets.operations', $booking))
+            ->assertSessionHas('warning', 'Phiên in trước đã hết hiệu lực. Vui lòng xác nhận kết quả lần in trước trước khi tiếp tục.');
 
         $state = BookingTicketPrint::query()->sole();
-        $this->assertSame(BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION, $state->status);
+        $this->assertSame(BookingTicketPrint::STATUS_PRINTING, $state->status);
+        $this->assertSame(1, $state->attempts_count);
+        $this->assertDatabaseCount('booking_ticket_print_events', 1);
+
+        $this->post(route('staff.tickets.print.recover-expired', $booking))
+            ->assertRedirect(route('staff.tickets.operations', $booking));
+        $state->refresh();
+        $this->assertSame(BookingTicketPrint::STATUS_RETRY_ALLOWED, $state->status);
         $this->assertNull($state->active_operation_id);
-        $this->assertDatabaseHas('booking_ticket_print_events', ['event_type' => 'stale_print_released']);
-        $this->assertDatabaseHas('activity_logs', ['action' => 'ticket.print_stale_released']);
+        $this->assertDatabaseHas('booking_ticket_print_events', [
+            'event_type' => 'print_failed',
+            'failure_code' => 'browser_interrupted',
+        ]);
+    }
+
+    public function test_back_to_consumed_print_redirects_to_printed_status_without_new_attempt(): void
+    {
+        $booking = $this->verifiedBooking();
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.tickets.print.start', $booking));
+        $this->post(route('staff.tickets.print.succeed', $booking));
+
+        $this->get(route('staff.tickets.print.show', $booking))
+            ->assertRedirect(route('staff.tickets.operations', $booking))
+            ->assertSessionHas('success', 'Vé này đã được ghi nhận in thành công.');
+        $this->assertSame(1, BookingTicketPrint::query()->sole()->attempts_count);
+        $this->assertSame(1, BookingTicketPrintEvent::query()->where('event_type', 'print_succeeded')->count());
     }
 
     public function test_unpaid_cancelled_refunded_expired_and_used_bookings_cannot_start_print(): void

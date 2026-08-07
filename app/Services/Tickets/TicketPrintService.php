@@ -17,11 +17,11 @@ final class TicketPrintService
     public const FAILURE_REASONS = [
         'paper_jam' => 'Kẹt giấy',
         'out_of_paper' => 'Hết giấy',
-        'printer_offline' => 'Máy in ngoại tuyến',
-        'printer_error' => 'Máy in báo lỗi',
-        'browser_interrupted' => 'Trình duyệt hoặc hộp thoại in bị gián đoạn',
-        'wrong_format' => 'Nội dung in sai định dạng',
-        'other' => 'Lý do khác',
+        'printer_offline' => 'Máy in không kết nối',
+        'printer_error' => 'Lỗi máy in',
+        'browser_interrupted' => 'Trình duyệt/phiên in bị gián đoạn',
+        'wrong_format' => 'Sai định dạng vé',
+        'other' => 'Khác',
     ];
 
     private const OPERATION_TTL_MINUTES = 10;
@@ -34,8 +34,7 @@ final class TicketPrintService
 
     public function start(Booking $booking, User $actor, string $operationId, string $token): BookingTicketPrint
     {
-        $staleReleased = false;
-        $state = DB::transaction(function () use ($booking, $actor, $operationId, $token, &$staleReleased): BookingTicketPrint {
+        return DB::transaction(function () use ($booking, $actor, $operationId, $token): BookingTicketPrint {
             $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->id);
             abort_unless($lockedBooking->cinema_id
                 && $this->cinemaAccess->allowsInCurrentContext($actor, (int) $lockedBooking->cinema_id), 404);
@@ -58,20 +57,7 @@ final class TicketPrintService
                     throw new HttpException(409, 'Một lần in khác đang được xử lý.');
                 }
 
-                $staleOperationId = $state->active_operation_id;
-                $state->forceFill([
-                    'status' => BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION,
-                    'last_completed_operation_id' => $state->active_operation_id,
-                    ...$this->clearActiveOperation(),
-                ])->save();
-                $this->event($state, $actor, 'stale_print_released', $state->attempts_count, null, null, $staleOperationId);
-                $this->activities->log('ticket.print_stale_released', $lockedBooking,
-                    ['print_status' => BookingTicketPrint::STATUS_PRINTING],
-                    ['print_status' => BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION],
-                    $this->activityContext($lockedBooking, $state, $actor));
-                $staleReleased = true;
-
-                return $state;
+                throw new HttpException(409, 'Phiên in trước đã hết hiệu lực. Vui lòng xác nhận kết quả lần in trước trước khi tiếp tục.');
             }
 
             if ($state && ! in_array($state->status, [
@@ -98,12 +84,6 @@ final class TicketPrintService
 
             return $state;
         });
-
-        if ($staleReleased) {
-            throw new HttpException(409, 'Lần in trước đã hết hiệu lực và cần được quản lý cho phép in lại.');
-        }
-
-        return $state;
     }
 
     public function active(Booking $booking, User $actor, string $operationId, string $token): BookingTicketPrint
@@ -172,6 +152,56 @@ final class TicketPrintService
             $this->activities->log('ticket.print_failed', $booking,
                 ['print_status' => BookingTicketPrint::STATUS_PRINTING], ['print_status' => $state->status],
                 $this->activityContext($booking, $state, $actor) + ['failure_code' => $reason]);
+
+            return $state;
+        });
+    }
+
+    public function failExpired(
+        Booking $booking,
+        User $actor,
+        string $reason = 'browser_interrupted',
+        ?string $note = null,
+    ): BookingTicketPrint {
+        abort_unless(array_key_exists($reason, self::FAILURE_REASONS), 422);
+
+        return DB::transaction(function () use ($booking, $actor, $reason, $note): BookingTicketPrint {
+            $lockedBooking = Booking::query()->lockForUpdate()->findOrFail($booking->id);
+            abort_unless($lockedBooking->cinema_id
+                && $this->cinemaAccess->allowsInCurrentContext($actor, (int) $lockedBooking->cinema_id), 404);
+            $state = BookingTicketPrint::query()
+                ->where('booking_id', $lockedBooking->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($state->status !== BookingTicketPrint::STATUS_PRINTING) {
+                if ($state->last_failed_by_user_id === $actor->id
+                    && $state->last_failure_code === $reason) {
+                    return $state;
+                }
+                throw new HttpException(409, 'Phiên in này không còn ở trạng thái chờ xác nhận.');
+            }
+            abort_unless($state->active_operator_user_id === $actor->id, 403);
+            abort_unless($state->active_operation_expires_at?->isPast(), 409,
+                'Phiên in vẫn còn hiệu lực. Vui lòng báo lỗi từ trang in hiện tại.');
+
+            $operationId = $state->active_operation_id;
+            $next = $state->attempts_count === 1
+                ? BookingTicketPrint::STATUS_RETRY_ALLOWED
+                : BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION;
+            $safeNote = $note === null ? null : Str::limit(strip_tags(trim($note)), 300, '');
+            $state->forceFill([
+                'status' => $next,
+                'last_failed_by_user_id' => $actor->id,
+                'last_failed_at' => now(),
+                'last_failure_code' => $reason,
+                'last_completed_operation_id' => $operationId,
+                ...$this->clearActiveOperation(),
+            ])->save();
+            $this->event($state, $actor, 'print_failed', $state->attempts_count, $reason, $safeNote, $operationId);
+            $this->activities->log('ticket.print_failed', $lockedBooking,
+                ['print_status' => BookingTicketPrint::STATUS_PRINTING], ['print_status' => $state->status],
+                $this->activityContext($lockedBooking, $state, $actor) + ['failure_code' => $reason]);
 
             return $state;
         });
