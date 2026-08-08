@@ -1,56 +1,43 @@
 @php
-    $dateList = collect($scheduleDates ?? []);
-    $movieRowsByDate = collect($scheduleMoviesByDate ?? []);
-    $availableDates = collect($showtimeDates ?? []);
-    $selectedDate = $selectedDate ?? now('Asia/Ho_Chi_Minh')->toDateString();
-    $safeTime = fn ($value) => blank($value) ? '--:--' : \Carbon\Carbon::parse($value)->format('H:i');
-    $isPast = fn ($showtime) => \Carbon\Carbon::parse(\Carbon\Carbon::parse($showtime->show_date)->toDateString().' '.$showtime->show_time, 'Asia/Ho_Chi_Minh')->isPast();
+    $cinemas = collect($cinemas ?? []);
+    $entries = collect($scheduleShowtimes ?? []);
+    $entriesByDate = $entries->groupBy('date');
+    $selectedDate = $selectedDate ?? now(config('cinema.timezone', 'Asia/Ho_Chi_Minh'))->toDateString();
 @endphp
-
-<section id="home-showtime-calendar" data-showtime-calendar data-selected-date="{{ $selectedDate }}" class="showtime-section max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="cinema-card rounded-[24px] border app-border shadow-2xl shadow-black/10 overflow-hidden">
-        <div class="p-5 lg:p-6 border-b app-border flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div><p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em]">Lịch chiếu MovieMate</p><h2 class="text-2xl sm:text-3xl font-extrabold app-text mt-2">{{ $cinema?->name ?? 'Tất cả rạp' }}</h2><p class="app-muted text-sm mt-2">{{ $cinema?->address ?? 'Chọn rạp ưu tiên ở thanh điều hướng hoặc xem lịch toàn hệ thống.' }}</p></div>
-            @if($cinema)<a href="{{ route('cinemas.show', $cinema->code) }}" class="inline-flex items-center gap-2 text-brand-start font-bold"><i class="ph-fill ph-map-trifold"></i> Xem rạp</a>@else<a href="{{ route('cinemas.index') }}" class="inline-flex items-center gap-2 text-brand-start font-bold"><i class="ph-fill ph-buildings"></i> Chọn rạp</a>@endif
-        </div>
+<section id="home-showtime-calendar" data-showtime-calendar data-selected-date="{{ $selectedDate }}" class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <div class="cinema-card overflow-hidden rounded-[24px] border app-border shadow-2xl shadow-black/10">
+        <header class="border-b app-border p-5 lg:p-6">
+            <p class="text-sm font-extrabold uppercase tracking-[0.22em] text-brand-start">Lịch chiếu MovieMate</p>
+            <h2 class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">Chọn chi nhánh, ngày và suất chiếu phù hợp</h2>
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <form method="GET" action="{{ route('home') }}"><label class="sr-only" for="homeCinemaSelect">Chi nhánh</label><select id="homeCinemaSelect" name="cinema" class="cinema-input" onchange="this.form.submit()"><option value="">Tất cả chi nhánh</option>@foreach($cinemas as $branch)<option value="{{ $branch->code }}" data-latitude="{{ $branch->latitude }}" data-longitude="{{ $branch->longitude }}" @selected($cinema?->is($branch))>{{ $branch->name }}</option>@endforeach</select></form>
+                <button id="nearbyCinemaBtn" type="button" class="btn-secondary" data-nearby-target="homeCinemaSelect"><i class="ph-fill ph-navigation-arrow" aria-hidden="true"></i> Gần bạn</button>
+                <p id="nearbyCinemaStatus" class="text-sm app-muted" role="status" aria-live="polite">Vị trí chỉ được yêu cầu sau khi bạn bấm nút.</p>
+            </div>
+        </header>
         <div class="p-5 lg:p-6">
-            <div data-showtime-date-strip class="flex gap-2 overflow-x-auto hide-scrollbar pb-4 mb-5 border-b app-border">
-                @foreach($dateList as $date)
-                    @php
-                        $active = ($date['date'] ?? null) === $selectedDate;
-                        $available = $availableDates->contains($date['date']);
-                    @endphp
-                    <button type="button" data-showtime-date="{{ $date['date'] }}" id="showtime-date-{{ $date['date'] }}" aria-controls="{{ $available ? 'showtime-panel-'.$date['date'] : 'showtime-empty-panel' }}" aria-pressed="{{ $active ? 'true' : 'false' }}" class="showtime-date-button shrink-0 min-w-24 px-4 py-3 rounded-2xl border text-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-start/30 {{ $active ? 'border-transparent bg-gradient-to-br from-brand-start to-brand-end text-white' : 'app-border app-secondary app-text' }}">
-                        <span class="block text-2xl font-black">{{ $date['day'] }}</span><span class="block text-xs font-bold mt-1">{{ $date['label'] }}</span>
-                        @if($available)<span data-showtime-availability class="mt-2 mx-auto block w-1.5 h-1.5 rounded-full {{ $active ? 'bg-white' : 'bg-brand-start' }}"></span>@endif
+            <div data-showtime-date-strip class="flex gap-2 overflow-x-auto pb-4">
+                @foreach($scheduleDates as $date)
+                    @php($active = $selectedDate === $date['date'])
+                    <button type="button" id="showtime-date-{{ $date['date'] }}" data-showtime-date="{{ $date['date'] }}" aria-controls="{{ $entriesByDate->has($date['date']) ? 'showtime-panel-'.$date['date'] : 'showtime-empty-panel' }}" aria-pressed="{{ $active ? 'true' : 'false' }}" class="shrink-0 min-w-20 rounded-2xl border px-4 py-3 text-center {{ $active ? 'border-transparent bg-gradient-to-br from-brand-start to-brand-end text-white' : 'app-border app-secondary app-text' }}">
+                        <span class="block text-lg font-black">{{ $date['day'] }}</span><span class="block text-xs font-bold">{{ $date['label'] }}</span>
                     </button>
                 @endforeach
             </div>
-            <div aria-live="polite">
-                @foreach($dateList as $date)
-                    @php
-                        $active = ($date['date'] ?? null) === $selectedDate;
-                        $movieRows = collect($movieRowsByDate->get($date['date'], []));
-                    @endphp
-                    @continue($movieRows->isEmpty())
-                    <div data-showtime-panel="{{ $date['date'] }}" id="showtime-panel-{{ $date['date'] }}" role="region" aria-labelledby="showtime-date-{{ $date['date'] }}" class="space-y-4" @if(! $active) hidden @endif>
-                        @foreach($movieRows as $row)
-                            @php
-                                $movie = $row['movie'];
-                            @endphp
-                            <article class="rounded-3xl border app-border app-secondary p-5"><h3 class="text-lg font-extrabold app-text">{{ $movie->title }}</h3><p class="app-muted text-sm mt-1">{{ $movie->genres->pluck('name')->join(', ') }}</p>
-                                <div class="mt-4 flex flex-wrap gap-2">@foreach($row['showtimes'] as $showtime)
-                                    @if($isPast($showtime))<span class="px-4 py-3 rounded-xl border app-border app-muted opacity-60">{{ $safeTime($showtime->show_time) }} · Đã qua</span>
-                                    @else<a href="{{ route('user.bookings.selectSeat', ['showtime' => $showtime, 'cinema' => $showtime->cinema->code]) }}" class="px-4 py-3 rounded-xl border border-brand-start/35 text-brand-start font-extrabold hover:bg-brand-start hover:text-white">{{ $safeTime($showtime->show_time) }} · {{ $showtime->room->name }} · {{ $showtime->cinema->name }}</a>@endif
-                                @endforeach</div>
-                            </article>
-                        @endforeach
-                    </div>
+            <div class="mt-5">
+                @foreach($scheduleDates as $date)
+                    @php($dateEntries = collect($entriesByDate->get($date['date'], [])))
+                    @if($dateEntries->isNotEmpty())
+                        <div data-showtime-panel="{{ $date['date'] }}" id="showtime-panel-{{ $date['date'] }}" class="space-y-7" @if($selectedDate !== $date['date']) hidden @endif>
+                            @foreach($dateEntries->groupBy(fn ($item) => $item['cinema']->id) as $branchEntries)
+                                @php($branch = $branchEntries->first()['cinema'])
+                                <section class="space-y-4"><div><h3 class="text-xl font-extrabold app-text">{{ $branch->name }}</h3><p class="text-sm app-muted">{{ $branch->address }}</p></div>
+                                @foreach($branchEntries->groupBy(fn ($item) => $item['movie']->id) as $movieEntries)<x-customer.showtimes.movie-card :entries="$movieEntries" />@endforeach</section>
+                            @endforeach
+                        </div>
+                    @endif
                 @endforeach
-                @php
-                    $selectedDateHasShowtimes = $availableDates->contains($selectedDate);
-                @endphp
-                <div data-showtime-empty-panel data-showtime-empty id="showtime-empty-panel" role="region" aria-labelledby="showtime-date-{{ $selectedDate }}" class="rounded-3xl border app-border app-secondary p-8 text-center" @if($selectedDateHasShowtimes) hidden @endif><i class="ph-fill ph-calendar-x text-4xl text-brand-start"></i><h3 class="app-text font-bold mt-3">Chưa có suất chiếu trong ngày</h3></div>
+                <div data-showtime-empty-panel data-showtime-empty id="showtime-empty-panel" class="rounded-3xl border app-border app-secondary p-8 text-center" @if($entriesByDate->has($selectedDate)) hidden @endif><i class="ph-fill ph-calendar-x text-4xl text-brand-start" aria-hidden="true"></i><h3 class="mt-3 font-bold app-text">Chưa có suất chiếu trong ngày</h3></div>
             </div>
         </div>
     </div>

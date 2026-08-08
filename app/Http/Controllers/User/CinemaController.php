@@ -5,6 +5,7 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Cinema;
 use App\Services\CinemaContext;
+use App\Services\CustomerShowtimeCatalogService;
 use App\Services\PublicShowtimeCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ final class CinemaController extends Controller
 {
     public function __construct(
         private readonly PublicShowtimeCatalog $catalog,
+        private readonly CustomerShowtimeCatalogService $customerCatalog,
         private readonly CinemaContext $context,
     ) {}
 
@@ -25,10 +27,7 @@ final class CinemaController extends Controller
             'city' => ['nullable', 'string', 'max:120'],
             'district' => ['nullable', 'string', 'max:120'],
             'open' => ['nullable', 'boolean'],
-            'nearby' => ['nullable', 'boolean'],
-            'lat' => ['nullable', 'required_if:nearby,1', 'numeric', 'between:-90,90'],
-            'lng' => ['nullable', 'required_if:nearby,1', 'numeric', 'between:-180,180'],
-            'sort' => ['nullable', Rule::in(['name', 'nearby'])],
+            'sort' => ['nullable', Rule::in(['name'])],
         ]);
         $query = Cinema::query()->active()->with('operatingHours')->orderBy('name');
         if ($search = trim((string) ($filters['search'] ?? ''))) {
@@ -54,17 +53,9 @@ final class CinemaController extends Controller
             $cinema->setAttribute('upcoming_showtime_count', $branchShowtimes->count());
             $cinema->setAttribute('is_accepting_showtimes', $this->acceptingNow($cinema));
             $cinema->setAttribute('today_hours', $this->todayHours($cinema));
-            if (! empty($filters['nearby'])) {
-                $cinema->setAttribute('distance_km', $this->distance(
-                    (float) $filters['lat'], (float) $filters['lng'], $cinema->latitude, $cinema->longitude,
-                ));
-            }
         });
         if (! empty($filters['open'])) {
             $cinemas = $cinemas->filter(fn (Cinema $cinema): bool => $cinema->is_accepting_showtimes === true)->values();
-        }
-        if (! empty($filters['nearby']) || ($filters['sort'] ?? null) === 'nearby') {
-            $cinemas = $cinemas->sortBy(fn (Cinema $cinema): array => [$cinema->distance_km === null, $cinema->distance_km ?? PHP_FLOAT_MAX, $cinema->name])->values();
         }
 
         return view('user.cinemas.index', [
@@ -81,7 +72,7 @@ final class CinemaController extends Controller
         abort_unless($cinema->status === 'active' && $cinema->archived_at === null, 404);
         $cinema->load(['operatingHours', 'rooms' => fn ($query) => $query->where('status', 'active')->orderBy('code')]);
         $date = $this->catalog->date($request->query('date'), $cinema);
-        $showtimes = $this->catalog->forDate($date, $cinema);
+        $showtimes = $this->customerCatalog->forDate($date, $cinema);
 
         return view('user.cinemas.show', [
             'cinema' => $cinema,
@@ -121,16 +112,4 @@ final class CinemaController extends Controller
         return 'Mở từ '.substr((string) $hours->opens_at, 0, 5).' · nhận suất đến '.substr((string) $hours->latest_show_start_at, 0, 5);
     }
 
-    private function distance(float $lat, float $lng, mixed $branchLat, mixed $branchLng): ?float
-    {
-        if ($branchLat === null || $branchLng === null) {
-            return null;
-        }
-        $earth = 6371.0;
-        $latDelta = deg2rad((float) $branchLat - $lat);
-        $lngDelta = deg2rad((float) $branchLng - $lng);
-        $a = sin($latDelta / 2) ** 2 + cos(deg2rad($lat)) * cos(deg2rad((float) $branchLat)) * sin($lngDelta / 2) ** 2;
-
-        return round($earth * 2 * atan2(sqrt($a), sqrt(1 - $a)), 2);
-    }
 }

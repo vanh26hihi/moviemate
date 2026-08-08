@@ -7,6 +7,7 @@ use App\Models\Cinema;
 use App\Models\Genre;
 use App\Models\Movie;
 use App\Services\CinemaContext;
+use App\Services\CustomerShowtimeCatalogService;
 use App\Services\PublicShowtimeCatalog;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,7 @@ class MovieController extends Controller
     public function __construct(
         private readonly CinemaContext $cinemaContext,
         private readonly PublicShowtimeCatalog $catalog,
+        private readonly CustomerShowtimeCatalogService $customerCatalog,
     ) {}
 
     /**
@@ -205,13 +207,13 @@ class MovieController extends Controller
             ? Cinema::query()->active()->where('code', mb_strtoupper((string) $request->query('cinema')))->firstOrFail()
             : null;
         $selectedDate = $this->catalog->date($request->query('date'), $selectedCinema);
-        $showtimes = $this->catalog->forDate($selectedDate, $selectedCinema, $movie);
+        $showtimes = $this->customerCatalog->forDate($selectedDate, $selectedCinema, $movie);
         $preferredCinema = $this->cinemaContext->preference();
         if (! $selectedCinema && $preferredCinema) {
             $showtimes = $showtimes->sortBy(fn ($showtime): array => [
-                (int) $showtime->cinema_id === (int) $preferredCinema->id ? 0 : 1,
-                $showtime->cinema->name,
-                $showtime->show_time,
+                (int) $showtime['cinema']->id === (int) $preferredCinema->id ? 0 : 1,
+                $showtime['cinema']->name,
+                $showtime['starts_at'],
             ])->values();
         }
 
@@ -220,7 +222,7 @@ class MovieController extends Controller
             'showtimes' => $showtimes,
             'selectedCinema' => $selectedCinema,
             'selectedDate' => $selectedDate,
-            'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name', 'address']),
+            'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name', 'address', 'latitude', 'longitude']),
             'dates' => $this->catalog->dates($selectedCinema),
             'preferredCinema' => $preferredCinema,
         ]);
