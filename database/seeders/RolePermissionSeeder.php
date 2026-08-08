@@ -13,7 +13,7 @@ class RolePermissionSeeder extends Seeder
         $permissionIds = Permission::query()->pluck('id', 'slug');
 
         Role::query()->where('slug', 'admin')->firstOrFail()
-            ->permissions()->sync($permissionIds->values()->all());
+            ->permissions()->sync($permissionIds->except(Role::DEPRECATED_PERMISSION_SLUGS)->values()->all());
 
         Role::query()->where('slug', 'manager')->firstOrFail()
             ->permissions()->sync($permissionIds->only(Role::MANAGER_PERMISSION_SLUGS)->values()->all());

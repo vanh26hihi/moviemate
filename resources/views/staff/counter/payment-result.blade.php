@@ -53,7 +53,7 @@
                 <p class="mt-2 app-muted">Người in: {{ $printState->printedBy?->name ?? '—' }} · {{ $printState->printed_at?->format('d/m/Y H:i:s') }}</p>
             @else
                 <h2 class="text-xl font-extrabold app-heading">Vé cần xử lý theo chính sách in lại</h2>
-                <p class="mt-2 app-muted">Không tự động tạo lượt in mới khi lần trước đã lỗi hoặc đang chờ phê duyệt.</p>
+                <p class="mt-2 app-muted">Không tự động tạo lượt in mới khi lần trước đã lỗi; nhân viên phải ghi lý do trước khi in lại.</p>
                 <a class="btn-primary mt-5" href="{{ route('staff.tickets.operations', $booking) }}">Mở vận hành vé</a>
             @endif
         @elseif($canResume)

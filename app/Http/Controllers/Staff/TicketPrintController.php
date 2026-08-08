@@ -25,6 +25,30 @@ final class TicketPrintController extends Controller
             ->with('success', 'Đã bắt đầu lần in vé.');
     }
 
+    public function reprint(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        $booking = $tickets->authorizedBooking($booking, $request->user());
+        $validated = $request->validate([
+            'reason_code' => ['required', 'in:'.implode(',', array_keys(TicketPrintService::REPRINT_REASONS))],
+            'safe_note' => ['nullable', 'string', 'max:300', 'required_if:reason_code,other'],
+        ], [
+            'reason_code.required' => 'Vui lòng chọn lý do in lại.',
+            'safe_note.required_if' => 'Vui lòng mô tả ngắn gọn khi chọn lý do khác.',
+        ]);
+        $operation = $this->operation($request, $booking, true);
+        $prints->reprint(
+            $booking,
+            $request->user(),
+            $operation['id'],
+            $operation['token'],
+            $validated['reason_code'],
+            $validated['safe_note'] ?? null,
+        );
+
+        return redirect()->route('staff.tickets.print.show', $booking)
+            ->with('success', 'Đã ghi nhận lý do và bắt đầu lần in lại.');
+    }
+
     public function show(
         Request $request,
         Booking $booking,
@@ -151,9 +175,8 @@ final class TicketPrintController extends Controller
             'printing' => $state->active_operation_expires_at?->isPast()
                 ? 'Phiên in trước đã hết hiệu lực. Vui lòng xác nhận kết quả lần in trước trước khi tiếp tục.'
                 : 'Phiên in đang được xử lý trong một cửa sổ khác. Vui lòng quay lại cửa sổ đó để xác nhận kết quả.',
-            'retry_allowed' => 'Lần in trước đã được báo lỗi. Vé đang được phép in lại theo chính sách hiện tại.',
-            'retry_requires_authorization' => 'Cần quản lý phê duyệt in lại.',
-            'retry_authorized' => 'Quản lý đã phê duyệt. Vui lòng bắt đầu lần in mới từ trang vận hành vé.',
+            'retry_allowed' => 'Lần in trước gặp lỗi. Vui lòng ghi lý do trước khi in lại.',
+            'retry_requires_authorization', 'retry_authorized' => 'Vui lòng ghi lý do trước khi in lại.',
             default => 'Không có phiên in hợp lệ. Vui lòng bắt đầu in từ trang vận hành vé.',
         };
 

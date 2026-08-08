@@ -52,6 +52,25 @@
                 <div><dt class="text-sm app-muted">Người in</dt><dd class="font-bold app-text">{{ $printState?->printedBy?->name ?? '—' }}</dd></div>
                 <div><dt class="text-sm app-muted">Soát vé</dt><dd class="font-bold app-text">{{ $checkinEvent ? $checkinEvent->scanned_at?->format('d/m/Y H:i').' · '.($checkinEvent->actor?->name ?? '—') : 'Chưa soát' }}</dd></div>
             </dl>
+            @if($printEvents->isNotEmpty())
+                <div class="mt-5 overflow-x-auto">
+                    <table class="admin-table">
+                        <thead><tr><th>Thời gian</th><th>Nhân viên</th><th>Hành động</th><th>Lần in</th><th>Lý do</th><th>Kết quả</th></tr></thead>
+                        <tbody>
+                            @foreach($printEvents as $event)
+                                <tr>
+                                    <td>{{ $event->created_at?->format('d/m/Y H:i:s') }}</td>
+                                    <td>{{ $event->actor?->name ?? 'Hệ thống' }}</td>
+                                    <td>{{ $event->attempt_number === 1 ? 'In lần đầu' : 'In lại' }}</td>
+                                    <td>#{{ $event->attempt_number }}</td>
+                                    <td>{{ $event->event_type === 'reprint_requested' || ($event->event_type === 'print_started' && $event->attempt_number > 1) ? (\App\Services\Tickets\TicketPrintService::REPRINT_REASONS[$event->failure_code] ?? '—') : ($event->event_type === 'print_failed' ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? '—') : '—') }}@if($event->safe_note)<span class="mt-1 block max-w-md break-words text-xs app-muted">{{ $event->safe_note }}</span>@endif</td>
+                                    <td>{{ match($event->event_type) { 'print_succeeded' => 'Thành công', 'print_failed' => 'Lỗi', 'reprint_requested' => 'Đã ghi nhận lý do', 'print_started' => 'Đang xử lý', 'stale_print_released' => 'Hết hạn', 'retry_authorized' => 'Dữ liệu duyệt cũ', default => 'Đã ghi nhận' } }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </section>
     @endif
 
@@ -60,18 +79,17 @@
         <p class="mt-2 app-muted">In vé cứng không đánh dấu đã soát. Soát vé vẫn là một thao tác xác nhận độc lập.</p>
         <div class="mt-5 flex flex-wrap gap-3">
             @can('tickets.print')
-                @if($booking->booking_status === 'paid' && $booking->payment_status === 'paid' && (!$printState || in_array($printState->status, ['retry_allowed', 'retry_authorized'], true)))
-                    @if($printState?->status === 'retry_allowed')
-                        <p class="w-full rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Được phép in lại do lần in trước gặp lỗi: {{ \App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$printState->last_failure_code] ?? 'Lỗi đã được ghi nhận' }}.</p>
-                    @elseif($printState?->status === 'retry_authorized')
-                        <p class="w-full rounded-xl bg-success/10 px-4 py-3 font-bold text-success">Quản lý đã phê duyệt thêm một lần in.</p>
-                    @endif
+                @if($booking->booking_status === 'paid' && $booking->payment_status === 'paid' && !$printState)
                     <form method="POST" action="{{ route('staff.tickets.print.start', $booking) }}" data-submit-once>@csrf
                         <button type="submit" class="btn-primary"><i class="ph ph-printer"></i>In vé cứng</button>
                     </form>
-                @elseif($printState?->status === 'printed')
-                    <span class="rounded-xl bg-success/10 px-4 py-3 font-bold text-success">Đã in thành công {{ $printState->printed_at?->format('d/m/Y H:i') }}</span>
-                    <span class="rounded-xl bg-success/10 px-4 py-3 font-bold text-success">Người in: {{ $printState->printedBy?->name ?? '—' }}</span>
+                @elseif($booking->booking_status === 'paid' && $booking->payment_status === 'paid' && in_array($printState?->status, ['printed', 'retry_allowed', 'retry_requires_authorization', 'retry_authorized'], true))
+                    @if($printState->status === 'printed')
+                        <p class="w-full rounded-xl bg-success/10 px-4 py-3 font-bold text-success">Đã in {{ $printState->printed_at?->format('d/m/Y H:i') }} · Người in: {{ $printState->printedBy?->name ?? '—' }} · {{ $printState->attempts_count }} lần in @if($printState->attempts_count > 1)· In lại {{ $printState->attempts_count - 1 }} lần @endif.</p>
+                    @else
+                        <p class="w-full rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Lần in trước gặp lỗi: {{ \App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$printState->last_failure_code] ?? 'Lỗi đã được ghi nhận' }}. Vui lòng ghi lý do trước khi in lại.</p>
+                    @endif
+                    <button type="button" class="btn-primary" data-modal-open="ticket-reprint" aria-haspopup="dialog" aria-controls="ticket-reprint"><i class="ph ph-printer"></i>In lại vé</button>
                 @elseif($printState?->status === 'printing' && $printState->active_operation_expires_at?->isPast())
                     @if((int) $printState->active_operator_user_id === (int) auth()->id())
                         <div class="w-full rounded-xl bg-warning/10 p-4 text-warning">
@@ -85,8 +103,6 @@
                     @endif
                 @elseif($printState?->status === 'printing')
                     <span class="rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Một phiên in đang chờ nhân viên xác nhận kết quả.</span>
-                @elseif($printState?->status === 'retry_requires_authorization')
-                    <span class="rounded-xl bg-warning/10 px-4 py-3 font-bold text-warning">Đã hết lượt in lại. Vui lòng yêu cầu Quản lý phê duyệt.</span>
                 @endif
             @endcan
             @can('tickets.checkin')
@@ -100,5 +116,31 @@
             @endcan
         </div>
     </section>
+
+    @can('tickets.print')
+        @if($booking->booking_status === 'paid' && $booking->payment_status === 'paid' && in_array($printState?->status, ['printed', 'retry_allowed', 'retry_requires_authorization', 'retry_authorized'], true))
+            <x-ui.modal id="ticket-reprint" title="In lại vé" description-id="ticket-reprint-description">
+                <p id="ticket-reprint-description" class="app-muted">Vui lòng chọn lý do cần in thêm một bản vé. Thông tin này sẽ được lưu vào lịch sử vận hành.</p>
+                <form method="POST" action="{{ route('staff.tickets.print.reprint', $booking) }}" class="mt-5 space-y-4" data-submit-once>
+                    @csrf
+                    <label class="cinema-label" for="reprint-reason">Lý do in lại
+                        <select id="reprint-reason" name="reason_code" class="cinema-input mt-1" required data-modal-initial-focus>
+                            <option value="">Chọn lý do</option>
+                            @foreach(\App\Services\Tickets\TicketPrintService::REPRINT_REASONS as $code => $label)
+                                <option value="{{ $code }}" @selected(old('reason_code') === $code)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="cinema-label" for="reprint-note">Ghi chú ngắn
+                        <textarea id="reprint-note" name="safe_note" maxlength="300" rows="3" class="cinema-input mt-1" placeholder="Bắt buộc khi chọn Lý do khác">{{ old('safe_note') }}</textarea>
+                    </label>
+                    <div class="flex justify-end gap-3">
+                        <button type="button" class="btn-secondary" data-modal-close="ticket-reprint">Hủy</button>
+                        <button type="submit" class="btn-primary">Xác nhận in lại</button>
+                    </div>
+                </form>
+            </x-ui.modal>
+        @endif
+    @endcan
 </div>
 @endsection

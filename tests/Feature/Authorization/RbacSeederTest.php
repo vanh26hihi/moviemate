@@ -26,7 +26,7 @@ class RbacSeederTest extends TestCase
         $staff = Role::query()->where('slug', 'staff')->firstOrFail();
         $user = Role::query()->where('slug', 'user')->firstOrFail();
 
-        $this->assertSame(Permission::query()->count(), $admin->permissions()->count());
+        $this->assertSame(Permission::query()->count() - 1, $admin->permissions()->count());
         $this->assertTrue($manager->hasPermission('admin.access'));
         $this->assertTrue($manager->hasPermission('cinema.update'));
         $this->assertFalse($manager->hasPermission('cinema.delete'));
@@ -52,6 +52,8 @@ class RbacSeederTest extends TestCase
         }
         $this->assertFalse($manager->hasPermission('activity_logs.view'));
         $this->assertTrue($admin->hasPermission('activity_logs.view'));
+        $this->assertFalse($admin->hasPermission('tickets.print.override'));
+        $this->assertFalse($manager->hasPermission('tickets.print.override'));
         $this->assertTrue($staff->hasPermission('ticket_checkins.view'));
         $this->assertFalse($staff->hasPermission('activity_logs.view'));
         $this->assertTrue($staff->hasPermission('tickets.checkin'));

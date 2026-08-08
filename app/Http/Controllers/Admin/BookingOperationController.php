@@ -9,11 +9,9 @@ use App\Models\Payment;
 use App\Services\ActivityLogger;
 use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\BookingCancellationService;
-use App\Services\CinemaAccessService;
 use App\Services\Payments\PaymentReconciliationService;
 use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\TicketDeliveryRetryService;
-use App\Services\Tickets\TicketPrintService;
 use App\Support\PrivacyMask;
 use App\Support\StatusLabel;
 use Illuminate\Http\RedirectResponse;
@@ -122,20 +120,6 @@ final class BookingOperationController extends Controller
         return back()->with('warning', $result->alreadyCancelled
             ? 'Đơn đặt vé đã được hủy trước đó.'
             : 'Đơn đặt vé này không thể hủy ở trạng thái hiện tại.');
-    }
-
-    public function authorizePrintRetry(
-        Request $request,
-        Booking $booking,
-        CinemaAccessService $cinemas,
-        TicketPrintService $prints,
-    ): RedirectResponse {
-        $validated = $request->validate(['safe_note' => ['nullable', 'string', 'max:300']]);
-        abort_unless($booking->cinema_id, 404);
-        $cinemas->authorizeCinema($request->user(), (int) $booking->cinema_id);
-        $prints->authorizeRetry($booking, $request->user(), $validated['safe_note'] ?? null);
-
-        return back()->with('success', 'Đã cho phép thực hiện thêm một lần in.');
     }
 
     private function assertRateLimit(string $action, Request $request, int $subjectId, int $maxAttempts): void

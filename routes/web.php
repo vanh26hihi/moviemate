@@ -297,10 +297,6 @@ Route::prefix('admin')->name('admin.')
         Route::post('/bookings/{booking}/cancel', [AdminBookingOperationController::class, 'cancel'])
             ->whereNumber('booking')
             ->middleware('permission:bookings.operate')->name('bookings.cancel');
-        Route::post('/bookings/{booking}/ticket-print/authorize-retry', [AdminBookingOperationController::class, 'authorizePrintRetry'])
-            ->whereNumber('booking')
-            ->middleware('permission:tickets.print.override')->name('bookings.ticket-print.authorize-retry');
-
         Route::resource('foods', AdminFoodController::class)->except(['show'])
             ->middlewareFor('index', 'permission:foods.view')
             ->middlewareFor(['create', 'store'], 'permission:foods.create')
@@ -481,6 +477,8 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('booking')->middleware('permission:tickets.lookup')->name('tickets.operations');
         Route::post('/tickets/{booking}/print', [StaffTicketPrintController::class, 'start'])
             ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.start');
+        Route::post('/tickets/{booking}/reprint', [StaffTicketPrintController::class, 'reprint'])
+            ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.reprint');
         Route::get('/tickets/{booking}/print', [StaffTicketPrintController::class, 'show'])
             ->whereNumber('booking')->middleware('permission:tickets.print')->name('tickets.print.show');
         Route::post('/tickets/{booking}/print/succeed', [StaffTicketPrintController::class, 'succeed'])
