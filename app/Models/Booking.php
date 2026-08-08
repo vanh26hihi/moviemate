@@ -238,4 +238,9 @@ class Booking extends Model
 
         return $currency === 'VND' ? 'VNĐ' : $currency;
     }
+
+    public function getFormattedSeatSubtotalAttribute(): string
+    {
+        return number_format((int) $this->seat_subtotal, 0, ',', '.').' '.$this->currency_label;
+    }
 }
