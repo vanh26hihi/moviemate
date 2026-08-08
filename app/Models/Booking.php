@@ -206,7 +206,7 @@ class Booking extends Model
 
     public function getFormattedTotalAttribute(): string
     {
-        return number_format((int) $this->total_amount, 0, ',', '.').' VNĐ';
+        return number_format((int) $this->total_amount, 0, ',', '.').' '.$this->currency_label;
     }
 
     public function getMovieTitleAttribute(): string
