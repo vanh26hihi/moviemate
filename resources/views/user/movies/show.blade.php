@@ -302,8 +302,19 @@
 
                                             {{-- Các suất chiếu --}}
                                             <div class="flex flex-wrap gap-2">
+                                                @php
+                                                    $nearestShowtime = $cinemaShowtimes->first();
+                                                @endphp
 
                                                 @foreach($cinemaShowtimes as $show)
+
+                                                @if($show->id === $nearestShowtime->id)
+
+                                                    <span class="text-[10px] font-bold text-brand-start">
+                                                        Suất gần nhất
+                                                    </span>
+                                                    
+                                                @endif
                                                 @php
                                                 $showDateTime = \Carbon\Carbon::parse(
                                                     $show->show_date->format('Y-m-d') . ' ' . $show->show_time,
