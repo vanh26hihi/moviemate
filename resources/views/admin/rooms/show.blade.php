@@ -53,7 +53,7 @@
             <h2 class="text-xl font-extrabold app-text">Thông tin phòng</h2>
             <dl class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">{{ __('rooms.fields.code') }}</dt><dd class="font-bold app-text">{{ $room->code }}</dd></div>
-                <div><dt class="text-sm app-muted">{{ __('rooms.fields.type') }}</dt><dd class="font-bold app-text">{{ $room->room_type }}</dd></div>
+                <div><dt class="text-sm app-muted">{{ __('rooms.fields.type') }}</dt><dd class="font-bold app-text">{{ $room->room_type_label }}</dd></div>
                 <div><dt class="text-sm app-muted">{{ __('rooms.fields.cinema') }}</dt><dd class="font-bold app-text">{{ $room->cinema->name }}</dd></div>
                 <div><dt class="text-sm app-muted">{{ __('rooms.fields.updated_at') }}</dt><dd class="font-bold app-text">{{ $room->updated_at->format('d/m/Y H:i') }}</dd></div>
             </dl>

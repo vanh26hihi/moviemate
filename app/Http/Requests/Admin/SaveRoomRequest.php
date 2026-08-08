@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Room;
+use App\Models\RoomType;
 use App\Services\CinemaAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -24,13 +25,7 @@ class SaveRoomRequest extends FormRequest
     {
         $roomType = $this->input('room_type');
         if (is_string($roomType)) {
-            $upper = mb_strtoupper(trim($roomType), 'UTF-8');
-            $roomType = match (true) {
-                str_starts_with($upper, '2D') => '2D',
-                str_starts_with($upper, '3D') => '3D',
-                str_contains($upper, 'IMAX') => 'IMAX',
-                default => trim($roomType),
-            };
+            $roomType = RoomType::normalizeCode($roomType);
         }
 
         $this->merge([
@@ -46,6 +41,7 @@ class SaveRoomRequest extends FormRequest
         $room = $this->route('room');
         $access = app(CinemaAccessService::class);
         $roomCinemaId = $room instanceof Room ? (int) $room->cinema_id : null;
+        $currentRoomType = $room instanceof Room ? $room->room_type : null;
         $requestedCinemaId = filter_var($this->input('cinema_id'), FILTER_VALIDATE_INT) ?: null;
         $cinemaId = $roomCinemaId ?? $access->currentCinemaId($this->user()) ?? $requestedCinemaId;
 
@@ -57,7 +53,10 @@ class SaveRoomRequest extends FormRequest
                     ->ignore($room instanceof Room ? $room->id : null),
             ],
             'name' => ['required', 'string', 'max:255'],
-            'room_type' => ['required', Rule::in(['2D', '3D', 'IMAX'])],
+            'room_type' => ['required', Rule::exists('room_types', 'code')->where(
+                fn ($query) => $query->where('is_active', true)
+                    ->when($currentRoomType, fn ($query, string $code) => $query->orWhere('code', $code))
+            )],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'cleaning_buffer_minutes' => ['nullable', 'integer', 'between:0,180'],
             'template_id' => [$room instanceof Room ? 'prohibited' : 'nullable', 'integer', Rule::exists('room_layout_templates', 'id')->where('status', 'active')],

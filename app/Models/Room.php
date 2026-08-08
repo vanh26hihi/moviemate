@@ -19,6 +19,7 @@ class Room extends Model
         'code',
         'name',
         'room_type',
+        'room_type_id',
         'total_seats',
         'cleaning_buffer_minutes',
         'status',
@@ -32,6 +33,16 @@ class Room extends Model
     public function cinema(): BelongsTo
     {
         return $this->belongsTo(Cinema::class);
+    }
+
+    public function roomType(): BelongsTo
+    {
+        return $this->belongsTo(RoomType::class);
+    }
+
+    public function getRoomTypeLabelAttribute(): string
+    {
+        return $this->roomType?->name ?: $this->room_type;
     }
 
     public function seats(): HasMany

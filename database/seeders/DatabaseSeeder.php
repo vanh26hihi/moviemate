@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             GenreSeeder::class,
             CinemaSeeder::class,
+            RoomTypeSeeder::class,
             RoomSeeder::class,
             RoomLayoutTemplateSeeder::class,
             MovieSeeder::class,

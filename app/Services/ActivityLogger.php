@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Role;
 use App\Models\Room;
 use App\Models\RoomLayout;
+use App\Models\RoomType;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Models\User;
@@ -127,6 +128,7 @@ final class ActivityLogger
             $subject instanceof BookingTicketDelivery => 'Gửi vé điện tử #'.$subject->getKey().' / đơn #'.$subject->booking_id,
             $subject instanceof Payment => 'Giao dịch #'.$subject->getKey().' / '.$subject->provider,
             $subject instanceof Room => 'Phòng '.$subject->code,
+            $subject instanceof RoomType => 'Loại phòng '.$subject->code,
             $subject instanceof RoomLayout => 'Sơ đồ #'.$subject->getKey().' / phòng #'.$subject->room_id,
             $subject instanceof Showtime => 'Suất chiếu #'.$subject->getKey(),
             $subject instanceof Seat => 'Ghế '.$subject->seat_code.' / phòng #'.$subject->room_id,

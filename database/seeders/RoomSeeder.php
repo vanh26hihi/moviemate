@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Cinema;
 use App\Models\Room;
+use App\Models\RoomType;
 use Illuminate\Database\Seeder;
 
 final class RoomSeeder extends Seeder
@@ -26,6 +27,7 @@ final class RoomSeeder extends Seeder
                     [
                         'name' => $code === 'DEMO' ? 'Phòng demo bảo vệ' : 'Phòng '.($index + 1),
                         'room_type' => $roomType,
+                        'room_type_id' => RoomType::query()->where('code', $roomType)->value('id'),
                         'total_seats' => 0,
                         'status' => 'active',
                     ],

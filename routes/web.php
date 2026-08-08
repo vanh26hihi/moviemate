@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\RoomLayoutTemplateController as AdminRoomLayoutTemplateController;
+use App\Http\Controllers\Admin\RoomTypeController as AdminRoomTypeController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
@@ -352,6 +353,19 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:pricing.manage')->name('pricing-rules.status');
         Route::post('/pricing-rules-preview', [AdminPricingRuleController::class, 'preview'])
             ->middleware(['permission:pricing.view', 'throttle:30,1'])->name('pricing-rules.preview');
+
+        Route::get('/room-types', [AdminRoomTypeController::class, 'index'])
+            ->middleware('permission:room_types.view')->name('room-types.index');
+        Route::get('/room-types/create', [AdminRoomTypeController::class, 'create'])
+            ->middleware('permission:room_types.manage')->name('room-types.create');
+        Route::post('/room-types', [AdminRoomTypeController::class, 'store'])
+            ->middleware('permission:room_types.manage')->name('room-types.store');
+        Route::get('/room-types/{roomType}/edit', [AdminRoomTypeController::class, 'edit'])
+            ->whereNumber('roomType')->middleware('permission:room_types.manage')->name('room-types.edit');
+        Route::put('/room-types/{roomType}', [AdminRoomTypeController::class, 'update'])
+            ->whereNumber('roomType')->middleware('permission:room_types.manage')->name('room-types.update');
+        Route::patch('/room-types/{roomType}/status', [AdminRoomTypeController::class, 'status'])
+            ->whereNumber('roomType')->middleware('permission:room_types.manage')->name('room-types.status');
 
         Route::patch('/rooms/{room}/status', [AdminRoomController::class, 'updateStatus'])
             ->middleware('permission:rooms.update')->name('rooms.status.update');

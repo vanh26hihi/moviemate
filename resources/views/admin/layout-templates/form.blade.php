@@ -6,7 +6,7 @@
     <div class="app-card p-5 grid md:grid-cols-2 gap-4">
         <label>Mã mẫu<input class="form-input w-full" name="code" value="{{ old('code', $template->code) }}" required placeholder="STANDARD_100"></label>
         <label>Tên mẫu<input class="form-input w-full" name="name" value="{{ old('name', $template->name) }}" required></label>
-        <label>Loại phòng<select class="form-input w-full" name="room_type"><option value="">Mọi loại</option>@foreach(['2D','3D','IMAX','4DX'] as $type)<option @selected(old('room_type',$template->room_type)===$type)>{{ $type }}</option>@endforeach</select></label>
+        <label>Loại phòng<select class="form-input w-full" name="room_type"><option value="">Mọi loại</option>@foreach($roomTypes as $type)<option value="{{ $type->code }}" @selected(old('room_type',$template->room_type)===$type->code)>{{ $type->name }}{{ $type->is_active ? '' : ' (đã lưu trữ)' }}</option>@endforeach</select></label>
         <label>Mô tả<input class="form-input w-full" name="description" value="{{ old('description', $template->description) }}"></label>
     </div>
     <div class="app-card p-5 space-y-4">

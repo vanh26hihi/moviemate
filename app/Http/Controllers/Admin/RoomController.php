@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\SaveRoomRequest;
 use App\Models\Cinema;
 use App\Models\Room;
 use App\Models\RoomLayoutTemplate;
+use App\Models\RoomType;
 use App\Services\ActivityLogger;
 use App\Services\ApplyRoomLayoutTemplateService;
 use App\Services\CinemaAccessService;
@@ -33,7 +34,7 @@ class RoomController extends Controller
         $roomType = (string) $request->query('room_type', '');
 
         $query = Room::query()
-            ->with(['cinema', 'latestPublishedLayout.cells.seat', 'draftLayout'])
+            ->with(['cinema', 'roomType', 'latestPublishedLayout.cells.seat', 'draftLayout'])
             ->withCount([
                 'showtimes',
                 'showtimes as upcoming_showtimes_count' => fn (Builder $query) => $this->futureActiveShowtimes($query),
@@ -45,12 +46,14 @@ class RoomController extends Controller
                     ->orWhere('code', 'like', "%{$search}%");
             }))
             ->when(in_array($status, ['active', 'inactive'], true), fn (Builder $query) => $query->where('status', $status))
-            ->when(in_array($roomType, ['2D', '3D', 'IMAX'], true), fn (Builder $query) => $query->where('room_type', $roomType))
+            ->when($roomType !== '' && RoomType::query()->where('code', $roomType)->exists(), fn (Builder $query) => $query->where('room_type', $roomType))
             ->orderBy('code')
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.rooms.index', compact('rooms', 'search', 'status', 'roomType'));
+        $roomTypes = RoomType::options(includeInactive: true);
+
+        return view('admin.rooms.index', compact('rooms', 'roomTypes', 'search', 'status', 'roomType'));
     }
 
     public function create(): View
@@ -58,8 +61,9 @@ class RoomController extends Controller
         $cinema = $this->cinemaAccess->currentCinema(auth()->user());
         $cinemas = $this->cinemaAccess->accessibleCinemas(auth()->user());
         $templates = RoomLayoutTemplate::query()->active()->orderBy('name')->get();
+        $roomTypes = RoomType::options();
 
-        return view('admin.rooms.create', compact('cinema', 'cinemas', 'templates'));
+        return view('admin.rooms.create', compact('cinema', 'cinemas', 'templates', 'roomTypes'));
     }
 
     public function store(SaveRoomRequest $request): RedirectResponse
@@ -72,6 +76,7 @@ class RoomController extends Controller
         $layoutName = $validated['layout_name'] ?? null;
         $changeNote = $validated['change_note'] ?? null;
         unset($validated['template_id'], $validated['layout_name'], $validated['change_note']);
+        $validated['room_type_id'] = RoomType::query()->where('code', $validated['room_type'])->value('id');
         $room = DB::transaction(function () use ($validated, $cinemaId, $templateId, $layoutName, $changeNote, $request): Room {
             $room = Room::query()->create([...$validated, 'total_seats' => 0, 'cinema_id' => $cinemaId]);
             if ($templateId) {
@@ -96,6 +101,7 @@ class RoomController extends Controller
         $this->assertManagedRoom($room);
         $room->load([
             'cinema',
+            'roomType',
             'latestPublishedLayout.cells.seat',
             'draftLayout',
             'layouts' => fn ($query) => $query->orderByDesc('version'),
@@ -130,14 +136,16 @@ class RoomController extends Controller
         $this->assertManagedRoom($room);
         $cinema = $room->cinema;
         $cinemas = collect([$cinema]);
+        $roomTypes = RoomType::options($room->room_type);
 
-        return view('admin.rooms.edit', compact('room', 'cinema', 'cinemas'));
+        return view('admin.rooms.edit', compact('room', 'cinema', 'cinemas', 'roomTypes'));
     }
 
     public function update(SaveRoomRequest $request, Room $room): RedirectResponse
     {
         $this->assertManagedRoom($room);
         $validated = $request->validated();
+        $validated['room_type_id'] = RoomType::query()->where('code', $validated['room_type'])->value('id');
         $this->ensureStatusTransitionIsSafe($room, $validated['status']);
         $this->ensureOperationalNameIsUnique($validated, $room->id, (int) $room->cinema_id);
 
