@@ -231,4 +231,11 @@ class Booking extends Model
     {
         return $this->showtime?->room?->name ?: 'Phòng đang cập nhật';
     }
+
+    public function getCurrencyLabelAttribute(): string
+    {
+        $currency = strtoupper($this->currency ?: 'VND');
+
+        return $currency === 'VND' ? 'VNĐ' : $currency;
+    }
 }
