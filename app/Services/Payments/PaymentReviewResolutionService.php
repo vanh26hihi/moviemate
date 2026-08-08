@@ -24,14 +24,15 @@ use LogicException;
 class PaymentReviewResolutionService
 {
     public function __construct(
-        private readonly ZaloPayGateway $gateway,
-        private readonly ZaloPayConfig $config,
         private readonly VerifiedPaymentService $verifiedPayments,
-        private readonly VnpayQueryService $vnpayQueries,
     ) {}
 
     public function resolve(Payment $payment, User $actor): PaymentReviewResolutionResult
     {
+        $vnpayQueries = $payment->provider === 'vnpay' ? app(VnpayQueryService::class) : null;
+        $zalopayGateway = $payment->provider === 'zalopay' ? app(ZaloPayGateway::class) : null;
+        $zalopayConfig = $payment->provider === 'zalopay' ? app(ZaloPayConfig::class) : null;
+
         $event = DB::transaction(function () use ($payment, $actor): PaymentReviewEvent {
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
@@ -56,14 +57,14 @@ class PaymentReviewResolutionService
         });
 
         if ($payment->provider === 'vnpay') {
-            return $this->resolveVnpay($payment, $event);
+            return $this->resolveVnpay($payment, $event, $vnpayQueries);
         }
         if ($payment->provider === 'payos') {
             return $this->resolvePayOs($payment, $event);
         }
 
         try {
-            $response = $this->gateway->query($payment->fresh());
+            $response = $zalopayGateway->query($payment->fresh());
         } catch (ZaloPayAuthenticationException) {
             return $this->finish(
                 $event,
@@ -115,7 +116,7 @@ class PaymentReviewResolutionService
             providerTransactionId: $this->normalizeTransactionId($payload['zp_trans_id'] ?? null),
             source: 'query',
             payloadHash: $response->hash,
-            appId: $this->config->appId,
+            appId: $zalopayConfig->appId,
             serverTimeMs: is_int($payload['server_time'] ?? null) ? $payload['server_time'] : null,
         ));
 
@@ -132,9 +133,10 @@ class PaymentReviewResolutionService
     private function resolveVnpay(
         Payment $payment,
         PaymentReviewEvent $event,
+        VnpayQueryService $vnpayQueries,
     ): PaymentReviewResolutionResult {
         try {
-            $status = $this->vnpayQueries->reconcileReview($payment);
+            $status = $vnpayQueries->reconcileReview($payment);
         } catch (VnpayTransportException) {
             return $this->finish(
                 $event,

@@ -47,7 +47,6 @@
                 ['label' => 'Kinh doanh', 'items' => [
                     ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],
                     ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
-                    ['route' => 'admin.payment-reconciliation.index', 'active' => ['admin.payment-reconciliation.*', 'admin.payment-reviews.*'], 'permission' => 'payments.reconcile', 'label' => 'Đối soát giao dịch', 'icon' => 'ph-arrows-clockwise', 'badge' => $paymentReconciliationBadge ?? null],
                     ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Mã giảm giá', 'icon' => 'ph-ticket-percent'],
                     ['route' => 'admin.ticket-checkins.index', 'active' => 'admin.ticket-checkins.*', 'permission' => 'ticket_checkins.view', 'label' => 'Lịch sử soát vé', 'icon' => 'ph-qr-code'],
                 ]],

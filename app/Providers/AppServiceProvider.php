@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Policies\BookingPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
-use App\Services\Admin\PaymentReconciliationQuery;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\CinemaAccessService;
 use App\Services\CinemaContext;
@@ -98,11 +97,7 @@ class AppServiceProvider extends ServiceProvider
             $user = auth()->user();
             $adminCinemas = $user ? $access->accessibleCinemas($user) : collect();
             $adminCurrentCinema = $user ? $access->resolve($user) : null;
-            $badge = auth()->check() && auth()->user()->can('payments.reconcile')
-                ? app(PaymentReconciliationQuery::class)->badgeLabel()
-                : null;
             $view->with([
-                'paymentReconciliationBadge' => $badge,
                 'adminAccessibleCinemas' => $adminCinemas,
                 'adminCurrentCinema' => $adminCurrentCinema,
                 'adminHasGlobalCinemaAccess' => $user ? $access->hasGlobalAccess($user) : false,
