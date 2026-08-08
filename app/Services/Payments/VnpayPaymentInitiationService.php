@@ -12,6 +12,7 @@ use App\Models\Payment;
 use App\Services\Vnpay\VnpayPaymentUrlBuilder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -32,12 +33,14 @@ class VnpayPaymentInitiationService
 
                 $activeAttempt = Payment::query()
                     ->where('booking_id', $lockedBooking->id)
-                    ->where('provider', 'vnpay')
                     ->whereIn('status', Payment::UNSAFE_RETRY_STATUSES)
                     ->latest('id')
                     ->lockForUpdate()
                     ->first();
                 if ($activeAttempt) {
+                    if ($activeAttempt->provider !== 'vnpay') {
+                        throw new PaymentInitiationException('Another payment provider attempt is still unresolved.');
+                    }
                     if ($activeAttempt->status === Payment::STATUS_REVIEW) {
                         throw new PaymentInitiationException(
                             'The existing VNPAY attempt requires review and cannot be replaced.',
@@ -85,11 +88,10 @@ class VnpayPaymentInitiationService
         } catch (UniqueConstraintViolationException $exception) {
             $active = Payment::query()
                 ->where('booking_id', $booking->getKey())
-                ->where('provider', 'vnpay')
                 ->whereIn('status', Payment::UNSAFE_RETRY_STATUSES)
                 ->latest('id')
                 ->first();
-            if (! $active) {
+            if (! $active || $active->provider !== 'vnpay') {
                 throw new PaymentInitiationException('Unable to allocate a unique VNPAY transaction reference.', previous: $exception);
             }
             $payment = $active;
@@ -98,7 +100,29 @@ class VnpayPaymentInitiationService
 
         $payment->loadMissing('booking');
         $state = $this->returnTokens->issue($payment);
-        $url = $this->urls->build($payment, $this->config->returnUrl($state), $clientIp);
+        $returnUrl = $this->config->returnUrl($state);
+        try {
+            $url = $this->urls->build($payment, $returnUrl, $clientIp);
+        } catch (PaymentInitiationException $exception) {
+            Log::warning('VNPAY PAY request validation failed before redirect.', [
+                'payment_id' => $payment->id,
+                'booking_id' => $payment->booking_id,
+                'provider' => 'vnpay',
+                'tmn_code' => $this->maskedTmnCode(),
+                'txn_ref' => $payment->order_code,
+                'amount' => $payment->amount,
+                'endpoint_host' => parse_url($this->config->paymentUrl, PHP_URL_HOST),
+                'return_host' => parse_url($returnUrl, PHP_URL_HOST),
+                'client_ip_family' => filter_var($clientIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
+                    ? 'IPv4'
+                    : (filter_var($clientIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? 'IPv6' : 'invalid'),
+                'bank_code' => $this->config->bankCode === '' ? 'omitted' : 'configured',
+                'request_contract_valid' => false,
+                'reason' => $exception->getMessage(),
+            ]);
+
+            throw $exception;
+        }
 
         return new PaymentInitiationResult($payment, $url, $replayed);
     }
@@ -161,5 +185,10 @@ class VnpayPaymentInitiationService
     private function transactionReference(): string
     {
         return 'MM'.now(VnpayConfig::TIMEZONE)->format('ymdHis').strtoupper(Str::random(18));
+    }
+
+    private function maskedTmnCode(): string
+    {
+        return substr($this->config->tmnCode, 0, 2).'****'.substr($this->config->tmnCode, -2);
     }
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'MovieMate Staff Panel')</title>
+    <title>@yield('title', 'Khu vực nhân viên MovieMate')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>
         (function () {
@@ -18,33 +18,27 @@
         <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0">
             <a href="{{ route('home') }}" class="flex items-center gap-2">
                 <i class="ph-fill ph-film-strip text-3xl text-ai-start"></i>
-                <div class="leading-tight"><span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-ai-start to-brand-start">MovieMate</span><span class="block text-[10px] uppercase tracking-widest app-muted font-bold">Staff Panel</span></div>
+                <div class="leading-tight"><span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-ai-start to-brand-start">MovieMate</span><span class="block text-[10px] uppercase tracking-widest app-muted font-bold">Khu vực nhân viên</span></div>
             </a>
         </div>
         <nav class="flex-grow py-6 px-4 space-y-1 overflow-y-auto hide-scrollbar">
-            @can('dashboard.view')<x-admin.nav-link route-name="staff.dashboard" active-pattern="staff.dashboard" label="Dashboard" icon="ph-squares-four" />@endcan
+            @can('dashboard.view')<x-admin.nav-link route-name="staff.dashboard" active-pattern="staff.dashboard" label="Tổng quan" icon="ph-squares-four" />@endcan
             @can('tickets.checkin')<x-admin.nav-link route-name="staff.tickets.check" active-pattern="staff.tickets.check" label="Kiểm tra vé QR" icon="ph-qr-code" />@endcan
-            @can('bookings.view')<x-admin.nav-link route-name="staff.tickets.index" active-pattern="staff.tickets.index" label="Danh sách vé" icon="ph-ticket" />@endcan
-            @can('bookings.operate')<x-admin.nav-link route-name="staff.sales.counter" active-pattern="staff.sales.counter" label="Bán vé tại quầy" icon="ph-storefront" />@endcan
+            @can('tickets.lookup')<x-admin.nav-link route-name="staff.tickets.index" active-pattern="staff.tickets.*" label="Tra cứu vé" icon="ph-ticket" />@endcan
+            @can('counter_sales.view')<x-admin.nav-link route-name="staff.counter.index" active-pattern="staff.counter.*" label="Bán vé tại quầy" icon="ph-storefront" />@endcan
         </nav>
         <div class="p-4 border-t app-border shrink-0">
-            <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về website</a>
+            <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về trang chính</a>
             <form method="POST" action="{{ route('logout') }}" class="mt-2">@csrf<button type="submit" class="w-full py-2 app-muted hover:text-error text-sm"><i class="ph ph-sign-out"></i> Đăng xuất</button></form>
         </div>
     </aside>
     <main class="staff-shell flex-grow flex flex-col min-w-0 app-bg relative h-full overflow-hidden">
         <header class="h-16 lg:h-20 flex items-center justify-between px-4 sm:px-8 border-b app-border app-card backdrop-blur-md sticky top-0 z-30 shrink-0">
             <div class="flex items-center gap-4"><button id="mobile-menu-btn" type="button" class="lg:hidden app-muted hover:app-text" aria-label="Mở menu" aria-expanded="false" aria-controls="sidebar"><i class="ph ph-list text-2xl"></i></button><h1 class="text-lg sm:text-xl font-bold app-text truncate">@yield('page-title')</h1></div>
-            <div class="flex items-center gap-2 sm:gap-3 min-w-0"><button data-theme-toggle type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border app-muted hover:border-brand-start transition-all text-sm" aria-label="Đổi giao diện sáng/tối" aria-pressed="false"><span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span><span class="theme-text hidden sm:inline text-xs font-medium">Tối</span></button><div class="flex items-center gap-3 pl-3 border-l app-border"><div class="hidden sm:block text-right"><p class="text-sm font-bold app-text leading-tight">{{ auth()->user()?->name ?? 'Nhân viên rạp' }}</p><p class="text-xs text-ai-start font-medium">{{ auth()->user()?->role?->name ?? 'Chưa có vai trò' }}</p></div><span class="w-9 h-9 rounded-full app-bg border app-border flex items-center justify-center text-ai-start"><i class="ph-fill ph-user text-lg"></i></span></div></div>
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0"><button data-theme-toggle type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border app-muted hover:border-brand-start transition-all text-sm" aria-label="Đổi giao diện sáng/tối" aria-pressed="false"><span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span><span class="theme-text hidden sm:inline text-xs font-medium">Tối</span></button><div class="flex items-center gap-3 pl-3 border-l app-border"><div class="hidden sm:block text-right"><p class="text-sm font-bold app-text leading-tight">{{ auth()->user()?->name ?? 'Nhân viên rạp' }}</p><p class="text-xs text-ai-start font-medium">{{ auth()->user()?->role?->display_name ?? 'Chưa có vai trò' }}</p></div><span class="w-9 h-9 rounded-full app-bg border app-border flex items-center justify-center text-ai-start"><i class="ph-fill ph-user text-lg"></i></span></div></div>
         </header>
         <div class="flex-grow p-4 sm:p-8 overflow-y-auto"><div class="max-w-7xl mx-auto pb-10">
-            @if(session('success') || session('error') || (isset($errors) && $errors->any()))
-                <div class="space-y-3 mb-6">
-                    @if(session('success'))<div class="rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-medium">{{ session('success') }}</div>@endif
-                    @if(session('error'))<div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium">{{ session('error') }}</div>@endif
-                    @if(isset($errors) && $errors->any())<div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium">{{ $errors->first() }}</div>@endif
-                </div>
-            @endif
+            <x-flash-messages :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
             @yield('content')
         </div></div>
     </main>

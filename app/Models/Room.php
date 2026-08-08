@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,11 +20,13 @@ class Room extends Model
         'name',
         'room_type',
         'total_seats',
+        'cleaning_buffer_minutes',
         'status',
     ];
 
     protected $casts = [
         'total_seats' => 'integer',
+        'cleaning_buffer_minutes' => 'integer',
     ];
 
     public function cinema(): BelongsTo
@@ -39,6 +42,11 @@ class Room extends Model
     public function showtimes(): HasMany
     {
         return $this->hasMany(Showtime::class);
+    }
+
+    public function pricingRules(): HasMany
+    {
+        return $this->hasMany(CinemaPricingRule::class);
     }
 
     public function layouts(): HasMany
@@ -64,5 +72,10 @@ class Room extends Model
     public function scopeOperational(Builder $query): Builder
     {
         return $query->where('status', 'active');
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('room', $this->status);
     }
 }

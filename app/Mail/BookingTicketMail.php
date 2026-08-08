@@ -14,6 +14,7 @@ class BookingTicketMail extends Mailable
     public function __construct(
         public Booking $booking,
         public string $ticketAccessUrl,
+        public string $ticketQrSvg,
     ) {}
 
     public function build(): self
@@ -24,7 +25,8 @@ class BookingTicketMail extends Mailable
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
-            'payment',
+            'payments',
+            'foodOrder.items',
         ]);
 
         return $this

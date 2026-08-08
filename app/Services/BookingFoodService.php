@@ -20,14 +20,19 @@ class BookingFoodService
         private readonly FoodSelectionCanonicalizer $foodSelections,
     ) {}
 
-    public function calculate(array|Collection|null $payload): FoodPriceBreakdown
+    public function calculate(array|Collection|null $payload, ?int $cinemaId = null): FoodPriceBreakdown
     {
         $selection = $this->foodSelections->canonicalize($payload);
         if ($selection === []) {
             return FoodPriceBreakdown::empty();
         }
 
-        $foods = FoodItem::query()->whereIn('id', array_column($selection, 'food_id'))->get()->keyBy('id');
+        $foods = FoodItem::query()
+            ->whereIn('id', array_column($selection, 'food_id'))
+            ->when($cinemaId !== null, fn ($query) => $query->where(
+                fn ($scope) => $scope->whereNull('cinema_id')->orWhere('cinema_id', $cinemaId)
+            ))
+            ->get()->keyBy('id');
         $lines = [];
         $subtotal = VndAmount::zero();
 
@@ -61,7 +66,7 @@ class BookingFoodService
         return new FoodPriceBreakdown(
             $subtotal->value(),
             $lines,
-            $this->cinemaContext->id(),
+            $cinemaId ?? $this->cinemaContext->id(),
         );
     }
 
@@ -73,16 +78,14 @@ class BookingFoodService
         if ($food->pickupCinemaId === null) {
             throw new InvalidArgumentException('A food order requires the canonical pickup cinema.');
         }
-        $canonicalCinemaId = $this->cinemaContext->id();
-        if ($food->pickupCinemaId !== $canonicalCinemaId) {
-            throw new InvalidArgumentException('Food pickup must use the canonical cinema.');
-        }
-
         if (! isset($attributes['booking_id'])) {
             throw new InvalidArgumentException('Food orders must belong to a unified booking checkout.');
         }
 
         $booking = Booking::query()->lockForUpdate()->findOrFail((int) $attributes['booking_id']);
+        if ($food->pickupCinemaId !== (int) $booking->cinema_id) {
+            throw new InvalidArgumentException('Food pickup must use the booking cinema.');
+        }
         if ($booking->booking_status !== 'pending_payment' || $booking->payment_status !== 'unpaid') {
             throw new InvalidArgumentException('Unified food can only be attached to an unpaid pending booking.');
         }
@@ -90,10 +93,10 @@ class BookingFoodService
         $order = Order::query()->create([
             'booking_id' => $booking->id,
             'user_id' => $booking->user_id,
-            'customer_name' => '',
-            'customer_phone' => null,
+            'customer_name' => (string) ($attributes['customer_name'] ?? $booking->customer_name ?? ''),
+            'customer_phone' => $attributes['customer_phone'] ?? $booking->customer_phone,
             'customer_email' => $booking->customer_email,
-            'pickup_cinema_id' => $canonicalCinemaId,
+            'pickup_cinema_id' => $booking->cinema_id,
             'subtotal' => $food->foodSubtotal,
             'total_amount' => $food->foodSubtotal,
             'status' => 'pending',

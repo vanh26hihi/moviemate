@@ -1,11 +1,14 @@
 @extends('layouts.user')
 
 @section('title', 'Chọn đồ ăn - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
     $maxFoodQuantity = (int) config('booking.max_food_quantity', 20);
 @endphp
+
+<x-validation-summary class="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8" :errors="$errors" :except="['customer_email', 'food_items']" />
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-6xl">
@@ -17,7 +20,7 @@
                 <header>
                     <p class="text-xs font-bold uppercase tracking-[0.24em] text-brand-start">Bước 2/4 · Tùy chọn</p>
                     <h1 class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">Thêm đồ ăn</h1>
-                    <p class="mt-2 leading-relaxed app-muted">Chọn trước để nhận tại {{ $preview->showtime->cinema->name }}, hoặc bỏ qua nếu bạn chỉ cần vé xem phim.</p>
+                    <p class="mt-2 leading-relaxed app-muted">Chọn trước để nhận tại {{ $preview->showtime->cinema->name }}. Bước này là tuỳ chọn — bạn có thể để trống và tiếp tục thanh toán.</p>
                 </header>
 
                 <div class="mt-7">
@@ -52,7 +55,7 @@
                                 <div class="flex min-h-16 items-start justify-between gap-3">
                                     <div>
                                         <h2 class="font-bold app-text">{{ $food->name }}</h2>
-                                        <p class="mt-1 text-sm font-semibold text-brand-start">{{ number_format((int) $food->price, 0, ',', '.') }} VND</p>
+                                        <p class="mt-1 text-sm font-semibold text-brand-start">{{ number_format((int) $food->price, 0, ',', '.') }} VNĐ</p>
                                     </div>
                                     <span class="rounded-full bg-brand-start/10 px-2.5 py-1 text-[0.65rem] font-bold uppercase tracking-wide text-brand-start">Đang bán</span>
                                 </div>
@@ -81,7 +84,7 @@
                                         </button>
                                     </div>
                                 </div>
-                                <p class="mt-3 text-right text-xs app-muted">Tạm tính: <strong class="app-text" data-food-line-total>{{ number_format((int) $food->price * $quantity, 0, ',', '.') }} VND</strong></p>
+                                <p class="mt-3 text-right text-xs app-muted">Tạm tính: <strong class="app-text" data-food-line-total>{{ number_format((int) $food->price * $quantity, 0, ',', '.') }} VNĐ</strong></p>
                             </article>
                         @empty
                             <div class="rounded-2xl border border-dashed app-border p-6 text-center sm:col-span-2" data-food-empty>
@@ -94,13 +97,15 @@
                 </fieldset>
 
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-                    <button type="submit" class="btn-primary flex-1" data-loading-label="Đang lưu lựa chọn…">
-                        Tiếp tục xác nhận
+                    {{-- Đồ ăn là tuỳ chọn: khách có thể để trống và bấm "Tiếp tục thanh toán". --}}
+                    <a href="{{ route('user.bookings.selectSeat', ['showtime' => $preview->showtime->id, 'cinema' => $preview->showtime->cinema->code]) }}"
+                       class="btn-secondary flex-1 justify-center">
+                        <i class="ph-bold ph-arrow-left" aria-hidden="true"></i>
+                        Quay lại chọn ghế
+                    </a>
+                    <button type="submit" name="checkout_action" value="confirm_food" class="btn-primary flex-1" data-loading-label="Đang lưu lựa chọn…">
+                        Tiếp tục thanh toán
                         <i class="ph-bold ph-arrow-right" aria-hidden="true"></i>
-                    </button>
-                    <button type="submit" name="skip_food" value="1" class="btn-secondary flex-1" data-loading-label="Đang bỏ qua…">
-                        <i class="ph ph-fast-forward" aria-hidden="true"></i>
-                        Bỏ qua đồ ăn
                     </button>
                 </div>
                 <p class="mt-3 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>
@@ -111,20 +116,21 @@
                 <h2 id="food-summary-title" class="mt-2 text-xl font-bold app-text">{{ $preview->showtime->movie->title }}</h2>
                 <p class="mt-1 text-sm app-muted">{{ $preview->showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($preview->showtime->show_time)->format('H:i') }}</p>
                 <p class="mt-1 text-sm app-muted">{{ $preview->showtime->cinema->name }} · {{ $preview->showtime->room->name }}</p>
+                <p class="mt-1 text-xs app-muted">{{ $preview->showtime->cinema->address }}</p>
 
                 <div class="mt-5 space-y-3">
                     @foreach($preview->seatSummaries() as $seat)
                         <div class="flex justify-between gap-3 text-sm">
-                            <span class="app-text">Ghế {{ $seat['seat_code'] }}</span>
-                            <strong class="app-text">{{ number_format($seat['price'], 0, ',', '.') }} VND</strong>
+                            <span class="app-text">{{ $seat['is_couple'] ? $seat['label'] : 'Ghế '.$seat['seat_code'] }}</span>
+                            <strong class="app-text">{{ number_format($seat['price'], 0, ',', '.') }} VNĐ</strong>
                         </div>
                     @endforeach
                 </div>
 
                 <dl class="mt-5 space-y-3 border-t pt-4 app-border">
-                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VND</dd></div>
-                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Đồ ăn tạm tính</dt><dd class="font-bold app-text" data-food-subtotal aria-live="polite">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VND</dd></div>
-                    <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng tạm tính</dt><dd class="text-xl font-extrabold text-brand-start" data-food-grand-total data-seat-subtotal="{{ $preview->prices->seatSubtotal }}">{{ number_format($preview->prices->grandTotal, 0, ',', '.') }} VND</dd></div>
+                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VNĐ</dd></div>
+                    <div class="flex justify-between gap-3 text-sm"><dt class="app-muted">Đồ ăn tạm tính</dt><dd class="font-bold app-text" data-food-subtotal aria-live="polite">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VNĐ</dd></div>
+                    <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng tạm tính</dt><dd class="text-xl font-extrabold text-brand-start" data-food-grand-total data-seat-subtotal="{{ $preview->prices->seatSubtotal }}">{{ number_format($preview->prices->grandTotal, 0, ',', '.') }} VNĐ</dd></div>
                 </dl>
                 <p class="mt-4 text-xs leading-relaxed app-muted"><i class="ph-fill ph-shield-check mr-1 text-success" aria-hidden="true"></i>Đây chỉ là tạm tính trên giao diện. Máy chủ sẽ xác nhận lại món, số lượng và tổng tiền.</p>
             </aside>

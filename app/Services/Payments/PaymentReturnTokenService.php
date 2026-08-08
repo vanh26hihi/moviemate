@@ -9,7 +9,9 @@ use JsonException;
 
 class PaymentReturnTokenService
 {
-    private const VERSION = 'v1';
+    private const CURRENT_VERSION = 'v2';
+
+    private const LEGACY_VERSION = 'v1';
 
     private const AUDIENCE = 'payment-return';
 
@@ -17,27 +19,19 @@ class PaymentReturnTokenService
 
     public function issue(Payment $payment): string
     {
-        $issuedAt = now()->getTimestamp();
-        $claims = [
-            'v' => 1,
-            'aud' => self::AUDIENCE,
-            'pid' => $payment->getKey(),
-            'attempt' => $this->attemptReference($payment),
-            'iat' => $issuedAt,
-            'exp' => $issuedAt + ($this->ttlMinutes() * 60),
-            'nonce' => $this->base64UrlEncode(random_bytes(16)),
-        ];
-
-        try {
-            $payload = $this->base64UrlEncode(json_encode(
-                $claims,
-                JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
-            ));
-        } catch (JsonException $exception) {
-            throw new PaymentConfigurationException('Payment return state could not be encoded.', previous: $exception);
+        $paymentId = $payment->getKey();
+        if (! is_int($paymentId) || $paymentId <= 0) {
+            throw new PaymentConfigurationException('Payment return state requires a persisted payment.');
         }
 
-        return self::VERSION.'.'.$payload.'.'.$this->signature($payload);
+        $payload = implode('.', [
+            self::CURRENT_VERSION,
+            base_convert((string) $paymentId, 10, 36),
+            base_convert((string) (now()->getTimestamp() + ($this->ttlMinutes() * 60)), 10, 36),
+            $this->base64UrlEncode(random_bytes(12)),
+        ]);
+
+        return $payload.'.'.$this->compactSignature($payload, $payment);
     }
 
     public function verify(Payment $payment, mixed $token): bool
@@ -93,12 +87,57 @@ class PaymentReturnTokenService
             return null;
         }
 
+        if (str_starts_with($token, self::CURRENT_VERSION.'.')) {
+            return $this->verifiedCompactClaims($payment, $token);
+        }
+
+        return $this->verifiedLegacyClaims($payment, $token);
+    }
+
+    private function verifiedCompactClaims(Payment $payment, string $token): ?array
+    {
         $parts = explode('.', $token);
-        if (count($parts) !== 3 || $parts[0] !== self::VERSION) {
+        if (count($parts) !== 5
+            || $parts[0] !== self::CURRENT_VERSION
+            || preg_match('/^[0-9a-z]+$/D', $parts[1]) !== 1
+            || preg_match('/^[0-9a-z]+$/D', $parts[2]) !== 1
+            || preg_match('/^[A-Za-z0-9_-]{16}$/D', $parts[3]) !== 1
+            || preg_match('/^[A-Za-z0-9_-]{43}$/D', $parts[4]) !== 1) {
+            return null;
+        }
+
+        [$version, $encodedPaymentId, $encodedExpiry, $nonce, $signature] = $parts;
+        $payload = implode('.', [$version, $encodedPaymentId, $encodedExpiry, $nonce]);
+        if (! hash_equals($this->compactSignature($payload, $payment), $signature)) {
+            return null;
+        }
+
+        $paymentId = base_convert($encodedPaymentId, 36, 10);
+        $expiresAt = base_convert($encodedExpiry, 36, 10);
+        if (! ctype_digit($paymentId) || ! ctype_digit($expiresAt)) {
+            return null;
+        }
+
+        $paymentId = (int) $paymentId;
+        $expiresAt = (int) $expiresAt;
+        $now = now()->getTimestamp();
+        if ($paymentId !== $payment->getKey()
+            || $expiresAt <= $now
+            || $expiresAt > $now + ($this->ttlMinutes() * 60) + 60) {
+            return null;
+        }
+
+        return ['exp' => $expiresAt];
+    }
+
+    private function verifiedLegacyClaims(Payment $payment, string $token): ?array
+    {
+        $parts = explode('.', $token);
+        if (count($parts) !== 3 || $parts[0] !== self::LEGACY_VERSION) {
             return null;
         }
         [, $payload, $signature] = $parts;
-        if (! hash_equals($this->signature($payload), $signature)) {
+        if (! hash_equals($this->legacySignature($payload), $signature)) {
             return null;
         }
 
@@ -132,19 +171,29 @@ class PaymentReturnTokenService
         return $claims;
     }
 
-    private function signature(string $payload): string
+    private function compactSignature(string $payload, Payment $payment): string
     {
         return $this->base64UrlEncode(hash_hmac(
             'sha256',
-            self::VERSION.'.'.$payload,
-            $this->derivedKey(),
+            $payload.'|attempt:'.$this->attemptReference($payment),
+            $this->derivedKey(self::CURRENT_VERSION),
+            true,
+        ));
+    }
+
+    private function legacySignature(string $payload): string
+    {
+        return $this->base64UrlEncode(hash_hmac(
+            'sha256',
+            self::LEGACY_VERSION.'.'.$payload,
+            $this->derivedKey(self::LEGACY_VERSION),
             true,
         ));
     }
 
     private function attemptReference(Payment $payment): string
     {
-        $reference = $payment->provider === 'vnpay' ? $payment->order_code : $payment->app_trans_id;
+        $reference = $payment->provider === 'zalopay' ? $payment->app_trans_id : $payment->order_code;
         if (! is_string($reference) || $reference === '') {
             throw new PaymentConfigurationException('Payment attempt reference is missing.');
         }
@@ -152,7 +201,7 @@ class PaymentReturnTokenService
         return $reference;
     }
 
-    private function derivedKey(): string
+    private function derivedKey(string $version): string
     {
         $configuredKey = config('app.key');
         if (! is_string($configuredKey) || $configuredKey === '') {
@@ -170,7 +219,7 @@ class PaymentReturnTokenService
             throw new PaymentConfigurationException('APP_KEY must provide at least 256 bits of key material.');
         }
 
-        return hash_hmac('sha256', 'moviemate/payment-return-state/v1', $key, true);
+        return hash_hmac('sha256', 'moviemate/payment-return-state/'.$version, $key, true);
     }
 
     private function ttlMinutes(): int

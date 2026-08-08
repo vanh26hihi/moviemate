@@ -2,22 +2,38 @@
 
 namespace App\Models;
 
+use App\Support\SeatPresentation;
+use App\Support\StatusLabel;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 class Booking extends Model
 {
+    public const SALES_CHANNEL_ONLINE = 'online';
+
+    public const SALES_CHANNEL_COUNTER = 'counter';
+
+    public const SALES_CHANNELS = [self::SALES_CHANNEL_ONLINE, self::SALES_CHANNEL_COUNTER];
+
+    public const STATUSES = ['pending_payment', 'paid', 'used', 'cancelled', 'expired'];
+
+    public const PAYMENT_STATUSES = ['unpaid', 'paid', 'failed', 'refunded'];
+
     protected $fillable = [
         'user_id',
+        'customer_name',
+        'customer_phone',
         'customer_email',
         'guest_access_token_hash',
         'guest_access_expires_at',
         'checkout_idempotency_key_hash',
         'checkout_request_fingerprint_hash',
         'showtime_id',
+        'cinema_id',
         'booking_code',
         'total_amount',
         'seat_subtotal',
@@ -55,9 +71,45 @@ class Booking extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function createdByStaff(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_staff_id');
+    }
+
     public function showtime(): BelongsTo
     {
         return $this->belongsTo(Showtime::class);
+    }
+
+    public function cinema(): BelongsTo
+    {
+        return $this->belongsTo(Cinema::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (Booking $booking): void {
+            $booking->sales_channel ??= self::SALES_CHANNEL_ONLINE;
+            if (! in_array($booking->sales_channel, self::SALES_CHANNELS, true)) {
+                throw new \LogicException('Unsupported booking sales channel.');
+            }
+            if ($booking->sales_channel === self::SALES_CHANNEL_ONLINE) {
+                $booking->created_by_staff_id = null;
+            } elseif ($booking->created_by_staff_id === null) {
+                throw new \LogicException('Counter bookings require an authenticated creator.');
+            }
+            $showtime = Showtime::query()->with('room')->findOrFail($booking->showtime_id);
+            if ((int) $showtime->cinema_id !== (int) $showtime->room?->cinema_id) {
+                throw new \LogicException('Showtime and room cinema ownership are inconsistent.');
+            }
+            $booking->cinema_id = $showtime->cinema_id;
+        });
+
+        static::updating(function (Booking $booking): void {
+            if ($booking->isDirty(['sales_channel', 'created_by_staff_id'])) {
+                throw new \LogicException('Booking channel and creator attribution are immutable.');
+            }
+        });
     }
 
     public function bookingSeats(): HasMany
@@ -76,6 +128,37 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function authoritativePayment(): HasOne
+    {
+        return $this->hasOne(Payment::class)->ofMany(
+            ['id' => 'max'],
+            fn ($query) => $query->where('status', Payment::STATUS_SUCCESS)
+                ->where(fn ($evidence) => $evidence->whereNotNull('verified_at')->orWhereNotNull('settled_at')),
+        );
+    }
+
+    public function ticketDelivery(): HasOne
+    {
+        return $this->hasOne(BookingTicketDelivery::class);
+    }
+
+    public function ticketPrint(): HasOne
+    {
+        return $this->hasOne(BookingTicketPrint::class);
+    }
+
+    public function ticketCheckinEvents(): HasMany
+    {
+        return $this->hasMany(TicketCheckinEvent::class);
+    }
+
+    public function acceptedTicketCheckin(): HasOne
+    {
+        return $this->hasOne(TicketCheckinEvent::class)
+            ->where('result', TicketCheckinEvent::RESULT_ACCEPTED)
+            ->oldestOfMany('id');
+    }
+
     public function foodOrder(): HasOne
     {
         return $this->hasOne(Order::class);
@@ -88,10 +171,17 @@ class Booking extends Model
 
     public function getSeatCodesAttribute(): string
     {
-        return $this->bookingSeats
-            ->pluck('seat.seat_code')
+        $labels = $this->seat_display_groups
+            ->pluck('label')
             ->filter()
             ->join(', ');
+
+        return $labels !== '' ? $labels : 'Chưa có thông tin ghế';
+    }
+
+    public function getSeatDisplayGroupsAttribute(): Collection
+    {
+        return SeatPresentation::groups($this->bookingSeats->pluck('seat')->filter()->values());
     }
 
     public function getShowtimeLabelAttribute(): string
@@ -106,17 +196,56 @@ class Booking extends Model
 
     public function getStatusLabelAttribute(): string
     {
-        return match ($this->booking_status) {
-            'paid' => 'Chưa sử dụng',
-            'used' => 'Đã sử dụng',
-            'cancelled' => 'Đã hủy',
-            'expired' => 'Hết hạn',
-            default => 'Đang xử lý',
-        };
+        return StatusLabel::for('booking', $this->booking_status);
+    }
+
+    public function getPaymentStatusLabelAttribute(): string
+    {
+        return StatusLabel::for('booking_payment', $this->payment_status);
     }
 
     public function getFormattedTotalAttribute(): string
     {
-        return number_format((float) $this->total_amount, 0, ',', '.').'đ';
+        return number_format((int) $this->total_amount, 0, ',', '.').' '.$this->currency_label;
+    }
+
+    public function getMovieTitleAttribute(): string
+    {
+        return $this->showtime?->movie?->title ?: 'Phim đang cập nhật';
+    }
+
+    public function getCinemaLabelAttribute(): string
+    {
+        $cinema = $this->showtime?->cinema;
+
+        if (! $cinema) {
+            return 'Rạp đang cập nhật';
+        }
+
+        return collect([$cinema->name, $cinema->address])
+            ->filter()
+            ->join(' - ');
+    }
+
+    public function getRoomLabelAttribute(): string
+    {
+        return $this->showtime?->room?->name ?: 'Phòng đang cập nhật';
+    }
+
+    public function getCurrencyLabelAttribute(): string
+    {
+        $currency = strtoupper($this->currency ?: 'VND');
+
+        return $currency === 'VND' ? 'VNĐ' : $currency;
+    }
+
+    public function getFormattedSeatSubtotalAttribute(): string
+    {
+        return number_format((int) $this->seat_subtotal, 0, ',', '.').' '.$this->currency_label;
+    }
+
+    public function getFormattedFoodSubtotalAttribute(): string
+    {
+        return number_format((int) $this->food_subtotal, 0, ',', '.').' '.$this->currency_label;
     }
 }

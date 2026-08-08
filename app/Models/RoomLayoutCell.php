@@ -30,19 +30,19 @@ class RoomLayoutCell extends Model
         static::saving(function (RoomLayoutCell $cell): void {
             $layout = $cell->layout()->first();
             if (! $layout) {
-                throw new LogicException('Layout cell must belong to a layout.');
+                throw new LogicException('Ô sơ đồ phải thuộc một sơ đồ ghế.');
             }
             if ($cell->x_position < 1 || $cell->x_position > $layout->columns
                 || $cell->y_position < 1 || $cell->y_position > $layout->rows) {
-                throw new LogicException('Layout cell coordinate is out of bounds.');
+                throw new LogicException('Tọa độ ô nằm ngoài giới hạn sơ đồ ghế.');
             }
             if ($cell->cell_type === 'aisle' && $cell->seat_id !== null) {
-                throw new LogicException('Aisle cells cannot reference a seat.');
+                throw new LogicException('Ô lối đi không thể tham chiếu đến ghế.');
             }
             if ($cell->cell_type === 'seat') {
                 $seat = $cell->seat()->first();
                 if (! $seat || $seat->room_id !== $layout->room_id) {
-                    throw new LogicException('Seat cells must reference a seat in the layout room.');
+                    throw new LogicException('Ô ghế phải tham chiếu đến một ghế trong đúng phòng.');
                 }
             }
         });
@@ -50,7 +50,7 @@ class RoomLayoutCell extends Model
         $assertMutable = function (RoomLayoutCell $cell): void {
             $layout = $cell->layout()->first();
             if ($layout?->status === 'published') {
-                throw new LogicException('Published room layout cells are immutable.');
+                throw new LogicException('Không thể chỉnh sửa ô thuộc sơ đồ ghế đã phát hành.');
             }
         };
 

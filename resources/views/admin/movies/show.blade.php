@@ -5,11 +5,13 @@
 
 @php
     $statusMeta = [
-        'now_showing' => ['label' => 'Đang chiếu', 'class' => 'bg-success/10 text-success border border-success/20'],
-        'coming_soon' => ['label' => 'Sắp chiếu', 'class' => 'bg-warning/10 text-warning border border-warning/20'],
-        'stopped' => ['label' => 'Ngừng chiếu', 'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'],
+        'draft' => ['class' => 'bg-blue-500/10 text-blue-400 border border-blue-500/20'],
+        'now_showing' => ['class' => 'bg-success/10 text-success border border-success/20'],
+        'coming_soon' => ['class' => 'bg-warning/10 text-warning border border-warning/20'],
+        'inactive' => ['class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'],
+        'archived' => ['class' => 'bg-slate-700/20 text-slate-400 border border-slate-600/20'],
     ];
-    $status = $statusMeta[$movie->status] ?? ['label' => $movie->status ?: 'Chưa rõ', 'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'];
+    $status = $statusMeta[$movie->status] ?? ['class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20'];
 @endphp
 
 @section('content')
@@ -20,26 +22,22 @@
             Quay lại danh sách
         </a>
         <h1 class="admin-page-title">{{ $movie->title }}</h1>
-        <p class="admin-page-subtitle">Thông tin chi tiết, media, thể loại và trạng thái phát hành.</p>
+        <p class="admin-page-subtitle">Thông tin chi tiết, hình ảnh, video, thể loại và trạng thái phát hành.</p>
     </div>
     <div class="flex flex-wrap gap-2">
-        @can('movies.update')<a href="{{ route('admin.movies.edit', $movie) }}" class="admin-btn-warning">
+        @can('movies.update')@if($movie->status !== 'archived')<a href="{{ route('admin.movies.edit', $movie) }}" class="admin-btn-warning">
             <i class="ph ph-pencil-simple"></i>
             Sửa phim
-        </a>@endcan
-        @can('movies.delete')<form action="{{ route('admin.movies.destroy', $movie) }}" method="POST"
-              onsubmit="return confirm('Bạn có chắc muốn xóa phim này?');" class="inline">
-            @csrf
-            @method('DELETE')
-            <button type="submit" class="admin-btn-danger">
-                <i class="ph ph-trash"></i>
-                Xóa
-            </button>
-        </form>@endcan
+        </a>@endif @endcan
     </div>
 </div>
 
 <div class="space-y-6">
+    @can('movies.lifecycle')
+    <section class="admin-detail-card"><h2 class="text-lg font-extrabold app-heading">Vòng đời phim</h2><p class="app-text-muted mt-1">Thay đổi trạng thái không xóa hình ảnh, suất chiếu hay lịch sử đặt vé. Phim lưu trữ không thể mở lại.</p>
+        <div class="flex flex-wrap gap-2 mt-4">@foreach($allowedTransitions as $next)<form method="POST" action="{{ route('admin.movies.lifecycle',$movie) }}">@csrf<input type="hidden" name="status" value="{{ $next }}"><button class="btn-secondary" @if($next==='archived') onclick="return confirm('Lưu trữ là thao tác một chiều. Tiếp tục?')" @endif>Chuyển sang {{ \App\Support\StatusLabel::for('movie',$next) }}</button></form>@endforeach @if(empty($allowedTransitions))<span class="app-muted">Không còn chuyển đổi khả dụng.</span>@endif</div>
+    </section>
+    @endcan
     <div class="admin-detail-card overflow-hidden !p-0">
         <div class="relative h-64 overflow-hidden bg-slate-950">
             @if($movie->cover_url)
@@ -67,7 +65,7 @@
 
             <div class="lg:col-span-9">
                 <div class="mb-4 flex flex-wrap items-center gap-2">
-                    <span class="admin-badge {{ $status['class'] }}">{{ $status['label'] }}</span>
+                    <span class="admin-badge {{ $status['class'] }}">{{ $movie->status_label }}</span>
                     @foreach($movie->genres as $genre)
                         <span class="admin-badge bg-brand-start/10 text-brand-start border border-brand-start/20">{{ $genre->name }}</span>
                     @endforeach
@@ -83,22 +81,22 @@
                     </div>
                     <div class="rounded-2xl app-card-soft border app-border p-4">
                         <p class="text-xs font-bold uppercase tracking-wider app-text-muted">Thời lượng</p>
-                        <p class="mt-1 font-bold app-text">{{ $movie->duration ?? 'N/A' }} phút</p>
+                        <p class="mt-1 font-bold app-text">{{ $movie->duration ?? 'Chưa cập nhật' }}{{ $movie->duration ? ' phút' : '' }}</p>
                     </div>
                     <div class="rounded-2xl app-card-soft border app-border p-4">
                         <p class="text-xs font-bold uppercase tracking-wider app-text-muted">Độ tuổi</p>
-                        <p class="mt-1 font-bold app-text">{{ $movie->age_rating ?? 'N/A' }}</p>
+                        <p class="mt-1 font-bold app-text">{{ $movie->age_rating ?? 'Chưa cập nhật' }}</p>
                     </div>
                     <div class="rounded-2xl app-card-soft border app-border p-4">
                         <p class="text-xs font-bold uppercase tracking-wider app-text-muted">Ngày khởi chiếu</p>
                         <p class="mt-1 font-bold app-text">{{ $movie->release_date ? \Carbon\Carbon::parse($movie->release_date)->format('d/m/Y') : 'Chưa cập nhật' }}</p>
                     </div>
                     <div class="rounded-2xl app-card-soft border app-border p-4">
-                        <p class="text-xs font-bold uppercase tracking-wider app-text-muted">Poster</p>
+                        <p class="text-xs font-bold uppercase tracking-wider app-text-muted">Áp phích</p>
                         <p class="mt-1 font-bold app-text">{{ $movie->poster_url ? 'Đã có' : 'Chưa có' }}</p>
                     </div>
                     <div class="rounded-2xl app-card-soft border app-border p-4">
-                        <p class="text-xs font-bold uppercase tracking-wider app-text-muted">Cover</p>
+                        <p class="text-xs font-bold uppercase tracking-wider app-text-muted">Ảnh bìa</p>
                         <p class="mt-1 font-bold app-text">{{ $movie->cover_url ? 'Đã có' : 'Chưa có' }}</p>
                     </div>
                 </div>
@@ -113,7 +111,7 @@
         </section>
 
         <section class="admin-detail-card">
-            <h3 class="text-lg font-extrabold app-heading mb-3">Trailer</h3>
+            <h3 class="text-lg font-extrabold app-heading mb-3">Video giới thiệu</h3>
             @if($movie->trailer_url)
                 <p class="app-text-muted text-sm mb-4">Mở trailer trong tab mới để kiểm tra nội dung hiển thị.</p>
                 <a href="{{ $movie->trailer_url }}" target="_blank" rel="noopener noreferrer" class="admin-btn-primary w-full">

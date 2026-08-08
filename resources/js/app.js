@@ -1,6 +1,21 @@
-import QRCode from 'qrcode';
-import html2canvas from 'html2canvas';
+// Both sides added a distinct entry module: R1 ships the branch-aware calendar and the
+// remote feature branch ships the cinema-finder/showtime filter helpers. They are
+// independent, so the merge keeps both rather than choosing a side.
+import './showtime-calendar';
 import './showtime';
+import './seat-gap-guard';
+
+const ticketScannerWorkspaces = document.querySelectorAll('[data-ticket-scanner]');
+if (ticketScannerWorkspaces.length > 0) {
+    import('./ticket-scanner').catch(() => {
+        ticketScannerWorkspaces.forEach((workspace) => {
+            const error = workspace.querySelector('[data-scanner-error]');
+            if (!error) return;
+            error.textContent = 'Không thể tải trình quét camera. Vui lòng nhập mã vé thủ công.';
+            error.hidden = false;
+        });
+    });
+}
 
 const THEME_KEY = 'theme';
 const LEGACY_THEME_KEY = 'moviemate_theme';
@@ -44,11 +59,14 @@ applyTheme(readTheme());
 const vndFormatter = new Intl.NumberFormat('vi-VN');
 
 function formatVnd(amount) {
-    return `${vndFormatter.format(Math.max(0, Number(amount) || 0))} VND`;
+    return `${vndFormatter.format(Math.max(0, Number(amount) || 0))} VNĐ`;
 }
 
 function initializeSeatPickers() {
     document.querySelectorAll('[data-seat-picker]').forEach((form) => {
+        if (form.dataset.seatPickerInitialized === 'true') return;
+        form.dataset.seatPickerInitialized = 'true';
+
         const buttons = Array.from(form.querySelectorAll('.seat-button:not(:disabled)'));
         const selected = new Map();
         const input = form.querySelector('#selectedSeatsInput');
@@ -60,27 +78,21 @@ function initializeSeatPickers() {
         if (!(input instanceof HTMLInputElement) || !display || !totalDisplay || !continueButton) return;
         hint?.setAttribute('aria-live', 'polite');
 
-        function targetsFor(button) {
-            if (button.dataset.seatType !== 'couple') return [button];
-
-            return buttons.filter((candidate) => (
-                candidate.dataset.pairCode
-                && candidate.dataset.pairCode === button.dataset.pairCode
-            ));
-        }
-
         function setSelected(button, value) {
-            const seatId = button.dataset.seatId;
-            if (!seatId) return;
+            const seatIds = (button.dataset.seatIds || '')
+                .split(',')
+                .map((seatId) => seatId.trim())
+                .filter(Boolean);
+            if (!seatIds.length) return;
 
             if (value) {
-                selected.set(seatId, {
-                    id: seatId,
+                selected.set(seatIds.join(','), {
+                    ids: seatIds,
                     code: button.dataset.seatCode || '',
                     price: Number(button.dataset.price) || 0,
                 });
             } else {
-                selected.delete(seatId);
+                selected.delete(seatIds.join(','));
             }
 
             button.setAttribute('aria-pressed', String(value));
@@ -88,29 +100,33 @@ function initializeSeatPickers() {
 
         function refresh() {
             const values = Array.from(selected.values());
-            input.value = values.map((item) => item.id).join(',');
+            input.value = values.flatMap((item) => item.ids).join(',');
             display.textContent = values.length ? values.map((item) => item.code).join(', ') : 'Chưa chọn';
             totalDisplay.textContent = formatVnd(values.reduce((total, item) => total + item.price, 0));
             continueButton.disabled = values.length === 0;
+            form.dispatchEvent(new CustomEvent('seat-selection:changed'));
         }
 
         buttons.forEach((button) => {
-            button.addEventListener('click', () => {
-                const targets = targetsFor(button);
-                const expectedCount = button.dataset.seatType === 'couple' ? 2 : 1;
+            if (button.getAttribute('aria-pressed') === 'true') {
+                setSelected(button, true);
+            }
 
-                if (targets.length !== expectedCount) {
+            button.addEventListener('click', () => {
+                const seatIds = (button.dataset.seatIds || '').split(',').filter(Boolean);
+                if (button.dataset.seatType === 'couple' && seatIds.length !== 2) {
                     if (hint) hint.textContent = 'Cặp ghế đôi này hiện không khả dụng. Vui lòng chọn ghế khác.';
                     return;
                 }
 
-                const shouldSelect = !targets.every((target) => selected.has(target.dataset.seatId));
-                targets.forEach((target) => setSelected(target, shouldSelect));
+                const selectionKey = seatIds.join(',');
+                const shouldSelect = !selected.has(selectionKey);
+                setSelected(button, shouldSelect);
                 refresh();
 
                 if (hint && button.dataset.seatType === 'couple') {
                     hint.textContent = shouldSelect
-                        ? `Đã chọn cả cặp ghế ${targets.map((target) => target.dataset.seatCode).join(' và ')}.`
+                        ? `Đã chọn ghế đôi ${button.dataset.seatCode}.`
                         : 'Đã bỏ chọn cả cặp ghế đôi.';
                 }
             });
@@ -122,6 +138,9 @@ function initializeSeatPickers() {
 
 function initializeFoodPickers() {
     document.querySelectorAll('[data-food-picker]').forEach((form) => {
+        if (form.dataset.foodPickerInitialized === 'true') return;
+        form.dataset.foodPickerInitialized = 'true';
+
         const cards = Array.from(form.querySelectorAll('[data-food-card]'));
         const subtotalDisplay = document.querySelector('[data-food-subtotal]');
         const grandTotalDisplay = document.querySelector('[data-food-grand-total]');
@@ -186,8 +205,32 @@ function initializeFoodPickers() {
     });
 }
 
+function resetSubmitGuard(form) {
+    delete form.dataset.submitting;
+    form.querySelectorAll('[data-submitter-copy]').forEach((input) => input.remove());
+    form.querySelectorAll('button[type="submit"]').forEach((button) => {
+        button.disabled = button.dataset.submitInitiallyDisabled === 'true';
+        button.removeAttribute('aria-disabled');
+
+        if (button.dataset.submitIdleMarkup) {
+            button.innerHTML = button.dataset.submitIdleMarkup;
+            delete button.dataset.submitIdleMarkup;
+        }
+    });
+
+    const status = form.querySelector('[data-submit-status]');
+    if (status) status.textContent = '';
+}
+
 function initializeSubmitGuards() {
     document.querySelectorAll('form[data-submit-once]').forEach((form) => {
+        if (form.dataset.submitGuardInitialized === 'true') return;
+        form.dataset.submitGuardInitialized = 'true';
+
+        form.querySelectorAll('button[type="submit"]').forEach((button) => {
+            button.dataset.submitInitiallyDisabled = String(button.disabled);
+        });
+
         form.addEventListener('submit', (event) => {
             if (form.dataset.submitting === 'true') {
                 event.preventDefault();
@@ -202,6 +245,7 @@ function initializeSubmitGuards() {
                 submittedValue.type = 'hidden';
                 submittedValue.name = submitter.name;
                 submittedValue.value = submitter.value;
+                submittedValue.dataset.submitterCopy = 'true';
                 form.appendChild(submittedValue);
             }
 
@@ -212,7 +256,11 @@ function initializeSubmitGuards() {
             });
 
             if (submitter instanceof HTMLButtonElement) {
-                submitter.innerHTML = `<i class="ph-bold ph-spinner-gap animate-spin" aria-hidden="true"></i>${loadingLabel}`;
+                submitter.dataset.submitIdleMarkup = submitter.innerHTML;
+                const spinner = document.createElement('i');
+                spinner.className = 'ph-bold ph-spinner-gap animate-spin';
+                spinner.setAttribute('aria-hidden', 'true');
+                submitter.replaceChildren(spinner, document.createTextNode(loadingLabel));
             }
 
             const status = form.querySelector('[data-submit-status]');
@@ -221,8 +269,41 @@ function initializeSubmitGuards() {
     });
 }
 
+function initializeImagePreviews() {
+    document.querySelectorAll('input[type="file"][data-image-preview]').forEach((input) => {
+        if (input.dataset.imagePreviewInitialized === 'true') return;
+        input.dataset.imagePreviewInitialized = 'true';
+
+        let objectUrl = null;
+        input.addEventListener('change', () => {
+            const preview = document.getElementById(input.dataset.imagePreview || '');
+            if (!(preview instanceof HTMLImageElement)) return;
+
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            const file = input.files?.[0];
+            if (!file) return;
+
+            objectUrl = URL.createObjectURL(file);
+            preview.src = objectUrl;
+            preview.classList.remove('hidden');
+            preview.parentElement?.querySelector('[data-image-fallback]')?.classList.add('hidden');
+        });
+    });
+}
+
+if (document.documentElement.dataset.submitGuardPageShowInitialized !== 'true') {
+    document.documentElement.dataset.submitGuardPageShowInitialized = 'true';
+    window.addEventListener('pageshow', () => {
+        document.querySelectorAll('form[data-submit-once]').forEach(resetSubmitGuard);
+    });
+}
+
 function initializeCountdowns() {
     document.querySelectorAll('[data-countdown]').forEach((element) => {
+        if (element.dataset.countdownInitialized === 'true') return;
+        element.dataset.countdownInitialized = 'true';
+        let expiryReloadScheduled = false;
+
         const deadline = Date.parse(element.dataset.countdown || '');
         if (!Number.isFinite(deadline)) return;
 
@@ -235,7 +316,18 @@ function initializeCountdowns() {
                 ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
                 : (element.dataset.expiredLabel || 'Đã hết thời gian');
 
-            if (remainingSeconds === 0) window.clearInterval(intervalId);
+            if (remainingSeconds === 0) {
+                window.clearInterval(intervalId);
+
+                if (element.dataset.expiryReload === 'true' && !expiryReloadScheduled) {
+                    expiryReloadScheduled = true;
+                    document.querySelectorAll('[data-expiry-action]').forEach((control) => {
+                        control.disabled = true;
+                        control.setAttribute('aria-disabled', 'true');
+                    });
+                    window.setTimeout(() => window.location.reload(), 750);
+                }
+            }
         }
 
         const intervalId = window.setInterval(refresh, 1000);
@@ -246,7 +338,16 @@ function initializeCountdowns() {
 initializeSeatPickers();
 initializeFoodPickers();
 initializeSubmitGuards();
+initializeImagePreviews();
 initializeCountdowns();
+
+if (document.documentElement.dataset.flashDismissInitialized !== 'true') {
+    document.documentElement.dataset.flashDismissInitialized = 'true';
+    document.addEventListener('click', (event) => {
+        const dismissFlashButton = event.target.closest('[data-dismiss-flash]');
+        dismissFlashButton?.closest('[data-flash-banner]')?.remove();
+    });
+}
 
 document.addEventListener('click', (event) => {
     const mobileMenuButton = event.target.closest('#mobile-menu-btn');
@@ -360,6 +461,9 @@ document.addEventListener('error', (event) => {
 
 async function renderTicketQrCodes() {
     const canvases = document.querySelectorAll('canvas[data-qr-value]');
+    if (canvases.length === 0) return;
+
+    const { default: QRCode } = await import('qrcode');
 
     await Promise.all(Array.from(canvases, async (canvas) => {
         const value = canvas.dataset.qrValue;
@@ -374,35 +478,6 @@ async function renderTicketQrCodes() {
         });
     }));
 }
-
-document.addEventListener('click', async (event) => {
-    const button = event.target.closest('[data-ticket-download]');
-    if (!button) return;
-
-    const target = document.getElementById(button.dataset.ticketDownload);
-    if (!target) return;
-
-    const original = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = '<i class="ph-bold ph-spinner-gap animate-spin"></i> Đang tạo ảnh';
-
-    try {
-        const canvas = await html2canvas(target, {
-            backgroundColor: '#ffffff',
-            scale: Math.min(window.devicePixelRatio || 2, 3),
-            useCORS: true,
-        });
-        const link = document.createElement('a');
-        link.download = button.dataset.ticketFilename || 'moviemate-ticket.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch (error) {
-        window.alert('Không thể tạo ảnh vé. Vui lòng thử lại.');
-    } finally {
-        button.disabled = false;
-        button.innerHTML = original;
-    }
-});
 
 renderTicketQrCodes().catch(() => {
     document.querySelectorAll('[data-qr-fallback]').forEach((element) => element.classList.remove('hidden'));

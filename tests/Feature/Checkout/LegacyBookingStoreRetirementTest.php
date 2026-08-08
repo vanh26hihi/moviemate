@@ -90,11 +90,15 @@ class LegacyBookingStoreRetirementTest extends PaymentTestCase
 
         $this->assertSame([
             'payments/zalopay/callback',
+            'payments/payos/webhook',
             'booking/store',
         ], $middleware->getExcludedPaths());
 
         $callback = $this->requestWithSession('/payments/zalopay/callback');
         $this->assertSame(204, $middleware->handle($callback, fn (): Response => response('', 204))->getStatusCode());
+
+        $payOsWebhook = $this->requestWithSession('/payments/payos/webhook');
+        $this->assertSame(204, $middleware->handle($payOsWebhook, fn (): Response => response('', 204))->getStatusCode());
 
         foreach (['/booking/confirm', '/booking/food', '/booking/store/anything'] as $uri) {
             try {
