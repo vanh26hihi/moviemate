@@ -5,14 +5,11 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Genre;
 use App\Models\Movie;
-use App\Services\CinemaContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class MovieController extends Controller
 {
-    public function __construct(private readonly CinemaContext $cinemaContext) {}
-
     /**
      * Hiển thị danh sách phim cho người dùng.
      */
@@ -82,6 +79,17 @@ class MovieController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Lọc theo độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRating = $request->query('age_rating');
+
+        if ($ageRating) {
+            $query->where('age_rating', $ageRating);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | Sắp xếp
         |--------------------------------------------------------------------------
         */
@@ -145,6 +153,19 @@ class MovieController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Danh sách độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRatings = Movie::query()
+            ->whereIn('status', ['now_showing', 'coming_soon'])
+            ->whereNotNull('age_rating')
+            ->where('age_rating', '!=', '')
+            ->distinct()
+            ->orderBy('age_rating')
+            ->pluck('age_rating');
+
+        /*
+        |--------------------------------------------------------------------------
         | Tiêu đề trang
         |--------------------------------------------------------------------------
         */
@@ -158,6 +179,7 @@ class MovieController extends Controller
             'movies',
             'genres',
             'countries',
+            'ageRatings',
             'pageTitle',
             'search'
         ));
@@ -215,9 +237,12 @@ class MovieController extends Controller
             })
             ->values();
 
-        return view('user.movies.show', compact(
-            'movie',
-            'showtimes'
-        ));
+            $availableShowtimesCount = $showtimes->count();
+
+      return view('user.movies.show', compact(
+    'movie',
+    'showtimes',
+    'availableShowtimesCount'
+));
     }
 }
