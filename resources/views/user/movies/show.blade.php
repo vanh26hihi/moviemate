@@ -204,7 +204,9 @@
                     <h2 class="text-2xl md:text-3xl font-extrabold app-text">
                         Lịch chiếu
                     </h2>
-
+                    <p class="text-sm font-semibold text-brand-start">
+                        {{ $availableShowtimesCount }} suất chiếu đang khả dụng
+                    </p>
                     <p class="app-muted text-sm mt-1">
                         Chọn ngày, rạp và giờ chiếu phù hợp để đặt vé.
                     </p>
