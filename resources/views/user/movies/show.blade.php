@@ -339,10 +339,21 @@
                                                         </div>
 
                                                         {{-- Phòng --}}
-                                                        <div class="mt-1 text-center text-[11px] font-semibold opacity-80">
-                                                            {{ $show->room->name }}
+                                                        <div class="mt-1 text-[10px] font-semibold opacity-80">
+                                                            {{ $show->room->name ?? 'Phòng chiếu' }}
                                                         </div>
+                                                            <a href="{{ route('user.bookings.selectSeat', $show->id) }}"
+   class="px-4 py-2 rounded-xl bg-brand-start/10 border border-brand-start/30 text-brand-start font-extrabold hover:bg-brand-start hover:text-white transition-colors">
 
+    <div class="text-center">
+        {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
+    </div>
+
+    <div class="mt-1 text-center text-[10px] font-semibold opacity-80">
+        {{ $show->room->name ?? 'Phòng chiếu' }}
+    </div>
+
+</a>
                                                         {{-- Giá thường --}}
                                                         <div class="mt-1 text-center text-[11px] opacity-80">
                                                             {{ number_format((float) $show->price, 0, ',', '.') }}đ
