@@ -12,9 +12,7 @@
     $genresText = $genresText ?: 'Đang cập nhật';
 
     $ratingValue = (float) ($movie->reviews_avg_rating ?? 0);
-    $ratingText = $ratingValue > 0
-        ? number_format($ratingValue, 1)
-        : 'Chưa có';
+    $ratingText = number_format($ratingValue, 1);
 
     $reviewsCount = (int) ($movie->reviews_count ?? 0);
 
@@ -45,6 +43,7 @@
 @endphp
 
 <article
+    data-movie-card="{{ $movie->id }}"
     class="movie-card group dark-surface border border-white/10 rounded-[1.25rem]
     overflow-hidden transition-all duration-300
     hover:-translate-y-1 hover:border-brand-start/60
@@ -54,7 +53,7 @@
         href="{{ route('user.movies.show', $movie->slug) }}"
         class="block"
     >
-        <div class="poster-frame relative overflow-hidden">
+        <div data-movie-poster class="poster-frame relative overflow-hidden transition-[filter] duration-500 group-hover:brightness-105">
             @if($movie->poster_url)
                 <img
                     src="{{ $movie->poster_url }}"
@@ -98,33 +97,6 @@
                         {{ $movie->age_rating }}
                     </span>
                 @endif
-            </div>
-
-            {{-- Phần hiện khi di chuột --}}
-            <div
-                class="absolute inset-x-0 bottom-0 z-10 p-3
-                bg-gradient-to-t from-black/90 via-black/45 to-transparent
-                opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-                <div class="grid grid-cols-2 gap-2">
-                    <span
-                        class="inline-flex items-center justify-center gap-1
-                        rounded-xl bg-white text-slate-950
-                        px-3 py-2 text-xs font-extrabold"
-                    >
-                        <i class="ph-fill ph-star text-yellow-500"></i>
-                        {{ $ratingText }}
-                    </span>
-
-                    <span
-                        class="inline-flex items-center justify-center gap-1
-                        rounded-xl bg-brand-start text-white
-                        px-3 py-2 text-xs font-extrabold"
-                    >
-                        <i class="ph-fill ph-ticket"></i>
-                        Đặt vé
-                    </span>
-                </div>
             </div>
         </div>
     </a>
@@ -183,6 +155,7 @@
             </a>
 
             <a
+                data-movie-booking-action
                 href="{{ route('user.movies.show', $movie->slug) }}#showtimes"
                 class="inline-flex items-center justify-center gap-2
                 rounded-xl primary-gradient px-3 py-2
