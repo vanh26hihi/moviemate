@@ -4,9 +4,11 @@ namespace Tests\Feature\Promotions;
 
 use App\Models\Cinema;
 use App\Models\DiscountCode;
+use App\Models\LoyaltySetting;
 use App\Models\User;
 use App\Services\PromotionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -59,12 +61,44 @@ final class DiscountCodeCheckoutTest extends TestCase
 
     public function test_non_combinable_and_maximum_code_rules_are_rejected(): void
     {
-        config(['promotions.max_discount_codes_per_booking' => 1]);
+        LoyaltySetting::current()->update(['max_discount_codes_per_booking' => 1]);
         $cinema = Cinema::factory()->create();
         foreach (['ONE', 'TWO'] as $code) {
             DiscountCode::query()->create(['code' => $code, 'name' => $code, 'discount_type' => 'fixed', 'discount_value' => 100]);
         }
         $this->expectException(ValidationException::class);
         app(PromotionService::class)->quote(50000, ['ONE', 'TWO'], null, $cinema->id);
+    }
+
+    public function test_discount_admin_and_apply_queries_are_bounded(): void
+    {
+        $this->seedRbac();
+        $admin = $this->userWithRole('admin');
+        $cinema = Cinema::factory()->create();
+        DiscountCode::query()->create(['code' => 'QUERY10', 'name' => 'Query budget', 'discount_type' => 'percent', 'discount_value' => 10]);
+
+        $counts = [
+            'admin_index' => $this->countQueries(fn () => $this->actingAs($admin)->get(route('admin.discounts.index'))->assertOk()),
+            'apply_quote' => $this->countQueries(fn () => app(PromotionService::class)->quote(100000, ['QUERY10'], null, $cinema->id)),
+        ];
+        foreach ($counts as $operation => $count) {
+            $this->assertLessThanOrEqual(30, $count, "{$operation} query budget exceeded: ".json_encode($counts));
+        }
+        if (getenv('REPORT_QUERY_COUNTS') === '1') {
+            fwrite(STDOUT, 'PROMOTION_QUERY_COUNTS='.json_encode($counts, JSON_THROW_ON_ERROR).PHP_EOL);
+        }
+    }
+
+    private function countQueries(callable $operation): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        try {
+            $operation();
+
+            return count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
     }
 }

@@ -34,6 +34,7 @@ class BookingCheckoutService
         private readonly SeatSelectionPolicy $seatSelectionPolicy,
         private readonly BookingExpirationService $expiration,
         private readonly PromotionService $promotions,
+        private readonly LoyaltyService $loyalty,
     ) {}
 
     public function createPendingBooking(
@@ -48,6 +49,7 @@ class BookingCheckoutService
         ?string $customerName = null,
         ?string $customerPhone = null,
         array $discountCodes = [],
+        int $pointsToUse = 0,
     ): BookingCheckoutResult {
         if (! in_array($salesChannel, Booking::SALES_CHANNELS, true)) {
             throw new InvalidArgumentException('Unsupported booking sales channel.');
@@ -74,6 +76,7 @@ class BookingCheckoutService
             $salesChannel,
             $counterActor?->getKey(),
             $discountCodes,
+            $pointsToUse,
         );
         $existing = Booking::query()
             ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -102,6 +105,7 @@ class BookingCheckoutService
                     $customerName,
                     $customerPhone,
                     $discountCodes,
+                    $pointsToUse,
                 ): Booking {
                     $existing = Booking::query()
                         ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -185,9 +189,11 @@ class BookingCheckoutService
                     ])->save();
 
                     $promotionQuote = $this->promotions->reserveForBooking($booking, $discountCodes, $priceBreakdown->grandTotal);
+                    $loyaltyQuote = $this->loyalty->reserveForBooking($booking, $pointsToUse, $promotionQuote->finalAmount);
                     $booking->forceFill([
                         'promotion_discount_amount' => $promotionQuote->discountAmount,
-                        'total_amount' => $promotionQuote->finalAmount,
+                        'points_discount_amount' => $loyaltyQuote->discountAmount,
+                        'total_amount' => $loyaltyQuote->finalAmount,
                     ])->save();
 
                     $this->seatLocks->acquire(

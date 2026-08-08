@@ -19,7 +19,8 @@ class BookingExpirationService
     public function __construct(
         private readonly BookingSeatLockService $seatLocks,
         private readonly BookingFoodService $food,
-        private readonly PromotionService $promotions,
+        private readonly ?PromotionService $promotions = null,
+        private readonly ?LoyaltyService $loyalty = null,
     ) {}
 
     public function expire(int $bookingId): bool
@@ -62,7 +63,8 @@ class BookingExpirationService
             $booking->forceFill(['booking_status' => 'expired'])->save();
             $this->seatLocks->release($booking);
             $this->food->transitionForBooking($booking, 'expired');
-            $this->promotions->release($booking);
+            ($this->promotions ?? app(PromotionService::class))->release($booking);
+            ($this->loyalty ?? app(LoyaltyService::class))->release($booking, 'expired');
 
             return true;
         });

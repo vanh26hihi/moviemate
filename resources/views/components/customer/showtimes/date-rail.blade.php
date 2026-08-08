@@ -1,7 +1,7 @@
 @props(['dates', 'selectedDate'])
-<fieldset>
+<fieldset class="min-w-0 max-w-full">
     <legend class="sr-only">Chọn ngày xem lịch</legend>
-    <div class="flex gap-2 overflow-x-auto pb-2" role="list">
+    <div class="flex w-full max-w-full gap-2 overflow-x-auto pb-2" role="list">
         @foreach($dates as $date)
             @php($active = $selectedDate === $date['date'])
             <button type="submit" name="date" value="{{ $date['date'] }}" aria-pressed="{{ $active ? 'true' : 'false' }}"

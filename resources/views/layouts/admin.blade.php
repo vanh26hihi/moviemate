@@ -36,6 +36,8 @@
                     ['route' => 'admin.movies.index', 'active' => 'admin.movies.*', 'permission' => 'movies.view', 'label' => 'Phim', 'icon' => 'ph-film-slate'],
                     ['route' => 'admin.genres.index', 'active' => 'admin.genres.*', 'permission' => 'genres.view', 'label' => 'Thể loại', 'icon' => 'ph-tag'],
                     ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
+                    ['route' => 'admin.loyalty-settings.edit', 'active' => 'admin.loyalty-settings.*', 'permission' => 'reviews.view', 'label' => 'Cấu hình điểm', 'icon' => 'ph-coins'],
+                    ['route' => 'admin.loyalty.index', 'active' => 'admin.loyalty.index', 'permission' => 'activity_logs.view', 'label' => 'Nhật ký điểm', 'icon' => 'ph-list-checks'],
                 ]],
                 ['label' => 'Rạp & lịch chiếu', 'items' => [
                     ['route' => 'admin.cinemas.index', 'active' => ['admin.cinema.*', 'admin.cinemas.*'], 'permission' => 'cinemas.view', 'label' => 'Chi nhánh', 'icon' => 'ph-buildings'],

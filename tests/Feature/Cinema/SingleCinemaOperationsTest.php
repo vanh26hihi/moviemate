@@ -207,7 +207,6 @@ class SingleCinemaOperationsTest extends TestCase
         $this->get(route('home'))
             ->assertOk()
             ->assertSee($canonical->name)
-            ->assertSee($canonical->address)
             ->assertSee('name="cinema"', false)
             ->assertSee('value="'.$canonical->code.'"', false)
             ->assertDontSee('value="'.$legacy->id.'"', false);

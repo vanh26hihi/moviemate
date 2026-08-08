@@ -32,7 +32,7 @@
                             <i class="ph ph-coins text-lg"></i> Lịch sử điểm
                         </a>
                     @endif
-                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
+                    <a href="{{ route('user.reviews.index') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
                         <i class="ph ph-star text-lg"></i> Đánh giá của tôi
                     </a>
                 </div>
@@ -103,6 +103,12 @@
                                     <div>
                                         <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
                                         <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
+                                        @if($booking->promotion_discount_amount > 0)
+                                            <p class="text-xs text-success">Mã {{ $booking->discountCodeRedemptions->pluck('code_snapshot')->join(', ') }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
+                                        @endif
+                                        @if($booking->pointRedemption)
+                                            <p class="text-xs text-ai-start">Đã dùng {{ number_format($booking->pointRedemption->points,0,',','.') }} điểm: −{{ number_format((int)$booking->points_discount_amount,0,',','.') }} VNĐ</p>
+                                        @endif
                                         @if($booking->loyalty_points_earned > 0)
                                             <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
                                         @endif

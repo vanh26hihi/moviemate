@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
-use App\Models\Movie;
 use App\Models\Cinema;
+use App\Models\Movie;
 use App\Services\CinemaContext;
 use App\Services\CustomerShowtimeCatalogService;
 use App\Services\PublicShowtimeCatalog;

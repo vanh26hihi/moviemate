@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Booking;
 use App\Models\BookingDiscountCode;
 use App\Models\DiscountCode;
+use App\Models\LoyaltySetting;
 use Illuminate\Validation\ValidationException;
 
 final class PromotionService
@@ -13,7 +14,7 @@ final class PromotionService
     public function quote(int $grossAmount, array $requestedCodes, ?int $userId, int $cinemaId, bool $lock = false): PromotionQuote
     {
         $codes = collect($requestedCodes)->map(fn ($code) => mb_strtoupper(trim((string) $code)))->filter()->unique()->values();
-        $maximum = max(1, (int) config('promotions.max_discount_codes_per_booking', 3));
+        $maximum = max(1, (int) LoyaltySetting::current()->max_discount_codes_per_booking);
         if ($codes->count() > $maximum) {
             throw ValidationException::withMessages(['discount_code' => "Mỗi đơn chỉ được dùng tối đa {$maximum} mã giảm giá."]);
         }
@@ -104,7 +105,9 @@ final class PromotionService
         if ($userId !== null && $code->per_user_quota !== null && (clone $used)->where('user_id', $userId)->count() >= $code->per_user_quota) {
             throw ValidationException::withMessages(['discount_code' => 'Bạn đã dùng hết lượt của mã giảm giá này.']);
         }
-        if ($code->first_order_only && ($userId === null || Booking::query()->where('user_id', $userId)->where('payment_status', 'paid')->exists())) {
+        if ($code->first_order_only && ($userId === null
+            || Booking::query()->where('user_id', $userId)->where('payment_status', 'paid')->exists()
+            || (clone $used)->where('user_id', $userId)->exists())) {
             throw ValidationException::withMessages(['discount_code' => 'Mã này chỉ áp dụng cho đơn hàng đầu tiên.']);
         }
     }

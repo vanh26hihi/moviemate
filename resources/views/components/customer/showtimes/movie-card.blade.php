@@ -15,7 +15,7 @@
         </div>
         <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-start justify-between gap-2">
-                <div><h3 class="text-lg font-extrabold app-text sm:text-xl">{{ $movie->title }}</h3>
+                <div><h3 class="text-lg font-extrabold app-text sm:text-xl"><a href="{{ route('user.movies.show', ['slug' => $movie->slug, 'cinema' => $first['cinema']->code, 'date' => $first['date']]) }}" class="hover:text-brand-start">{{ $movie->title }}</a></h3>
                     <p class="mt-1 text-sm app-muted">@if($movie->age_rating)<strong class="app-text">{{ $movie->age_rating }}</strong> · @endif{{ $movie->genres->pluck('name')->join(', ') ?: 'Đang cập nhật thể loại' }}@if($movie->duration) · {{ $movie->duration }} phút @endif</p>
                 </div>
                 @if($showCinema)<a href="{{ route('cinemas.show', ['cinema' => $first['cinema']->code, 'date' => $first['date']]) }}" class="text-sm font-bold text-brand-start">{{ $first['cinema']->name }}</a>@endif

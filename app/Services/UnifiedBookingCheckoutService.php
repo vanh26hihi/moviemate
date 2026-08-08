@@ -32,6 +32,7 @@ class UnifiedBookingCheckoutService
             $draft['checkout_token'],
             $draft['food_items'],
             discountCodes: $draft['discount_codes'] ?? [],
+            pointsToUse: (int) ($draft['points_to_use'] ?? 0),
         );
 
         try {

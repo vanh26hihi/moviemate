@@ -15,7 +15,7 @@
 <section class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
     <div class="grid gap-8 lg:grid-cols-[260px_1fr]">
         <aside class="cinema-card self-start rounded-3xl p-5 lg:sticky lg:top-24"><h2 class="font-extrabold app-text">Giờ hoạt động</h2><dl class="mt-4 space-y-2 text-sm">@foreach($cinema->operatingHours->sortBy('day_of_week') as $hours)<div class="flex justify-between gap-3"><dt class="app-muted">Thứ {{ $hours->day_of_week === 7 ? 'CN' : $hours->day_of_week + 1 }}</dt><dd class="font-bold app-text">{{ $hours->is_closed ? 'Đóng cửa' : substr($hours->opens_at,0,5).' – '.substr($hours->latest_show_start_at,0,5) }}</dd></div>@endforeach</dl></aside>
-        <div>
+        <div class="min-w-0">
             <form method="GET" action="{{ route('cinemas.show', $cinema->code) }}" data-showtime-filter-form data-filter-endpoint="{{ route('showtimes.filter') }}" data-filter-context="cinema" data-cinema-code="{{ $cinema->code }}" class="cinema-card mb-6 p-4">
                 <x-customer.showtimes.date-rail :dates="$dates" :selected-date="$selectedDate" />
             </form>

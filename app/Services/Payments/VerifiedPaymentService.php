@@ -9,6 +9,7 @@ use App\Models\BookingSeat;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Services\ActivityLogger;
+use App\Services\LoyaltyService;
 use App\Services\PromotionService;
 use App\Services\Tickets\TicketDeliveryOutbox;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ class VerifiedPaymentService
         private readonly TicketDeliveryOutbox $ticketDeliveries,
         private readonly ActivityLogger $activities,
         private readonly PromotionService $promotions,
+        private readonly LoyaltyService $loyalty,
     ) {}
 
     public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
@@ -178,6 +180,7 @@ class VerifiedPaymentService
                 ->first();
             $foodOrder?->forceFill(['status' => 'paid'])->save();
             $this->promotions->redeem($booking);
+            $this->loyalty->redeem($booking);
             $this->ticketDeliveries->enqueueVerifiedBooking($booking);
             $this->activities->log(
                 'payment.verified',

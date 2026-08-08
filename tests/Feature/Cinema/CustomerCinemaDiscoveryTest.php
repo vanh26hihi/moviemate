@@ -32,7 +32,7 @@ class CustomerCinemaDiscoveryTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_directory_only_shows_active_branches_with_correct_counts_and_no_internal_coordinates(): void
+    public function test_directory_only_shows_active_branches_with_counts_and_discovery_coordinates(): void
     {
         $active = $this->publicScenario('PUB-CG', 'MovieMate Public Cầu Giấy', '2030-06-02');
         $inactive = $this->publicScenario('PUB-OFF', 'MovieMate Hidden', '2030-06-02', ['cinema_status' => 'inactive']);
@@ -40,7 +40,8 @@ class CustomerCinemaDiscoveryTest extends TestCase
         $this->get(route('cinemas.index'))->assertOk()
             ->assertSee($active['cinema']->name)->assertDontSee($inactive['cinema']->name)
             ->assertSee('Phim khả dụng')->assertSee('Suất sắp tới')
-            ->assertDontSee((string) $active['cinema']->latitude)->assertDontSee('Manager');
+            ->assertSee('data-latitude="'.$active['cinema']->latitude.'"', false)
+            ->assertDontSee('lat=', false)->assertDontSee('lng=', false)->assertDontSee('Manager');
     }
 
     public function test_directory_search_city_district_and_open_filters_are_server_backed(): void
@@ -52,18 +53,19 @@ class CustomerCinemaDiscoveryTest extends TestCase
             ->assertOk()->assertSee($wanted['cinema']->name)->assertDontSee($other['cinema']->address);
     }
 
-    public function test_nearby_sort_validates_coordinates_handles_missing_coordinates_and_writes_no_activity_log(): void
+    public function test_nearby_sort_is_client_side_and_writes_no_activity_log(): void
     {
         $near = $this->publicScenario('PUB-NEAR', 'Near Cinema', '2030-06-02', ['latitude' => '21.0301', 'longitude' => '105.7801']);
         $far = $this->publicScenario('PUB-FAR', 'Far Cinema', '2030-06-02', ['latitude' => '20.0000', 'longitude' => '104.0000']);
         Cinema::query()->where('is_primary', true)->update(['latitude' => null, 'longitude' => null]);
 
-        $response = $this->get(route('cinemas.index', ['nearby' => 1, 'sort' => 'nearby', 'lat' => 21.03, 'lng' => 105.78]))->assertOk();
-        $this->assertLessThan(
-            strpos($response->getContent(), route('cinemas.show', $far['cinema']->code)),
-            strpos($response->getContent(), route('cinemas.show', $near['cinema']->code)),
-        );
-        $this->get(route('cinemas.index', ['nearby' => 1, 'lat' => 91, 'lng' => 181]))->assertSessionHasErrors(['lat', 'lng']);
+        $response = $this->get(route('cinemas.index'))->assertOk();
+        $response->assertSee('data-latitude="'.$near['cinema']->latitude.'"', false)
+            ->assertSee('data-latitude="'.$far['cinema']->latitude.'"', false)
+            ->assertDontSee('lat=', false)->assertDontSee('lng=', false);
+        $source = file_get_contents(resource_path('js/showtime.js'));
+        $this->assertStringContainsString('navigator.geolocation.getCurrentPosition', $source);
+        $this->assertStringContainsString('haversineDistance', $source);
         $this->assertSame(0, ActivityLog::query()->count());
     }
 
@@ -74,10 +76,10 @@ class CustomerCinemaDiscoveryTest extends TestCase
 
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-02']))
             ->assertOk()->assertSee('Lịch chiếu tại '.$branch['cinema']->name)
-            ->assertSee($branch['movie']->title)->assertSee('Từ 80.000 ₫')->assertSee('3D')
+            ->assertSee($branch['movie']->title)->assertSee('80.000 ₫')->assertSee('3D')
             ->assertDontSee($other['movie']->title);
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-03']))
-            ->assertOk()->assertSee('chưa có lịch chiếu');
+            ->assertOk()->assertSee('Chưa có suất chiếu');
     }
 
     public function test_inactive_branch_detail_is_not_public(): void
@@ -151,13 +153,16 @@ class CustomerCinemaDiscoveryTest extends TestCase
             'movie_index' => $this->countQueries(fn () => $this->get(route('user.movies.index', ['cinema' => $first['cinema']->code, 'date' => '2030-06-02']))),
             'movie_detail' => $this->countQueries(fn () => $this->get(route('user.movies.show', ['slug' => $first['movie']->slug, 'date' => '2030-06-02']))),
             'partial' => $this->countQueries(fn () => $this->get(route('showtimes.filter', ['context' => 'cinema', 'cinema' => $first['cinema']->code, 'date' => '2030-06-02']))),
-            'nearby' => $this->countQueries(fn () => $this->get(route('cinemas.index', ['nearby' => 1, 'sort' => 'nearby', 'lat' => 21.03, 'lng' => 105.78]))),
+            'nearby' => $this->countQueries(fn () => $this->get(route('cinemas.index'))),
         ];
 
         foreach ($counts as $page => $count) {
             $this->assertLessThanOrEqual(25, $count, "{$page} query count exceeded the bounded discovery budget: ".json_encode($counts));
         }
         $this->assertLessThanOrEqual($counts['cinema_detail'], $counts['partial']);
+        if (getenv('REPORT_QUERY_COUNTS') === '1') {
+            fwrite(STDOUT, 'DISCOVERY_QUERY_COUNTS='.json_encode($counts, JSON_THROW_ON_ERROR).PHP_EOL);
+        }
     }
 
     private function countQueries(callable $request): int

@@ -143,7 +143,8 @@ class Movie extends Model
      */
     public function reviews(): HasMany
     {
-        return $this->hasMany(Review::class)->where('status', Review::STATUS_VISIBLE);
+        return $this->hasMany(Review::class)->where('status', Review::STATUS_VISIBLE)
+            ->where('moderation_status', Review::MODERATION_PUBLISHED);
     }
 
     public function getStatusLabelAttribute(): string
