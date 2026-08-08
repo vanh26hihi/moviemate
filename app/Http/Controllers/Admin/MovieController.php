@@ -19,21 +19,40 @@ use Throwable;
 
 class MovieController extends Controller
 {
-    /**
-     * Display a listing of the movies.
-     */
     public function index(Request $request)
     {
-        $query = Movie::with('genres');
+        $search = trim((string) $request->query('search', ''));
+        $status = (string) $request->query('status', '');
+        $genreId = $request->integer('genre') ?: null;
+        $country = trim((string) $request->query('country', ''));
 
-        // Simple search by title
-        if ($search = $request->query('search')) {
-            $query->where('title', 'like', "%{$search}%");
+        $query = Movie::query()->with('genres');
+
+        if ($search !== '') {
+            $query->where(function ($query) use ($search): void {
+                $query->where('title', 'like', "%{$search}%")
+                    ->orWhere('slug', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('country', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%");
+            });
+        }
+        if (in_array($status, [Movie::STATUS_DRAFT, Movie::STATUS_COMING_SOON, Movie::STATUS_NOW_SHOWING, Movie::STATUS_INACTIVE, Movie::STATUS_ARCHIVED], true)) {
+            $query->where('status', $status);
+        }
+        if ($genreId) {
+            $query->whereHas('genres', fn ($genres) => $genres->whereKey($genreId));
+        }
+        if ($country !== '') {
+            $query->where('country', $country);
         }
 
-        $movies = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
+        $movies = $query->latest()->paginate(15)->withQueryString();
+        $genres = Genre::query()->orderBy('name')->get(['id', 'name']);
+        $countries = Movie::query()->whereNotNull('country')->where('country', '!=', '')
+            ->distinct()->orderBy('country')->pluck('country');
 
-        return view('admin.movies.index', compact('movies', 'search'));
+        return view('admin.movies.index', compact('movies', 'search', 'status', 'genreId', 'country', 'genres', 'countries'));
     }
 
     /**
