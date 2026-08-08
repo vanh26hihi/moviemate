@@ -13,7 +13,7 @@
         })();
     </script>
 </head>
-<body class="user-app app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden">
+<body class="user-app app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden @yield('body_class')">
     <header class="app-header fixed w-full top-0 z-50 backdrop-blur-xl border-b app-border transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16 md:h-20">
@@ -21,7 +21,7 @@
                     <span class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-start to-brand-end text-white flex items-center justify-center shadow-lg shadow-brand-start/25">
                         <i class="ph-fill ph-film-strip text-2xl"></i>
                     </span>
-                    <span class="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end">
+                    <span class="hidden text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end sm:inline md:text-2xl">
                         MovieMate
                     </span>
                 </a>
@@ -29,13 +29,22 @@
                 <nav class="hidden md:flex items-center gap-1 rounded-full app-card border app-border p-1">
                     <a href="{{ route('home') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('home')]) @if(request()->routeIs('home')) aria-current="page" @endif>Trang chủ</a>
                     <a href="{{ route('user.movies.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.movies.*')]) @if(request()->routeIs('user.movies.*')) aria-current="page" @endif>Phim</a>
+                    <a href="{{ route('cinemas.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('cinemas.*')]) @if(request()->routeIs('cinemas.*')) aria-current="page" @endif>Rạp</a>
                     <a href="{{ route('home') }}#home-showtime-calendar" class="user-nav-link">Lịch chiếu</a>
                     <a href="{{ route('foods.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('foods.*')]) @if(request()->routeIs('foods.*')) aria-current="page" @endif>Đồ ăn</a>
                     <a href="{{ route('user.ai.recommend') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.ai.*')]) @if(request()->routeIs('user.ai.*')) aria-current="page" @endif>
                         <i class="ph-fill ph-sparkle text-ai-start"></i> AI Gợi ý
                     </a>
-                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket')) aria-current="page" @endif>Vé của tôi</a>
+                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Vé của tôi</a>
                 </nav>
+
+                <details id="customer-cinema-selector" class="relative ml-auto md:ml-0">
+                    <summary class="flex max-w-44 cursor-pointer list-none items-center gap-2 rounded-xl border app-border app-card px-3 py-2 text-sm font-bold app-text" aria-label="Chọn rạp ưu tiên"><i class="ph-fill ph-map-pin text-brand-start" aria-hidden="true"></i><span class="truncate">{{ $customerPreferredCinema?->name ?? 'Tất cả rạp' }}</span><i class="ph ph-caret-down text-xs" aria-hidden="true"></i></summary>
+                    <div class="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border app-border app-card p-2 shadow-2xl">
+                        <form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="all"><button type="submit" class="user-dropdown-link w-full text-left" @if(!$customerPreferredCinema) aria-current="true" @endif>Tất cả rạp</button></form>
+                        @foreach($customerCinemas as $contextCinema)<form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="{{ $contextCinema->code }}"><button type="submit" class="user-dropdown-link w-full text-left" @if($customerPreferredCinema?->is($contextCinema)) aria-current="true" @endif>{{ $contextCinema->name }}</button></form>@endforeach
+                    </div>
+                </details>
 
                 <div class="hidden md:flex items-center gap-3">
                     <button data-theme-toggle type="button"
@@ -86,12 +95,13 @@
             <div class="px-4 pt-2 pb-4 space-y-1">
                 <a href="{{ route('home') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('home')])>Trang chủ</a>
                 <a href="{{ route('user.movies.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.movies.*')])>Phim</a>
+                <a href="{{ route('cinemas.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('cinemas.*')])>Rạp</a>
                 <a href="{{ route('home') }}#home-showtime-calendar" class="block px-3 py-2.5 rounded-lg text-sm font-medium app-muted hover:bg-brand-start/10 hover:text-brand-start transition-colors">Lịch chiếu</a>
                 <a href="{{ route('foods.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('foods.*')])>Đồ ăn</a>
                 <a href="{{ route('user.ai.recommend') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-ai-start hover:bg-ai-start/10 transition-colors">
                     <i class="ph-fill ph-sparkle"></i> AI Gợi ý
                 </a>
-                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket')])>Vé của tôi</a>
+                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')])>Vé của tôi</a>
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
                         <a href="{{ route('user.profile') }}" class="user-mobile-link"><i class="ph ph-user mr-2"></i>Hồ sơ</a>
@@ -109,22 +119,7 @@
     </header>
 
     <main class="flex-grow pt-16 md:pt-20 min-w-0">
-        @if(session('success') || session('error') || session('warning') || $errors->any())
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5">
-                @if(session('success'))
-                    <div class="rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-medium">{{ session('success') }}</div>
-                @endif
-                @if(session('error'))
-                    <div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium">{{ session('error') }}</div>
-                @endif
-                @if(session('warning'))
-                    <div class="rounded-2xl border border-warning/30 bg-warning/10 text-warning px-4 py-3 text-sm font-medium">{{ session('warning') }}</div>
-                @endif
-                @if($errors->any())
-                    <div class="rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-medium" role="alert">{{ $errors->first() }}</div>
-                @endif
-            </div>
-        @endif
+        <x-flash-messages class="mx-auto max-w-7xl px-4 pt-5 sm:px-6 lg:px-8" :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
         @yield('content')
     </main>
 
@@ -174,7 +169,7 @@
         </div>
     </footer>
 
-    <a href="{{ route('user.ai.chatbot') }}" class="fixed bottom-6 right-6 w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-ai-start to-ai-end rounded-full shadow-lg shadow-ai-start/30 flex items-center justify-center text-white hover:scale-110 transition-transform z-50" title="Chat với AI">
+    <a href="{{ route('user.ai.chatbot') }}" class="fixed bottom-6 right-6 w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-ai-start to-ai-end rounded-full shadow-lg shadow-ai-start/30 flex items-center justify-center text-white hover:scale-110 transition-transform z-50" title="Trò chuyện với AI">
         <i class="ph-fill ph-robot text-2xl md:text-3xl"></i>
     </a>
 

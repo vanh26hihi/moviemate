@@ -3,6 +3,7 @@
 namespace App\Services\Vnpay;
 
 use App\Domain\Payments\VnpayConfig;
+use App\Domain\Payments\VnpayPayRequestValidator;
 use App\Domain\Payments\VnpaySigner;
 use App\Exceptions\PaymentInitiationException;
 use App\Models\Payment;
@@ -12,9 +13,21 @@ class VnpayPaymentUrlBuilder
     public function __construct(
         private readonly VnpayConfig $config,
         private readonly VnpaySigner $signer,
+        private readonly VnpayPayRequestValidator $validator,
     ) {}
 
     public function build(Payment $payment, string $returnUrl, string $clientIp): string
+    {
+        $parameters = $this->parameters($payment, $returnUrl, $clientIp);
+        $this->validator->assertValid($parameters, $payment);
+        $query = $this->signer->paymentCanonical($parameters);
+        $secureHash = $this->signer->signPayment($parameters, $this->config->hashSecret);
+
+        return $this->config->paymentUrl.'?'.$query.'&vnp_SecureHash='.$secureHash;
+    }
+
+    /** @return array<string, string|int> */
+    public function parameters(Payment $payment, string $returnUrl, string $clientIp): array
     {
         if ($payment->provider !== 'vnpay'
             || ! is_string($payment->order_code)
@@ -23,6 +36,7 @@ class VnpayPaymentUrlBuilder
             || ! $payment->expires_at) {
             throw new PaymentInitiationException('The VNPAY payment attempt is incomplete.');
         }
+        $clientIp = $this->normalizeClientIp($clientIp);
         if (filter_var($clientIp, FILTER_VALIDATE_IP) === false) {
             throw new PaymentInitiationException('The VNPAY client IP address is invalid.');
         }
@@ -57,10 +71,7 @@ class VnpayPaymentUrlBuilder
             $parameters['vnp_BankCode'] = $this->config->bankCode;
         }
 
-        $query = $this->signer->paymentCanonical($parameters);
-        $secureHash = $this->signer->signPayment($parameters, $this->config->hashSecret);
-
-        return $this->config->paymentUrl.'?'.$query.'&vnp_SecureHash='.$secureHash;
+        return $parameters;
     }
 
     public function orderInfo(Payment $payment): string
@@ -72,5 +83,16 @@ class VnpayPaymentUrlBuilder
         $value = trim(preg_replace('/\s+/', ' ', $value) ?? $value);
 
         return mb_substr($value, 0, 255, 'UTF-8');
+    }
+
+    private function normalizeClientIp(string $clientIp): string
+    {
+        $clientIp = trim($clientIp);
+        if (preg_match('/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/Di', $clientIp, $matches) === 1
+            && filter_var($matches[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return $matches[1];
+        }
+
+        return $clientIp;
     }
 }

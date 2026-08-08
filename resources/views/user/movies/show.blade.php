@@ -5,6 +5,12 @@
 @php
     $poster = $movie->poster_url;
     $cover = $movie->cover_url ?: $poster;
+    $showtimes = collect($showtimes ?? []);
+    $cinemas = collect($cinemas ?? []);
+    $selectedCinema = $selectedCinema ?? null;
+    $preferredCinema = $preferredCinema ?? null;
+    $selectedDate = $selectedDate ?? now(config('cinema.timezone', 'Asia/Ho_Chi_Minh'))->toDateString();
+    $dates = collect($dates ?? [['date' => $selectedDate, 'label' => 'Hôm nay', 'day' => now()->format('d/m')]]);
     $genresText = $movie->genres->pluck('name')->join(', ') ?: 'Đang cập nhật';
 
     $showtimesByDate = $showtimes->groupBy(

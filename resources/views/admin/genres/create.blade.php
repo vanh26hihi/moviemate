@@ -2,6 +2,7 @@
 
 @section('title', 'Thêm thể loại')
 @section('page-title', 'Thêm thể loại')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="admin-page-header">
@@ -15,15 +16,7 @@
     </a>
 </div>
 
-@if ($errors->any())
-    <div class="mb-5 max-w-3xl rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm">
-        <ul class="list-disc list-inside">
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+<x-validation-summary class="mb-5 max-w-3xl" :errors="$errors" />
 
 <form action="{{ route('admin.genres.store') }}" method="POST" class="admin-form-card max-w-3xl">
     @csrf
@@ -35,7 +28,7 @@
         </div>
 
         <div>
-            <label class="admin-label">Slug</label>
+            <label class="admin-label">Đường dẫn rút gọn</label>
             <input type="text" name="slug" value="{{ old('slug') }}" class="admin-input" placeholder="Để trống để tự tạo">
             <p class="admin-help">Slug dùng cho URL và lọc dữ liệu.</p>
         </div>

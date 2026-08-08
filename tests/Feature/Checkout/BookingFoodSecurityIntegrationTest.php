@@ -124,10 +124,10 @@ class BookingFoodSecurityIntegrationTest extends TestCase
 
         $this->get(route('user.bookings.review'))
             ->assertOk()
-            ->assertSee('30.000 VND')
-            ->assertSee('60.000 VND')
-            ->assertSee('110.000 VND')
-            ->assertDontSee('1 VND');
+            ->assertSee('30.000 VNĐ')
+            ->assertSee('60.000 VNĐ')
+            ->assertSee('110.000 VNĐ')
+            ->assertDontSee('1 VNĐ');
 
         $this->assertDatabaseCount('bookings', 0);
         $this->assertDatabaseCount('orders', 0);

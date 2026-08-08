@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,16 +13,26 @@ class Role extends Model
 
     public const MANAGER_PERMISSION_SLUGS = [
         'admin.access', 'dashboard.view',
-        'cinema.view', 'cinema.update',
-        'rooms.view', 'rooms.create', 'rooms.update', 'rooms.delete',
+        'cinema.view', 'cinema.update', 'cinemas.view', 'cinemas.operations.manage',
+        'cinema_assignments.view', 'cinema_assignments.manage', 'users.view',
+        'rooms.view', 'rooms.create', 'rooms.update',
         'seats.view', 'seats.manage',
-        'movies.view', 'movies.create', 'movies.update', 'movies.delete',
+        'layout_templates.view', 'room_layouts.apply_template',
+        'movies.view', 'movies.create', 'movies.update',
         'genres.view', 'genres.create', 'genres.update', 'genres.delete',
         'showtimes.view', 'showtimes.create', 'showtimes.update', 'showtimes.delete',
+        'pricing.view', 'pricing.manage',
         'foods.view', 'foods.create', 'foods.update', 'foods.delete',
         'food-orders.view', 'food-orders.update-status',
         'bookings.view', 'bookings.operate',
-        'payments.view', 'reports.view', 'tickets.print', 'tickets.checkin',
+        'counter_sales.view', 'counter_sales.create', 'counter_sales.settle', 'counter_sales.cancel',
+        'payments.view', 'payments.reconcile',
+        'ticket_deliveries.view', 'ticket_deliveries.retry', 'ticket_checkins.view',
+        'seats.maintenance.view', 'seats.maintenance.update',
+        'discounts.view', 'discounts.manage',
+        'reviews.view', 'reviews.moderate',
+        'reports.view', 'tickets.print', 'tickets.checkin', 'tickets.lookup',
+        'tickets.print.override', 'ticket_prints.view',
     ];
 
     public const STAFF_PERMISSION_SLUGS = [
@@ -33,8 +44,14 @@ class Role extends Model
         'food-orders.update-status',
         'bookings.view',
         'bookings.operate',
+        'counter_sales.view',
+        'counter_sales.create',
+        'counter_sales.settle',
+        'counter_sales.cancel',
+        'ticket_checkins.view',
         'tickets.print',
         'tickets.checkin',
+        'tickets.lookup',
     ];
 
     protected $fillable = ['name', 'slug', 'description', 'is_system'];
@@ -48,7 +65,7 @@ class Role extends Model
     {
         static::deleting(function (Role $role): void {
             if ($role->is_system || $role->users()->exists()) {
-                throw new \LogicException('System roles and roles assigned to users cannot be deleted.');
+                throw new \LogicException('Không thể xóa vai trò hệ thống hoặc vai trò đang được gán cho người dùng.');
             }
         });
     }
@@ -71,5 +88,10 @@ class Role extends Model
     public function isEditable(): bool
     {
         return in_array($this->slug, self::EDITABLE_SLUGS, true);
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return StatusLabel::for('role', $this->slug);
     }
 }

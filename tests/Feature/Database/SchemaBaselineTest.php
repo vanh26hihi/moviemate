@@ -45,7 +45,7 @@ class SchemaBaselineTest extends TestCase
             'phone', 'role_id', 'avatar', 'status', 'email_verified_at',
         ]));
         $this->assertTrue(Schema::hasColumns('cinemas', [
-            'canonical_key', 'school_name', 'country', 'latitude', 'longitude',
+            'canonical_key', 'school_name', 'country', 'district', 'latitude', 'longitude',
             'is_primary', 'archived_at',
         ]));
         $this->assertTrue(Schema::hasColumns('rooms', [

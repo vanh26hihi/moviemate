@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Services\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -34,7 +35,7 @@ class RoleController extends Controller
         ]);
     }
 
-    public function update(Request $request, Role $role): RedirectResponse
+    public function update(Request $request, Role $role, ActivityLogger $activityLogger): RedirectResponse
     {
         Gate::authorize('update', $role);
         $allowed = $this->allowedPermissions($role);
@@ -42,8 +43,19 @@ class RoleController extends Controller
             'permissions' => ['array'],
             'permissions.*' => ['string', Rule::in($allowed->pluck('slug')->all())],
         ]);
+        $before = $role->permissions()->orderBy('slug')->pluck('slug')->all();
         $permissionIds = $allowed->whereIn('slug', $validated['permissions'] ?? [])->pluck('id')->all();
-        DB::transaction(fn () => $role->permissions()->sync($permissionIds));
+        DB::transaction(function () use ($role, $permissionIds, $before, $activityLogger): void {
+            $role->permissions()->sync($permissionIds);
+            $after = $role->permissions()->orderBy('slug')->pluck('slug')->all();
+            $activityLogger->log(
+                'role.permissions_updated',
+                $role,
+                ['permission_slugs' => $before],
+                ['permission_slugs' => $after],
+                ['count' => count($after)],
+            );
+        });
 
         return redirect()->route('admin.roles.index')->with('success', 'Đã cập nhật quyền cho '.$role->name.'.');
     }

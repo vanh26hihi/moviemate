@@ -5,6 +5,11 @@ namespace App\Services\Payments;
 use App\Domain\Payments\PaymentReviewResolutionResult;
 use App\Domain\Payments\VerifiedPaymentData;
 use App\Domain\Payments\ZaloPayConfig;
+use App\Exceptions\PaymentConfigurationException;
+use App\Exceptions\PayOsResponseException;
+use App\Exceptions\PayOsTransportException;
+use App\Exceptions\VnpayResponseException;
+use App\Exceptions\VnpayTransportException;
 use App\Exceptions\ZaloPayAuthenticationException;
 use App\Exceptions\ZaloPayResponseException;
 use App\Exceptions\ZaloPayTransportException;
@@ -22,6 +27,7 @@ class PaymentReviewResolutionService
         private readonly ZaloPayGateway $gateway,
         private readonly ZaloPayConfig $config,
         private readonly VerifiedPaymentService $verifiedPayments,
+        private readonly VnpayQueryService $vnpayQueries,
     ) {}
 
     public function resolve(Payment $payment, User $actor): PaymentReviewResolutionResult
@@ -31,11 +37,11 @@ class PaymentReviewResolutionService
             $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
 
             if ($lockedPayment->status !== Payment::STATUS_REVIEW) {
-                throw new LogicException('Only a payment in review can be manually reconciled.');
+                throw new LogicException('Chỉ giao dịch đang chờ kiểm tra mới có thể được đối soát thủ công.');
             }
 
-            if ($lockedPayment->provider !== 'zalopay') {
-                throw new LogicException('This payment provider does not support manual order reconciliation.');
+            if (! in_array($lockedPayment->provider, Payment::SUPPORTED_PROVIDERS, true)) {
+                throw new LogicException('Nhà cung cấp thanh toán này không hỗ trợ đối soát đơn hàng thủ công.');
             }
 
             return PaymentReviewEvent::query()->create([
@@ -48,6 +54,13 @@ class PaymentReviewResolutionService
                 'provider_result_code' => null,
             ]);
         });
+
+        if ($payment->provider === 'vnpay') {
+            return $this->resolveVnpay($payment, $event);
+        }
+        if ($payment->provider === 'payos') {
+            return $this->resolvePayOs($payment, $event);
+        }
 
         try {
             $response = $this->gateway->query($payment->fresh());
@@ -113,6 +126,118 @@ class PaymentReviewResolutionService
             $result->accepted
                 ? 'Authoritative provider success was verified and the valid booking was fulfilled.'
                 : $result->message.' Payment remains in review; do not create a replacement until the discrepancy is resolved.',
+        );
+    }
+
+    private function resolveVnpay(
+        Payment $payment,
+        PaymentReviewEvent $event,
+    ): PaymentReviewResolutionResult {
+        try {
+            $status = $this->vnpayQueries->reconcileReview($payment);
+        } catch (VnpayTransportException) {
+            return $this->finish(
+                $event,
+                'uncertain',
+                'transport_error',
+                'Chưa kết nối được VNPAY. Giao dịch vẫn ở trạng thái cần kiểm tra và có thể thử lại sau.',
+            );
+        } catch (VnpayResponseException) {
+            return $this->finish(
+                $event,
+                'uncertain',
+                'invalid_response',
+                'VNPAY trả về phản hồi không hợp lệ. Giao dịch vẫn ở trạng thái cần kiểm tra.',
+            );
+        }
+
+        $fresh = $payment->fresh();
+        $category = match (true) {
+            $status === Payment::STATUS_SUCCESS => 'authoritative_success',
+            $fresh->failure_reason === 'query_authentication_error' => 'authentication_error',
+            in_array($fresh->failure_reason, [
+                'amount_mismatch',
+                'query_amount_invalid',
+                'query_amount_mismatch',
+                'query_identity_mismatch',
+                'provider_transaction_id_mismatch',
+                'duplicate_provider_transaction_id',
+                'late_payment_after_expiration',
+                'seat_ownership_lost',
+                'booking_not_payable',
+            ], true) => 'validation_rejected',
+            in_array($fresh->failure_reason, ['query_failed', 'vnpay_terminal_failed'], true) => 'not_successful',
+            default => 'uncertain',
+        };
+        $code = collect([$fresh->response_code, $fresh->transaction_status])
+            ->filter(fn ($value): bool => is_string($value) && $value !== '')
+            ->join('/');
+
+        return $this->finish(
+            $event,
+            $category,
+            $code === '' ? null : $code,
+            $status === Payment::STATUS_SUCCESS
+                ? 'VNPAY đã xác nhận giao dịch hợp lệ và đơn đặt vé đã được hoàn tất an toàn.'
+                : 'Kết quả VNPAY chưa đủ điều kiện hoàn tất đơn. Giao dịch vẫn được giữ để kiểm tra.',
+        );
+    }
+
+    private function resolvePayOs(
+        Payment $payment,
+        PaymentReviewEvent $event,
+    ): PaymentReviewResolutionResult {
+        try {
+            $status = app(PayOsPaymentReconciliationService::class)->reconcileReview($payment);
+        } catch (PaymentConfigurationException) {
+            return $this->finish(
+                $event,
+                'authentication_error',
+                'configuration_invalid',
+                'Cáº¥u hÃ¬nh payOS khÃ´ng há»£p lá»‡. Giao dá»‹ch váº«n á»Ÿ tráº¡ng thÃ¡i cáº§n kiá»ƒm tra; hÃ£y xÃ¡c minh cáº¥u hÃ¬nh nhÃ  cung cáº¥p trÆ°á»›c khi thá»­ láº¡i.',
+            );
+        } catch (PayOsTransportException) {
+            return $this->finish(
+                $event,
+                'uncertain',
+                'transport_error',
+                'Chưa kết nối được payOS. Giao dịch vẫn ở trạng thái cần kiểm tra và có thể thử lại sau.',
+            );
+        } catch (PayOsResponseException) {
+            return $this->finish(
+                $event,
+                'uncertain',
+                'invalid_response',
+                'payOS trả về phản hồi không hợp lệ. Giao dịch vẫn ở trạng thái cần kiểm tra.',
+            );
+        }
+
+        $fresh = $payment->fresh();
+        $category = match (true) {
+            $status === Payment::STATUS_SUCCESS => 'authoritative_success',
+            in_array($fresh->failure_reason, [
+                'amount_mismatch',
+                'payos_amount_paid_mismatch',
+                'payos_currency_mismatch',
+                'payos_order_code_mismatch',
+                'payos_payment_link_mismatch',
+                'provider_transaction_id_mismatch',
+                'duplicate_provider_transaction_id',
+                'late_payment_after_expiration',
+                'seat_ownership_lost',
+                'booking_not_payable',
+            ], true) => 'validation_rejected',
+            $fresh->failure_reason === 'payos_cancelled' => 'not_successful',
+            default => 'uncertain',
+        };
+
+        return $this->finish(
+            $event,
+            $category,
+            is_string($fresh->response_code) ? $fresh->response_code : null,
+            $status === Payment::STATUS_SUCCESS
+                ? 'payOS đã xác nhận giao dịch hợp lệ và đơn đặt vé đã được hoàn tất an toàn.'
+                : 'Kết quả payOS chưa đủ điều kiện hoàn tất đơn. Giao dịch được giữ để kiểm tra.',
         );
     }
 

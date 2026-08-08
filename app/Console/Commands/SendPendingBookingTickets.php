@@ -6,13 +6,20 @@ use App\Exceptions\UnsafeProductionMailConfiguration;
 use App\Mail\BookingTicketMail;
 use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
+use App\Services\ActivityLogger;
+use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\BookingTokenService;
 use App\Services\Mail\ProductionMailTransportGuard;
+use App\Services\Mail\TicketMailConfigurationInspector;
+use App\Services\Tickets\BookingTicketEligibility;
+use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\TicketQrCode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Throwable;
 
 class SendPendingBookingTickets extends Command
@@ -24,11 +31,21 @@ class SendPendingBookingTickets extends Command
     public function handle(
         BookingTokenService $tokens,
         ProductionMailTransportGuard $mailGuard,
+        TicketMailConfigurationInspector $mailConfiguration,
+        ActivityLogger $activities,
+        AdminTicketDeliveryQuery $deliveryQuery,
     ): int {
         try {
             $mailGuard->assertSafeForProduction();
         } catch (UnsafeProductionMailConfiguration $exception) {
             $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        }
+
+        $configuration = $mailConfiguration->inspect();
+        if (! $configuration['ready']) {
+            $this->error('Ticket mail delivery is blocked: '.$configuration['category'].'.');
 
             return self::FAILURE;
         }
@@ -48,11 +65,40 @@ class SendPendingBookingTickets extends Command
 
             try {
                 $this->send($claim, $tokens);
-                $counts['sent']++;
             } catch (Throwable $exception) {
                 $this->failDelivery($claim, $exception);
+                $failed = $claim->fresh();
+                $deliveryQuery->forgetBadge();
+
+                if ($failed?->status === BookingTicketDelivery::STATUS_FAILED) {
+                    $activities->log('ticket_delivery.send_failed', $failed, [
+                        'delivery_status' => BookingTicketDelivery::STATUS_PROCESSING,
+                    ], [
+                        'delivery_status' => $failed->status,
+                    ], [
+                        'booking_id' => $failed->booking_id,
+                        'delivery_id' => $failed->id,
+                        'attempt_number' => $failed->attempts,
+                        'error_category' => $failed->last_error_code,
+                    ]);
+                }
                 $counts['failed']++;
+
+                continue;
             }
+
+            $sent = $claim->fresh();
+            $deliveryQuery->forgetBadge();
+            $activities->log('ticket_delivery.send_succeeded', $sent, [
+                'delivery_status' => BookingTicketDelivery::STATUS_PROCESSING,
+            ], [
+                'delivery_status' => $sent->status,
+            ], [
+                'booking_id' => $sent->booking_id,
+                'delivery_id' => $sent->id,
+                'attempt_number' => $sent->attempts,
+            ]);
+            $counts['sent']++;
         }
 
         $this->info("Sent: {$counts['sent']}; failed: {$counts['failed']}");
@@ -64,9 +110,11 @@ class SendPendingBookingTickets extends Command
     {
         return DB::transaction(function (): ?BookingTicketDelivery {
             $now = now()->startOfSecond();
+            $leaseSeconds = max(30, (int) config('payment.ticket_delivery.lease_seconds', 300));
+            $staleStartedAt = $now->copy()->subSeconds($leaseSeconds);
             $delivery = BookingTicketDelivery::query()
                 ->whereNull('sent_at')
-                ->where(function ($query) use ($now): void {
+                ->where(function ($query) use ($now, $staleStartedAt): void {
                     $query->where(function ($ready) use ($now): void {
                         $ready->whereIn('status', [
                             BookingTicketDelivery::STATUS_PENDING,
@@ -74,10 +122,18 @@ class SendPendingBookingTickets extends Command
                         ])->where(function ($available) use ($now): void {
                             $available->whereNull('available_at')->orWhere('available_at', '<=', $now);
                         });
-                    })->orWhere(function ($expiredLease) use ($now): void {
+                    })->orWhere(function ($expiredLease) use ($now, $staleStartedAt): void {
                         $expiredLease->where('status', BookingTicketDelivery::STATUS_PROCESSING)
-                            ->whereNotNull('lease_expires_at')
-                            ->where('lease_expires_at', '<=', $now);
+                            ->where(function ($stale) use ($now, $staleStartedAt): void {
+                                $stale->where('lease_expires_at', '<=', $now)
+                                    ->orWhere(function ($missingLease) use ($staleStartedAt): void {
+                                        $missingLease->whereNull('lease_expires_at')
+                                            ->where(function ($missingClaimTime) use ($staleStartedAt): void {
+                                                $missingClaimTime->whereNull('processing_started_at')
+                                                    ->orWhere('processing_started_at', '<=', $staleStartedAt);
+                                            });
+                                    });
+                            });
                     });
                 })
                 ->orderBy('available_at')
@@ -89,7 +145,6 @@ class SendPendingBookingTickets extends Command
                 return null;
             }
 
-            $leaseSeconds = max(30, (int) config('payment.ticket_delivery.lease_seconds', 300));
             $delivery->forceFill([
                 'status' => BookingTicketDelivery::STATUS_PROCESSING,
                 'attempts' => $delivery->attempts + 1,
@@ -124,7 +179,9 @@ class SendPendingBookingTickets extends Command
             : route('user.bookings.access.show', $booking)
                 .'#token='.rawurlencode($ticketEmailToken).'&destination=ticket';
 
-        Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl));
+        $checkinCapability = app(TicketCheckinCapability::class)->issue($booking);
+        $ticketQrSvg = app(TicketQrCode::class)->svg($checkinCapability);
+        Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl, $ticketQrSvg));
 
         DB::transaction(function () use ($delivery, $booking): void {
             $claimedAt = $delivery->processing_started_at;
@@ -172,8 +229,7 @@ class SendPendingBookingTickets extends Command
                 ->lockForUpdate()
                 ->first();
             if (! $booking
-                || $booking->payment_status !== 'paid'
-                || $booking->booking_status !== 'paid') {
+                || ! app(BookingTicketEligibility::class)->isDeliverable($booking)) {
                 throw new RuntimeException('booking_not_paid');
             }
 
@@ -236,13 +292,20 @@ class SendPendingBookingTickets extends Command
         Log::warning('Ticket delivery attempt failed and remains retryable.', [
             'delivery_id' => $delivery->getKey(),
             'error_code' => $code,
-            'exception' => $exception::class,
         ]);
     }
 
     private function errorCode(Throwable $exception): string
     {
         $message = $exception->getMessage();
+        if ($exception instanceof TransportExceptionInterface) {
+            $normalized = strtolower($message);
+
+            return str_contains($normalized, 'authenticat') || str_contains($normalized, '535')
+                ? 'smtp_authentication_failed'
+                : 'smtp_connection_failed';
+        }
+
         if ($exception instanceof RuntimeException
             && preg_match('/^[a-z0-9_]{1,100}$/D', $message) === 1) {
             return $message;

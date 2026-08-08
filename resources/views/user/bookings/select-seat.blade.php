@@ -1,16 +1,21 @@
 @extends('layouts.user')
 
 @section('title', 'Chọn ghế - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
     $cellMap = $layoutCells->keyBy(fn ($cell) => $cell->x_position.':'.$cell->y_position);
+    $seatCellLookup = $layoutCells->where('cell_type', 'seat')->keyBy('seat_id');
     $bookedSeatLookup = array_fill_keys($bookedSeatIds, true);
-    $unavailablePairs = $seats
-        ->filter(fn ($seat) => $seat->type === 'couple' && ($seat->status !== 'active' || isset($bookedSeatLookup[$seat->id])))
-        ->pluck('pair_code')
-        ->filter()
-        ->unique();
+    $selectedSeatLookup = array_fill_keys($selectedSeatIds ?? [], true);
+    $seatGroups = \App\Support\SeatPresentation::groups($seats);
+    $seatGroupLookup = collect();
+    foreach ($seatGroups as $group) {
+        foreach ($group['seats'] as $member) {
+            $seatGroupLookup->put($member->id, $group);
+        }
+    }
     $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
 @endphp
 
@@ -26,12 +31,6 @@
             <p class="text-sm app-muted">Bước 1/4 · Chọn ghế phù hợp</p>
         </div>
 
-        @if(session('error'))
-            <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 px-4 py-3 text-sm font-bold text-error" role="alert" aria-live="assertive">
-                {{ session('error') }}
-            </div>
-        @endif
-
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
             <section class="cinema-card overflow-hidden rounded-3xl p-4 sm:p-6 lg:col-span-2" aria-labelledby="seat-picker-title">
                 <header class="mb-6 text-center">
@@ -40,6 +39,7 @@
                     <p class="text-sm app-muted">
                         {{ $showtime->cinema->name }} · {{ $showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}
                     </p>
+                    <p class="mt-1 text-sm app-muted">{{ $showtime->cinema->address }}</p>
                 </header>
 
                 <form id="seatForm" action="{{ route('user.bookings.checkout', $showtime) }}" method="GET" data-seat-picker>
@@ -57,23 +57,39 @@
                                     @php
                                         $cell = $cellMap->get($x.':'.$y);
                                         $seat = $cell?->seat;
-                                        $booked = $seat && isset($bookedSeatLookup[$seat->id]);
-                                        $pairUnavailable = $seat?->pair_code && $unavailablePairs->contains($seat->pair_code);
-                                        $maintenance = $seat && $seat->status !== 'active';
-                                        $disabled = $seat && ($booked || $maintenance || $pairUnavailable);
+                                        $seatGroup = $seat ? $seatGroupLookup->get($seat->id) : null;
+                                        $groupSeats = $seatGroup['seats'] ?? collect([$seat]);
+                                        $groupCells = $groupSeats->map(fn ($member) => $seatCellLookup->get($member?->id))->filter()->values();
+                                        $isLayoutCoupleValid = $groupCells->count() === 2
+                                            && $groupCells->pluck('y_position')->unique()->count() === 1
+                                            && abs((int) $groupCells[0]->x_position - (int) $groupCells[1]->x_position) === 1;
+                                        $isMergedCouple = (bool) ($seatGroup['is_couple'] ?? false)
+                                            && (bool) ($seatGroup['is_valid'] ?? false)
+                                            && $isLayoutCoupleValid;
+                                        $primarySeatId = $isMergedCouple
+                                            ? $groupCells->sortBy('x_position')->first()?->seat_id
+                                            : $seat?->id;
                                     @endphp
 
                                     @if(!$cell)
                                         <span class="h-10 w-10" aria-hidden="true"></span>
                                     @elseif($cell->cell_type === 'aisle')
                                         <span class="flex h-10 w-10 items-center justify-center text-xs app-muted opacity-50" aria-label="Lối đi"><i class="ph ph-arrows-down-up" aria-hidden="true"></i></span>
+                                    @elseif($isMergedCouple && $seat->id !== $primarySeatId)
+                                        @continue
                                     @else
                                         @php
-                                            $price = $showtime->priceForSeatType($seat->type);
+                                            $booked = $groupSeats->contains(fn ($member) => isset($bookedSeatLookup[$member->id]));
+                                            $maintenance = $groupSeats->contains(fn ($member) => $member->status !== 'active');
+                                            $invalidPair = (bool) ($seatGroup['is_couple'] ?? false)
+                                                && (! (bool) ($seatGroup['is_valid'] ?? false) || ! $isLayoutCoupleValid);
+                                            $disabled = $booked || $maintenance || $invalidPair;
+                                            $priceCalculation = $seatPrices[$seatGroup['type'] ?? $seat->type];
+                                            $price = $priceCalculation->finalAmount;
                                             $seatClass = match(true) {
                                                 $booked => 'border-slate-500 bg-slate-600/50 text-slate-300 cursor-not-allowed',
                                                 $maintenance => 'border-dashed border-warning/60 bg-warning/10 text-warning cursor-not-allowed',
-                                                $pairUnavailable => 'border-slate-500 bg-slate-600/50 text-slate-300 cursor-not-allowed',
+                                                $invalidPair => 'border-dashed border-error/70 bg-error/10 text-error cursor-not-allowed',
                                                 $seat->type === 'vip' => 'border-ai-start/60 bg-ai-start/10 text-ai-start hover:bg-ai-start/20',
                                                 $seat->type === 'couple' => 'border-warning/60 bg-warning/10 text-warning hover:bg-warning/20',
                                                 default => 'app-input app-muted app-border hover:border-brand-start hover:text-brand-start',
@@ -81,23 +97,38 @@
                                             $availability = match(true) {
                                                 $booked => 'đã có người giữ',
                                                 $maintenance => 'đang bảo trì',
-                                                $pairUnavailable => 'cặp ghế không khả dụng',
+                                                $invalidPair => 'dữ liệu cặp ghế không hợp lệ, không khả dụng',
                                                 default => 'còn trống',
                                             };
-                                            $typeLabel = $seatTypeLabels[$seat->type] ?? ucfirst($seat->type);
+                                            $type = $seatGroup['type'] ?? $seat->type;
+                                            $typeLabel = $seatTypeLabels[$type] ?? \App\Support\StatusLabel::for('seat_type', $type);
+                                            $seatCode = $seatGroup['seat_code'] ?? $seat->seat_code;
+                                            $seatIds = implode(',', $seatGroup['seat_ids'] ?? [$seat->id]);
+                                            $seatGeometry = $groupCells
+                                                ->sortBy('x_position')
+                                                ->map(fn ($groupCell) => $groupCell->seat_id.':'.$groupCell->x_position)
+                                                ->implode(',');
+                                            $preselected = !$disabled && $groupSeats->every(
+                                                fn ($member) => isset($selectedSeatLookup[$member->id])
+                                            );
                                         @endphp
                                         <button
                                             type="button"
-                                            class="checkout-seat seat-button flex items-center justify-center rounded-lg border px-1 text-[10px] font-extrabold transition {{ $seatClass }}"
-                                            data-seat-id="{{ $seat->id }}"
-                                            data-seat-code="{{ $seat->seat_code }}"
-                                            data-seat-type="{{ $seat->type }}"
+                                            class="checkout-seat seat-button flex items-center justify-center rounded-lg border px-1 text-[10px] font-extrabold transition {{ $isMergedCouple ? 'checkout-seat-couple col-span-2' : '' }} {{ $seatClass }}"
+                                            data-seat-ids="{{ $seatIds }}"
+                                            data-seat-code="{{ $seatCode }}"
+                                            data-seat-row-label="{{ $seat->row }}"
+                                            data-seat-type="{{ $type }}"
                                             data-pair-code="{{ $seat->pair_code }}"
+                                            data-seat-row="{{ $y }}"
+                                            data-seat-x="{{ $x }}"
+                                            data-seat-geometry="{{ $seatGeometry }}"
+                                            data-seat-available="{{ $disabled ? '0' : '1' }}"
                                             data-price="{{ $price }}"
-                                            aria-label="Ghế {{ $seat->seat_code }}, loại {{ $typeLabel }}, {{ $availability }}, {{ number_format($price, 0, ',', '.') }} VND"
-                                            aria-pressed="false"
+                                            aria-label="{{ $isMergedCouple ? 'Ghế đôi '.$seatCode : 'Ghế '.$seatCode }}, loại {{ $typeLabel }}, {{ $availability }}, {{ number_format($price, 0, ',', '.') }} VNĐ"
+                                            aria-pressed="{{ $preselected ? 'true' : 'false' }}"
                                             @disabled($disabled)
-                                        >{{ $seat->seat_code }}</button>
+                                        >{{ $seatCode }}</button>
                                     @endif
                                 @endfor
                             @endfor
@@ -119,6 +150,9 @@
                     <span class="flex items-center gap-2 text-warning"><i class="h-4 w-4 rounded border border-dashed border-warning/60" aria-hidden="true"></i>Bảo trì</span>
                     <span class="flex items-center gap-2"><i class="ph ph-arrows-down-up" aria-hidden="true"></i>Lối đi</span>
                 </div>
+                <details class="mt-4 rounded-xl border app-border p-4 text-sm app-muted"><summary class="cursor-pointer font-bold app-text">Giải thích giá vé</summary>
+                    @foreach($seatPrices as $type => $calculation)<div class="mt-3"><strong class="app-text">{{ $seatTypeLabels[$type] ?? $type }}: {{ number_format($calculation->finalAmount,0,',','.') }} VNĐ</strong><div>Giá cơ bản {{ number_format($calculation->baseAmount,0,',','.') }} VNĐ @foreach($calculation->surcharges as $item) · {{ $item['label'] }} {{ number_format($item['amount'],0,',','.') }} VNĐ @endforeach</div></div>@endforeach
+                </details>
             </section>
 
             <aside class="lg:col-span-1" aria-labelledby="booking-estimate-title">
@@ -128,9 +162,17 @@
                     <dl class="mt-5 space-y-3 text-sm">
                         <div class="flex justify-between gap-4"><dt class="app-muted">Phòng</dt><dd class="font-bold app-text">{{ $showtime->room->name }}</dd></div>
                         <div class="flex justify-between gap-4"><dt class="app-muted">Ghế</dt><dd id="selectedSeatsDisplay" class="text-right font-bold app-text" aria-live="polite">Chưa chọn</dd></div>
-                        <div class="flex justify-between gap-4 border-t pt-4 app-border"><dt class="app-muted">Tạm tính tiền ghế</dt><dd id="totalAmountDisplay" class="text-2xl font-extrabold text-brand-start" aria-live="polite">0 VND</dd></div>
+                        <div class="flex justify-between gap-4 border-t pt-4 app-border"><dt class="app-muted">Tạm tính tiền ghế</dt><dd id="totalAmountDisplay" class="text-2xl font-extrabold text-brand-start" aria-live="polite">0 VNĐ</dd></div>
                     </dl>
                     <button id="continueBookingButton" type="submit" form="seatForm" disabled class="btn-primary mt-5 w-full">Tiếp tục chọn đồ ăn</button>
+                    <p
+                        id="seatSelectionError"
+                        class="mt-3 rounded-xl border border-error/30 bg-error/10 px-3 py-2 text-sm font-semibold leading-relaxed text-error"
+                        role="alert"
+                        aria-live="polite"
+                        data-server-error="{{ $errors->has('seat_ids') ? 'true' : 'false' }}"
+                        @if(! $errors->has('seat_ids')) hidden @endif
+                    >{{ $errors->first('seat_ids') }}</p>
                     <p id="seatSelectionHint" class="mt-3 text-xs leading-relaxed app-muted">Ghế đôi sẽ được chọn hoặc bỏ chọn cả cặp. Giá và tình trạng ghế sẽ được máy chủ kiểm tra lại.</p>
                 </div>
             </aside>

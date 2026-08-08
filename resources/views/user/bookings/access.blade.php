@@ -14,7 +14,7 @@
 </head>
 <body>
 <main>
-    <h1>Đang xác minh quyền truy cập booking</h1>
+    <h1>Đang xác minh quyền truy cập đơn đặt vé</h1>
     <p id="status" role="status" aria-live="polite">MovieMate đang thiết lập phiên truy cập an toàn trên thiết bị này.</p>
     <noscript>Trình duyệt cần bật JavaScript để hoàn tất bước xác minh.</noscript>
 </main>

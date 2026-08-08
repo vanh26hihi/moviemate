@@ -13,4 +13,13 @@ class Permission extends Model
     {
         return $this->belongsToMany(Role::class)->withTimestamps();
     }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return str_ireplace(
+            ['dashboard', 'layout', 'booking', 'check-in'],
+            ['tổng quan', 'sơ đồ', 'đơn đặt vé', 'soát'],
+            $this->name
+        );
+    }
 }

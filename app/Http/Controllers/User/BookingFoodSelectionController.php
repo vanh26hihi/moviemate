@@ -9,6 +9,7 @@ use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -33,6 +34,7 @@ class BookingFoodSelectionController extends Controller
             'food_items' => ['sometimes', 'array'],
             'food_items.*.food_id' => ['required', 'integer', 'distinct', 'min:1'],
             'food_items.*.quantity' => ['required', 'integer', 'min:0', 'max:'.config('booking.max_food_quantity', 20)],
+            'checkout_action' => ['sometimes', Rule::in(['confirm_food', 'skip_food'])],
             'skip_food' => ['sometimes', 'boolean'],
             'pickup_cinema_id' => ['prohibited'],
             'seat_price' => ['prohibited'],
@@ -40,7 +42,9 @@ class BookingFoodSelectionController extends Controller
             'total_amount' => ['prohibited'],
         ]);
 
-        $food = ($validated['skip_food'] ?? false) ? [] : ($validated['food_items'] ?? []);
+        $action = $validated['checkout_action']
+            ?? (($validated['skip_food'] ?? false) ? 'skip_food' : 'confirm_food');
+        $food = $action === 'skip_food' ? [] : ($validated['food_items'] ?? []);
         $draft = $this->drafts->updateContactAndFood(
             $request,
             $validated['customer_email'],

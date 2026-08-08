@@ -9,6 +9,7 @@ use App\Exceptions\VnpayResponseException;
 use App\Exceptions\VnpayTransportException;
 use App\Models\Booking;
 use App\Models\Payment;
+use App\Services\BookingCancellationService;
 use App\Services\Vnpay\VnpayGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -19,45 +20,58 @@ class VnpayQueryService
         private readonly VnpayGateway $gateway,
         private readonly VnpayConfig $config,
         private readonly VerifiedPaymentService $verifiedPayments,
+        private readonly BookingCancellationService $cancellations,
     ) {}
 
     public function reconcile(Payment $payment): string
     {
-        if (! $this->beginQuery($payment)) {
+        return $this->reconcileEligiblePayment($payment, false);
+    }
+
+    public function reconcileReview(Payment $payment): string
+    {
+        return $this->reconcileEligiblePayment($payment, true);
+    }
+
+    private function reconcileEligiblePayment(
+        Payment $payment,
+        bool $allowReview,
+    ): string {
+        if (! $this->beginQuery($payment, $allowReview)) {
             return $payment->fresh()->status;
         }
 
         try {
             $response = $this->gateway->query($payment->fresh());
         } catch (VnpayAuthenticationException $exception) {
-            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_authentication_error');
+            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_authentication_error', allowReview: $allowReview);
         } catch (VnpayTransportException $exception) {
-            $this->applyOutcome($payment, Payment::STATUS_UNRESOLVED, 'query_transport_unknown');
+            $this->applyOutcome($payment, Payment::STATUS_UNRESOLVED, 'query_transport_unknown', allowReview: $allowReview);
             throw $exception;
         } catch (VnpayResponseException $exception) {
-            $this->applyOutcome($payment, Payment::STATUS_UNRESOLVED, 'query_response_unknown');
+            $this->applyOutcome($payment, Payment::STATUS_UNRESOLVED, 'query_response_unknown', allowReview: $allowReview);
             throw $exception;
         }
 
         $payload = $response->payload;
         if (($payload['vnp_TmnCode'] ?? null) !== $this->config->tmnCode
             || ($payload['vnp_TxnRef'] ?? null) !== $payment->order_code) {
-            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_identity_mismatch', $payload, $response->hash);
+            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_identity_mismatch', $payload, $response->hash, $allowReview);
         }
 
         $responseCode = $payload['vnp_ResponseCode'] ?? null;
         $transactionStatus = $payload['vnp_TransactionStatus'] ?? null;
         if (! is_string($responseCode) || ! is_string($transactionStatus)) {
-            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_response_schema_invalid', $payload, $response->hash);
+            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_response_schema_invalid', $payload, $response->hash, $allowReview);
+        }
+
+        $amount = $this->providerAmount($payload['vnp_Amount'] ?? null);
+        if ($amount === null || $amount !== (int) $payment->amount) {
+            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_amount_mismatch', $payload, $response->hash, $allowReview);
         }
 
         if ($responseCode === '00' && $transactionStatus === '00') {
-            $amount = $this->providerAmount($payload['vnp_Amount'] ?? null);
-            if ($amount === null) {
-                return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_amount_invalid', $payload, $response->hash);
-            }
-
-            $result = $this->verifiedPayments->verify($payment, new VerifiedPaymentData(
+            $verifiedData = new VerifiedPaymentData(
                 provider: 'vnpay',
                 merchantReference: $payment->order_code,
                 amount: $amount,
@@ -68,28 +82,60 @@ class VnpayQueryService
                 transactionStatus: $transactionStatus,
                 bankCode: $this->shortText($payload['vnp_BankCode'] ?? null, 20),
                 providerPaidAt: $this->payDate($payload['vnp_PayDate'] ?? null),
-            ));
+            );
+            $result = $allowReview
+                ? $this->verifiedPayments->verifyReview($payment, $verifiedData)
+                : $this->verifiedPayments->verify($payment, $verifiedData);
 
             return $result->accepted ? Payment::STATUS_SUCCESS : $payment->fresh()->status;
         }
 
         return match ($transactionStatus) {
-            '01' => $this->storePending($payment, $payload, $response->hash),
-            '02' => $this->applyOutcome($payment, Payment::STATUS_FAILED, 'query_failed', $payload, $response->hash),
-            '04', '07' => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_requires_review', $payload, $response->hash),
-            default => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_unknown_status', $payload, $response->hash),
+            '01' => $this->storePending($payment, $payload, $response->hash, $allowReview),
+            '02' => $this->applyTerminalFailure($payment, 'vnpay_terminal_failed', $payload, $response->hash, $allowReview),
+            '04', '07' => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_requires_review', $payload, $response->hash, $allowReview),
+            default => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_unknown_status', $payload, $response->hash, $allowReview),
         };
     }
 
-    private function beginQuery(Payment $payment): bool
+    /** @param array<string, string> $payload */
+    private function applyTerminalFailure(
+        Payment $payment,
+        string $reason,
+        array $payload,
+        string $hash,
+        bool $allowReview,
+    ): string {
+        $status = $this->applyOutcome(
+            $payment,
+            Payment::STATUS_FAILED,
+            $reason,
+            $payload,
+            $hash,
+            $allowReview,
+        );
+
+        if ($status === Payment::STATUS_FAILED) {
+            $this->cancellations->cancel(
+                $payment->booking_id,
+                $reason,
+                'booking.payment_cancelled',
+            );
+        }
+
+        return $status;
+    }
+
+    private function beginQuery(Payment $payment, bool $allowReview): bool
     {
-        return DB::transaction(function () use ($payment): bool {
+        return DB::transaction(function () use ($payment, $allowReview): bool {
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $locked = Payment::query()->lockForUpdate()->findOrFail($payment->id);
-            if (! in_array($locked->status, Payment::RECONCILABLE_STATUSES, true)) {
+            $isReview = $allowReview && $locked->status === Payment::STATUS_REVIEW;
+            if (! $isReview && ! in_array($locked->status, Payment::RECONCILABLE_STATUSES, true)) {
                 return false;
             }
-            if (! $locked->reconcile_until || $locked->reconcile_until->isPast()) {
+            if (! $isReview && (! $locked->reconcile_until || $locked->reconcile_until->isPast())) {
                 $locked->forceFill(['status' => Payment::STATUS_UNRESOLVED, 'failure_reason' => 'reconciliation_window_elapsed'])->save();
 
                 return false;
@@ -100,21 +146,28 @@ class VnpayQueryService
         });
     }
 
-    private function applyOutcome(Payment $payment, string $status, string $reason, ?array $payload = null, ?string $hash = null): string
-    {
-        return DB::transaction(function () use ($payment, $status, $reason, $payload, $hash): string {
+    private function applyOutcome(
+        Payment $payment,
+        string $status,
+        string $reason,
+        ?array $payload = null,
+        ?string $hash = null,
+        bool $allowReview = false,
+    ): string {
+        return DB::transaction(function () use ($payment, $status, $reason, $payload, $hash, $allowReview): string {
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $locked = Payment::query()->lockForUpdate()->findOrFail($payment->id);
             if ($locked->status === Payment::STATUS_SUCCESS) {
                 return Payment::STATUS_SUCCESS;
             }
-            if (! in_array($locked->status, Payment::RECONCILABLE_STATUSES, true)) {
+            $isReview = $allowReview && $locked->status === Payment::STATUS_REVIEW;
+            if (! $isReview && ! in_array($locked->status, Payment::RECONCILABLE_STATUSES, true)) {
                 return $locked->status;
             }
             $fields = [
-                'status' => $status,
+                'status' => $isReview ? Payment::STATUS_REVIEW : $status,
                 'failure_reason' => $reason,
-                'failed_at' => in_array($status, Payment::RECONCILABLE_STATUSES, true) ? null : now(),
+                'failed_at' => $isReview || ! in_array($status, Payment::RECONCILABLE_STATUSES, true) ? now() : null,
             ];
             if ($payload !== null) {
                 $fields += [
@@ -131,13 +184,14 @@ class VnpayQueryService
     }
 
     /** @param array<string, string> $payload */
-    private function storePending(Payment $payment, array $payload, string $hash): string
+    private function storePending(Payment $payment, array $payload, string $hash, bool $allowReview): string
     {
-        return DB::transaction(function () use ($payment, $payload, $hash): string {
+        return DB::transaction(function () use ($payment, $payload, $hash, $allowReview): string {
             Booking::query()->lockForUpdate()->findOrFail($payment->booking_id);
             $locked = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $isReview = $allowReview && $locked->status === Payment::STATUS_REVIEW;
             if ($locked->status === Payment::STATUS_SUCCESS
-                || ! in_array($locked->status, Payment::RECONCILABLE_STATUSES, true)) {
+                || (! $isReview && ! in_array($locked->status, Payment::RECONCILABLE_STATUSES, true))) {
                 return $locked->status;
             }
             $locked->forceFill([

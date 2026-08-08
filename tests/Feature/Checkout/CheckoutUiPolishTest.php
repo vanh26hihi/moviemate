@@ -55,7 +55,9 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee('max="20"', false)
             ->assertSee('data-quantity-decrease', false)
             ->assertSee('data-quantity-increase', false)
-            ->assertSee('Bỏ qua đồ ăn')
+            ->assertDontSee('Bỏ qua đồ ăn')
+            ->assertSee('Tiếp tục thanh toán')
+            ->assertSee('Quay lại chọn ghế')
             ->assertDontSee('name="total_amount"', false);
 
         $this->post(route('user.bookings.food.store'), [
@@ -69,11 +71,13 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee($scenario['movie']->title)
             ->assertSee($scenario['room']->name)
             ->assertSee('Ghế <strong>A1</strong> · Thường', false)
-            ->assertSee('50.000 VND')
+            ->assertSee('50.000 VNĐ')
             ->assertSee('Không chọn đồ ăn')
             ->assertSee('ZaloPay')
+            ->assertSee('payOS — Chuyển khoản ngân hàng / VietQR')
+            ->assertSee('value="payos"', false)
             ->assertSee('mobile@example.test')
-            ->assertSee('Thời gian phiên checkout còn lại')
+            ->assertSee('Thời gian phiên đặt vé còn lại')
             ->assertDontSee('name="total_amount"', false)
             ->assertDontSee('name="payment_status"', false);
     }
@@ -83,11 +87,11 @@ class CheckoutUiPolishTest extends PaymentTestCase
         $this->seedRbac();
         $user = $this->userWithRole('user');
         $cases = [
-            ['pending', Payment::STATUS_PENDING, 'pending_payment', 'unpaid', 'Đang chờ xác minh thanh toán', 'user.bookings.pending'],
-            ['review', Payment::STATUS_REVIEW, 'pending_payment', 'unpaid', 'Giao dịch đang được đối soát', 'user.bookings.payment-review'],
-            ['failed', Payment::STATUS_FAILED, 'pending_payment', 'unpaid', 'Thanh toán không thành công', 'user.bookings.failed'],
-            ['expired', Payment::STATUS_EXPIRED, 'expired', 'unpaid', 'Booking đã hết hạn', 'user.bookings.expired'],
-            ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Booking đã bị hủy', 'user.bookings.success'],
+            ['pending', Payment::STATUS_PENDING, 'pending_payment', 'unpaid', 'Đang xác minh kết quả thanh toán', 'user.bookings.pending'],
+            ['review', Payment::STATUS_REVIEW, 'pending_payment', 'unpaid', 'Giao dịch cần được hỗ trợ', 'user.bookings.payment-review'],
+            ['pending', Payment::STATUS_FAILED, 'pending_payment', 'unpaid', 'Đang xác minh kết quả thanh toán', 'user.bookings.failed'],
+            ['expired', Payment::STATUS_EXPIRED, 'expired', 'unpaid', 'Đơn đặt vé đã hết hạn', 'user.bookings.expired'],
+            ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Thanh toán đã được hủy', 'user.bookings.success'],
             ['used', Payment::STATUS_SUCCESS, 'used', 'paid', 'Vé đã được sử dụng', 'user.bookings.success'],
         ];
 
@@ -107,7 +111,7 @@ class CheckoutUiPolishTest extends PaymentTestCase
                 ->assertSee($message)
                 ->assertDontSee('data-paid-ticket-link', false)
                 ->assertDontSee('data-qr-value', false)
-                ->assertDontSee('data-ticket-download', false);
+                ->assertDontSee('data-print-ticket', false);
         }
     }
 
@@ -159,17 +163,17 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ->assertSee('data-paid-ticket-link', false)
             ->assertSee($booking->booking_code)
             ->assertSee('Bắp rang caramel')
-            ->assertSee('90.000 VND')
+            ->assertSee('90.000 VNĐ')
             ->assertDontSee('api.qrserver.com', false);
 
         $this->actingAs($user)->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertSee('data-ticket-state="usable"', false)
-            ->assertSee('data-qr-value="'.$booking->booking_code.'"', false)
-            ->assertSee('data-ticket-download', false)
+            ->assertSee('data-qr-value="v1.', false)
+            ->assertDontSee('data-print-ticket', false)
             ->assertSee('A1')
             ->assertSee('Bắp rang caramel')
-            ->assertSee('90.000 VND')
+            ->assertSee('90.000 VNĐ')
             ->assertDontSee('api.qrserver.com', false);
     }
 

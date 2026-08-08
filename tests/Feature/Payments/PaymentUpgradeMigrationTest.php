@@ -128,7 +128,11 @@ class PaymentUpgradeMigrationTest extends PaymentTestCase
 
     public function test_duplicate_unresolved_and_review_group_aborts_with_actionable_safe_details(): void
     {
+        $crossProviderMigration = require database_path(
+            'migrations/2026_08_07_300000_enforce_single_active_payment_attempt_per_booking.php',
+        );
         $migration = $this->upgradeMigration();
+        $crossProviderMigration->down();
         $migration->down();
         $booking = $this->payableBooking();
         $first = $this->pendingPayment($booking, ['status' => Payment::STATUS_UNRESOLVED]);
@@ -149,6 +153,10 @@ class PaymentUpgradeMigrationTest extends PaymentTestCase
 
         $this->assertSame($statuses, DB::table('payments')->orderBy('id')->pluck('status', 'id')->all());
         $this->assertExpression(self::OLD);
+
+        DB::table('payments')->where('id', $second->id)->delete();
+        $migration->up();
+        $crossProviderMigration->up();
     }
 
     #[DataProvider('blockingStatuses')]

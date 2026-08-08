@@ -7,32 +7,25 @@ use App\Http\Requests\Admin\SaveRoomLayoutRequest;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
-use App\Services\CinemaContext;
+use App\Services\ActivityLogger;
+use App\Services\CinemaAccessService;
 use App\Services\RoomLayoutService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SeatController extends Controller
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
-        private readonly RoomLayoutService $layouts
+        private readonly CinemaAccessService $cinemaAccess,
+        private readonly RoomLayoutService $layouts,
+        private readonly ActivityLogger $activityLogger,
     ) {}
 
-    public function index(Request $request)
+    public function index(): RedirectResponse
     {
-        $rooms = $this->operationalRooms();
-        $roomId = $request->query('room_id');
-        $query = Seat::query()->with(['room.cinema'])->whereHas('room', fn ($query) => $query
-            ->where('cinema_id', $this->cinemaContext->id())->where('status', 'active'));
-
-        if ($roomId && $rooms->contains('id', (int) $roomId)) {
-            $query->where('room_id', $roomId);
-        }
-
-        $seats = $query->orderBy('room_id')->orderBy('row')->orderBy('number')->paginate(30)->withQueryString();
-
-        return view('admin.seats.index', compact('seats', 'rooms', 'roomId'));
+        return redirect()->route('admin.rooms.index');
     }
 
     public function manage(Room $room)
@@ -46,10 +39,13 @@ class SeatController extends Controller
     {
         $this->assertOperationalRoom($room);
         $room->load('cinema');
-        $layout = $room->draftLayout()->with('cells.seat')->first()
-            ?? $room->latestPublishedLayout()->with('cells.seat')->first();
+        $seatRelation = fn ($query) => $query->withCount('bookingSeats');
+        $layout = $room->draftLayout()->with(['cells.seat' => $seatRelation])->first()
+            ?? $room->latestPublishedLayout()->with(['cells.seat' => $seatRelation])->first();
+        $roomSeatCodes = Seat::query()->where('room_id', $room->id)->pluck('seat_code')->values();
+        $layoutSummary = $this->layoutSummary($layout);
 
-        return view('admin.rooms.layout', compact('room', 'layout'));
+        return view('admin.rooms.layout', compact('room', 'layout', 'roomSeatCodes', 'layoutSummary'));
     }
 
     public function createDraft(Request $request, Room $room)
@@ -59,21 +55,23 @@ class SeatController extends Controller
             'rows' => ['nullable', 'integer', 'min:1', 'max:30'],
             'columns' => ['nullable', 'integer', 'min:1', 'max:40'],
             'screen_position' => ['nullable', 'in:top,bottom'],
+            'name' => ['nullable', 'string', 'min:5', 'max:255'],
         ]);
 
         if ($this->layouts->latestPublishedFor($room)) {
-            $this->layouts->clonePublishedToDraft($room, Auth::id());
+            $this->layouts->clonePublishedToDraft($room, Auth::id(), $validated['name'] ?? null);
         } else {
             $this->layouts->createBlankDraft(
                 $room,
                 Auth::id(),
                 (int) ($validated['rows'] ?? 10),
                 (int) ($validated['columns'] ?? 12),
-                (string) ($validated['screen_position'] ?? 'top')
+                (string) ($validated['screen_position'] ?? 'top'),
+                $validated['name'] ?? null,
             );
         }
 
-        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã tạo layout nháp.');
+        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã tạo bản nháp sơ đồ ghế.');
     }
 
     public function saveDraft(SaveRoomLayoutRequest $request, Room $room)
@@ -82,22 +80,37 @@ class SeatController extends Controller
         $draft = $room->draftLayout()->firstOrFail();
         $this->layouts->saveDraft($draft, $request->validated('layout'), Auth::id());
 
-        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã lưu layout nháp.');
+        return redirect()->route('admin.rooms.layout.show', $room)->with('success', 'Đã lưu bản nháp sơ đồ ghế.');
     }
 
     public function publish(Room $room)
     {
         $this->assertOperationalRoom($room);
         $draft = $room->draftLayout()->firstOrFail();
-        $published = $this->layouts->publish($draft, Auth::id());
+        $published = DB::transaction(function () use ($draft): RoomLayout {
+            $published = $this->layouts->publish($draft, Auth::id());
+            $this->activityLogger->log(
+                'room_layout.published',
+                $published,
+                ['status' => 'draft', 'layout_version' => $draft->version],
+                ['status' => $published->status, 'layout_version' => $published->version],
+                [
+                    'room_id' => $published->room_id,
+                    'layout_id' => $published->id,
+                    'seat_count' => $published->cells()->where('cell_type', 'seat')->count(),
+                ],
+            );
+
+            return $published;
+        });
 
         return redirect()->route('admin.rooms.layout.show', $room)
-            ->with('success', "Đã publish layout v{$published->version}.");
+            ->with('success', "Đã phát hành {$published->display_name}.");
     }
 
     public function preview(Request $request, Room $room)
     {
-        $this->assertOperationalRoom($room);
+        $this->assertManagedRoom($room);
         $layout = RoomLayout::query()->with('cells.seat')
             ->where('room_id', $room->id)
             ->when($request->integer('version'), fn ($query, $version) => $query->where('version', $version))
@@ -113,30 +126,41 @@ class SeatController extends Controller
         $this->assertOperationalRoom($room);
 
         return redirect()->route('admin.rooms.layout.show', $room)
-            ->with('warning', 'Trình tạo ma trận ghế cũ đã ngừng sử dụng. Hãy dùng Dynamic Layout Editor.');
-    }
-
-    public function update(Request $request, Seat $seat)
-    {
-        $seat->loadMissing('room');
-        $this->assertOperationalRoom($seat->room);
-        $validated = $request->validate([
-            'type' => ['required', 'in:normal,vip,couple'],
-            'status' => ['required', 'in:active,maintenance,inactive,retired'],
-        ]);
-        $seat->update($validated);
-
-        return back()->with('success', 'Cập nhật trạng thái ghế thành công.');
-    }
-
-    private function operationalRooms()
-    {
-        return Room::query()->with('cinema')->where('cinema_id', $this->cinemaContext->id())
-            ->operational()->orderBy('code')->get();
+            ->with('warning', 'Trình tạo ma trận ghế cũ đã ngừng sử dụng. Hãy dùng trình thiết kế sơ đồ ghế mới.');
     }
 
     private function assertOperationalRoom(Room $room): void
     {
-        abort_unless($room->cinema_id === $this->cinemaContext->id() && $room->status === 'active', 404);
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $room->cinema_id);
+        abort_unless($room->status === 'active', 404);
+    }
+
+    private function assertManagedRoom(Room $room): void
+    {
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $room->cinema_id);
+    }
+
+    private function layoutSummary(?RoomLayout $layout): array
+    {
+        if (! $layout) {
+            return [];
+        }
+
+        $seats = $layout->cells->where('cell_type', 'seat')->pluck('seat')->filter();
+        $used = $layout->cells->count();
+
+        return [
+            'rows' => $layout->rows,
+            'columns' => $layout->columns,
+            'used' => $used,
+            'empty' => max(0, ($layout->rows * $layout->columns) - $used),
+            'normal' => $seats->where('type', 'normal')->count(),
+            'vip' => $seats->where('type', 'vip')->count(),
+            'couple_pairs' => $seats->where('type', 'couple')->pluck('pair_code')->filter()->unique()->count(),
+            'aisles' => $layout->cells->where('cell_type', 'aisle')->count(),
+            'maintenance' => $seats->where('status', 'maintenance')->count(),
+            'inactive' => $seats->whereIn('status', ['inactive', 'retired'])->count(),
+            'capacity' => $seats->where('status', 'active')->count(),
+        ];
     }
 }
