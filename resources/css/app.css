@@ -318,6 +318,43 @@ html.light {
     margin-bottom: 0.5rem;
 }
 
+.room-type-modal-overlay {
+    background-color: rgba(0, 0, 0, 0.76);
+}
+
+.room-type-modal-panel {
+    background-color: var(--app-card);
+    border-color: color-mix(in srgb, var(--app-text) 16%, transparent);
+    box-shadow: 0 28px 90px rgba(0, 0, 0, 0.68);
+    isolation: isolate;
+}
+
+.pricing-field-state {
+    border: 1px solid transparent;
+    border-radius: 0.9rem;
+    min-width: 0;
+    padding: 0.75rem;
+    transition: background-color .2s ease, border-color .2s ease;
+}
+
+.pricing-field-state.is-relevant {
+    background-color: color-mix(in srgb, var(--primary-from) 7%, transparent);
+    border-color: color-mix(in srgb, var(--primary-from) 28%, transparent);
+}
+
+.pricing-field-state.is-inactive > .cinema-label,
+.pricing-field-state.is-inactive legend {
+    color: var(--app-text-muted);
+}
+
+.pricing-field-state.is-inactive .cinema-input:disabled {
+    background-color: var(--app-bg-soft);
+    border-color: var(--app-border);
+    color: var(--app-text-muted);
+    cursor: not-allowed;
+    opacity: 1;
+}
+
 .btn-primary {
     display: inline-flex;
     align-items: center;

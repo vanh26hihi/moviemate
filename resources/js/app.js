@@ -351,6 +351,36 @@ if (document.documentElement.dataset.flashDismissInitialized !== 'true') {
 
 const modalTriggers = new WeakMap();
 const modalFocusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+let modalScrollState = null;
+
+function lockModalBackgroundScroll() {
+    if (modalScrollState !== null) return;
+
+    const appScrollContainer = document.querySelector('[data-app-scroll-container]');
+    modalScrollState = {
+        bodyHadOverflowHidden: document.body.classList.contains('overflow-hidden'),
+        bodyOverflow: document.body.style.overflow,
+        documentOverflow: document.documentElement.style.overflow,
+        appScrollContainer,
+        appScrollOverflow: appScrollContainer instanceof HTMLElement ? appScrollContainer.style.overflow : '',
+    };
+    document.body.classList.add('overflow-hidden');
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    if (appScrollContainer instanceof HTMLElement) appScrollContainer.style.overflow = 'hidden';
+}
+
+function restoreModalBackgroundScroll() {
+    if (modalScrollState === null || document.querySelector('[data-modal]:not([hidden])')) return;
+
+    document.body.classList.toggle('overflow-hidden', modalScrollState.bodyHadOverflowHidden);
+    document.body.style.overflow = modalScrollState.bodyOverflow;
+    document.documentElement.style.overflow = modalScrollState.documentOverflow;
+    if (modalScrollState.appScrollContainer instanceof HTMLElement) {
+        modalScrollState.appScrollContainer.style.overflow = modalScrollState.appScrollOverflow;
+    }
+    modalScrollState = null;
+}
 
 function openModal(modal, trigger) {
     if (!(modal instanceof HTMLElement)) return;
@@ -359,7 +389,7 @@ function openModal(modal, trigger) {
     modal.hidden = false;
     modal.classList.remove('hidden');
     modal.classList.add('grid');
-    document.body.classList.add('overflow-hidden');
+    lockModalBackgroundScroll();
     const initialFocus = modal.querySelector('[data-modal-initial-focus]')
         || modal.querySelector(modalFocusableSelector)
         || modal.querySelector('[data-modal-panel]');
@@ -372,7 +402,7 @@ function closeModal(modal) {
     modal.hidden = true;
     modal.classList.add('hidden');
     modal.classList.remove('grid');
-    document.body.classList.toggle('overflow-hidden', Boolean(document.querySelector('[data-modal]:not([hidden])')));
+    restoreModalBackgroundScroll();
     const trigger = modalTriggers.get(modal);
     if (trigger instanceof HTMLElement) trigger.focus();
     modalTriggers.delete(modal);
@@ -495,8 +525,8 @@ document.addEventListener('change', (event) => {
     if (!(select instanceof HTMLSelectElement) || select.value !== '__create_room_type__') return;
 
     select.value = select.dataset.previousValue || '';
-    const trigger = document.querySelector(`[data-room-type-modal-trigger="${CSS.escape(select.dataset.roomTypeModal || '')}"]`);
-    trigger?.click();
+    const modal = document.getElementById(select.dataset.roomTypeModalId || '');
+    openModal(modal, select);
 });
 
 document.addEventListener('input', (event) => {
@@ -521,28 +551,63 @@ document.addEventListener('submit', async (event) => {
     if (!(form instanceof HTMLFormElement)) return;
 
     event.preventDefault();
+    if (form.dataset.submitting === 'true') return;
+
     const submit = form.querySelector('[type="submit"]');
     const errors = form.querySelector('[data-room-type-errors]');
+    const idleLabel = submit?.querySelector('[data-submit-idle]');
+    const loadingLabel = submit?.querySelector('[data-submit-loading]');
+    const genericFailureMessage = 'Không thể thêm loại phòng lúc này. Vui lòng thử lại.';
+    const validationFailureMessage = 'Vui lòng kiểm tra lại thông tin loại phòng.';
+    form.dataset.submitting = 'true';
+    form.setAttribute('aria-busy', 'true');
     if (submit instanceof HTMLButtonElement) submit.disabled = true;
+    if (idleLabel instanceof HTMLElement) idleLabel.hidden = true;
+    if (loadingLabel instanceof HTMLElement) loadingLabel.hidden = false;
     if (errors instanceof HTMLElement) {
         errors.hidden = true;
         errors.textContent = '';
     }
+    form.querySelectorAll('[data-room-type-field-error]').forEach((element) => {
+        element.hidden = true;
+        element.textContent = '';
+    });
 
     try {
+        const body = new FormData(form);
+        body.set('name', String(body.get('room_type_display_name') || '').trim());
+        body.set('code', String(body.get('room_type_code') || '').trim());
+        body.set('description', String(body.get('room_type_description') || '').trim());
+        body.delete('room_type_display_name');
+        body.delete('room_type_code');
+        body.delete('room_type_description');
         const response = await fetch(form.action, {
             method: 'POST',
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            body: new FormData(form),
+            body,
             credentials: 'same-origin',
         });
-        const data = await response.json();
+        const data = response.headers.get('content-type')?.includes('application/json')
+            ? await response.json()
+            : {};
         if (!response.ok) {
-            const message = Object.values(data.errors || {}).flat()[0] || data.message || 'Không thể thêm loại phòng.';
-            throw new Error(message);
+            if (response.status === 422 && data.errors && typeof data.errors === 'object') {
+                Object.entries(data.errors).forEach(([field, messages]) => {
+                    const fieldError = form.querySelector(`[data-room-type-field-error="${CSS.escape(field)}"]`);
+                    if (fieldError instanceof HTMLElement) {
+                        fieldError.textContent = Array.isArray(messages) ? String(messages[0] || '') : String(messages);
+                        fieldError.hidden = false;
+                    }
+                });
+                throw new Error(validationFailureMessage);
+            }
+            throw new Error(genericFailureMessage);
         }
 
         const roomType = data.room_type;
+        if (!roomType || typeof roomType.code !== 'string' || typeof roomType.name !== 'string') {
+            throw new Error(genericFailureMessage);
+        }
         document.querySelectorAll('[data-room-type-select]').forEach((select) => {
             if (!(select instanceof HTMLSelectElement)) return;
             let option = Array.from(select.options).find((item) => item.value === roomType.code);
@@ -551,7 +616,16 @@ document.addEventListener('submit', async (event) => {
                 const createIndex = Array.from(select.options).findIndex((item) => item.value === '__create_room_type__');
                 select.add(option, createIndex > 0 ? createIndex - 1 : undefined);
             }
-            if (select.id === form.dataset.roomTypeTarget) select.value = roomType.code;
+            if (select.id === form.dataset.roomTypeTarget) {
+                select.value = roomType.code;
+                select.dataset.previousValue = roomType.code;
+                const success = select.closest('[data-room-type-selector]')?.querySelector('[data-room-type-success]');
+                if (success instanceof HTMLElement) {
+                    success.textContent = `Đã thêm loại phòng ${roomType.name}.`;
+                    success.hidden = false;
+                    window.setTimeout(() => { success.hidden = true; }, 5000);
+                }
+            }
         });
         const modal = form.closest('[data-modal]');
         form.reset();
@@ -561,22 +635,36 @@ document.addEventListener('submit', async (event) => {
         document.getElementById(form.dataset.roomTypeTarget || '')?.focus();
     } catch (error) {
         if (errors instanceof HTMLElement) {
-            errors.textContent = error instanceof Error ? error.message : 'Không thể thêm loại phòng.';
+            errors.textContent = error instanceof Error && error.message === validationFailureMessage
+                ? validationFailureMessage
+                : genericFailureMessage;
             errors.hidden = false;
         }
     } finally {
         if (submit instanceof HTMLButtonElement) submit.disabled = false;
+        if (idleLabel instanceof HTMLElement) idleLabel.hidden = false;
+        if (loadingLabel instanceof HTMLElement) loadingLabel.hidden = true;
+        form.removeAttribute('aria-busy');
+        delete form.dataset.submitting;
     }
 });
 
 function refreshPricingRuleForm(form) {
     const type = form.querySelector('[data-pricing-rule-type]')?.value;
-    form.querySelectorAll('[data-pricing-dimension]').forEach((section) => {
-        const relatedTypes = (section.dataset.pricingDimension || '').split(/\s+/);
+    form.querySelectorAll('[data-pricing-conditional]').forEach((section) => {
+        const relatedTypes = (section.dataset.pricingConditional || '').split(/\s+/);
         const relevant = relatedTypes.includes(type);
-        section.classList.toggle('opacity-50', !relevant);
-        section.classList.toggle('ring-2', relevant);
-        section.classList.toggle('ring-brand-start/30', relevant);
+        section.classList.toggle('is-relevant', relevant);
+        section.classList.toggle('is-inactive', !relevant);
+        section.querySelectorAll('input, select, textarea').forEach((field) => {
+            field.disabled = !relevant;
+            field.setAttribute('aria-disabled', String(!relevant));
+        });
+        const help = section.querySelector('[data-pricing-inactive-help]');
+        if (help instanceof HTMLElement) help.hidden = relevant;
+    });
+    form.querySelectorAll('[data-pricing-highlight]').forEach((section) => {
+        section.classList.toggle('is-relevant', (section.dataset.pricingHighlight || '').split(/\s+/).includes(type));
     });
 
     const requiredFields = {
@@ -595,8 +683,8 @@ function refreshPricingRuleForm(form) {
         if (field instanceof HTMLElement) field.setAttribute('required', 'required');
     });
 
-    const amountLabel = form.querySelector('label[for="amount_vnd"]');
-    if (amountLabel) amountLabel.firstChild.textContent = type === 'base' ? 'Giá vé cơ bản (VNĐ)' : 'Mức điều chỉnh (VNĐ)';
+    const amountLabel = form.querySelector('[data-pricing-amount-label]');
+    if (amountLabel) amountLabel.textContent = type === 'base' ? 'Giá vé cơ bản (VNĐ)' : 'Mức phụ thu/điều chỉnh (VNĐ)';
 }
 
 document.querySelectorAll('[data-pricing-rule-form]').forEach(refreshPricingRuleForm);

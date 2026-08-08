@@ -41,10 +41,10 @@ class ManagedRoomTypesTest extends TestCase
         $admin = $this->userWithRole('admin');
         $manager = $this->userWithRole('manager');
 
-        $this->actingAs($admin)->post(route('admin.room-types.store'), [
+        $this->actingAs($admin)->postJson(route('admin.room-types.store'), [
             'name' => 'ScreenX', 'code' => 'screenx', 'description' => 'Ba mặt chiếu',
             'is_active' => '1', 'sort_order' => 40,
-        ])->assertRedirect(route('admin.room-types.index'));
+        ])->assertCreated()->assertJsonPath('room_type.code', 'SCREENX')->assertJsonPath('room_type.name', 'ScreenX');
 
         $type = RoomType::query()->where('code', 'SCREENX')->sole();
         $this->assertDatabaseHas('activity_logs', ['action' => 'room_type.created', 'subject_id' => (string) $type->id]);
@@ -153,19 +153,117 @@ class ManagedRoomTypesTest extends TestCase
     {
         $admin = $this->userWithRole('admin');
         $room = Room::factory()->create();
+        $pricingRule = CinemaPricingRule::query()->create($this->rulePayload());
         DB::enableQueryLog();
 
         foreach ([
             route('admin.pricing-rules.index'),
+            route('admin.pricing-rules.create'),
+            route('admin.pricing-rules.edit', $pricingRule),
             route('admin.rooms.create'),
             route('admin.rooms.edit', $room),
             route('admin.room-types.index'),
         ] as $url) {
             DB::flushQueryLog();
             $this->actingAs($admin)->get($url)->assertOk();
-            $this->assertLessThanOrEqual(30, count(DB::getQueryLog()), "Query budget exceeded for {$url}");
+            $queryCount = count(DB::getQueryLog());
+            $this->assertLessThanOrEqual(30, $queryCount, "Query budget exceeded for {$url}");
         }
         DB::disableQueryLog();
+    }
+
+    public function test_pricing_edit_keeps_an_archived_room_type_selected_and_available(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $type = RoomType::query()->create([
+            'code' => 'SCREENX_QA',
+            'name' => 'ScreenX QA',
+            'is_active' => false,
+        ]);
+        $rule = CinemaPricingRule::query()->create($this->rulePayload([
+            'name' => 'Phụ thu ScreenX QA',
+            'rule_type' => 'room_type',
+            'room_type' => $type->code,
+        ]));
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.pricing-rules.edit', $rule))
+            ->assertOk();
+
+        $response->assertSee('value="SCREENX_QA" selected', false)
+            ->assertSee('ScreenX QA')
+            ->assertSee('Đã ngừng sử dụng')
+            ->assertSee('data-room-type-modal', false);
+    }
+
+    public function test_room_type_modal_has_accessible_opaque_autocomplete_safe_contract_and_is_reused(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $room = Room::factory()->create();
+        $pricingRule = CinemaPricingRule::query()->create($this->rulePayload());
+
+        foreach ([
+            route('admin.pricing-rules.create'),
+            route('admin.pricing-rules.edit', $pricingRule),
+            route('admin.rooms.create'),
+            route('admin.rooms.edit', $room),
+        ] as $url) {
+            $html = $this->actingAs($admin)->get($url)->assertOk()->getContent();
+
+            $this->assertStringContainsString('role="dialog"', $html);
+            $this->assertStringContainsString('aria-modal="true"', $html);
+            $this->assertStringContainsString('aria-labelledby="add-room-type-', $html);
+            $this->assertStringContainsString('aria-describedby="add-room-type-', $html);
+            $this->assertStringContainsString('data-room-type-modal', $html);
+            $this->assertStringContainsString('data-room-type-modal-id="add-room-type-', $html);
+            $this->assertStringContainsString('room-type-modal-overlay', $html);
+            $this->assertStringContainsString('room-type-modal-panel', $html);
+            $this->assertStringContainsString('fixed inset-0 hidden place-items-center', $html);
+            $this->assertStringContainsString('aria-label="Đóng"', $html);
+            $this->assertStringContainsString('autocomplete="off"', $html);
+            $this->assertStringContainsString('name="room_type_display_name"', $html);
+            $this->assertStringContainsString('name="room_type_code"', $html);
+            $this->assertStringContainsString('name="room_type_description"', $html);
+            $this->assertStringContainsString('action="'.route('admin.room-types.store').'"', $html);
+            $this->assertStringContainsString('name="_token"', $html);
+            $this->assertStringContainsString('data-submit-loading', $html);
+        }
+
+        $pricingHtml = $this->actingAs($admin)->get(route('admin.pricing-rules.create'))->getContent();
+        $pricingFormEnd = strpos($pricingHtml, '</form>', strpos($pricingHtml, 'data-pricing-rule-form'));
+        $modalFormStart = strpos($pricingHtml, 'data-room-type-create-form');
+        $this->assertIsInt($pricingFormEnd);
+        $this->assertIsInt($modalFormStart);
+        $this->assertGreaterThan($pricingFormEnd, $modalFormStart, 'Room-type form must be portaled outside the pricing form.');
+    }
+
+    public function test_pricing_form_exposes_all_conditional_disabled_state_contracts_without_engine_changes(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $response = $this->actingAs($admin)->get(route('admin.pricing-rules.create'))->assertOk();
+
+        foreach (CinemaPricingRule::TYPES as $type) {
+            $response->assertSee('value="'.$type.'"', false);
+        }
+        foreach (['seat_type', 'room_type', 'time_window', 'weekend', 'holiday'] as $type) {
+            $response->assertSee('data-pricing-conditional="'.$type.'"', false);
+        }
+        $response->assertSee('data-pricing-highlight="cinema_adjustment"', false)
+            ->assertSee('data-pricing-highlight="room_adjustment"', false)
+            ->assertSee('data-pricing-amount-label', false)
+            ->assertSee('Không áp dụng cho loại quy tắc này.');
+
+        $javascript = file_get_contents(resource_path('js/app.js'));
+        $this->assertStringContainsString('field.disabled = !relevant', $javascript);
+        $this->assertStringContainsString("field.setAttribute('aria-disabled', String(!relevant))", $javascript);
+        $this->assertStringContainsString("seat_type: 'seat_type'", $javascript);
+        $this->assertStringContainsString("room_type: 'room_type'", $javascript);
+        $this->assertStringContainsString("time_window: ['time_start', 'time_end']", $javascript);
+        $this->assertStringContainsString("holiday: 'date_start'", $javascript);
+        $this->assertStringContainsString('Mức phụ thu/điều chỉnh (VNĐ)', $javascript);
+        $this->assertStringContainsString('genericFailureMessage', $javascript);
+        $this->assertStringNotContainsString('data.message', $javascript);
+        $this->assertStringNotContainsString('TicketPricingService', $javascript);
     }
 
     /** @param array<string, mixed> $overrides */
