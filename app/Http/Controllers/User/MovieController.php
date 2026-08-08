@@ -3,20 +3,15 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
-use App\Models\Cinema;
 use App\Models\Genre;
 use App\Models\Movie;
-use App\Services\CinemaContext;
-use App\Services\PublicShowtimeCatalog;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use App\Models\Seat;
+use App\Models\BookingSeat;
 
 class MovieController extends Controller
 {
-    public function __construct(
-        private readonly CinemaContext $cinemaContext,
-        private readonly PublicShowtimeCatalog $catalog,
-    ) {}
-
     /**
      * Hiển thị danh sách phim cho người dùng.
      */
@@ -26,23 +21,7 @@ class MovieController extends Controller
             ->with('genres')
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
-            ->whereIn('status', Movie::PUBLIC_STATUSES);
-
-        $selectedCinema = null;
-        if ($request->filled('cinema')) {
-            $selectedCinema = Cinema::query()->active()->where('code', mb_strtoupper((string) $request->query('cinema')))->firstOrFail();
-        }
-        $selectedDate = $this->catalog->date($request->query('date'), $selectedCinema);
-        if ($selectedCinema || $request->filled('date')) {
-            $availableMovieIds = $this->catalog->forDate($selectedDate, $selectedCinema)->pluck('movie_id')->unique();
-            $query->whereIn('id', $availableMovieIds);
-        }
-        $preferredCinema = $this->cinemaContext->preference();
-        if (! $selectedCinema && $preferredCinema) {
-            $query->withExists(['showtimes as preferred_branch_available' => fn ($showtimes) => $showtimes
-                ->where('cinema_id', $preferredCinema->id)->where('status', 'active')->whereDate('show_date', $selectedDate)])
-                ->orderByDesc('preferred_branch_available');
-        }
+            ->whereIn('status', ['now_showing', 'coming_soon']);
 
         /*
         |--------------------------------------------------------------------------
@@ -69,7 +48,7 @@ class MovieController extends Controller
         */
         $status = $request->query('status');
 
-        if (in_array($status, Movie::PUBLIC_STATUSES, true)) {
+        if (in_array($status, ['now_showing', 'coming_soon'], true)) {
             $query->where('status', $status);
         }
 
@@ -98,6 +77,17 @@ class MovieController extends Controller
 
         if ($country) {
             $query->where('country', $country);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Lọc theo độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRating = $request->query('age_rating');
+
+        if ($ageRating) {
+            $query->where('age_rating', $ageRating);
         }
 
         /*
@@ -156,12 +146,25 @@ class MovieController extends Controller
         |--------------------------------------------------------------------------
         */
         $countries = Movie::query()
-            ->whereIn('status', Movie::PUBLIC_STATUSES)
+            ->whereIn('status', ['now_showing', 'coming_soon'])
             ->whereNotNull('country')
             ->where('country', '!=', '')
             ->distinct()
             ->orderBy('country')
             ->pluck('country');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Danh sách độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRatings = Movie::query()
+            ->whereIn('status', ['now_showing', 'coming_soon'])
+            ->whereNotNull('age_rating')
+            ->where('age_rating', '!=', '')
+            ->distinct()
+            ->orderBy('age_rating')
+            ->pluck('age_rating');
 
         /*
         |--------------------------------------------------------------------------
@@ -178,51 +181,89 @@ class MovieController extends Controller
             'movies',
             'genres',
             'countries',
+            'ageRatings',
             'pageTitle',
-            'search',
-            'selectedCinema',
-            'selectedDate'
-        ) + [
-            'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name']),
-            'dates' => $this->catalog->dates($selectedCinema),
-            'preferredCinema' => $preferredCinema,
-        ]);
+            'search'
+        ));
     }
 
     /**
      * Hiển thị chi tiết phim theo slug.
      */
-    public function show(Request $request, string $slug)
+    public function show(string $slug)
     {
+        $today = now()
+            ->timezone('Asia/Ho_Chi_Minh')
+            ->toDateString();
+
         $movie = Movie::query()
             ->where('slug', $slug)
-            ->whereIn('status', PublicShowtimeCatalog::MOVIE_STATUSES)
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
-            ->with('genres')
+            ->with([
+                'genres',
+                'showtimes' => function ($query) use ($today) {
+                    $query->where('status', 'active')
+                        ->whereDate('show_date', '>=', $today)
+                        ->orderBy('show_date')
+                        ->orderBy('show_time');
+                },
+            ])
             ->firstOrFail();
-        $selectedCinema = $request->filled('cinema')
-            ? Cinema::query()->active()->where('code', mb_strtoupper((string) $request->query('cinema')))->firstOrFail()
-            : null;
-        $selectedDate = $this->catalog->date($request->query('date'), $selectedCinema);
-        $showtimes = $this->catalog->forDate($selectedDate, $selectedCinema, $movie);
-        $preferredCinema = $this->cinemaContext->preference();
-        if (! $selectedCinema && $preferredCinema) {
-            $showtimes = $showtimes->sortBy(fn ($showtime): array => [
-                (int) $showtime->cinema_id === (int) $preferredCinema->id ? 0 : 1,
-                $showtime->cinema->name,
-                $showtime->show_time,
-            ])->values();
-        }
 
-        return view('user.movies.show', [
-            'movie' => $movie,
-            'showtimes' => $showtimes,
-            'selectedCinema' => $selectedCinema,
-            'selectedDate' => $selectedDate,
-            'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name', 'address']),
-            'dates' => $this->catalog->dates($selectedCinema),
-            'preferredCinema' => $preferredCinema,
-        ]);
+        $now = now()->timezone('Asia/Ho_Chi_Minh');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Loại bỏ suất chiếu đã qua
+        |--------------------------------------------------------------------------
+        */
+        $showtimes = $movie->showtimes
+            ->filter(function ($showtime) use ($now) {
+                if (! $showtime->show_date || ! $showtime->show_time) {
+                    return false;
+                }
+                $showDate = Carbon::parse($showtime->show_date)
+                    ->timezone('Asia/Ho_Chi_Minh');
+
+                if ($showDate->isAfter($now->copy()->startOfDay())) {
+                    return true;
+                }
+
+                if ($showDate->isSameDay($now)) {
+                    return $showtime->show_time >= $now->format('H:i:s');
+                }
+
+                return false;
+            })
+            ->values();
+                                /*
+|--------------------------------------------------------------------------
+| Tính số ghế còn trống của từng suất chiếu
+|--------------------------------------------------------------------------
+*/
+  $showtimes->each(function ($showtime) {
+    $totalSeats = Seat::query()
+        ->where('room_id', $showtime->room_id)
+        ->where('status', 'active')
+        ->count();
+
+    $bookedSeats = BookingSeat::query()
+        ->where('showtime_id', $showtime->id)
+        ->count();
+
+    $showtime->available_seats = max(
+        $totalSeats - $bookedSeats,
+        0
+    );
+});
+
+            $availableShowtimesCount = $showtimes->count();
+
+      return view('user.movies.show', compact(
+    'movie',
+    'showtimes',
+    'availableShowtimesCount'
+));
     }
 }

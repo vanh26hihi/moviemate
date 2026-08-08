@@ -313,9 +313,19 @@
                                                     <span class="text-[10px] font-bold text-brand-start">
                                                         Suất gần nhất
                                                     </span>
-                                                    
+
                                                 @endif
-                                                @php
+                                                                                            @if($show->available_seats > 0)
+                                                <div class="mt-1 text-center text-[10px] font-semibold">
+                                                    <i class="ph ph-armchair"></i>
+                                                    Còn {{ $show->available_seats }} ghế
+                                                </div>
+                                            @else
+                                                <div class="mt-1 text-center text-[10px] font-extrabold text-error">
+                                                    Hết ghế
+                                                </div>
+                                            @endif
+                                                                                            @php
                                                 $showDateTime = \Carbon\Carbon::parse(
                                                     $show->show_date->format('Y-m-d') . ' ' . $show->show_time,
                                                     'Asia/Ho_Chi_Minh'
