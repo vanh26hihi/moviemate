@@ -21,6 +21,7 @@ final class BookingCancellationService
         private readonly BookingSeatLockService $seatLocks,
         private readonly BookingFoodService $food,
         private readonly ActivityLogger $activities,
+        private readonly PromotionService $promotions,
     ) {}
 
     public function isCancellable(Booking $booking): bool
@@ -229,6 +230,7 @@ final class BookingCancellationService
         $booking->forceFill(['booking_status' => 'cancelled'])->save();
         $released = $this->seatLocks->release($booking);
         $this->food->transitionForBooking($booking, 'cancelled');
+        $this->promotions->release($booking);
 
         // One audit event per successful cancellation. Seat labels are logical and safe;
         // no capability, token or provider payload is ever recorded here.

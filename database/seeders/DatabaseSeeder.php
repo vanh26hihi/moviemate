@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             ShowtimeSeeder::class,
             DemoUserSeeder::class,
             FoodItemSeeder::class,
+            DiscountCodeSeeder::class,
         ]);
     }
 }

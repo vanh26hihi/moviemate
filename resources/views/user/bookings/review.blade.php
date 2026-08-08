@@ -82,6 +82,12 @@
                 </div>
 
                 <aside class="self-start rounded-2xl app-secondary p-5 sm:p-6 lg:sticky lg:top-24" aria-labelledby="payment-summary-title">
+                    <section class="mb-5 rounded-xl border app-border p-4" aria-labelledby="promotion-title">
+                        <h2 id="promotion-title" class="text-sm font-bold app-text">Mã giảm giá</h2>
+                        <form method="POST" action="{{ route('user.bookings.promotions') }}" class="mt-3 flex gap-2">@csrf<input type="hidden" name="action" value="apply"><label class="sr-only" for="discount-code">Mã giảm giá</label><input id="discount-code" name="code" maxlength="50" class="user-form-control uppercase" placeholder="Nhập mã"><button class="btn-secondary" type="submit">Áp dụng</button></form>
+                        @error('discount_code')<p class="mt-2 text-sm text-error" role="alert">{{ $message }}</p>@enderror
+                        <div class="mt-3 space-y-2">@foreach($promotion->lines as $line)<div class="flex items-center justify-between gap-2 text-sm"><span><strong class="app-text">{{ $line['code']->code }}</strong><span class="block text-xs app-muted">{{ $line['code']->name }}</span></span><div class="flex items-center gap-2"><strong class="text-success">−{{ number_format($line['discount_amount'], 0, ',', '.') }} VNĐ</strong><form method="POST" action="{{ route('user.bookings.promotions') }}">@csrf<input type="hidden" name="action" value="remove"><input type="hidden" name="code" value="{{ $line['code']->code }}"><button type="submit" class="text-error" aria-label="Gỡ mã {{ $line['code']->code }}"><i class="ph ph-x"></i></button></form></div></div>@endforeach</div>
+                    </section>
                     <div class="flex items-center justify-between gap-3">
                         <h2 id="payment-summary-title" class="font-bold app-text">Chi tiết thanh toán</h2>
                         <span class="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-extrabold text-white">VNĐ</span>
@@ -90,7 +96,8 @@
                     <dl class="mt-5 space-y-3 text-sm">
                         <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VNĐ</dd></div>
                         <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VNĐ</dd></div>
-                        <div class="flex justify-between gap-3 border-t pt-4 app-border"><dt class="font-bold app-text">Tổng thanh toán</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format($preview->prices->grandTotal, 0, ',', '.') }} VNĐ</dd></div>
+                        @if($promotion->discountAmount > 0)<div class="flex justify-between gap-3 text-success"><dt>Giảm giá</dt><dd class="font-bold">−{{ number_format($promotion->discountAmount, 0, ',', '.') }} VNĐ</dd></div>@endif
+                        <div class="flex justify-between gap-3 border-t pt-4 app-border"><dt class="font-bold app-text">Tổng thanh toán</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format($promotion->finalAmount, 0, ',', '.') }} VNĐ</dd></div>
                     </dl>
 
                     <div class="mt-5 rounded-xl border app-border px-4 py-3">
