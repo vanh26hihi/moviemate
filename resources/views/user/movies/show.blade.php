@@ -331,6 +331,11 @@
                                                             </div>
                                                         @endif
                                                                 @endif
+                                                                @if($minutesUntilShow > 0 && $minutesUntilShow <= 120)
+                                                                        <div class="mt-1 text-center text-[10px] font-semibold opacity-80">
+                                                                            Còn {{ $minutesUntilShow }} phút
+                                                                        </div>
+                                                                    @endif
                                                         </div>
 
                                                         {{-- Phòng --}}
