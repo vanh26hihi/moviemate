@@ -19,22 +19,33 @@ use Throwable;
 
 class MovieController extends Controller
 {
-    /**
-     * Display a listing of the movies.
-     */
-    public function index(Request $request)
-    {
-        $query = Movie::with('genres');
+public function index(Request $request)
+{
+    $search = trim((string) $request->query('search', ''));
 
-        // Simple search by title
-        if ($search = $request->query('search')) {
-            $query->where('title', 'like', "%{$search}%");
-        }
+    $query = Movie::query()
+        ->with('genres');
 
-        $movies = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
-
-        return view('admin.movies.index', compact('movies', 'search'));
+    if ($search !== '') {
+        $query->where(function ($q) use ($search) {
+            $q->where('title', 'like', "%{$search}%")
+                ->orWhere('slug', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('country', 'like', "%{$search}%")
+                ->orWhere('status', 'like', "%{$search}%");
+        });
     }
+
+    $movies = $query
+        ->orderByDesc('created_at')
+        ->paginate(15)
+        ->withQueryString();
+
+    return view('admin.movies.index', compact(
+        'movies',
+        'search'
+    ));
+}
 
     /**
      * Show the form for creating a new movie.
