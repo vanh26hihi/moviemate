@@ -23,6 +23,7 @@ class BookingCheckoutFingerprint
         string $salesChannel = 'online',
         ?int $creatorStaffId = null,
         array $discountCodes = [],
+        int $pointsToUse = 0,
     ): string {
         $normalizedSeats = collect($seatIds)
             ->map(fn ($id): int => (int) $id)
@@ -45,6 +46,7 @@ class BookingCheckoutFingerprint
             'creator_staff_id' => $creatorStaffId,
             'food' => $this->foodSelections->canonicalize($foodSelection),
             'discount_codes' => collect($discountCodes)->map(fn ($code) => mb_strtoupper(trim((string) $code)))->filter()->unique()->sort()->values()->all(),
+            'points_to_use' => max(0, $pointsToUse),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
         return hash('sha256', $canonical);

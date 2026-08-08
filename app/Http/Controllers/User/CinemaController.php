@@ -47,7 +47,7 @@ final class CinemaController extends Controller
             $today->addDays(PublicShowtimeCatalog::WINDOW_DAYS - 1)->toDateString(),
         )->groupBy('cinema_id');
 
-        $cinemas->each(function (Cinema $cinema) use ($filters, $showtimes): void {
+        $cinemas->each(function (Cinema $cinema) use ($showtimes): void {
             $branchShowtimes = $showtimes->get($cinema->id, collect());
             $cinema->setAttribute('available_movie_count', $branchShowtimes->pluck('movie_id')->unique()->count());
             $cinema->setAttribute('upcoming_showtime_count', $branchShowtimes->count());
@@ -111,5 +111,4 @@ final class CinemaController extends Controller
 
         return 'Mở từ '.substr((string) $hours->opens_at, 0, 5).' · nhận suất đến '.substr((string) $hours->latest_show_start_at, 0, 5);
     }
-
 }

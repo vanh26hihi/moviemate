@@ -123,8 +123,8 @@ class AdminNavigationFoundationTest extends TestCase
         foreach (['Tổng quan', 'Nội dung', 'Rạp &amp; lịch chiếu', 'Kinh doanh', 'Dịch vụ', 'Hệ thống'] as $group) {
             $this->assertStringContainsString($group, $managerNavigation);
         }
-        foreach (['admin.discounts.index', 'admin.reviews.index'] as $missingRoute) {
-            $this->assertStringNotContainsString($missingRoute, $managerNavigation);
+        foreach (['admin.discounts.index', 'admin.reviews.index'] as $implementedRoute) {
+            $this->assertStringContainsString($implementedRoute, $managerNavigation);
         }
 
         $adminNavigation = $this->navigationHtml(

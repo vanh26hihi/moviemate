@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Cinema;
 use App\Models\Genre;
 use App\Models\Movie;
+use App\Models\Review;
 use App\Services\CinemaContext;
 use App\Services\CustomerShowtimeCatalogService;
 use App\Services\PublicShowtimeCatalog;
+use App\Services\ReviewService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class MovieController extends Controller
 {
@@ -17,6 +20,7 @@ class MovieController extends Controller
         private readonly CinemaContext $cinemaContext,
         private readonly PublicShowtimeCatalog $catalog,
         private readonly CustomerShowtimeCatalogService $customerCatalog,
+        private readonly ReviewService $reviewService,
     ) {}
 
     /**
@@ -45,7 +49,6 @@ class MovieController extends Controller
                 ->where('cinema_id', $preferredCinema->id)->where('status', 'active')->whereDate('show_date', $selectedDate)])
                 ->orderByDesc('preferred_branch_available');
         }
-
         /*
         |--------------------------------------------------------------------------
         | Tìm kiếm phim
@@ -216,6 +219,17 @@ class MovieController extends Controller
                 $showtime['starts_at'],
             ])->values();
         }
+        $publicReviews = Review::query()->where('movie_id', $movie->id)->where('moderation_status', Review::MODERATION_PUBLISHED)
+            ->where('status', Review::STATUS_VISIBLE)->with('user:id,name')->latest('first_published_at')->paginate(10, ['*'], 'reviews_page')->withQueryString();
+        $existingReview = $request->user()?->reviews()->where('movie_id', $movie->id)->first();
+        $reviewBooking = null;
+        if ($request->user()) {
+            try {
+                $reviewBooking = $this->reviewService->eligibleBooking($request->user(), $movie->id);
+            } catch (ValidationException) {
+                $reviewBooking = null;
+            }
+        }
 
         return view('user.movies.show', [
             'movie' => $movie,
@@ -225,6 +239,9 @@ class MovieController extends Controller
             'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name', 'address', 'latitude', 'longitude']),
             'dates' => $this->catalog->dates($selectedCinema),
             'preferredCinema' => $preferredCinema,
+            'publicReviews' => $publicReviews,
+            'existingReview' => $existingReview,
+            'reviewBooking' => $reviewBooking,
         ]);
     }
 }

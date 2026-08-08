@@ -100,8 +100,9 @@ function syncForm(form, pageUrl) {
         form.querySelectorAll(`[name="${name}"]`).forEach((control) => {
             if (control instanceof HTMLSelectElement) control.value = value;
             if (control instanceof HTMLButtonElement) {
-                const selected = control.value === value;
-                control.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                const button = control;
+                const selected = button.value === value;
+                button.setAttribute('aria-pressed', selected ? 'true' : 'false');
             }
         });
     }

@@ -226,6 +226,7 @@
                         <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-semibold app-text">{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
                         <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-semibold app-text">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
                         @if((int) $booking->promotion_discount_amount > 0)<div class="flex justify-between gap-3 text-success"><dt>Giảm giá</dt><dd class="font-semibold">−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} {{ $currency }}</dd></div>@endif
+                        @if((int) $booking->points_discount_amount > 0)<div class="flex justify-between gap-3 text-ai-start"><dt>Đổi điểm</dt><dd class="font-semibold">−{{ number_format((int) $booking->points_discount_amount, 0, ',', '.') }} {{ $currency }}</dd></div>@endif
                         <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng cộng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</dd></div>
                     </dl>
                     <div class="mt-5 rounded-xl border app-border px-4 py-3">
