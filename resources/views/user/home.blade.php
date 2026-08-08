@@ -64,15 +64,7 @@
                     <div class="absolute -inset-5 rounded-[2rem] bg-gradient-to-br from-brand-start/30 via-ai-start/20 to-brand-end/20 blur-2xl"></div>
                     <div class="relative cinema-card p-4">
                         <div class="poster-frame rounded-2xl shadow-2xl shadow-black/30">
-                            @if($featuredMovie?->poster_url)
-                                <img src="{{ $featuredMovie->poster_url }}" alt="{{ $featuredMovie->title }}" loading="lazy">
-                            @else
-                                <div class="fallback-poster">
-                                    <i class="ph-fill ph-film-slate"></i>
-                                    <strong class="text-2xl">MovieMate</strong>
-                                    <span>Ảnh áp phích phim sẽ hiển thị tại đây</span>
-                                </div>
-                            @endif
+                            <x-movie-media :src="$featuredMovie?->poster_url" :alt="$featuredMovie?->title ?? 'Phim MovieMate'" fallback-title="MovieMate" fallback-text="Ảnh áp phích phim sẽ hiển thị tại đây" />
                         </div>
                     </div>
                 </div>

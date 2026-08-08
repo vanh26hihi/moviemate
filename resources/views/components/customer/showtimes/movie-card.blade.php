@@ -7,11 +7,7 @@
 <article class="cinema-card rounded-3xl p-4 sm:p-6">
     <div class="flex gap-4 sm:gap-6">
         <div class="h-32 w-24 shrink-0 overflow-hidden rounded-2xl app-secondary sm:h-40 sm:w-28">
-            @if($first['poster'])
-                <img src="{{ $first['poster'] }}" alt="Áp phích {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
-            @else
-                <div class="flex h-full flex-col items-center justify-center gap-2 p-2 text-center app-muted"><i class="ph-fill ph-film-slate text-3xl" aria-hidden="true"></i><span class="text-xs font-bold">MovieMate</span></div>
-            @endif
+            <x-movie-media :src="$first['poster']" alt="Áp phích {{ $movie->title }}" image-class="h-full w-full object-cover" fallback-class="flex h-full flex-col items-center justify-center gap-2 p-2 text-center app-muted" fallback-title="MovieMate" />
         </div>
         <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-start justify-between gap-2">

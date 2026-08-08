@@ -157,9 +157,10 @@
             </div>
 
             <div class="border-t app-border pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <p class="app-muted text-sm text-center sm:text-left safe-break">
-                    &copy; {{ date('Y') }} MovieMate. Tất cả quyền được bảo lưu. Dự án Tốt nghiệp.
-                </p>
+                <div class="app-muted text-sm text-center sm:text-left safe-break">
+                    <p>&copy; {{ date('Y') }} MovieMate. Tất cả quyền được bảo lưu. Dự án Tốt nghiệp.</p>
+                    <p class="mt-1 text-xs">Dữ liệu phim và hình ảnh từ <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" class="font-bold text-brand-start hover:underline">TMDB</a>. MovieMate không được TMDB chứng thực hoặc chứng nhận.</p>
+                </div>
                 <div class="payment-badges flex flex-wrap items-center justify-center sm:justify-end gap-2">
                     <span class="payment-badge px-3 py-1 app-card border app-border rounded text-xs font-bold app-muted tracking-widest">VISA</span>
                     <span class="payment-badge px-3 py-1 app-card border app-border rounded text-xs font-bold app-muted tracking-widest">Mastercard</span>

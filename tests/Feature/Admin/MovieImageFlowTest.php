@@ -183,6 +183,19 @@ class MovieImageFlowTest extends TestCase
         }
 
         $this->assertNull(Movie::imageUrl('movies/posters/missing.jpg'));
+
+        $trusted = 'https://media.themoviedb.org/t/p/w500/example.jpg';
+        $this->assertSame($trusted, Movie::trustedRemoteImageUrl($trusted));
+        $this->assertSame($trusted, Movie::imageUrl($trusted));
+        foreach ([
+            'http://media.themoviedb.org/t/p/w500/example.jpg',
+            'https://media.themoviedb.org/t/p/w500/example.jpg?token=secret',
+            'https://media.themoviedb.org/unsafe/example.jpg',
+            'https://example.com/t/p/w500/example.jpg',
+        ] as $untrusted) {
+            $this->assertNull(Movie::trustedRemoteImageUrl($untrusted));
+            $this->assertNull(Movie::imageUrl($untrusted));
+        }
     }
 
     public function test_admin_and_public_lists_use_relative_urls_and_missing_file_fallbacks(): void

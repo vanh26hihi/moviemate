@@ -19,17 +19,14 @@
 <article class="group dark-surface flex h-full flex-col overflow-hidden rounded-3xl border border-white/[0.08] {{ $cardBg }} shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-orange-400/25 {{ $cinemaGlow }}">
     <a href="{{ $detailUrl }}" class="block">
         <div class="relative aspect-[2/3] overflow-hidden rounded-t-3xl bg-slate-950">
-            @if($poster)
-                <img src="{{ $poster }}" alt="{{ $movie->title }}" class="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]" loading="lazy">
-            @else
-                <div class="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,77,109,0.35)_0%,rgba(255,122,24,0.12)_30%,transparent_70%),linear-gradient(145deg,#172033,#070B16)] px-6 text-center text-white">
-                    <div class="mb-4 rounded-full bg-white/10 p-5 text-pink-500 shadow-[0_0_32px_rgba(255,77,109,0.28)]">
-                        <i class="ph-fill ph-film-slate text-4xl"></i>
-                    </div>
-                    <p class="text-lg font-black">MovieMate</p>
-                    <p class="mt-2 line-clamp-2 text-sm text-slate-400">{{ $movie->title ?? 'Phim MovieMate' }}</p>
-                </div>
-            @endif
+            <x-movie-media
+                :src="$poster"
+                :alt="$movie->title"
+                image-class="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                fallback-class="flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(255,77,109,0.35)_0%,rgba(255,122,24,0.12)_30%,transparent_70%),linear-gradient(145deg,#172033,#070B16)] px-6 text-center text-white"
+                fallback-title="MovieMate"
+                :fallback-text="$movie->title ?? 'Phim MovieMate'"
+            />
 
             <div class="absolute inset-0 bg-gradient-to-t from-[#0B1020]/70 via-transparent to-black/20"></div>
 

@@ -10,17 +10,7 @@
     <div class="flex h-full flex-col gap-4 sm:flex-row">
         <a href="{{ $detailUrl }}" class="w-full shrink-0 sm:w-24 md:w-28">
             <div class="aspect-[2/3] overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-950 to-black shadow-lg shadow-black/15">
-                @if($movie?->poster_url)
-                    <img src="{{ $movie->poster_url }}" alt="{{ $movie->title }}" class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy">
-                @else
-                    <div class="flex h-full w-full flex-col items-center justify-center px-3 text-center text-white">
-                        <div class="mb-2 rounded-full bg-brand-start/20 p-3 text-brand-start">
-                            <i class="ph-fill ph-film-slate text-2xl"></i>
-                        </div>
-                        <p class="text-sm font-black">MovieMate</p>
-                        <p class="mt-1 line-clamp-2 text-[11px] text-slate-300">{{ $movie->title ?? 'Phim đang chiếu' }}</p>
-                    </div>
-                @endif
+                <x-movie-media :src="$movie?->poster_url" :alt="$movie?->title ?? 'Phim MovieMate'" image-class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" fallback-class="flex h-full w-full flex-col items-center justify-center px-3 text-center text-white" fallback-title="MovieMate" :fallback-text="$movie?->title ?? 'Phim đang chiếu'" />
             </div>
         </a>
 
