@@ -11,11 +11,14 @@
             <h1 class="app-text text-3xl font-extrabold">{{ __('rooms.index_title') }}</h1>
             <p class="app-muted mt-2">{{ __('rooms.description') }}</p>
         </div>
-        @can('rooms.create')
-            <a href="{{ route('admin.rooms.create') }}" class="btn-primary" title="{{ __('rooms.add') }}">
-                <i class="ph-bold ph-plus" aria-hidden="true"></i> {{ __('rooms.add') }}
-            </a>
-        @endcan
+        <div class="flex flex-wrap gap-3">
+            @can('room_types.view')<a href="{{ route('admin.room-types.index') }}" class="btn-secondary"><i class="ph ph-stack" aria-hidden="true"></i> Quản lý loại phòng</a>@endcan
+            @can('rooms.create')
+                <a href="{{ route('admin.rooms.create') }}" class="btn-primary" title="{{ __('rooms.add') }}">
+                    <i class="ph-bold ph-plus" aria-hidden="true"></i> {{ __('rooms.add') }}
+                </a>
+            @endcan
+        </div>
     </div>
 
     <div class="cinema-card overflow-hidden">
@@ -38,8 +41,8 @@
                     <span class="sr-only">{{ __('rooms.fields.type') }}</span>
                     <select name="room_type" class="cinema-input">
                         <option value="">{{ __('rooms.all_types') }}</option>
-                        @foreach(['2D', '3D', 'IMAX'] as $type)
-                            <option value="{{ $type }}" @selected($roomType === $type)>{{ $type }}</option>
+                        @foreach($roomTypes as $type)
+                            <option value="{{ $type->code }}" @selected($roomType === $type->code)>{{ $type->name }}{{ $type->is_active ? '' : ' · Đã lưu trữ' }}</option>
                         @endforeach
                     </select>
                 </label>
@@ -83,7 +86,7 @@
                                 <p class="font-bold app-text">{{ $room->cinema->name ?? '—' }}</p>
                                 <p class="text-xs app-muted">{{ $room->cinema->city ?? '' }}</p>
                             </td>
-                            <td>{{ $room->room_type }}</td>
+                            <td>{{ $room->room_type_label }}</td>
                             <td>
                                 @if($published)
                                     <p class="font-bold app-text">Phiên bản {{ $published->version }} · {{ $published->rows }} × {{ $published->columns }}</p>

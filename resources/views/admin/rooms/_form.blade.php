@@ -36,11 +36,7 @@
 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
     <div>
         <label for="room_type" class="cinema-label">{{ __('rooms.fields.type') }} <span aria-hidden="true">*</span></label>
-        <select id="room_type" name="room_type" required class="cinema-input @error('room_type') !border-error @enderror" aria-describedby="room-type-error">
-            @foreach(['2D', '3D', 'IMAX'] as $type)
-                <option value="{{ $type }}" @selected(old('room_type', $room->room_type ?? '2D') === $type)>{{ $type }}</option>
-            @endforeach
-        </select>
+        <x-admin.room-type-select :room-types="$roomTypes" :selected="old('room_type', $room->room_type ?? $roomTypes->first()?->code)" :can-create="auth()->user()->hasPermission('room_types.manage')" required />
         @error('room_type')<p id="room-type-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
     </div>
     <div>
@@ -62,7 +58,7 @@
 @if(! $editing && isset($templates) && $templates->isNotEmpty() && auth()->user()->hasPermission('room_layouts.apply_template'))
 <div class="rounded-2xl border app-border app-card-soft p-4 space-y-4">
     <div><p class="font-bold app-text">Khởi tạo từ mẫu sơ đồ</p><p class="text-sm app-muted">Tùy chọn. Hệ thống sao chép mẫu thành ghế và sơ đồ riêng của phòng rồi phát hành ngay.</p></div>
-    <label class="cinema-label">Mẫu<select name="template_id" class="cinema-input"><option value="">Thiết kế sau</option>@foreach($templates as $template)<option value="{{ $template->id }}" @selected(old('template_id')==$template->id)>{{ $template->name }} · {{ $template->rows }}×{{ $template->columns }}{{ $template->room_type ? ' · '.$template->room_type : '' }}</option>@endforeach</select></label>
+    <label class="cinema-label">Mẫu<select name="template_id" class="cinema-input"><option value="">Thiết kế sau</option>@foreach($templates as $template)<option value="{{ $template->id }}" @selected(old('template_id')==$template->id)>{{ $template->name }} · {{ $template->rows }}×{{ $template->columns }}{{ $template->room_type ? ' · '.($roomTypes->firstWhere('code', $template->room_type)?->name ?? $template->room_type) : '' }}</option>@endforeach</select></label>
     <label class="cinema-label">Tên sơ đồ<input name="layout_name" class="cinema-input" value="{{ old('layout_name') }}" placeholder="Ví dụ: Tiêu chuẩn 100 ghế – khai trương"></label>
     <label class="cinema-label">Ghi chú thay đổi<textarea name="change_note" class="cinema-input" rows="2">{{ old('change_note') }}</textarea></label>
     @error('template_id')<p class="text-error">{{ $message }}</p>@enderror @error('layout_name')<p class="text-error">{{ $message }}</p>@enderror

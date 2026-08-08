@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 @section('title', $layoutTemplate->name)
 @section('content')
-<div class="space-y-6"><div class="flex justify-between"><div><h1 class="text-2xl font-bold">{{ $layoutTemplate->name }}</h1><p class="app-muted">{{ $layoutTemplate->code }} · {{ $layoutTemplate->status_label }} · {{ $layoutTemplate->rows }} × {{ $layoutTemplate->columns }}</p></div><div class="flex gap-2">@can('layout_templates.manage')
+<div class="space-y-6"><div class="flex justify-between"><div><h1 class="text-2xl font-bold">{{ $layoutTemplate->name }}</h1><p class="app-muted">{{ $layoutTemplate->code }} · {{ $roomTypeName ?: 'Mọi loại phòng' }} · {{ $layoutTemplate->status_label }} · {{ $layoutTemplate->rows }} × {{ $layoutTemplate->columns }}</p></div><div class="flex gap-2">@can('layout_templates.manage')
 @if($layoutTemplate->status !== 'archived')<a class="btn-secondary" href="{{ route('admin.layout-templates.edit',$layoutTemplate) }}">Chỉnh sửa</a>@endif
 @if($layoutTemplate->status === 'draft')<form method="POST" action="{{ route('admin.layout-templates.activate',$layoutTemplate) }}">@csrf<button class="btn-primary">Đưa vào sử dụng</button></form>@endif
 @if($layoutTemplate->status !== 'archived')<form method="POST" action="{{ route('admin.layout-templates.archive',$layoutTemplate) }}">@csrf<button class="btn-secondary">Lưu trữ</button></form>@endif @endcan</div></div>

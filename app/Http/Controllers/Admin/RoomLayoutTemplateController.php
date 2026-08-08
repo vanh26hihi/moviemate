@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveRoomLayoutTemplateRequest;
 use App\Models\RoomLayoutTemplate;
+use App\Models\RoomType;
 use App\Services\ActivityLogger;
 use App\Services\RoomLayoutTemplateGeometry;
 use Illuminate\Http\RedirectResponse;
@@ -30,12 +31,17 @@ class RoomLayoutTemplateController extends Controller
             ->orderByRaw("case status when 'active' then 0 when 'draft' then 1 else 2 end")
             ->orderBy('name')->paginate(15);
 
-        return view('admin.layout-templates.index', compact('templates'));
+        $roomTypeNames = RoomType::query()->pluck('name', 'code');
+
+        return view('admin.layout-templates.index', compact('templates', 'roomTypeNames'));
     }
 
     public function create(): View
     {
-        return view('admin.layout-templates.create', ['template' => new RoomLayoutTemplate]);
+        return view('admin.layout-templates.create', [
+            'template' => new RoomLayoutTemplate,
+            'roomTypes' => RoomType::options(),
+        ]);
     }
 
     public function store(SaveRoomLayoutTemplateRequest $request): RedirectResponse
@@ -51,7 +57,11 @@ class RoomLayoutTemplateController extends Controller
         $layoutTemplate->load(['cells' => fn ($query) => $query->orderBy('y_position')->orderBy('x_position')]);
         $usages = $layoutTemplate->roomLayouts()->with('room.cinema')->latest()->paginate(10);
 
-        return view('admin.layout-templates.show', compact('layoutTemplate', 'usages'));
+        $roomTypeName = $layoutTemplate->room_type
+            ? RoomType::query()->where('code', $layoutTemplate->room_type)->value('name')
+            : null;
+
+        return view('admin.layout-templates.show', compact('layoutTemplate', 'usages', 'roomTypeName'));
     }
 
     public function edit(RoomLayoutTemplate $layoutTemplate): View
@@ -59,7 +69,10 @@ class RoomLayoutTemplateController extends Controller
         $this->assertMutable($layoutTemplate);
         $layoutTemplate->load('cells');
 
-        return view('admin.layout-templates.edit', ['template' => $layoutTemplate]);
+        return view('admin.layout-templates.edit', [
+            'template' => $layoutTemplate,
+            'roomTypes' => RoomType::options($layoutTemplate->room_type),
+        ]);
     }
 
     public function update(SaveRoomLayoutTemplateRequest $request, RoomLayoutTemplate $layoutTemplate): RedirectResponse

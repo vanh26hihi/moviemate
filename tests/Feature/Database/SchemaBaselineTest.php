@@ -51,6 +51,10 @@ class SchemaBaselineTest extends TestCase
         $this->assertTrue(Schema::hasColumns('rooms', [
             'cinema_id', 'code', 'room_type_id', 'total_seats', 'status',
         ]));
+        $this->assertTrue(Schema::hasColumns('room_types', [
+            'code', 'name', 'description', 'is_active', 'sort_order',
+            'created_by_user_id', 'updated_by_user_id',
+        ]));
         $this->assertTrue(Schema::hasColumns('seats', [
             'room_id',
             'seat_type_id',

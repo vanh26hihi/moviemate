@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\CinemaPricingRule;
+use App\Models\RoomType;
 use App\Models\Seat;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,7 @@ class SavePricingRuleRequest extends FormRequest
             'cinema_id' => $this->filled('cinema_id') ? $this->input('cinema_id') : null,
             'room_id' => $this->filled('room_id') ? $this->input('room_id') : null,
             'seat_type' => $this->filled('seat_type') ? strtolower(trim((string) $this->input('seat_type'))) : null,
-            'room_type' => $this->filled('room_type') ? strtoupper(trim((string) $this->input('room_type'))) : null,
+            'room_type' => $this->filled('room_type') ? RoomType::normalizeCode((string) $this->input('room_type')) : null,
             'stacks_with_weekend' => $this->boolean('stacks_with_weekend'),
         ]);
     }
@@ -33,7 +34,15 @@ class SavePricingRuleRequest extends FormRequest
             'cinema_id' => ['nullable', 'integer', 'exists:cinemas,id'],
             'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'seat_type' => ['nullable', Rule::in(Seat::TYPES), Rule::requiredIf($this->input('rule_type') === 'seat_type')],
-            'room_type' => ['nullable', Rule::in(['2D', '3D', 'IMAX']), Rule::requiredIf($this->input('rule_type') === 'room_type')],
+            'room_type' => [
+                'nullable',
+                Rule::requiredIf($this->input('rule_type') === 'room_type'),
+                Rule::exists('room_types', 'code')->where(function ($query): void {
+                    $current = $this->route('pricing_rule');
+                    $query->where('is_active', true)
+                        ->when($current instanceof CinemaPricingRule && $current->room_type, fn ($query) => $query->orWhere('code', $current->room_type));
+                }),
+            ],
             'days_of_week' => ['nullable', 'array', 'min:1'],
             'days_of_week.*' => ['integer', 'between:1,7', 'distinct'],
             'date_start' => ['nullable', 'date_format:Y-m-d', Rule::requiredIf($this->input('rule_type') === 'holiday')],

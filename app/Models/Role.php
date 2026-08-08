@@ -17,7 +17,7 @@ class Role extends Model
         'admin.access', 'dashboard.view',
         'cinema.view', 'cinema.update', 'cinemas.view', 'cinemas.operations.manage',
         'cinema_assignments.view', 'cinema_assignments.manage', 'users.view',
-        'rooms.view', 'rooms.create', 'rooms.update',
+        'rooms.view', 'rooms.create', 'rooms.update', 'room_types.view',
         'seats.view', 'seats.manage',
         'layout_templates.view', 'room_layouts.apply_template',
         'movies.view', 'movies.create', 'movies.update',

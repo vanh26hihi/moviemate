@@ -13,6 +13,27 @@ class CinemaPricingRule extends Model
         'cinema_adjustment', 'room_adjustment',
     ];
 
+    public const TYPE_LABELS = [
+        'base' => 'Giá cơ bản',
+        'seat_type' => 'Phụ thu theo loại ghế',
+        'room_type' => 'Phụ thu theo loại phòng',
+        'time_window' => 'Phụ thu theo khung giờ',
+        'weekend' => 'Phụ thu cuối tuần',
+        'holiday' => 'Phụ thu ngày lễ',
+        'cinema_adjustment' => 'Điều chỉnh theo chi nhánh',
+        'room_adjustment' => 'Điều chỉnh theo phòng chiếu',
+    ];
+
+    public static function typeLabel(string $type): string
+    {
+        return self::TYPE_LABELS[$type] ?? $type;
+    }
+
+    public function getRuleTypeLabelAttribute(): string
+    {
+        return self::typeLabel((string) $this->rule_type);
+    }
+
     protected $fillable = [
         'name', 'rule_type', 'cinema_id', 'room_id', 'seat_type', 'room_type',
         'days_of_week', 'date_start', 'date_end', 'time_start', 'time_end',

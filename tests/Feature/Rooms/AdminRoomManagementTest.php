@@ -93,7 +93,7 @@ class AdminRoomManagementTest extends TestCase
     {
         $manager = $this->userWithRole('manager');
         $response = $this->actingAs($manager)->post(route('admin.rooms.store'), [
-            'code' => 'p20', 'name' => 'Phòng Hai Mươi', 'room_type' => '2d cao cấp',
+            'code' => 'p20', 'name' => 'Phòng Hai Mươi', 'room_type' => '2d',
             'status' => 'active', 'total_seats' => 999,
         ]);
         $room = Room::query()->where('code', 'P20')->sole();

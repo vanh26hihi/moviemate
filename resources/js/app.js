@@ -485,6 +485,127 @@ document.addEventListener('keydown', (event) => {
     if (openModalElement) closeModal(openModalElement);
 });
 
+document.addEventListener('focusin', (event) => {
+    const select = event.target.closest?.('[data-room-type-select]');
+    if (select instanceof HTMLSelectElement) select.dataset.previousValue = select.value;
+});
+
+document.addEventListener('change', (event) => {
+    const select = event.target.closest?.('[data-room-type-select]');
+    if (!(select instanceof HTMLSelectElement) || select.value !== '__create_room_type__') return;
+
+    select.value = select.dataset.previousValue || '';
+    const trigger = document.querySelector(`[data-room-type-modal-trigger="${CSS.escape(select.dataset.roomTypeModal || '')}"]`);
+    trigger?.click();
+});
+
+document.addEventListener('input', (event) => {
+    const form = event.target.closest?.('[data-room-type-create-form]');
+    if (!(form instanceof HTMLFormElement)) return;
+
+    const name = form.querySelector('[data-room-type-name]');
+    const code = form.querySelector('[data-room-type-code]');
+    if (!(name instanceof HTMLInputElement) || !(code instanceof HTMLInputElement)) return;
+    if (event.target === code) {
+        code.dataset.manuallyEdited = 'true';
+        return;
+    }
+    if (event.target !== name || code.dataset.manuallyEdited === 'true') return;
+
+    code.value = name.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+});
+
+document.addEventListener('submit', async (event) => {
+    const form = event.target.closest?.('[data-room-type-create-form]');
+    if (!(form instanceof HTMLFormElement)) return;
+
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    const errors = form.querySelector('[data-room-type-errors]');
+    if (submit instanceof HTMLButtonElement) submit.disabled = true;
+    if (errors instanceof HTMLElement) {
+        errors.hidden = true;
+        errors.textContent = '';
+    }
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(form),
+            credentials: 'same-origin',
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            const message = Object.values(data.errors || {}).flat()[0] || data.message || 'Không thể thêm loại phòng.';
+            throw new Error(message);
+        }
+
+        const roomType = data.room_type;
+        document.querySelectorAll('[data-room-type-select]').forEach((select) => {
+            if (!(select instanceof HTMLSelectElement)) return;
+            let option = Array.from(select.options).find((item) => item.value === roomType.code);
+            if (!option) {
+                option = new Option(roomType.name, roomType.code);
+                const createIndex = Array.from(select.options).findIndex((item) => item.value === '__create_room_type__');
+                select.add(option, createIndex > 0 ? createIndex - 1 : undefined);
+            }
+            if (select.id === form.dataset.roomTypeTarget) select.value = roomType.code;
+        });
+        const modal = form.closest('[data-modal]');
+        form.reset();
+        const code = form.querySelector('[data-room-type-code]');
+        if (code instanceof HTMLInputElement) delete code.dataset.manuallyEdited;
+        closeModal(modal);
+        document.getElementById(form.dataset.roomTypeTarget || '')?.focus();
+    } catch (error) {
+        if (errors instanceof HTMLElement) {
+            errors.textContent = error instanceof Error ? error.message : 'Không thể thêm loại phòng.';
+            errors.hidden = false;
+        }
+    } finally {
+        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+    }
+});
+
+function refreshPricingRuleForm(form) {
+    const type = form.querySelector('[data-pricing-rule-type]')?.value;
+    form.querySelectorAll('[data-pricing-dimension]').forEach((section) => {
+        const relatedTypes = (section.dataset.pricingDimension || '').split(/\s+/);
+        const relevant = relatedTypes.includes(type);
+        section.classList.toggle('opacity-50', !relevant);
+        section.classList.toggle('ring-2', relevant);
+        section.classList.toggle('ring-brand-start/30', relevant);
+    });
+
+    const requiredFields = {
+        seat_type: 'seat_type',
+        room_type: 'room_type',
+        time_window: ['time_start', 'time_end'],
+        holiday: 'date_start',
+    };
+    ['seat_type', 'room_type', 'time_start', 'time_end', 'date_start'].forEach((name) => {
+        const field = form.elements.namedItem(name);
+        if (field instanceof HTMLElement) field.removeAttribute('required');
+    });
+    const fields = [].concat(requiredFields[type] || []);
+    fields.forEach((name) => {
+        const field = form.elements.namedItem(name);
+        if (field instanceof HTMLElement) field.setAttribute('required', 'required');
+    });
+
+    const amountLabel = form.querySelector('label[for="amount_vnd"]');
+    if (amountLabel) amountLabel.firstChild.textContent = type === 'base' ? 'Giá vé cơ bản (VNĐ)' : 'Mức điều chỉnh (VNĐ)';
+}
+
+document.querySelectorAll('[data-pricing-rule-form]').forEach(refreshPricingRuleForm);
+document.addEventListener('change', (event) => {
+    if (!event.target.matches?.('[data-pricing-rule-type]')) return;
+    const form = event.target.closest('[data-pricing-rule-form]');
+    if (form instanceof HTMLFormElement) refreshPricingRuleForm(form);
+});
+
 const posterFallback = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
 <svg xmlns="http://www.w3.org/2000/svg" width="500" height="750" viewBox="0 0 500 750">
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#151A27"/><stop offset="1" stop-color="#080A12"/></linearGradient></defs>

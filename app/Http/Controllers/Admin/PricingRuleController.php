@@ -7,10 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SavePricingRuleRequest;
 use App\Models\CinemaPricingRule;
 use App\Models\Room;
+use App\Models\RoomType;
+use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
 use App\Services\TicketPricingService;
+use App\Support\StatusLabel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -77,7 +80,7 @@ class PricingRuleController extends Controller
     {
         $this->authorizeRule($request, $pricingRule, true);
 
-        return view('admin.pricing-rules.form', ['rule' => $pricingRule, ...$this->formOptions($request)]);
+        return view('admin.pricing-rules.form', ['rule' => $pricingRule, ...$this->formOptions($request, $pricingRule->room_type)]);
     }
 
     public function update(SavePricingRuleRequest $request, CinemaPricingRule $pricingRule)
@@ -169,12 +172,15 @@ class PricingRuleController extends Controller
         }
     }
 
-    private function formOptions(Request $request): array
+    private function formOptions(Request $request, ?string $currentRoomType = null): array
     {
         $cinemas = $this->access->accessibleCinemas($request->user(), $this->access->hasGlobalAccess($request->user()));
         $rooms = Room::query()->whereIn('cinema_id', $cinemas->pluck('id'))->orderBy('code')->get();
+        $roomTypes = RoomType::options($currentRoomType, $request->routeIs('admin.pricing-rules.index'));
+        $pricingRuleTypes = CinemaPricingRule::TYPE_LABELS;
+        $seatTypes = collect(Seat::TYPES)->mapWithKeys(fn (string $type): array => [$type => StatusLabel::for('seat_type', $type)]);
 
-        return compact('cinemas', 'rooms');
+        return compact('cinemas', 'rooms', 'roomTypes', 'pricingRuleTypes', 'seatTypes');
     }
 
     private function auditData(CinemaPricingRule $rule): array
