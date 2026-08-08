@@ -98,9 +98,9 @@ class AdminNavigationFoundationTest extends TestCase
 
     public function test_protected_and_unimplemented_links_are_not_rendered(): void
     {
-        $managerNavigation = $this->navigationHtml(
-            $this->actingAs($this->userWithRole('manager'))->get(route('admin.dashboard'))->assertOk()->getContent()
-        );
+        $managerHtml = $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.dashboard'))->assertOk()->getContent();
+        $managerNavigation = $this->navigationHtml($managerHtml);
 
         $this->assertStringNotContainsString('admin.activity-logs.index', $managerNavigation);
         // Multi-cinema gives Manager scoped 'users.view' so it can manage branch Staff
@@ -109,7 +109,13 @@ class AdminNavigationFoundationTest extends TestCase
         $this->assertStringNotContainsString('admin.roles.index', $managerNavigation);
         $this->assertStringContainsString('admin.bookings.index', $managerNavigation);
         $this->assertStringContainsString('admin.payments.index', $managerNavigation);
-        $this->assertStringContainsString('admin.payment-reconciliation.index', $managerNavigation);
+        $this->assertStringNotContainsString('admin.payment-reconciliation.index', $managerNavigation);
+        $this->assertStringNotContainsString('Đối soát giao dịch', $managerNavigation);
+        $this->assertStringNotContainsString(route('admin.payment-reconciliation.index'), $managerNavigation);
+        $this->assertSame(1, substr_count($managerHtml, 'data-admin-sidebar-scroll'));
+        $provider = file_get_contents(app_path('Providers/AppServiceProvider.php'));
+        $this->assertStringNotContainsString('paymentReconciliationBadge', $provider);
+        $this->assertStringNotContainsString('badgeLabel()', $provider);
         $this->assertStringNotContainsString('admin.ticket-deliveries.index', $managerNavigation);
         $this->assertStringNotContainsString('Gửi vé điện tử', $managerNavigation);
         $this->assertStringContainsString('admin.ticket-checkins.index', $managerNavigation);
@@ -125,6 +131,8 @@ class AdminNavigationFoundationTest extends TestCase
             $this->actingAs($this->userWithRole('admin'))->get(route('admin.dashboard'))->assertOk()->getContent()
         );
         $this->assertStringContainsString('admin.activity-logs.index', $adminNavigation);
+        $this->assertStringNotContainsString('admin.payment-reconciliation.index', $adminNavigation);
+        $this->assertStringNotContainsString('Đối soát giao dịch', $adminNavigation);
     }
 
     public function test_admin_success_notification_is_rendered_once(): void

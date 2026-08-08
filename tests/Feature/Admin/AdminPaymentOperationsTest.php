@@ -250,9 +250,10 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         $this->assertSame(1, ActivityLog::query()->where('action', 'payment.provider_query_completed')->count());
     }
 
-    public function test_vnpay_review_is_resolved_only_by_authenticated_matching_query_evidence(): void
+    public function test_vnpay_review_is_resolved_without_requiring_zalopay_configuration(): void
     {
         $this->configureVnpay();
+        config(['payment.zalopay.app_id' => null]);
         $payment = $this->paymentMatchingBooking([
             'provider' => 'vnpay',
             'status' => Payment::STATUS_REVIEW,
@@ -407,7 +408,7 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         $this->assertLessThanOrEqual(12, $queryCount, 'Danh sách payment có dấu hiệu N+1.');
     }
 
-    public function test_detail_queue_and_badge_queries_are_bounded_and_navigation_has_one_active_item(): void
+    public function test_detail_and_queue_queries_are_bounded_while_reconciliation_stays_out_of_navigation(): void
     {
         $payment = $this->paymentMatchingBooking([
             'status' => Payment::STATUS_UNRESOLVED,
@@ -431,9 +432,9 @@ class AdminPaymentOperationsTest extends PaymentTestCase
         $this->assertLessThanOrEqual(15, $detailQueries, 'Chi tiết payment có dấu hiệu N+1.');
         $this->assertLessThanOrEqual(8, $queueQueries, 'Queue đối soát có dấu hiệu N+1.');
         $this->assertSame(1, substr_count($detail->getContent(), 'aria-current="page"'));
-        $this->assertSame(1, substr_count($queue->getContent(), 'aria-current="page"'));
+        $this->assertSame(0, substr_count($queue->getContent(), 'aria-current="page"'));
         $this->assertMatchesRegularExpression('/data-admin-nav-route="admin\.payments\.index"[^>]*aria-current="page"|aria-current="page"[^>]*data-admin-nav-route="admin\.payments\.index"/s', $detail->getContent());
-        $this->assertMatchesRegularExpression('/data-admin-nav-route="admin\.payment-reconciliation\.index"[^>]*aria-current="page"|aria-current="page"[^>]*data-admin-nav-route="admin\.payment-reconciliation\.index"/s', $queue->getContent());
+        $this->assertStringNotContainsString('data-admin-nav-route="admin.payment-reconciliation.index"', $queue->getContent());
     }
 
     public function test_reconciliation_badge_is_capped_at_ninety_nine_plus(): void
