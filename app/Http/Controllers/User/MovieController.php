@@ -6,17 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Cinema;
 use App\Models\Genre;
 use App\Models\Movie;
-use App\Services\CinemaContext;
-use App\Services\PublicShowtimeCatalog;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class MovieController extends Controller
 {
-    public function __construct(
-        private readonly CinemaContext $cinemaContext,
-        private readonly PublicShowtimeCatalog $catalog,
-    ) {}
-
     /**
      * Hiển thị danh sách phim cho người dùng.
      */
@@ -102,6 +96,17 @@ class MovieController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Lọc theo độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRating = $request->query('age_rating');
+
+        if ($ageRating) {
+            $query->where('age_rating', $ageRating);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | Sắp xếp
         |--------------------------------------------------------------------------
         */
@@ -165,6 +170,19 @@ class MovieController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Danh sách độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRatings = Movie::query()
+            ->whereIn('status', ['now_showing', 'coming_soon'])
+            ->whereNotNull('age_rating')
+            ->where('age_rating', '!=', '')
+            ->distinct()
+            ->orderBy('age_rating')
+            ->pluck('age_rating');
+
+        /*
+        |--------------------------------------------------------------------------
         | Tiêu đề trang
         |--------------------------------------------------------------------------
         */
@@ -178,6 +196,7 @@ class MovieController extends Controller
             'movies',
             'genres',
             'countries',
+            'ageRatings',
             'pageTitle',
             'search',
             'selectedCinema',
@@ -215,14 +234,40 @@ class MovieController extends Controller
             ])->values();
         }
 
-        return view('user.movies.show', [
-            'movie' => $movie,
-            'showtimes' => $showtimes,
-            'selectedCinema' => $selectedCinema,
-            'selectedDate' => $selectedDate,
-            'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name', 'address']),
-            'dates' => $this->catalog->dates($selectedCinema),
-            'preferredCinema' => $preferredCinema,
-        ]);
+        $now = now()->timezone('Asia/Ho_Chi_Minh');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Loại bỏ suất chiếu đã qua
+        |--------------------------------------------------------------------------
+        */
+        $showtimes = $movie->showtimes
+            ->filter(function ($showtime) use ($now) {
+                if (! $showtime->show_date || ! $showtime->show_time) {
+                    return false;
+                }
+
+                $showDate = Carbon::parse($showtime->show_date)
+                    ->timezone('Asia/Ho_Chi_Minh');
+
+                if ($showDate->isAfter($now->copy()->startOfDay())) {
+                    return true;
+                }
+
+                if ($showDate->isSameDay($now)) {
+                    return $showtime->show_time >= $now->format('H:i:s');
+                }
+
+                return false;
+            })
+            ->values();
+
+            $availableShowtimesCount = $showtimes->count();
+
+      return view('user.movies.show', compact(
+    'movie',
+    'showtimes',
+    'availableShowtimesCount'
+));
     }
 }
