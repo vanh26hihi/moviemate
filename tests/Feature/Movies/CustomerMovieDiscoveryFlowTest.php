@@ -43,6 +43,31 @@ class CustomerMovieDiscoveryFlowTest extends TestCase
             ->assertOk()->assertSee($movie->title);
     }
 
+    public function test_movie_card_uses_visual_only_poster_hover_and_real_zero_review_aggregate(): void
+    {
+        $movie = Movie::query()->create([
+            'title' => 'Zero Review Movie',
+            'slug' => 'zero-review-movie',
+            'duration' => 120,
+            'release_date' => '2030-06-01',
+            'status' => Movie::STATUS_NOW_SHOWING,
+        ]);
+
+        $response = $this->get(route('user.movies.index'))->assertOk();
+        $html = $response->getContent();
+        $start = strpos($html, 'data-movie-card="'.$movie->id.'"');
+        $this->assertNotFalse($start);
+        $card = substr($html, $start, strpos($html, '</article>', $start) - $start);
+
+        $this->assertStringContainsString('data-movie-poster', $card);
+        $this->assertStringNotContainsString('Chưa có', $card);
+        $this->assertStringContainsString('0.0', $card);
+        $this->assertStringContainsString('0 đánh giá', $card);
+        $this->assertSame(1, substr_count($card, 'data-movie-booking-action'));
+        $this->assertSame(1, substr_count($card, 'Đặt vé'));
+        $this->assertStringContainsString('Chi tiết', $card);
+    }
+
     public function test_preferred_branch_is_prioritized_without_hiding_other_branches(): void
     {
         $movie = Movie::query()->create(['title' => 'Priority Movie', 'slug' => 'priority-movie', 'duration' => 100, 'status' => 'now_showing']);
