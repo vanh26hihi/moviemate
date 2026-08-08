@@ -4,6 +4,7 @@ namespace Tests\Feature\Bookings;
 
 use App\Models\BookingTicketPrint;
 use App\Models\BookingTicketPrintEvent;
+use App\Models\Cinema;
 use App\Models\UserCinemaAssignment;
 use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Database\QueryException;
@@ -78,6 +79,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
         UserCinemaAssignment::query()->where('user_id', $staff->id)->update(['status' => 'revoked']);
 
         $this->get(route('staff.tickets.print.show', $booking))->assertNotFound();
+        $this->post(route('staff.tickets.print.reprint', $booking), ['reason_code' => 'printer_error'])->assertNotFound();
         $this->post(route('staff.tickets.print.succeed', $booking))->assertNotFound();
         $this->post(route('staff.tickets.print.fail', $booking), ['failure_code' => 'paper_jam'])->assertNotFound();
         $this->travel(11)->minutes();
@@ -138,34 +140,45 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->post(route('staff.tickets.print.start', $booking))->assertStatus(409);
     }
 
-    public function test_documented_failure_allows_one_retry_then_requires_manager_authorization(): void
+    public function test_multiple_reason_backed_reprints_after_success_need_no_approval(): void
     {
         $booking = $this->verifiedBooking();
         $staff = $this->userWithRole('staff');
         $this->actingAs($staff)->post(route('staff.tickets.print.start', $booking));
-        $this->post(route('staff.tickets.print.fail', $booking), ['failure_code' => 'paper_jam'])
-            ->assertRedirect(route('staff.tickets.operations', $booking));
-        $this->assertSame(BookingTicketPrint::STATUS_RETRY_ALLOWED, BookingTicketPrint::query()->sole()->status);
-
-        $this->post(route('staff.tickets.print.start', $booking));
-        $this->assertSame(2, BookingTicketPrint::query()->sole()->attempts_count);
-        $this->post(route('staff.tickets.print.fail', $booking), ['failure_code' => 'printer_offline']);
-        $state = BookingTicketPrint::query()->sole();
-        $this->assertSame(BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION, $state->status);
+        $this->post(route('staff.tickets.print.succeed', $booking));
         $this->post(route('staff.tickets.print.start', $booking))->assertStatus(409);
 
-        $manager = $this->userWithRole('manager');
-        $this->actingAs($manager)->post(route('admin.bookings.ticket-print.authorize-retry', $booking), ['safe_note' => 'Đã kiểm tra máy in dự phòng.'])
-            ->assertRedirect()->assertSessionHas('success', 'Đã cho phép thực hiện thêm một lần in.');
-        $state->refresh();
-        $this->assertSame(BookingTicketPrint::STATUS_RETRY_AUTHORIZED, $state->status);
-        $this->assertSame($manager->id, $state->retry_authorized_by_user_id);
-        $this->assertNull($state->printed_at);
-        $this->assertDatabaseHas('booking_ticket_print_events', ['event_type' => 'retry_authorized']);
-        $this->assertDatabaseHas('activity_logs', ['action' => 'ticket.print_retry_authorized']);
+        foreach ([
+            ['reason_code' => 'damaged_ticket'],
+            ['reason_code' => 'customer_lost_ticket'],
+            ['reason_code' => 'other', 'safe_note' => '<b>Khách cần bản thay thế tại quầy</b>'],
+        ] as $index => $payload) {
+            $this->post(route('staff.tickets.print.reprint', $booking), $payload)
+                ->assertRedirect(route('staff.tickets.print.show', $booking));
+            $this->assertSame($index + 2, BookingTicketPrint::query()->sole()->attempts_count);
+            $this->post(route('staff.tickets.print.succeed', $booking))
+                ->assertRedirect(route('staff.tickets.operations', $booking));
+        }
+
+        $state = BookingTicketPrint::query()->sole();
+        $this->assertSame(BookingTicketPrint::STATUS_PRINTED, $state->status);
+        $this->assertSame(4, $state->attempts_count);
+        $this->assertSame($staff->id, $state->printed_by_user_id);
+        $this->assertSame(3, BookingTicketPrintEvent::query()->where('event_type', 'reprint_requested')->count());
+        $this->assertSame(4, BookingTicketPrintEvent::query()->where('event_type', 'print_started')->count());
+        $this->assertSame(4, BookingTicketPrintEvent::query()->where('event_type', 'print_succeeded')->count());
+        $this->assertDatabaseHas('booking_ticket_print_events', [
+            'event_type' => 'reprint_requested',
+            'attempt_number' => 4,
+            'failure_code' => 'other',
+            'safe_note' => 'Khách cần bản thay thế tại quầy',
+            'actor_user_id' => $staff->id,
+        ]);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'ticket.reprint_requested']);
+        $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.bookings.ticket-print.authorize-retry'));
     }
 
-    public function test_failure_validation_and_unauthorized_override_are_enforced(): void
+    public function test_reprint_reason_and_failure_validation_are_enforced(): void
     {
         $booking = $this->verifiedBooking();
         $staff = $this->userWithRole('staff');
@@ -176,7 +189,59 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->assertSame(BookingTicketPrint::STATUS_PRINTING, BookingTicketPrint::query()->sole()->status);
         $this->post(route('staff.tickets.print.fail', $booking), ['failure_code' => 'other', 'safe_note' => '<b>Máy không nhận giấy</b>']);
         $this->assertDatabaseHas('booking_ticket_print_events', ['failure_code' => 'other', 'safe_note' => 'Máy không nhận giấy']);
-        $this->actingAs($staff)->post(route('admin.bookings.ticket-print.authorize-retry', $booking))->assertForbidden();
+
+        $beforeEvents = BookingTicketPrintEvent::query()->count();
+        $this->post(route('staff.tickets.print.reprint', $booking), [])->assertSessionHasErrors('reason_code');
+        $this->post(route('staff.tickets.print.reprint', $booking), ['reason_code' => 'other'])->assertSessionHasErrors('safe_note');
+        $this->post(route('staff.tickets.print.reprint', $booking), [
+            'reason_code' => 'other',
+            'safe_note' => str_repeat('x', 301),
+        ])->assertSessionHasErrors('safe_note');
+        $this->post(route('staff.tickets.print.reprint', $booking), ['reason_code' => 'unbounded_raw'])->assertSessionHasErrors('reason_code');
+        $state = BookingTicketPrint::query()->sole();
+        $this->assertSame(1, $state->attempts_count);
+        $this->assertNull($state->active_operation_id);
+        $this->assertSame($beforeEvents, BookingTicketPrintEvent::query()->count());
+    }
+
+    public function test_repeated_failures_can_each_be_reprinted_with_an_explicit_reason(): void
+    {
+        $booking = $this->verifiedBooking();
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.tickets.print.start', $booking));
+        $this->post(route('staff.tickets.print.fail', $booking), ['failure_code' => 'printer_error']);
+
+        foreach (['printer_error', 'paper_jam'] as $reason) {
+            $this->post(route('staff.tickets.print.reprint', $booking), ['reason_code' => $reason])->assertRedirect();
+            $this->post(route('staff.tickets.print.fail', $booking), ['failure_code' => $reason])->assertRedirect();
+            $this->assertSame(BookingTicketPrint::STATUS_RETRY_ALLOWED, BookingTicketPrint::query()->sole()->status);
+        }
+
+        $this->post(route('staff.tickets.print.reprint', $booking), ['reason_code' => 'out_of_paper'])->assertRedirect();
+        $this->post(route('staff.tickets.print.succeed', $booking))->assertRedirect();
+        $this->assertSame(4, BookingTicketPrint::query()->sole()->attempts_count);
+        $this->assertSame(3, BookingTicketPrintEvent::query()->where('event_type', 'reprint_requested')->count());
+        $this->assertDatabaseMissing('booking_ticket_print_events', ['event_type' => 'retry_authorized']);
+    }
+
+    public function test_cross_branch_reprint_is_hidden_even_with_a_valid_booking_id_and_reason(): void
+    {
+        $booking = $this->verifiedBooking();
+        $staff = $this->userWithRole('staff');
+        $otherCinema = Cinema::factory()->create(['is_primary' => false, 'status' => 'active']);
+        $booking->forceFill(['cinema_id' => $otherCinema->id])->save();
+        BookingTicketPrint::query()->create([
+            'booking_id' => $booking->id,
+            'status' => BookingTicketPrint::STATUS_PRINTED,
+            'attempts_count' => 1,
+            'printed_by_user_id' => $staff->id,
+            'printed_at' => now(),
+        ]);
+
+        $this->actingAs($staff)->get(route('staff.tickets.operations', $booking))->assertNotFound();
+        $this->post(route('staff.tickets.print.reprint', $booking), ['reason_code' => 'damaged_ticket'])->assertNotFound();
+        $this->assertSame(1, BookingTicketPrint::query()->sole()->attempts_count);
+        $this->assertDatabaseCount('booking_ticket_print_events', 0);
     }
 
     public function test_expired_print_back_navigation_recovers_without_get_mutation(): void
@@ -218,6 +283,29 @@ final class TicketOperationsR3Test extends PaymentTestCase
             ->assertSessionHas('success', 'Vé này đã được ghi nhận in thành công.');
         $this->assertSame(1, BookingTicketPrint::query()->sole()->attempts_count);
         $this->assertSame(1, BookingTicketPrintEvent::query()->where('event_type', 'print_succeeded')->count());
+    }
+
+    public function test_staff_and_admin_details_report_reprints_without_an_approval_action(): void
+    {
+        $booking = $this->verifiedBooking();
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.tickets.print.start', $booking));
+        $this->post(route('staff.tickets.print.succeed', $booking));
+        $this->post(route('staff.tickets.print.reprint', $booking), ['reason_code' => 'faded_ticket']);
+        $this->post(route('staff.tickets.print.succeed', $booking));
+
+        $this->get(route('staff.tickets.operations', $booking))->assertOk()
+            ->assertSee('In lại 1 lần')->assertSee('Vé in mờ/không đọc được')
+            ->assertSee('In lại vé')->assertSee('Lịch sử vận hành')
+            ->assertDontSee('phê duyệt', false);
+
+        $manager = $this->userWithRole('manager');
+        $this->actingAs($manager)->get(route('admin.bookings.show', $booking))->assertOk()
+            ->assertSee('Số lần in')->assertSee('Số lần in lại')
+            ->assertSee('Người in gần nhất')->assertSee('Lý do in lại gần nhất')
+            ->assertSee('Vé in mờ/không đọc được')->assertSee('Yêu cầu in lại')
+            ->assertDontSee('Cho phép thêm một lần in')
+            ->assertDontSee('Phê duyệt in lại');
     }
 
     public function test_unpaid_cancelled_refunded_expired_and_used_bookings_cannot_start_print(): void

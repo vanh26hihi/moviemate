@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\BookingTicketPrintEvent;
 use App\Services\CinemaAccessService;
 use App\Services\Tickets\TicketCheckinCapability;
 use App\Services\Tickets\TicketQrPayload;
@@ -59,6 +60,10 @@ final class TicketWorkspaceController extends Controller
             $booking->payment_status !== 'paid' || ! $verified => 'Vé chưa có thanh toán được xác minh.',
             default => 'Vé hợp lệ và đã thanh toán.',
         };
+        $printEvents = $booking->ticketPrint
+            ? BookingTicketPrintEvent::query()->with('actor:id,name')
+                ->where('booking_id', $booking->id)->latest('id')->get()
+            : collect();
 
         return view('staff.tickets.operations', [
             'booking' => $booking,
@@ -66,6 +71,7 @@ final class TicketWorkspaceController extends Controller
             'customerEmail' => PrivacyMask::email($booking->recipient_email),
             'eligibilityMessage' => $eligibility,
             'printState' => $booking->ticketPrint,
+            'printEvents' => $printEvents,
             'checkinEvent' => $booking->acceptedTicketCheckin,
         ]);
     }

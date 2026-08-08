@@ -36,7 +36,6 @@ final class AdminBookingDetailService
             'ticketDelivery',
             'ticketPrint.printedBy:id,name',
             'ticketPrint.lastFailedBy:id,name',
-            'ticketPrint.retryAuthorizedBy:id,name',
         ]);
 
         $payments = $booking->payments()->with('settledBy:id,name,email')->latest('id')->limit(100)->get();
@@ -80,8 +79,10 @@ final class AdminBookingDetailService
         $printState = $booking->ticketPrint;
         $printEvents = $printState
             ? BookingTicketPrintEvent::query()->with('actor:id,name')
-                ->where('booking_id', $booking->id)->latest('id')->limit(20)->get()
+                ->where('booking_id', $booking->id)->latest('id')->get()
             : collect();
+        $latestPrintEvent = $printEvents->firstWhere('event_type', 'print_started');
+        $latestReprintEvent = $printEvents->firstWhere('event_type', 'reprint_requested');
 
         return [
             'booking' => $booking,
@@ -106,6 +107,8 @@ final class AdminBookingDetailService
                 && ! $this->deliveryRetries->hasActiveClaim($booking->ticketDelivery),
             'printState' => $printState,
             'printEvents' => $printEvents,
+            'latestPrintEvent' => $latestPrintEvent,
+            'latestReprintEvent' => $latestReprintEvent,
             'checkins' => $checkins,
             'acceptedCheckin' => $acceptedCheckin,
             'duplicateCheckinCount' => $duplicateCount,

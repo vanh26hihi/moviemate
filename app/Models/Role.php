@@ -11,6 +11,8 @@ class Role extends Model
 {
     public const EDITABLE_SLUGS = ['manager', 'staff'];
 
+    public const DEPRECATED_PERMISSION_SLUGS = ['tickets.print.override'];
+
     public const MANAGER_PERMISSION_SLUGS = [
         'admin.access', 'dashboard.view',
         'cinema.view', 'cinema.update', 'cinemas.view', 'cinemas.operations.manage',
@@ -32,7 +34,7 @@ class Role extends Model
         'discounts.view', 'discounts.manage',
         'reviews.view', 'reviews.moderate',
         'reports.view', 'tickets.print', 'tickets.checkin', 'tickets.lookup',
-        'tickets.print.override', 'ticket_prints.view',
+        'ticket_prints.view',
     ];
 
     public const STAFF_PERMISSION_SLUGS = [

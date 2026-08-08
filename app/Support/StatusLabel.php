@@ -63,9 +63,9 @@ final class StatusLabel
             'unprinted' => 'Chưa in',
             'printing' => 'Đang in',
             'printed' => 'Đã in',
-            'retry_allowed' => 'In lỗi · được thử lại',
-            'retry_requires_authorization' => 'Chờ duyệt in lại',
-            'retry_authorized' => 'Được phép in lại',
+            'retry_allowed' => 'In lỗi · cần ghi lý do in lại',
+            'retry_requires_authorization' => 'Cần ghi lý do in lại',
+            'retry_authorized' => 'Sẵn sàng ghi lý do in lại',
         ],
         'movie' => [
             'draft' => 'Bản nháp',

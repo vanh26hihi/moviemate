@@ -71,24 +71,17 @@
             <h2 class="text-xl font-extrabold app-heading">In vé cứng</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Trạng thái</dt><dd class="font-bold app-text">{{ $printState?->status_label ?? 'Chưa có dữ liệu in' }}</dd></div>
-                <div><dt class="text-sm app-muted">Số lần bắt đầu</dt><dd class="font-bold app-text">{{ $printState?->attempts_count ?? 0 }}</dd></div>
-                <div><dt class="text-sm app-muted">Người in thành công</dt><dd class="font-bold app-text">{{ $printState?->printedBy?->name ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">In thành công lúc</dt><dd class="font-bold app-text">{{ $printState?->printed_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Số lần in</dt><dd class="font-bold app-text">{{ $printState?->attempts_count ?? 0 }}</dd></div>
+                <div><dt class="text-sm app-muted">Số lần in lại</dt><dd class="font-bold app-text">{{ max(0, ($printState?->attempts_count ?? 0) - 1) }}</dd></div>
+                <div><dt class="text-sm app-muted">Người in gần nhất</dt><dd class="font-bold app-text">{{ $latestPrintEvent?->actor?->name ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Thời gian in gần nhất</dt><dd class="font-bold app-text">{{ $latestPrintEvent?->created_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Lý do in lại gần nhất</dt><dd class="font-bold app-text">{{ $latestReprintEvent ? (\App\Services\Tickets\TicketPrintService::REPRINT_REASONS[$latestReprintEvent->failure_code] ?? 'Lý do đã được ghi nhận') : '—' }}@if($latestReprintEvent?->safe_note)<span class="mt-1 block max-w-md break-words text-xs app-muted">{{ $latestReprintEvent->safe_note }}</span>@endif</dd></div>
                 <div><dt class="text-sm app-muted">Lỗi gần nhất</dt><dd class="font-bold app-text">{{ $printState?->last_failure_code ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$printState->last_failure_code] ?? 'Lỗi in') : '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Duyệt in lại</dt><dd class="font-bold app-text">{{ $printState?->retryAuthorizedBy?->name ?? '—' }} @if($printState?->retry_authorized_at)· {{ $printState->retry_authorized_at->format('d/m/Y H:i:s') }}@endif</dd></div>
             </dl>
-            @can('tickets.print.override')
-                @if($printState?->status === 'retry_requires_authorization')
-                    <form method="POST" action="{{ route('admin.bookings.ticket-print.authorize-retry', $booking) }}" class="mt-5">@csrf
-                        <label class="cinema-label">Ghi chú duyệt (không chứa dữ liệu máy in)<textarea name="safe_note" maxlength="300" class="cinema-input mt-1"></textarea></label>
-                        <button class="btn-primary mt-3" type="submit">Cho phép thêm một lần in</button>
-                    </form>
-                @endif
-            @endcan
             @can('ticket_prints.view')
                 @if($printEvents->isNotEmpty())
-                    <div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Sự kiện</th><th>Lần</th><th>Chi tiết an toàn</th><th>Người thực hiện</th></tr></thead><tbody>
-                        @foreach($printEvents as $event)<tr><td>{{ $event->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ match($event->event_type) { 'print_started' => 'Bắt đầu in', 'print_succeeded' => 'In thành công', 'print_failed' => 'In lỗi', 'retry_authorized' => 'Duyệt in lại', 'stale_print_released' => 'Lần in hết hạn', default => 'Sự kiện in' } }}</td><td>{{ $event->attempt_number }}</td><td>{{ $event->failure_code ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? 'Lỗi in') : '—' }}@if($event->safe_note)<span class="mt-1 block max-w-md break-words text-xs app-muted">{{ $event->safe_note }}</span>@endif</td><td>{{ $event->actor?->name ?? 'Hệ thống' }}</td></tr>@endforeach
+                    <div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Nhân viên</th><th>Hành động</th><th>Lần in</th><th>Lý do</th><th>Kết quả</th></tr></thead><tbody>
+                        @foreach($printEvents as $event)<tr><td>{{ $event->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $event->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($event->event_type) { 'print_started' => $event->attempt_number === 1 ? 'In lần đầu' : 'Bắt đầu in lại', 'reprint_requested' => 'Yêu cầu in lại', 'print_succeeded' => 'Xác nhận kết quả', 'print_failed' => 'Xác nhận kết quả', 'retry_authorized' => 'Dữ liệu duyệt cũ', 'stale_print_released' => 'Lần in hết hạn', default => 'Sự kiện in' } }}</td><td>#{{ $event->attempt_number }}</td><td>{{ $event->event_type === 'reprint_requested' || ($event->event_type === 'print_started' && $event->attempt_number > 1) ? (\App\Services\Tickets\TicketPrintService::REPRINT_REASONS[$event->failure_code] ?? '—') : ($event->event_type === 'print_failed' ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? '—') : '—') }}@if($event->safe_note)<span class="mt-1 block max-w-md break-words text-xs app-muted">{{ $event->safe_note }}</span>@endif</td><td>{{ match($event->event_type) { 'print_succeeded' => 'Thành công', 'print_failed' => 'Lỗi', 'reprint_requested' => 'Đã ghi nhận lý do', 'print_started' => 'Đang xử lý', 'stale_print_released' => 'Hết hạn', 'retry_authorized' => 'Lịch sử', default => 'Đã ghi nhận' } }}</td></tr>@endforeach
                     </tbody></table></div>
                 @endif
             @endcan
@@ -214,7 +207,7 @@
         <section class="cinema-card overflow-hidden">
             <div class="border-b app-border p-6"><h2 class="text-xl font-extrabold app-heading">Lịch sử hoạt động</h2></div>
             <div class="overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Mã yêu cầu</th></tr></thead><tbody>
-                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', 'ticket.print_started' => 'Bắt đầu in vé cứng', 'ticket.print_succeeded' => 'Xác nhận in thành công', 'ticket.print_failed' => 'Ghi nhận in lỗi', 'ticket.print_retry_authorized' => 'Cho phép in lại', 'ticket.print_stale_released' => 'Giải phóng lần in hết hạn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
+                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', 'ticket.reprint_requested' => 'Ghi nhận lý do in lại', 'ticket.print_started' => 'Bắt đầu in vé cứng', 'ticket.print_succeeded' => 'Xác nhận in thành công', 'ticket.print_failed' => 'Ghi nhận in lỗi', 'ticket.print_retry_authorized' => 'Lịch sử cấp quyền in cũ', 'ticket.print_stale_released' => 'Giải phóng lần in hết hạn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
                 @empty<tr><td colspan="4" class="py-8 text-center app-muted">Chưa có hoạt động quản trị liên quan.</td></tr>@endforelse
             </tbody></table></div>
         </section>
