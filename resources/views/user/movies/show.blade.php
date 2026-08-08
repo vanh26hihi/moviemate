@@ -15,31 +15,26 @@
 @section('content')
 <div class="cinema-surface relative overflow-hidden">
 
-    {{-- Background cover --}}
     <div class="absolute inset-x-0 top-0 h-[28rem] opacity-40">
         @if($cover)
             <img
                 src="{{ $cover }}"
                 alt="{{ $movie->title }}"
-                class="w-full h-full object-cover blur-sm scale-105"
+                class="h-full w-full scale-105 object-cover blur-sm"
                 loading="lazy"
             >
-
             <div class="absolute inset-0 bg-gradient-to-b from-dark-main/60 via-dark-main/80 to-dark-main"></div>
         @else
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,61,87,0.28),transparent_34%),radial-gradient(circle_at_82%_12%,rgba(124,58,237,0.22),transparent_32%)]"></div>
         @endif
     </div>
 
-    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
+    <div class="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-14 lg:px-8">
 
-        {{-- Thông tin phim --}}
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+        <div class="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-12">
 
-            {{-- Poster --}}
             <div class="lg:col-span-4">
-                <div class="poster-frame rounded-3xl cinema-card overflow-hidden shadow-2xl shadow-black/30">
-
+                <div class="poster-frame cinema-card overflow-hidden rounded-3xl shadow-2xl shadow-black/30">
                     @if($poster)
                         <img
                             src="{{ $poster }}"
@@ -49,33 +44,21 @@
                     @else
                         <div class="fallback-poster">
                             <i class="ph-fill ph-film-slate"></i>
-
-                            <strong class="text-2xl">
-                                MovieMate
-                            </strong>
-
-                            <span>
-                                {{ $movie->title }}
-                            </span>
+                            <strong class="text-2xl">MovieMate</strong>
+                            <span>{{ $movie->title }}</span>
                         </div>
                     @endif
-
                 </div>
             </div>
 
+            <div class="pt-2 lg:col-span-8 lg:pt-8">
 
-            {{-- Chi tiết phim --}}
-            <div class="lg:col-span-8 pt-2 lg:pt-8">
-
-                {{-- Badge --}}
-                <div class="flex flex-wrap items-center gap-3 mb-5">
-
+                <div class="mb-5 flex flex-wrap items-center gap-3">
                     <span
                         class="{{ $movie->status === 'now_showing'
                             ? 'bg-brand-start'
                             : 'bg-ai-start' }}
-                        text-white text-xs font-extrabold
-                        px-3 py-1.5 rounded-full uppercase tracking-wider"
+                        rounded-full px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white"
                     >
                         {{ $movie->status === 'now_showing'
                             ? 'Đang chiếu'
@@ -83,94 +66,65 @@
                     </span>
 
                     @if($movie->age_rating)
-                        <span class="border app-border app-text text-xs font-extrabold px-3 py-1.5 rounded-full">
+                        <span class="rounded-full border app-border px-3 py-1.5 text-xs font-extrabold app-text">
                             {{ $movie->age_rating }}
                         </span>
                     @endif
 
-                    <span class="border app-border app-text text-xs font-extrabold px-3 py-1.5 rounded-full">
+                    <span class="rounded-full border app-border px-3 py-1.5 text-xs font-extrabold app-text">
                         <i class="ph-fill ph-star text-brand-start"></i>
-                        8.6
+                        {{ $movie->reviews_avg_rating
+                            ? number_format((float) $movie->reviews_avg_rating, 1)
+                            : 'Chưa có' }}
                     </span>
-
                 </div>
 
-
-                {{-- Tên phim --}}
-                <h1 class="hero-title text-4xl md:text-6xl font-extrabold app-text mb-6">
+                <h1 class="hero-title mb-6 text-4xl font-extrabold app-text md:text-6xl">
                     {{ $movie->title }}
                 </h1>
 
-
-                {{-- Thông tin nhanh --}}
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-7">
+                <div class="mb-7 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div class="cinema-card p-4">
+                        <p class="mb-1 text-xs app-muted">Thể loại</p>
+                        <p class="line-clamp-1 font-bold app-text">{{ $genresText }}</p>
+                    </div>
 
                     <div class="cinema-card p-4">
-                        <p class="text-xs app-muted mb-1">
-                            Thể loại
-                        </p>
-
-                        <p class="app-text font-bold line-clamp-1">
-                            {{ $genresText }}
+                        <p class="mb-1 text-xs app-muted">Thời lượng</p>
+                        <p class="font-bold app-text">
+                            {{ $movie->duration ? $movie->duration . ' phút' : 'Đang cập nhật' }}
                         </p>
                     </div>
 
                     <div class="cinema-card p-4">
-                        <p class="text-xs app-muted mb-1">
-                            Thời lượng
-                        </p>
-
-                        <p class="app-text font-bold">
-                            {{ $movie->duration ?? '--' }} phút
-                        </p>
-                    </div>
-
-                    <div class="cinema-card p-4">
-                        <p class="text-xs app-muted mb-1">
-                            Quốc gia
-                        </p>
-
-                        <p class="app-text font-bold">
+                        <p class="mb-1 text-xs app-muted">Quốc gia</p>
+                        <p class="font-bold app-text">
                             {{ $movie->country ?? 'Đang cập nhật' }}
                         </p>
                     </div>
 
                     <div class="cinema-card p-4">
-                        <p class="text-xs app-muted mb-1">
-                            Khởi chiếu
-                        </p>
-
-                        <p class="app-text font-bold">
+                        <p class="mb-1 text-xs app-muted">Khởi chiếu</p>
+                        <p class="font-bold app-text">
                             {{ $movie->release_date
                                 ? \Carbon\Carbon::parse($movie->release_date)->format('d/m/Y')
                                 : 'Chưa xác định' }}
                         </p>
                     </div>
-
                 </div>
 
-
-                {{-- Nội dung --}}
-                <div class="cinema-card p-5 sm:p-6 mb-6">
-
-                    <h2 class="text-xl font-extrabold app-text mb-3 border-l-4 border-brand-start pl-3">
+                <div class="cinema-card mb-6 p-5 sm:p-6">
+                    <h2 class="mb-3 border-l-4 border-brand-start pl-3 text-xl font-extrabold app-text">
                         Nội dung phim
                     </h2>
 
-                    <p class="app-muted leading-relaxed">
+                    <p class="leading-relaxed app-muted">
                         {{ $movie->description ?? 'Nội dung phim đang được cập nhật.' }}
                     </p>
-
                 </div>
 
-
-                {{-- Button --}}
                 <div class="flex flex-wrap gap-3">
-
-                    <a
-                        href="#showtimes"
-                        class="btn-primary"
-                    >
+                    <a href="#showtimes" class="btn-primary">
                         <i class="ph-fill ph-ticket"></i>
                         Xem lịch chiếu
                     </a>
@@ -186,39 +140,35 @@
                             Xem trailer
                         </a>
                     @endif
-
                 </div>
 
             </div>
         </div>
 
-
-        {{-- Lịch chiếu --}}
         <section id="showtimes" class="mt-14">
 
-            <div class="flex items-center gap-3 mb-6">
-
-                <span class="w-1 h-8 rounded-full bg-gradient-to-b from-brand-start to-brand-end"></span>
+            <div class="mb-6 flex items-center gap-3">
+                <span class="h-8 w-1 rounded-full bg-gradient-to-b from-brand-start to-brand-end"></span>
 
                 <div>
-                    <h2 class="text-2xl md:text-3xl font-extrabold app-text">
+                    <h2 class="text-2xl font-extrabold app-text md:text-3xl">
                         Lịch chiếu
                     </h2>
+
                     <p class="text-sm font-semibold text-brand-start">
-                        {{ $availableShowtimesCount }} suất chiếu đang khả dụng
+                        {{ $availableShowtimesCount ?? $showtimes->count() }}
+                        suất chiếu đang khả dụng
                     </p>
-                    <p class="app-muted text-sm mt-1">
+
+                    <p class="mt-1 text-sm app-muted">
                         Chọn ngày, rạp và giờ chiếu phù hợp để đặt vé.
                     </p>
                 </div>
-
             </div>
-
 
             @if($showtimes->isEmpty())
 
                 <div class="cinema-card p-8 text-center">
-
                     <i class="ph-fill ph-calendar-x text-4xl text-brand-start"></i>
 
                     <h3 class="mt-4 text-xl font-extrabold app-text">
@@ -228,7 +178,6 @@
                     <p class="mt-2 app-muted">
                         Hiện chưa có suất chiếu khả dụng cho phim này.
                     </p>
-
                 </div>
 
             @else
@@ -239,11 +188,10 @@
 
                         <div class="cinema-card p-5">
 
-                            {{-- Ngày chiếu --}}
-                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
                                 <div>
-                                    <p class="text-brand-start text-sm font-extrabold uppercase tracking-wider">
+                                    <p class="text-sm font-extrabold uppercase tracking-wider text-brand-start">
                                         {{ \Carbon\Carbon::parse($date)->translatedFormat('l') }}
                                     </p>
 
@@ -251,7 +199,7 @@
                                         <h3 class="text-xl font-extrabold app-text">
                                             {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}
                                         </h3>
-                                    
+
                                         @if(\Carbon\Carbon::parse($date)->isToday())
                                             <span class="rounded-full bg-brand-start px-2.5 py-1 text-xs font-extrabold text-white">
                                                 Hôm nay
@@ -260,133 +208,118 @@
                                     </div>
                                 </div>
 
-                                <span class="app-muted text-sm">
+                                <span class="text-sm app-muted">
                                     {{ $items->count() }} suất chiếu
                                 </span>
 
                             </div>
 
-
-                            {{-- Nhóm theo rạp --}}
                             <div class="space-y-4">
 
                                 @foreach($items->groupBy('cinema_id') as $cinemaShowtimes)
 
                                     @php
                                         $first = $cinemaShowtimes->first();
+
+                                        $nearestShowtime = $cinemaShowtimes
+                                            ->sortBy('show_time')
+                                            ->first();
                                     @endphp
 
-                                    <div class="app-secondary border app-border rounded-2xl p-4">
+                                    <div class="rounded-2xl border app-border app-secondary p-4">
 
                                         <div class="flex flex-col gap-4">
 
-                                            {{-- Thông tin rạp --}}
                                             <div>
-
-                                                <h4 class="app-text font-extrabold">
-                                                    {{ $first->cinema->name }}
+                                                <h4 class="font-extrabold app-text">
+                                                    {{ $first->cinema->name ?? 'MovieMate Cinema' }}
                                                 </h4>
 
-                                                @if($first->cinema->address)
+                                                @if($first->cinema?->address)
                                                     <p class="mt-1 text-sm app-muted">
                                                         {{ $first->cinema->address }}
                                                     </p>
                                                 @endif
 
                                                 <p class="mt-1 text-xs font-semibold text-brand-start">
-                                                    {{ $cinemaShowtimes->count() }} suất chiếu khả dụng
+                                                    {{ $cinemaShowtimes->count() }}
+                                                    suất chiếu khả dụng
                                                 </p>
-
                                             </div>
 
-
-                                            {{-- Các suất chiếu --}}
-                                            <div class="flex flex-wrap gap-2">
-                                                @php
-                                                    $nearestShowtime = $cinemaShowtimes->first();
-                                                @endphp
+                                            <div class="flex flex-wrap gap-3">
 
                                                 @foreach($cinemaShowtimes as $show)
 
-                                                @if($show->id === $nearestShowtime->id)
+                                                    @php
+                                                        $showDateValue = $show->show_date instanceof \Carbon\Carbon
+                                                            ? $show->show_date->format('Y-m-d')
+                                                            : \Carbon\Carbon::parse($show->show_date)->format('Y-m-d');
 
-                                                    <span class="text-[10px] font-bold text-brand-start">
-                                                        Suất gần nhất
-                                                    </span>
+                                                        $showDateTime = \Carbon\Carbon::parse(
+                                                            $showDateValue . ' ' . $show->show_time,
+                                                            'Asia/Ho_Chi_Minh'
+                                                        );
 
-                                                @endif
-                                                                                            @if($show->available_seats > 0)
-                                                <div class="mt-1 text-center text-[10px] font-semibold">
-                                                    <i class="ph ph-armchair"></i>
-                                                    Còn {{ $show->available_seats }} ghế
-                                                </div>
-                                            @else
-                                                <div class="mt-1 text-center text-[10px] font-extrabold text-error">
-                                                    Hết ghế
-                                                </div>
-                                            @endif
-                                                                                            @php
-                                                $showDateTime = \Carbon\Carbon::parse(
-                                                    $show->show_date->format('Y-m-d') . ' ' . $show->show_time,
-                                                    'Asia/Ho_Chi_Minh'
-                                                );
-                                            
-                                                $minutesUntilShow = now('Asia/Ho_Chi_Minh')->diffInMinutes(
-                                                    $showDateTime,
-                                                    false
-                                                );
-                                            
-                                                $isStartingSoon = $minutesUntilShow >= 0 && $minutesUntilShow <= 60;
-                                            @endphp
-                                                    <a
-                                                        href="{{ route('user.bookings.selectSeat', $show->id) }}"
-                                                        class="min-w-[110px] rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 text-brand-start transition-colors hover:bg-brand-start hover:text-white"
-                                                    >
+                                                        $minutesUntilShow = (int) now('Asia/Ho_Chi_Minh')
+                                                            ->diffInMinutes($showDateTime, false);
 
-                                                        {{-- Giờ --}}
-                                                        <div class="font-extrabold text-center">
-                                                            {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
-                                                            @if($isStartingSoon)
-                                                            <div class="mt-1 text-center text-[10px] font-extrabold">
-                                                                Sắp bắt đầu
+                                                        $isStartingSoon =
+                                                            $minutesUntilShow >= 0 &&
+                                                            $minutesUntilShow <= 60;
+
+                                                        $isNearest =
+                                                            $nearestShowtime &&
+                                                            $show->id === $nearestShowtime->id;
+                                                    @endphp
+
+                                                    <div class="min-w-[125px]">
+
+                                                        @if($isNearest)
+                                                            <div class="mb-1 text-center text-[10px] font-bold text-brand-start">
+                                                                Suất gần nhất
                                                             </div>
                                                         @endif
-                                                                @endif
-                                                                @if($minutesUntilShow > 0 && $minutesUntilShow <= 120)
-                                                                        <div class="mt-1 text-center text-[10px] font-semibold opacity-80">
-                                                                            Còn {{ $minutesUntilShow }} phút
-                                                                        </div>
-                                                                    @endif
+
+                                                        @if(isset($show->available_seats) && $show->available_seats <= 0)
+
+                                                        <div class="block cursor-not-allowed rounded-xl border border-slate-500/30 bg-slate-500/10 px-4 py-2 text-slate-500 opacity-70">
+                                                            <div class="text-center font-extrabold">
+                                                                {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
+                                                            </div>
+                                                    
+                                                            <div class="mt-1 text-center text-[10px] font-semibold">
+                                                                {{ $show->room->name ?? 'Phòng chiếu' }}
+                                                            </div>
+                                                    
+                                                            <div class="mt-1 text-center text-[10px] font-extrabold">
+                                                                Hết ghế
+                                                            </div>
                                                         </div>
+                                                    
+                                                    @else
+                                                    
+                                                        <a
+                                                            href="{{ route('user.bookings.selectSeat', $show->id) }}"
+                                                            class="block rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 text-brand-start transition-colors hover:bg-brand-start hover:text-white"
+                                                        >
+                                                            <div class="text-center font-extrabold">
+                                                                {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
+                                                            </div>
+                                                    
+                                                            <div class="mt-1 text-center text-[10px] font-semibold opacity-80">
+                                                                {{ $show->room->name ?? 'Phòng chiếu' }}
+                                                            </div>
+                                                    
+                                                            <div class="mt-1 text-center text-[10px]">
+                                                                Còn {{ $show->available_seats ?? '?' }} ghế
+                                                            </div>
+                                                        </a>
+                                                    
+                                                    @endif
+                                                    </div>
 
-                                                        @foreach($cinemaShowtimes as $show)
-    <a href="{{ route('user.bookings.selectSeat', $show->id) }}"
-       class="px-4 py-2 rounded-xl bg-brand-start/10 border border-brand-start/30 text-brand-start font-extrabold hover:bg-brand-start hover:text-white transition-colors">
-
-        {{-- Giờ chiếu --}}
-        <div class="text-center">
-            {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
-        </div>
-
-        {{-- Phòng chiếu --}}
-        <div class="mt-1 text-center text-[10px] font-semibold opacity-80">
-            {{ $show->room->name ?? 'Phòng chiếu' }}
-        </div>
-
-        {{-- Giá vé thường --}}
-        <div class="mt-1 text-center text-[10px] opacity-80">
-            {{ number_format((float) $show->price, 0, ',', '.') }}đ
-        </div>
-
-        {{-- Giá vé VIP --}}
-        @if($show->vip_price)
-            <div class="text-center text-[10px] opacity-70">
-                VIP: {{ number_format((float) $show->vip_price, 0, ',', '.') }}đ
-            </div>
-        @endif
-
-    </a>
-@endforeach
+                                                @endforeach
 
                                             </div>
 
