@@ -247,9 +247,17 @@
                                         {{ \Carbon\Carbon::parse($date)->translatedFormat('l') }}
                                     </p>
 
-                                    <h3 class="text-xl font-extrabold app-text">
-                                        {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}
-                                    </h3>
+                                    <div class="flex items-center gap-2">
+                                        <h3 class="text-xl font-extrabold app-text">
+                                            {{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}
+                                        </h3>
+                                    
+                                        @if(\Carbon\Carbon::parse($date)->isToday())
+                                            <span class="rounded-full bg-brand-start px-2.5 py-1 text-xs font-extrabold text-white">
+                                                Hôm nay
+                                            </span>
+                                        @endif
+                                    </div>
                                 </div>
 
                                 <span class="app-muted text-sm">
