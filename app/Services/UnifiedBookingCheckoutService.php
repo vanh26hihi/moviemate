@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\PayOsResponseException;
+use App\Exceptions\PayOsTransportException;
 use App\Exceptions\VnpayResponseException;
 use App\Exceptions\VnpayTransportException;
 use App\Exceptions\ZaloPayResponseException;
@@ -39,7 +41,7 @@ class UnifiedBookingCheckoutService
                 $payment->payment,
                 $payment->orderUrl,
             );
-        } catch (PaymentInitiationException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
+        } catch (PaymentInitiationException|PayOsResponseException|PayOsTransportException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
             return new UnifiedBookingCheckoutResult(
                 $checkout,
                 $checkout->booking->payments()->latest('id')->first(),

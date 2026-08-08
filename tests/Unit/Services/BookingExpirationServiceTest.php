@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use App\Models\Booking;
 use App\Models\BookingSeat;
+use App\Models\Payment;
 use App\Services\BookingExpirationService;
 use App\Services\BookingFoodService;
 use App\Services\BookingSeatLockService;
@@ -193,6 +194,50 @@ class BookingExpirationServiceTest extends TestCase
             ->count());
     }
 
+    public function test_provider_uncertainty_states_retain_the_booking_and_seats(): void
+    {
+        foreach ([Payment::STATUS_PROCESSING, Payment::STATUS_UNRESOLVED, Payment::STATUS_REVIEW] as $status) {
+            [$booking] = $this->overdueBooking();
+            $this->paymentFor($booking, $status);
+
+            $this->assertFalse(app(BookingExpirationService::class)->expire($booking->id));
+            $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+            $this->assertSame(
+                BookingSeat::ACTIVE_LOCK_KEY,
+                $booking->bookingSeats()->sole()->active_lock_key,
+            );
+        }
+    }
+
+    public function test_authoritative_payment_success_wins_expiration_race(): void
+    {
+        [$booking] = $this->overdueBooking();
+        $this->paymentFor($booking, Payment::STATUS_SUCCESS, [
+            'verified_at' => now(),
+            'paid_at' => now(),
+        ]);
+
+        $this->assertFalse(app(BookingExpirationService::class)->expire($booking->id));
+        $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+        $this->assertNotNull($booking->bookingSeats()->sole()->active_lock_key);
+    }
+
+    public function test_scheduler_expires_ordinary_pending_attempt_but_retains_unresolved_attempt(): void
+    {
+        [$eligible] = $this->overdueBooking();
+        $this->paymentFor($eligible, Payment::STATUS_PENDING);
+        [$retained] = $this->overdueBooking();
+        $this->paymentFor($retained, Payment::STATUS_UNRESOLVED);
+
+        $this->artisan('bookings:expire-pending')->assertSuccessful();
+        $this->artisan('bookings:expire-pending')->assertSuccessful();
+
+        $this->assertSame('expired', $eligible->fresh()->booking_status);
+        $this->assertNull($eligible->bookingSeats()->sole()->active_lock_key);
+        $this->assertSame('pending_payment', $retained->fresh()->booking_status);
+        $this->assertNotNull($retained->bookingSeats()->sole()->active_lock_key);
+    }
+
     private function overdueBooking(): array
     {
         $scenario = $this->bookingScenario();
@@ -200,5 +245,20 @@ class BookingExpirationServiceTest extends TestCase
         $booking->update(['expires_at' => now()->subMinute()]);
 
         return [$booking, $scenario];
+    }
+
+    private function paymentFor(Booking $booking, string $status, array $overrides = []): Payment
+    {
+        return Payment::createForProvider('vnpay', [
+            'booking_id' => $booking->id,
+            'payment_method' => 'vnpay',
+            'order_code' => 'EXPIRY-'.str()->upper(str()->random(16)),
+            'amount' => (int) $booking->total_amount,
+            'currency' => 'VND',
+            'status' => $status,
+            'expires_at' => now()->subMinute(),
+            'reconcile_until' => now()->addDay(),
+            ...$overrides,
+        ]);
     }
 }

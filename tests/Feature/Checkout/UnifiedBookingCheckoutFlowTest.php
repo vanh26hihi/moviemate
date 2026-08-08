@@ -33,7 +33,8 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
             ->assertOk()
             ->assertViewIs('user.bookings.food')
             ->assertSee('Ghế '.$scenario['seats'][0]->seat_code)
-            ->assertSee('Bỏ qua đồ ăn')
+            ->assertDontSee('Bỏ qua đồ ăn')
+            ->assertSee('Tiếp tục thanh toán')
             ->assertDontSee('checkout_token', false);
 
         $this->post(route('user.bookings.food.store'), [
@@ -49,9 +50,9 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
         $this->get(route('user.bookings.review'))
             ->assertOk()
             ->assertViewIs('user.bookings.review')
-            ->assertSee('50.000 VND')
-            ->assertSee('70.000 VND')
-            ->assertSee('120.000 VND')
+            ->assertSee('50.000 VNĐ')
+            ->assertSee('70.000 VNĐ')
+            ->assertSee('120.000 VNĐ')
             ->assertDontSee('name="total_amount"', false);
 
         $this->post(route('user.bookings.confirm'))
@@ -83,7 +84,7 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
 
         $this->get(route('user.bookings.pending', $booking))
             ->assertOk()
-            ->assertSee('Đang chờ xác minh thanh toán');
+            ->assertSee('Đang xác minh kết quả thanh toán');
     }
 
     public function test_seat_only_skip_creates_no_empty_order_and_one_payment_attempt(): void

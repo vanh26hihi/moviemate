@@ -70,7 +70,7 @@
                                 <div class="fallback-poster">
                                     <i class="ph-fill ph-film-slate"></i>
                                     <strong class="text-2xl">MovieMate</strong>
-                                    <span>Poster phim sẽ hiển thị tại đây</span>
+                                    <span>Ảnh áp phích phim sẽ hiển thị tại đây</span>
                                 </div>
                             @endif
                         </div>
@@ -121,7 +121,7 @@
     <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
     <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-8">
         <div>
-            <p class="bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 bg-clip-text text-sm font-black uppercase tracking-[0.28em] text-transparent mb-3">Now Showing</p>
+            <p class="bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 bg-clip-text text-sm font-black uppercase tracking-[0.28em] text-transparent mb-3">Đang chiếu</p>
             <h2 class="text-3xl sm:text-4xl font-black app-text">Phim đang chiếu</h2>
         </div>
         <a href="{{ route('user.movies.index', ['status' => 'now_showing']) }}" class="inline-flex w-fit items-center justify-center gap-2 rounded-xl border app-border app-card px-5 py-3 text-sm font-bold app-text-soft transition-all duration-300 hover:border-brand-start/40 hover:bg-brand-start/10 hover:text-brand-start hover:shadow-lg hover:shadow-brand-start/10">
@@ -152,7 +152,7 @@
     <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
     <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-8">
         <div>
-            <p class="bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 bg-clip-text text-sm font-semibold uppercase tracking-[0.28em] text-transparent mb-3 opacity-90">Coming Soon</p>
+            <p class="bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 bg-clip-text text-sm font-semibold uppercase tracking-[0.28em] text-transparent mb-3 opacity-90">Sắp chiếu</p>
             <h2 class="text-3xl sm:text-4xl font-bold app-heading">Phim sắp chiếu</h2>
         </div>
         <a href="{{ route('user.movies.index', ['status' => 'coming_soon']) }}" class="inline-flex w-fit items-center justify-center gap-2 rounded-xl border app-border app-card px-5 py-3 text-sm font-bold app-text-soft transition-all duration-300 hover:border-orange-400/25 hover:bg-pink-500/10 hover:text-brand-start hover:shadow-lg hover:shadow-pink-500/10">

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - MovieMate</title>
+    <title>Đăng nhập quản trị - MovieMate</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>
         (function() {
@@ -14,7 +14,7 @@
     </script>
 </head>
 <body class="app-page font-sans antialiased min-h-screen flex items-center justify-center p-4 overflow-x-hidden overflow-y-auto relative">
-    @php($loginEnabled = \Illuminate\Support\Facades\Route::has('login.post'))
+    @php($loginEnabled = \Illuminate\Support\Facades\Route::has('login.store'))
 
     <button data-theme-toggle type="button"
         class="fixed top-4 right-4 z-30 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-dark-card/80 backdrop-blur border border-dark-border text-text-sub hover:text-text-main hover:border-brand-start transition-all text-sm"
@@ -37,7 +37,7 @@
                 <div class="absolute inset-0 bg-gradient-to-tr from-brand-start/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <i class="ph-fill ph-film-strip text-5xl text-brand-start"></i>
             </div>
-            <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">MovieMate Admin</h1>
+            <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">Quản trị MovieMate</h1>
             <p class="text-text-sub">Hệ thống quản trị đặt vé xem phim</p>
         </div>
 
@@ -45,7 +45,7 @@
             <!-- Top line highlight -->
             <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-start to-brand-end"></div>
 
-            <form action="{{ $loginEnabled ? route('login.post') : '#' }}" method="POST" class="space-y-6" @unless($loginEnabled) onsubmit="return false" @endunless>
+            <form action="{{ $loginEnabled ? route('login.store') : '#' }}" method="POST" class="space-y-6" @unless($loginEnabled) onsubmit="return false" @endunless>
                 @csrf
                 
                 <div>
@@ -86,10 +86,10 @@
 
                 <div class="pt-2">
                     @if($loginEnabled)
-                        <button type="submit" class="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5">Đăng nhập Dashboard <i class="ph-bold ph-arrow-right"></i></button>
+                        <button type="submit" class="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-xl font-bold text-white bg-gradient-to-r from-brand-start to-brand-end hover:shadow-lg hover:shadow-brand-start/25 transition-all transform hover:-translate-y-0.5">Đăng nhập trang quản trị <i class="ph-bold ph-arrow-right"></i></button>
                     @else
                         <button type="button" disabled class="w-full cursor-not-allowed rounded-xl border app-border app-card px-4 py-4 font-bold app-text-muted opacity-60">Đăng nhập chưa khả dụng</button>
-                        <p class="mt-3 text-center text-xs app-text-muted">Backend TEAM chưa cung cấp POST login.</p>
+                        <p class="mt-3 text-center text-xs app-text-muted">Hệ thống chưa cấu hình chức năng đăng nhập.</p>
                     @endif
                 </div>
             </form>

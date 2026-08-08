@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Chi tiết đơn đồ ăn - MovieMate Admin')
+@section('title', 'Chi tiết đơn đồ ăn - Quản trị MovieMate')
 @section('page-title', 'Chi tiết đơn đồ ăn')
 
 @section('content')
@@ -28,8 +28,8 @@
                 </div>
                 <div class="app-card rounded-3xl p-4 border app-border">
                     <div class="text-xs uppercase tracking-wider app-muted mb-2">Tổng</div>
-                    <div class="text-2xl font-bold">{{ number_format($order->total_amount,2) }}đ</div>
-                    <div class="text-xs app-muted">Trạng thái: {{ ucfirst($order->status) }}</div>
+                    <div class="text-2xl font-bold">{{ number_format((int) $order->total_amount, 0, ',', '.') }} VNĐ</div>
+                    <div class="text-xs app-muted">Trạng thái: {{ \App\Support\StatusLabel::for('food_order', $order->status) }}</div>
                 </div>
             </div>
 
@@ -40,9 +40,9 @@
                         <div class="py-3 grid grid-cols-12 gap-4 items-center">
                             <div class="col-span-6">
                                 <div class="font-semibold">{{ $item->food->name }}</div>
-                                <div class="text-sm app-muted">{{ $item->quantity }} x {{ number_format($item->price,2) }}đ</div>
+                                <div class="text-sm app-muted">{{ $item->quantity }} × {{ number_format((int) $item->price, 0, ',', '.') }} VNĐ</div>
                             </div>
-                            <div class="col-span-6 text-right font-semibold">{{ number_format($item->total,2) }}đ</div>
+                            <div class="col-span-6 text-right font-semibold">{{ number_format((int) $item->total, 0, ',', '.') }} VNĐ</div>
                         </div>
                     @endforeach
                 </div>

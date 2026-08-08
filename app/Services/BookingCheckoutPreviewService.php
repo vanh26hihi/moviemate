@@ -2,9 +2,14 @@
 
 namespace App\Services;
 
+use App\Exceptions\PricingConfigurationException;
+use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Seat;
 use App\Models\Showtime;
+use App\Services\Seats\SeatAvailabilitySnapshot;
+use App\Services\Seats\SeatSelectionPolicy;
+use App\Support\SeatPresentation;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -12,10 +17,12 @@ use Illuminate\Validation\ValidationException;
 class BookingCheckoutPreviewService
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
         private readonly BookingPricingService $pricing,
         private readonly BookingFoodService $food,
+        private readonly SeatSelectionPolicy $seatSelectionPolicy,
+        private readonly BookingTokenService $tokens,
+        private readonly BookingExpirationService $expiration,
     ) {}
 
     public function preview(array $draft): BookingCheckoutPreview
@@ -30,6 +37,8 @@ class BookingCheckoutPreviewService
             ->unique()
             ->sort()
             ->values();
+        $this->expiration->expireStaleForSeats($showtime->id, $seatIds);
+
         $layout = $this->layouts->resolveForShowtime($showtime);
         $seats = Seat::query()
             ->where('room_id', $showtime->room_id)
@@ -39,9 +48,16 @@ class BookingCheckoutPreviewService
             ->orderBy('number')
             ->get();
 
-        $this->assertSeatsAvailable($showtime, $seats, $seatIds, $layout->id);
-        $food = $this->food->calculate($draft['food_items'] ?? []);
-        $prices = $this->pricing->calculate($showtime, $seats)->withFood($food);
+        $ownBookingId = $this->ownActiveBookingId($draft, $showtime);
+        $this->assertSeatsAvailable($showtime, $seats, $seatIds, $layout, $ownBookingId);
+        $this->assertLogicalSeatLimit($seats);
+        $this->assertNoIsolatedSeat($showtime, $layout, $seatIds, $ownBookingId);
+        $food = $this->food->calculate($draft['food_items'] ?? [], (int) $showtime->cinema_id);
+        try {
+            $prices = $this->pricing->calculate($showtime, $seats)->withFood($food);
+        } catch (PricingConfigurationException $exception) {
+            throw ValidationException::withMessages(['pricing' => $exception->getMessage()]);
+        }
 
         return new BookingCheckoutPreview($showtime, $seats, $prices);
     }
@@ -49,12 +65,11 @@ class BookingCheckoutPreviewService
     private function assertShowtimeAvailable(Showtime $showtime): void
     {
         $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time);
-        $canonicalCinemaId = $this->cinemaContext->id();
-
         if ($showtime->status !== 'active'
-            || $showtime->cinema_id !== $canonicalCinemaId
+            || $showtime->cinema?->status !== 'active'
+            || $showtime->cinema?->archived_at !== null
             || $showtime->room?->status !== 'active'
-            || $showtime->room?->cinema_id !== $canonicalCinemaId
+            || $showtime->room?->cinema_id !== $showtime->cinema_id
             || ! $showtime->roomLayout
             || $showtime->roomLayout->status !== 'published'
             || $showtime->roomLayout->room_id !== $showtime->room_id
@@ -69,7 +84,8 @@ class BookingCheckoutPreviewService
         Showtime $showtime,
         Collection $seats,
         Collection $seatIds,
-        int $layoutId,
+        $layout,
+        ?int $ownBookingId,
     ): void {
         if ($seats->count() !== $seatIds->count()
             || $seats->contains(fn ($seat): bool => $seat->status !== 'active')) {
@@ -80,16 +96,15 @@ class BookingCheckoutPreviewService
 
         foreach ($seats->where('type', 'couple')->groupBy('pair_code') as $pairCode => $pair) {
             $positions = $pair->pluck('pair_position')->sort()->values()->all();
-            $layoutPairCount = $pairCode
-                ? Seat::query()
-                    ->where('room_id', $showtime->room_id)
-                    ->where('type', 'couple')
-                    ->where('pair_code', $pairCode)
-                    ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layoutId))
-                    ->count()
-                : 0;
+            $layoutPair = $pairCode
+                ? $layout->cells->whereIn('seat_id', $pair->pluck('id'))->values()
+                : collect();
+            $layoutPairIsContiguous = $layoutPair->count() === 2
+                && $layoutPair->pluck('y_position')->unique()->count() === 1
+                && abs((int) $layoutPair[0]->x_position - (int) $layoutPair[1]->x_position) === 1;
 
-            if ($pair->count() !== 2 || $positions !== ['left', 'right'] || $layoutPairCount !== 2) {
+            if ($pair->count() !== 2 || $positions !== ['left', 'right'] || ! $layoutPairIsContiguous
+                || ! SeatPresentation::isValidCouple($pair)) {
                 throw ValidationException::withMessages([
                     'seat_ids' => 'Ghế đôi phải được chọn đủ cả cặp.',
                 ]);
@@ -99,11 +114,74 @@ class BookingCheckoutPreviewService
         if (BookingSeat::query()
             ->where('showtime_id', $showtime->id)
             ->where('active_lock_key', BookingSeat::ACTIVE_LOCK_KEY)
+            ->when($ownBookingId !== null, fn ($query) => $query->where('booking_id', '!=', $ownBookingId))
             ->whereIn('seat_id', $seatIds)
             ->exists()) {
             throw ValidationException::withMessages([
                 'seat_ids' => 'Một hoặc nhiều ghế vừa được người khác giữ.',
             ]);
         }
+    }
+
+    /**
+     * Reject selections that would leave exactly one isolated available seat. Evaluated
+     * against the authoritative layout snapshot, not against browser-supplied seat state.
+     */
+    private function assertNoIsolatedSeat(
+        Showtime $showtime,
+        $layout,
+        Collection $seatIds,
+        ?int $ownBookingId,
+    ): void {
+        $snapshot = SeatAvailabilitySnapshot::for(
+            $showtime,
+            $layout,
+            excludeBookingId: $ownBookingId,
+        );
+
+        $message = $this->seatSelectionPolicy->violationMessage(
+            $layout,
+            $snapshot->unavailableSeatIds,
+            $seatIds,
+            $snapshot->cells,
+        );
+        if ($message !== null) {
+            throw ValidationException::withMessages([
+                'seat_ids' => $message,
+            ]);
+        }
+    }
+
+    private function assertLogicalSeatLimit(Collection $seats): void
+    {
+        $maximum = max(1, (int) config('booking.max_logical_seat_units', 8));
+        if (SeatPresentation::groups($seats)->count() > $maximum) {
+            throw ValidationException::withMessages([
+                'seat_ids' => "Mỗi đơn chỉ được chọn tối đa {$maximum} ghế hoặc cặp ghế đôi.",
+            ]);
+        }
+    }
+
+    /**
+     * Resolve an exclusion only from the signed, session-held checkout capability. A browser
+     * cannot nominate an arbitrary booking id, and an expired/cancelled aggregate is never
+     * treated as the current checkout's valid hold.
+     */
+    private function ownActiveBookingId(array $draft, Showtime $showtime): ?int
+    {
+        $checkoutToken = $draft['checkout_token'] ?? null;
+        if (! is_string($checkoutToken) || ! $this->tokens->isValidCheckoutToken($checkoutToken)) {
+            return null;
+        }
+
+        $bookingId = Booking::query()
+            ->where('checkout_idempotency_key_hash', $this->tokens->hash($checkoutToken))
+            ->where('showtime_id', $showtime->id)
+            ->where('booking_status', 'pending_payment')
+            ->where('payment_status', 'unpaid')
+            ->where('expires_at', '>', now())
+            ->value('id');
+
+        return $bookingId === null ? null : (int) $bookingId;
     }
 }

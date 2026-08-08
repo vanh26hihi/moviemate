@@ -65,6 +65,19 @@ class VnpayQueryDrTest extends VnpayPaymentTestCase
         $this->assertSame('unpaid', $payment->booking->fresh()->payment_status);
     }
 
+    public function test_terminal_failed_query_cancels_booking_and_releases_seats(): void
+    {
+        $payment = $this->vnpayPayment();
+        Http::fake(fn () => Http::response($this->response(
+            $payment,
+            ['vnp_TransactionStatus' => '02'],
+        ), 200));
+
+        $this->assertSame(Payment::STATUS_FAILED, app(PaymentReconciliationService::class)->reconcile($payment));
+        $this->assertSame('cancelled', $payment->booking->fresh()->booking_status);
+        $this->assertSame(0, $payment->booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+    }
+
     public function test_malformed_query_response_fails_closed(): void
     {
         $payment = $this->vnpayPayment();

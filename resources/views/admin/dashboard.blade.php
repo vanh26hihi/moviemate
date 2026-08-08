@@ -1,19 +1,20 @@
 @extends('layouts.admin')
 
-@section('title', 'Tổng quan quản trị - MovieMate')
-@section('page-title', 'Tổng quan quản trị')
+@section('title', 'Tổng quan hệ thống - MovieMate')
+@section('page-title', 'Tổng quan')
 
 @section('content')
-<div class="admin-page-header">
+<header class="admin-page-header items-start">
     <div>
-        <h1 class="admin-page-title">Tổng quan quản trị</h1>
-        <p class="admin-page-subtitle">Giao diện đồng bộ MovieMate và tuân theo dữ liệu backend TEAM.</p>
+        <p class="text-xs font-bold uppercase tracking-[0.18em] text-brand-start">MovieMate Cinema</p>
+        <h1 class="admin-page-title mt-2">Tổng quan hệ thống</h1>
+        <p class="admin-page-subtitle">Tài chính theo thời điểm thu tiền; vận hành theo ngày bắt đầu suất chiếu.</p>
     </div>
-</div>
+    @can('reports.view')
+        <a class="btn-secondary" href="{{ route('admin.reports.index', $filters) }}"><i class="ph ph-chart-line-up"></i>Báo cáo chi tiết</a>
+    @endcan
+</header>
 
-<x-empty-state
-    title="Dashboard chưa có dữ liệu"
-    description="Backend TEAM chưa đăng ký route/controller cung cấp số liệu Dashboard. Giao diện được giữ ở trạng thái trống an toàn."
-    icon="ph-squares-four"
-/>
+@include('admin.reports._filters', ['filterAction' => route('admin.dashboard'), 'detailed' => false])
+@include('admin.reports._analytics', ['detailed' => false])
 @endsection

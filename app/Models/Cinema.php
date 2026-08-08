@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use App\Services\CinemaContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Cinema extends Model
@@ -14,11 +14,15 @@ class Cinema extends Model
 
     protected $fillable = [
         'canonical_key',
+        'code',
         'name',
         'school_name',
         'address',
         'city',
+        'district',
         'country',
+        'timezone',
+        'default_cleaning_buffer_minutes',
         'phone',
         'latitude',
         'longitude',
@@ -36,18 +40,22 @@ class Cinema extends Model
             'longitude' => 'decimal:14',
             'is_primary' => 'boolean',
             'archived_at' => 'datetime',
+            'default_cleaning_buffer_minutes' => 'integer',
         ];
     }
 
     protected static function booted(): void
     {
         static::deleting(function (Cinema $cinema): void {
+            // The primary branch anchors the customer default context, so it stays undeletable
+            // even when it currently has no dependent records.
             if ($cinema->is_primary
-                || $cinema->canonical_key === CinemaContext::CANONICAL_KEY
                 || $cinema->rooms()->exists()
                 || $cinema->showtimes()->exists()
-                || $cinema->pickupOrders()->exists()) {
-                throw new \LogicException('The canonical or referenced cinema cannot be deleted.');
+                || $cinema->bookings()->exists()
+                || $cinema->pickupOrders()->exists()
+                || $cinema->assignments()->exists()) {
+                throw new \LogicException('The primary or a referenced cinema cannot be deleted.');
             }
         });
     }
@@ -72,9 +80,41 @@ class Cinema extends Model
         return $this->hasMany(Showtime::class);
     }
 
+    public function operatingHours(): HasMany
+    {
+        return $this->hasMany(CinemaOperatingHour::class);
+    }
+
+    public function pricingRules(): HasMany
+    {
+        return $this->hasMany(CinemaPricingRule::class);
+    }
+
     public function pickupOrders(): HasMany
     {
         return $this->hasMany(Order::class, 'pickup_cinema_id');
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(Booking::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(UserCinemaAssignment::class);
+    }
+
+    public function activeAssignments(): HasMany
+    {
+        return $this->assignments()->where('status', UserCinemaAssignment::STATUS_ACTIVE);
+    }
+
+    public function assignedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_cinema_assignments')
+            ->withPivot(['id', 'assigned_by_user_id', 'status', 'assigned_at'])
+            ->withTimestamps();
     }
 
     public function getMapUrlAttribute(): string

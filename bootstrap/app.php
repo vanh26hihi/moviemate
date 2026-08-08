@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureAdminCinemaScope;
+use App\Http\Middleware\EnsureTrustedHost;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\RequirePermission;
 use App\Http\Middleware\RequireRole;
@@ -14,8 +16,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Laravel's TrustProxies global middleware runs first and reads
+        // config/trustedproxy.php. Validate the resulting host afterwards so a
+        // trusted proxy cannot supply an arbitrary X-Forwarded-Host value.
+        $middleware->append(EnsureTrustedHost::class);
+
         $middleware->validateCsrfTokens(except: [
             'payments/zalopay/callback',
+            'payments/payos/webhook',
             'booking/store',
         ]);
 
@@ -23,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => EnsureUserIsActive::class,
             'role' => RequireRole::class,
             'permission' => RequirePermission::class,
+            'admin.cinema.scope' => EnsureAdminCinemaScope::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

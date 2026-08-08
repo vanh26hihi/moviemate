@@ -167,10 +167,14 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
 
     public function test_reconciliation_migration_aborts_before_ddl_for_duplicate_unresolved_attempts(): void
     {
+        $crossProviderMigration = require database_path(
+            'migrations/2026_08_07_300000_enforce_single_active_payment_attempt_per_booking.php',
+        );
         $upgradeMigration = $this->upgradeMigration();
         $booking = $this->payableBooking();
         $first = $this->pendingPayment($booking);
 
+        $crossProviderMigration->down();
         $upgradeMigration->down();
         $secondId = DB::table('payments')->insertGetId([
             'booking_id' => $booking->id,
@@ -207,6 +211,7 @@ class PaymentAttemptSchemaTest extends PaymentTestCase
 
         DB::table('payments')->where('id', $secondId)->delete();
         $upgradeMigration->up();
+        $crossProviderMigration->up();
     }
 
     public function test_zalopay_down_handles_a_missing_foreign_key_while_booking_index_remains(): void

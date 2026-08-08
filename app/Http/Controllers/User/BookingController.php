@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Exceptions\PricingConfigurationException;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\BookingSeat;
@@ -10,30 +11,40 @@ use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
-use App\Services\CinemaContext;
+use App\Services\BookingExpirationService;
 use App\Services\GuestBookingAccessService;
+use App\Services\Mail\TicketMailConfigurationInspector;
+use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
-use Carbon\Carbon;
+use App\Services\Tickets\BookingTicketEligibility;
+use App\Services\Tickets\TicketCheckinCapability;
+use App\Support\SeatPresentation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class BookingController extends Controller
 {
     public function __construct(
-        private readonly CinemaContext $cinemaContext,
         private readonly RoomLayoutService $layouts,
         private readonly GuestBookingAccessService $guestAccess,
         private readonly BookingCheckoutDraftService $drafts,
         private readonly BookingCheckoutPreviewService $previews,
+        private readonly BookingTicketEligibility $ticketEligibility,
+        private readonly TicketCheckinCapability $checkinCapabilities,
+        private readonly TicketMailConfigurationInspector $mailConfiguration,
+        private readonly PublicShowtimeCatalog $showtimeCatalog,
+        private readonly BookingExpirationService $expiration,
     ) {}
 
     /**
      * Show seat selection page for a given showtime.
      */
-    public function selectSeat(Showtime $showtime)
+    public function selectSeat(Request $request, Showtime $showtime)
     {
         $showtime->load(['movie', 'cinema', 'room', 'roomLayout.cells.seat']);
+        $this->assertExpectedCinema($request, $showtime);
 
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
@@ -42,8 +53,15 @@ class BookingController extends Controller
         }
 
         $layout = $this->layouts->resolveForShowtime($showtime);
+        $this->expiration->expireStaleForShowtime($showtime->id);
         $layoutCells = $layout->cells->sortBy(fn ($cell) => sprintf('%03d:%03d', $cell->y_position, $cell->x_position))->values();
         $seats = $layoutCells->where('cell_type', 'seat')->pluck('seat')->filter()->values();
+        try {
+            $seatPrices = $this->showtimeCatalog->pricesFor($showtime);
+        } catch (PricingConfigurationException $exception) {
+            return redirect()->route('user.movies.show', $showtime->movie->slug)
+                ->with('error', $exception->getMessage());
+        }
 
         $bookedSeatIds = BookingSeat::query()
             ->where('showtime_id', $showtime->id)
@@ -51,12 +69,27 @@ class BookingController extends Controller
             ->pluck('seat_id')
             ->all();
 
+        $selectedSeatIds = [];
+        if ($this->drafts->hasCurrent($request)) {
+            $draft = $this->drafts->current($request);
+            if ((int) $draft['showtime_id'] === (int) $showtime->id) {
+                $selectedSeatIds = collect($draft['seat_ids'])
+                    ->map(fn ($seatId): int => (int) $seatId)
+                    ->filter(fn (int $seatId): bool => $seatId > 0)
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+        }
+
         return view('user.bookings.select-seat', compact(
             'showtime',
             'layout',
             'layoutCells',
             'seats',
-            'bookedSeatIds'
+            'bookedSeatIds',
+            'selectedSeatIds',
+            'seatPrices',
         ));
     }
 
@@ -66,6 +99,7 @@ class BookingController extends Controller
     public function checkout(Request $request, Showtime $showtime)
     {
         $showtime->load(['movie', 'cinema', 'room', 'roomLayout']);
+        $this->assertExpectedCinema($request, $showtime);
 
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
@@ -82,6 +116,7 @@ class BookingController extends Controller
         }
 
         $layout = $this->layouts->resolveForShowtime($showtime);
+        $this->expiration->expireStaleForShowtime($showtime->id);
         $seats = Seat::where('room_id', $showtime->room_id)
             ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layout->id))
             ->whereIn('id', $seatIds)
@@ -120,7 +155,13 @@ class BookingController extends Controller
         }
 
         $draft = $this->drafts->start($request, $showtime->id, $seatIds);
-        $preview = $this->previews->preview($draft);
+        try {
+            $preview = $this->previews->preview($draft);
+        } catch (ValidationException $exception) {
+            return redirect()
+                ->route('user.bookings.selectSeat', $showtime)
+                ->withErrors($exception->errors());
+        }
         $foods = FoodItem::query()->where('active', true)->orderBy('name')->get();
 
         return view('user.bookings.food', compact('draft', 'preview', 'foods'));
@@ -132,18 +173,32 @@ class BookingController extends Controller
     public function success(Request $request, Booking $booking)
     {
         $this->authorizeBookingView($request, $booking);
+        $this->expiration->expire($booking->id);
+        $booking->refresh();
 
         $booking->load([
             'user',
             'payment',
+            'payments',
+            'ticketDelivery',
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
             'foodOrder.items',
+            'acceptedTicketCheckin',
         ]);
 
-        return view('user.bookings.success', compact('booking'));
+        $isUsable = $this->ticketEligibility->isUsable($booking);
+        $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
+        $mailDeliveryReady = $this->mailConfiguration->inspect()['ready'];
+
+        return view('user.bookings.success', compact(
+            'booking',
+            'isUsable',
+            'verifiedPayment',
+            'mailDeliveryReady',
+        ));
     }
 
     public function ticket(Request $request, Booking $booking)
@@ -153,14 +208,32 @@ class BookingController extends Controller
         $booking->load([
             'user',
             'payment',
+            'payments',
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
             'foodOrder.items',
+            'acceptedTicketCheckin',
         ]);
 
-        return view('user.bookings.ticket', compact('booking'));
+        $isUsable = $this->ticketEligibility->isUsable($booking);
+        $isDeliverable = $this->ticketEligibility->isDeliverable($booking);
+        $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
+        $checkinCapability = $isDeliverable ? $this->checkinCapabilities->issue($booking) : null;
+        $ticketState = match (true) {
+            $booking->payment_status === 'refunded' => 'refunded',
+            $booking->booking_status === 'cancelled' => 'cancelled',
+            $booking->booking_status === 'expired' => 'expired',
+            $booking->booking_status === 'used' => 'used',
+            $isUsable => 'valid',
+            default => 'invalid',
+        };
+
+        return response()->view('user.bookings.ticket', compact(
+            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'checkinCapability', 'ticketState'
+        ))->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache');
     }
 
     private function authorizeBookingView(Request $request, Booking $booking): void
@@ -196,21 +269,20 @@ class BookingController extends Controller
      */
     protected function isShowtimeAvailable(Showtime $showtime): bool
     {
-        if ($showtime->status !== 'active'
-            || $showtime->cinema_id !== $this->cinemaContext->id()
-            || $showtime->room?->status !== 'active'
-            || $showtime->room?->cinema_id !== $this->cinemaContext->id()
-            || ! $showtime->roomLayout
-            || $showtime->roomLayout->status !== 'published'
-            || $showtime->roomLayout->room_id !== $showtime->room_id) {
-            return false;
+        return $this->showtimeCatalog->isSellable($showtime);
+    }
+
+    private function assertExpectedCinema(Request $request, Showtime $showtime): void
+    {
+        if ($request->query->has('cinema')) {
+            abort_unless(
+                hash_equals((string) $showtime->cinema->code, mb_strtoupper((string) $request->query('cinema'))),
+                404,
+            );
         }
-
-        $showDateTime = Carbon::parse(
-            $showtime->show_date->format('Y-m-d').' '.$showtime->show_time
-        );
-
-        return $showDateTime->isFuture();
+        if ($request->query->has('cinema_id')) {
+            abort_unless($request->integer('cinema_id') === (int) $showtime->cinema_id, 404);
+        }
     }
 
     private function coupleSelectionIsComplete($seats, int $layoutId): bool
@@ -218,7 +290,8 @@ class BookingController extends Controller
         $couples = $seats->where('type', 'couple')->groupBy('pair_code');
         foreach ($couples as $pairCode => $selectedPair) {
             if (! $pairCode || $selectedPair->count() !== 2
-                || $selectedPair->pluck('pair_position')->sort()->values()->all() !== ['left', 'right']) {
+                || $selectedPair->pluck('pair_position')->sort()->values()->all() !== ['left', 'right']
+                || ! SeatPresentation::isValidCouple($selectedPair)) {
                 return false;
             }
 

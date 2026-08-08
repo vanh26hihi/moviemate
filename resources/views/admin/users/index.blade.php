@@ -12,7 +12,7 @@
     <input class="app-input border app-border rounded-xl px-4 py-2" name="search" value="{{ request('search') }}" placeholder="Tên hoặc email">
     <select class="app-input border app-border rounded-xl px-4 py-2" name="role">
         <option value="">Tất cả vai trò</option>
-        @foreach($roles as $role)<option value="{{ $role->slug }}" @selected(request('role') === $role->slug)>{{ $role->name }}</option>@endforeach
+        @foreach($roles as $role)<option value="{{ $role->slug }}" @selected(request('role') === $role->slug)>{{ $role->display_name }}</option>@endforeach
     </select>
     <select class="app-input border app-border rounded-xl px-4 py-2" name="status">
         <option value="">Tất cả trạng thái</option>
@@ -29,8 +29,8 @@
         @forelse($users as $managedUser)
             <tr>
                 <td><div class="font-semibold app-text">{{ $managedUser->name }}</div><div class="text-sm app-muted">{{ $managedUser->email }}</div></td>
-                <td>{{ $managedUser->role?->name ?? 'Chưa có vai trò' }}</td>
-                <td><span class="font-semibold {{ $managedUser->status === 'active' ? 'text-success' : 'text-error' }}">{{ $managedUser->status === 'active' ? 'Hoạt động' : 'Vô hiệu hóa' }}</span></td>
+                <td>{{ $managedUser->role?->display_name ?? 'Chưa có vai trò' }}</td>
+                <td><span class="font-semibold {{ $managedUser->status === 'active' ? 'text-success' : 'text-error' }}">{{ $managedUser->status_label }}</span></td>
                 <td>{{ $managedUser->created_at?->format('d/m/Y') }}</td>
                 <td class="text-right"><a class="admin-btn-warning" href="{{ route('admin.users.edit', $managedUser) }}">Quản lý</a></td>
             </tr>

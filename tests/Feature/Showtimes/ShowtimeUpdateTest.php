@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Showtimes;
 
+use App\Models\Booking;
 use App\Services\RoomLayoutService;
 use Illuminate\Support\Facades\DB;
 
@@ -34,7 +35,69 @@ class ShowtimeUpdateTest extends ShowtimeTestCase
             'show_time' => '21:00', 'price' => 95000,
         ]))->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
 
-        $this->assertDatabaseHas('showtimes', ['id' => $showtime->id, 'show_time' => '21:00:00', 'price' => 95000]);
+        $this->assertDatabaseHas('showtimes', [
+            'id' => $showtime->id,
+            'show_time' => '21:00:00',
+            'price' => 80000,
+            'pricing_version' => 'cinema-pricing-v1',
+        ]);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'showtime.updated', 'subject_id' => (string) $showtime->id]);
+    }
+
+    public function test_delete_route_non_destructively_cancels_and_records_the_event(): void
+    {
+        $movie = $this->movie(90);
+        $room = $this->rooms['P01'];
+        $showtime = $this->existing($movie, $room);
+
+        $this->actingAs($this->userWithRole('admin'))
+            ->delete(route('admin.showtimes.destroy', $showtime))
+            ->assertRedirect(route('admin.showtimes.index'));
+
+        $this->assertDatabaseHas('showtimes', ['id' => $showtime->id, 'status' => 'cancelled']);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'showtime.cancelled', 'subject_id' => (string) $showtime->id]);
+    }
+
+    public function test_showtime_with_booking_history_cannot_be_cancelled_or_deleted(): void
+    {
+        $movie = $this->movie(90);
+        $room = $this->rooms['P01'];
+        $showtime = $this->existing($movie, $room);
+        $booking = Booking::query()->create([
+            'showtime_id' => $showtime->id,
+            'booking_code' => 'HISTORY-SAFE-001',
+            'total_amount' => 80_000,
+            'seat_subtotal' => 80_000,
+            'food_subtotal' => 0,
+            'currency' => 'VND',
+            'payment_status' => 'unpaid',
+            'booking_status' => 'pending_payment',
+            'expires_at' => now()->addMinutes(10),
+        ]);
+
+        $this->actingAs($this->userWithRole('admin'))
+            ->delete(route('admin.showtimes.destroy', $showtime))
+            ->assertSessionHasErrors('showtime');
+
+        $this->assertDatabaseHas('showtimes', ['id' => $showtime->id, 'status' => 'active']);
+        $this->assertDatabaseHas('bookings', ['id' => $booking->id, 'showtime_id' => $showtime->id]);
+        $this->assertDatabaseMissing('activity_logs', ['action' => 'showtime.cancelled', 'subject_id' => (string) $showtime->id]);
+    }
+
+    public function test_finished_showtime_cannot_be_changed_to_cancelled_through_legacy_delete_route(): void
+    {
+        $showtime = $this->existing($this->movie(90), $this->rooms['P01']);
+        $showtime->forceFill(['status' => 'finished'])->save();
+
+        $this->actingAs($this->userWithRole('admin'))
+            ->delete(route('admin.showtimes.destroy', $showtime))
+            ->assertSessionHasErrors('showtime');
+
+        $this->assertSame('finished', $showtime->fresh()->status);
+        $this->assertDatabaseMissing('activity_logs', [
+            'action' => 'showtime.cancelled',
+            'subject_id' => (string) $showtime->id,
+        ]);
     }
 
     public function test_conflicting_update_rolls_back_every_field(): void

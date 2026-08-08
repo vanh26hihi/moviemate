@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Payments;
 
+use App\Models\ActivityLog;
 use App\Models\Payment;
 use App\Models\PaymentReviewEvent;
 use App\Services\BookingCheckoutService;
@@ -43,7 +44,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.payment-reviews.resolve', ['paymentId' => $payment->id]))
             ->assertRedirect(route('admin.payment-reviews.index'))
-            ->assertSessionHas('payment_review_error');
+            ->assertSessionHas('error')
+            ->assertSessionMissing('payment_review_error');
 
         Http::assertNothingSent();
         $this->assertDatabaseCount('payment_review_events', 0);
@@ -58,7 +60,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.payment-reviews.resolve', ['paymentId' => $payment->id]))
             ->assertRedirect(route('admin.payment-reviews.index'))
-            ->assertSessionHas('payment_review_result');
+            ->assertSessionHas('success')
+            ->assertSessionMissing('payment_review_result');
 
         Http::assertSentCount(1);
         Http::assertSent(function (Request $request) use ($payment): bool {
@@ -78,7 +81,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
 
         $this->actingAs($actor = $this->userWithRole('manager'))
             ->post(route('admin.payment-reviews.resolve', ['paymentId' => $payment->id]))
-            ->assertSessionHas('payment_review_result');
+            ->assertSessionHas('success')
+            ->assertSessionMissing('payment_review_result');
 
         $this->assertSame(Payment::STATUS_SUCCESS, $payment->fresh()->status);
         $this->assertSame('paid', $payment->booking->fresh()->booking_status);
@@ -92,6 +96,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
             'provider_result_category' => 'authoritative_success',
             'provider_result_code' => '1',
         ]);
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.reconciliation_completed')->count());
+        $this->assertSame(1, ActivityLog::query()->where('action', 'payment.review_resolved')->count());
     }
 
     public function test_expired_booking_remains_unfulfilled_and_creates_no_ticket(): void
@@ -118,8 +124,8 @@ class PaymentReviewResolutionTest extends PaymentTestCase
     {
         $booking = $this->payableBooking(['expires_at' => now()->subMinute()]);
         $seatId = $booking->bookingSeats()->value('seat_id');
-        $payment = $this->reviewPayment($booking);
         $this->assertTrue(app(BookingExpirationService::class)->expire($booking->id));
+        $payment = $this->reviewPayment($booking);
         $replacement = app(BookingCheckoutService::class)->createPendingBooking(
             $booking->showtime_id,
             [$seatId],
