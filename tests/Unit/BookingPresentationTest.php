@@ -56,10 +56,31 @@ class BookingPresentationTest extends TestCase
         $booking = new Booking([
             'booking_status' => 'paid',
             'total_amount' => 180000,
+            'seat_subtotal' => 150000,
+            'food_subtotal' => 30000,
+            'currency' => 'VND',
         ]);
 
         $this->assertSame('Chưa sử dụng', $booking->status_label);
+        $this->assertSame('VNĐ', $booking->currency_label);
+        $this->assertSame('150.000 VNĐ', $booking->formatted_seat_subtotal);
+        $this->assertSame('30.000 VNĐ', $booking->formatted_food_subtotal);
         $this->assertSame('180.000 VNĐ', $booking->formatted_total);
+    }
+
+    public function test_it_preserves_a_non_vnd_currency_label(): void
+    {
+        $booking = new Booking([
+            'total_amount' => 25,
+            'seat_subtotal' => 20,
+            'food_subtotal' => 5,
+            'currency' => 'usd',
+        ]);
+
+        $this->assertSame('USD', $booking->currency_label);
+        $this->assertSame('20 USD', $booking->formatted_seat_subtotal);
+        $this->assertSame('5 USD', $booking->formatted_food_subtotal);
+        $this->assertSame('25 USD', $booking->formatted_total);
     }
 
     public function test_it_provides_complete_ticket_context_and_safe_fallbacks(): void

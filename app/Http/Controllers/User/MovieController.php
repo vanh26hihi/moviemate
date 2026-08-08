@@ -107,6 +107,25 @@ class MovieController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Lọc theo độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRating = $request->query('age_rating');
+
+        if ($ageRating) {
+            $query->where('age_rating', $ageRating);
+        }
+
+        $duration = $request->query('duration');
+        match ($duration) {
+            'short' => $query->where('duration', '<', 90),
+            'medium' => $query->whereBetween('duration', [90, 120]),
+            'long' => $query->where('duration', '>', 120),
+            default => null,
+        };
+
+        /*
+        |--------------------------------------------------------------------------
         | Sắp xếp
         |--------------------------------------------------------------------------
         */
@@ -170,6 +189,19 @@ class MovieController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | Danh sách độ tuổi
+        |--------------------------------------------------------------------------
+        */
+        $ageRatings = Movie::query()
+            ->whereIn('status', ['now_showing', 'coming_soon'])
+            ->whereNotNull('age_rating')
+            ->where('age_rating', '!=', '')
+            ->distinct()
+            ->orderBy('age_rating')
+            ->pluck('age_rating');
+
+        /*
+        |--------------------------------------------------------------------------
         | Tiêu đề trang
         |--------------------------------------------------------------------------
         */
@@ -183,6 +215,7 @@ class MovieController extends Controller
             'movies',
             'genres',
             'countries',
+            'ageRatings',
             'pageTitle',
             'search',
             'selectedCinema',
@@ -234,6 +267,7 @@ class MovieController extends Controller
         return view('user.movies.show', [
             'movie' => $movie,
             'showtimes' => $showtimes,
+            'availableShowtimesCount' => $showtimes->count(),
             'selectedCinema' => $selectedCinema,
             'selectedDate' => $selectedDate,
             'cinemas' => Cinema::query()->active()->orderBy('name')->get(['id', 'code', 'name', 'address', 'latitude', 'longitude']),

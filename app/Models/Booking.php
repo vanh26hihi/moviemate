@@ -224,7 +224,7 @@ class Booking extends Model
 
     public function getFormattedTotalAttribute(): string
     {
-        return number_format((int) $this->total_amount, 0, ',', '.').' VNĐ';
+        return number_format((int) $this->total_amount, 0, ',', '.').' '.$this->currency_label;
     }
 
     public function getMovieTitleAttribute(): string
@@ -248,5 +248,22 @@ class Booking extends Model
     public function getRoomLabelAttribute(): string
     {
         return $this->showtime?->room?->name ?: 'Phòng đang cập nhật';
+    }
+
+    public function getCurrencyLabelAttribute(): string
+    {
+        $currency = strtoupper($this->currency ?: 'VND');
+
+        return $currency === 'VND' ? 'VNĐ' : $currency;
+    }
+
+    public function getFormattedSeatSubtotalAttribute(): string
+    {
+        return number_format((int) $this->seat_subtotal, 0, ',', '.').' '.$this->currency_label;
+    }
+
+    public function getFormattedFoodSubtotalAttribute(): string
+    {
+        return number_format((int) $this->food_subtotal, 0, ',', '.').' '.$this->currency_label;
     }
 }

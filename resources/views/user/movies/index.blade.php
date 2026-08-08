@@ -62,7 +62,21 @@
                     class="w-full bg-transparent app-text placeholder:text-text-sub/70 focus:outline-none py-3"
                 >
             </label>
+            <select name="duration" class="cinema-input">
+                <option value="">Tất cả thời lượng</option>
 
+                <option value="short" {{ request('duration') === 'short' ? 'selected' : '' }}>
+                    Dưới 90 phút
+                </option>
+
+                <option value="medium" {{ request('duration') === 'medium' ? 'selected' : '' }}>
+                    90 - 120 phút
+                </option>
+
+                <option value="long" {{ request('duration') === 'long' ? 'selected' : '' }}>
+                    Trên 120 phút
+                </option>
+            </select>
             <select name="genre" class="cinema-input">
                 <option value="">Tất cả thể loại</option>
 
@@ -110,7 +124,18 @@
                     Sắp chiếu
                 </option>
             </select>
+            <select name="age_rating" class="cinema-input">
+                <option value="">Tất cả độ tuổi</option>
 
+                @foreach($ageRatings as $age)
+                    <option
+                        value="{{ $age }}"
+                        {{ request('age_rating') === $age ? 'selected' : '' }}
+                    >
+                        {{ $age }}
+                    </option>
+                @endforeach
+            </select>
             <select name="sort" class="cinema-input">
                 <option value="latest" {{ request('sort', 'latest') === 'latest' ? 'selected' : '' }}>
                     Mới nhất
@@ -138,7 +163,6 @@
                 Lọc
             </button>
         </form>
-
         @if(request()->hasAny([
             'search',
             'keyword',
@@ -146,8 +170,11 @@
             'genre_id',
             'country',
             'status',
-            'sort'
-            ,'cinema','date'
+            'sort',
+            'age_rating',
+            'duration',
+            'cinema',
+            'date'
         ]))
             <div class="mt-4">
                 <a
