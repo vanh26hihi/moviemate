@@ -18,7 +18,6 @@
         default => 'Cổng thanh toán',
     };
     $foodItems = $booking->foodOrder?->items ?? collect();
-    $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
 @endphp
 <body style="margin:0;background:#f3f4f6;font-family:Arial,sans-serif;color:#111827">
 <div style="max-width:640px;margin:0 auto;padding:28px 16px">
@@ -42,9 +41,9 @@
 
             <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px">
                 @foreach([
-                    'Phim' => $booking->showtime?->movie?->title,
-                    'Rạp' => $booking->showtime?->cinema?->name,
-                    'Phòng' => $booking->showtime?->room?->name,
+                    'Phim' => $booking->movie_title,
+                    'Rạp' => $booking->cinema_label,
+                    'Phòng' => $booking->room_label,
                     'Suất chiếu' => $booking->showtime_label,
                     'Ghế' => $booking->seat_codes,
                     'Thanh toán' => $provider.' · '.($verifiedPayment?->provider === 'counter_cash' ? 'Đã thu tại quầy' : 'Đã xác minh'),
@@ -61,7 +60,7 @@
                 @forelse($foodItems as $item)
                     <p style="display:flex;justify-content:space-between;gap:12px;margin:6px 0;font-size:14px">
                         <span>{{ $item->snapshot_name }} × {{ $item->quantity }}</span>
-                        <strong>{{ number_format((int) $item->line_total, 0, ',', '.') }} {{ $currency }}</strong>
+                        <strong>{{ number_format((int) $item->line_total, 0, ',', '.') }} {{ $booking->currency_label }}</strong>
                     </p>
                 @empty
                     <p style="margin:0;color:#6b7280;font-size:14px">Không có đồ ăn trong đơn.</p>
@@ -69,9 +68,9 @@
             </div>
 
             <table role="presentation" style="width:100%;margin-top:16px;border-collapse:collapse;font-size:14px">
-                <tr><td style="padding:6px 0;color:#6b7280">Tiền ghế</td><td style="padding:6px 0;text-align:right;font-weight:bold">{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} {{ $currency }}</td></tr>
-                <tr><td style="padding:6px 0;color:#6b7280">Tiền đồ ăn</td><td style="padding:6px 0;text-align:right;font-weight:bold">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} {{ $currency }}</td></tr>
-                <tr><td style="padding:10px 0 0;font-weight:bold">Tổng thanh toán</td><td style="padding:10px 0 0;text-align:right;color:#e91e3d;font-size:18px;font-weight:bold">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280">Tiền ghế</td><td style="padding:6px 0;text-align:right;font-weight:bold">{{ $booking->formatted_seat_subtotal }}</td></tr>
+                <tr><td style="padding:6px 0;color:#6b7280">Tiền đồ ăn</td><td style="padding:6px 0;text-align:right;font-weight:bold">{{ $booking->formatted_food_subtotal }}</td></tr>
+                <tr><td style="padding:10px 0 0;font-weight:bold">Tổng thanh toán</td><td style="padding:10px 0 0;text-align:right;color:#e91e3d;font-size:18px;font-weight:bold">{{ $booking->formatted_total }}</td></tr>
             </table>
 
             <p style="margin:24px 0 0;text-align:center">
