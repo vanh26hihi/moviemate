@@ -125,12 +125,14 @@
                 </div>
             </div>
         </header>
-        <div class="flex-grow overflow-y-auto"><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12">
+        <div class="flex-grow overflow-y-auto" data-app-scroll-container><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12">
             <div class="sm:hidden mb-4"><p class="text-xl font-bold app-heading">@yield('page-title')</p></div>
             <x-flash-messages :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
             @yield('content')
         </div></div>
     </main>
+
+    @stack('modals')
 
     <script>
         const sidebar = document.getElementById('sidebar');
