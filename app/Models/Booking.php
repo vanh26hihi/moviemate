@@ -243,4 +243,9 @@ class Booking extends Model
     {
         return number_format((int) $this->seat_subtotal, 0, ',', '.').' '.$this->currency_label;
     }
+
+    public function getFormattedFoodSubtotalAttribute(): string
+    {
+        return number_format((int) $this->food_subtotal, 0, ',', '.').' '.$this->currency_label;
+    }
 }
