@@ -10,7 +10,7 @@ use BaconQrCode\Writer;
 
 final class TicketQrCode
 {
-    public function png(string $payload, int $size = 320): string
+    public function png(string $payload, int $size = 480): string
     {
         if ($payload === '') {
             throw new \InvalidArgumentException('QR payload must not be empty.');
