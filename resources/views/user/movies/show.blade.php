@@ -338,38 +338,34 @@
                                                                     @endif
                                                         </div>
 
-                                                        {{-- Phòng --}}
-                                                        <div class="mt-1 text-[10px] font-semibold opacity-80">
-                                                            {{ $show->room->name ?? 'Phòng chiếu' }}
-                                                        </div>
-                                                            <a href="{{ route('user.bookings.selectSeat', $show->id) }}"
-   class="px-4 py-2 rounded-xl bg-brand-start/10 border border-brand-start/30 text-brand-start font-extrabold hover:bg-brand-start hover:text-white transition-colors">
+                                                        @foreach($cinemaShowtimes as $show)
+    <a href="{{ route('user.bookings.selectSeat', $show->id) }}"
+       class="px-4 py-2 rounded-xl bg-brand-start/10 border border-brand-start/30 text-brand-start font-extrabold hover:bg-brand-start hover:text-white transition-colors">
 
-    <div class="text-center">
-        {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
-    </div>
+        {{-- Giờ chiếu --}}
+        <div class="text-center">
+            {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
+        </div>
 
-    <div class="mt-1 text-center text-[10px] font-semibold opacity-80">
-        {{ $show->room->name ?? 'Phòng chiếu' }}
-    </div>
+        {{-- Phòng chiếu --}}
+        <div class="mt-1 text-center text-[10px] font-semibold opacity-80">
+            {{ $show->room->name ?? 'Phòng chiếu' }}
+        </div>
 
-</a>
-                                                        {{-- Giá thường --}}
-                                                        <div class="mt-1 text-center text-[11px] opacity-80">
-                                                            {{ number_format((float) $show->price, 0, ',', '.') }}đ
-                                                        </div>
+        {{-- Giá vé thường --}}
+        <div class="mt-1 text-center text-[10px] opacity-80">
+            {{ number_format((float) $show->price, 0, ',', '.') }}đ
+        </div>
 
-                                                        {{-- Giá VIP --}}
-                                                        @if($show->vip_price)
-                                                            <div class="text-center text-[10px] opacity-70">
-                                                                VIP:
-                                                                {{ number_format((float) $show->vip_price, 0, ',', '.') }}đ
-                                                            </div>
-                                                        @endif
+        {{-- Giá vé VIP --}}
+        @if($show->vip_price)
+            <div class="text-center text-[10px] opacity-70">
+                VIP: {{ number_format((float) $show->vip_price, 0, ',', '.') }}đ
+            </div>
+        @endif
 
-                                                    </a>
-
-                                                @endforeach
+    </a>
+@endforeach
 
                                             </div>
 
