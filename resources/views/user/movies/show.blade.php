@@ -304,7 +304,19 @@
                                             <div class="flex flex-wrap gap-2">
 
                                                 @foreach($cinemaShowtimes as $show)
-
+                                                @php
+                                                $showDateTime = \Carbon\Carbon::parse(
+                                                    $show->show_date->format('Y-m-d') . ' ' . $show->show_time,
+                                                    'Asia/Ho_Chi_Minh'
+                                                );
+                                            
+                                                $minutesUntilShow = now('Asia/Ho_Chi_Minh')->diffInMinutes(
+                                                    $showDateTime,
+                                                    false
+                                                );
+                                            
+                                                $isStartingSoon = $minutesUntilShow >= 0 && $minutesUntilShow <= 60;
+                                            @endphp
                                                     <a
                                                         href="{{ route('user.bookings.selectSeat', $show->id) }}"
                                                         class="min-w-[110px] rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 text-brand-start transition-colors hover:bg-brand-start hover:text-white"
@@ -313,6 +325,11 @@
                                                         {{-- Giờ --}}
                                                         <div class="font-extrabold text-center">
                                                             {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }}
+                                                            @if($isStartingSoon)
+                                                             <div class="mt-1 text-center text-[10px] font-extrabold">
+                                                                     Sắp bắt đầu
+                                                                     </div>
+                                                                @endif
                                                         </div>
 
                                                         {{-- Phòng --}}
