@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Cinema;
 use App\Models\Movie;
 use App\Services\CinemaContext;
+use App\Services\CustomerShowtimeCatalogService;
 use App\Services\PublicShowtimeCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,7 @@ final class ShowtimeFilterController extends Controller
 {
     public function __construct(
         private readonly PublicShowtimeCatalog $catalog,
+        private readonly CustomerShowtimeCatalogService $customerCatalog,
         private readonly CinemaContext $context,
     ) {}
 
@@ -32,13 +34,13 @@ final class ShowtimeFilterController extends Controller
         abort_if($data['context'] === 'cinema' && ! $cinema, 422);
         abort_if($data['context'] === 'movie' && ! $movie, 422);
         $date = $this->catalog->date($data['date'] ?? null, $cinema);
-        $showtimes = $this->catalog->forDate($date, $cinema, $movie);
+        $showtimes = $this->customerCatalog->forDate($date, $cinema, $movie);
         $preferred = $this->context->preference();
         if (! $cinema && $preferred) {
             $showtimes = $showtimes->sortBy(fn ($showtime): array => [
-                (int) $showtime->cinema_id === (int) $preferred->id ? 0 : 1,
-                $showtime->cinema->name,
-                $showtime->show_time,
+                (int) $showtime['cinema']->id === (int) $preferred->id ? 0 : 1,
+                $showtime['cinema']->name,
+                $showtime['starts_at'],
             ])->values();
         }
 

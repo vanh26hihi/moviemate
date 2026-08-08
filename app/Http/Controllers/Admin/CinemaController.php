@@ -99,6 +99,8 @@ final class CinemaController extends Controller
         abort_unless($cinema, 403, 'Hãy chọn một chi nhánh trước khi cập nhật.');
         $validated = $request->validate([
             'phone' => ['nullable', 'string', 'max:30'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'description' => ['nullable', 'string', 'max:5000'],
         ]);
         $cinema->update($validated);
@@ -126,6 +128,6 @@ final class CinemaController extends Controller
 
     private function auditData(Cinema $cinema): array
     {
-        return $cinema->only(['id', 'code', 'name', 'address', 'city', 'district', 'phone', 'timezone', 'status']);
+        return $cinema->only(['id', 'code', 'name', 'address', 'city', 'district', 'phone', 'latitude', 'longitude', 'timezone', 'status']);
     }
 }
