@@ -110,6 +110,7 @@
                     <dl class="cinema-ticket-totals">
                         <div><dt>Tiền ghế</dt><dd>{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
                         <div><dt>Tiền đồ ăn</dt><dd>{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
+                        @if((int) $booking->promotion_discount_amount > 0)<div><dt>Giảm giá</dt><dd>−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} {{ $currency }}</dd></div>@endif
                         <div class="cinema-ticket-grand-total"><dt>Tổng cộng</dt><dd>{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</dd></div>
                     </dl>
                 </section>

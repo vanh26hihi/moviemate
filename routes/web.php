@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\CinemaContextController as AdminCinemaContextCont
 use App\Http\Controllers\Admin\CinemaController as AdminCinemaController;
 use App\Http\Controllers\Admin\CinemaOperatingHoursController as AdminCinemaOperatingHoursController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\DiscountController as AdminDiscountController;
 use App\Http\Controllers\Admin\FoodController as AdminFoodController;
 use App\Http\Controllers\Admin\FoodOrderController as AdminFoodOrderController;
 use App\Http\Controllers\Admin\GenreController as AdminGenreController;
@@ -51,6 +52,7 @@ use App\Http\Controllers\User\BookingController;
 use App\Http\Controllers\User\BookingFoodSelectionController;
 use App\Http\Controllers\User\BookingHistoryController;
 use App\Http\Controllers\User\BookingReviewController;
+use App\Http\Controllers\User\BookingPromotionController;
 use App\Http\Controllers\User\CinemaController as UserCinemaController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\GuestBookingAccessController;
@@ -188,6 +190,10 @@ Route::get('/booking/review', BookingReviewController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:30,1'])
     ->name('user.bookings.review');
 
+Route::post('/booking/promotions', BookingPromotionController::class)
+    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
+    ->name('user.bookings.promotions');
+
 Route::post('/booking/confirm', BookingCheckoutConfirmController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:booking-hold-creation'])
     ->name('user.bookings.confirm');
@@ -303,6 +309,12 @@ Route::prefix('admin')->name('admin.')
             ->middlewareFor(['create', 'store'], 'permission:foods.create')
             ->middlewareFor(['edit', 'update'], 'permission:foods.update')
             ->middlewareFor('destroy', 'permission:foods.delete');
+
+        Route::resource('discounts', AdminDiscountController::class)->except(['show', 'destroy'])
+            ->middlewareFor('index', 'permission:discounts.view')
+            ->middlewareFor(['create', 'store', 'edit', 'update'], 'permission:discounts.manage');
+        Route::patch('/discounts/{discount}/archive', [AdminDiscountController::class, 'archive'])
+            ->middleware('permission:discounts.manage')->name('discounts.archive');
 
         Route::resource('movies', AdminMovieController::class)->except(['destroy'])
             ->middlewareFor(['index', 'show'], 'permission:movies.view')

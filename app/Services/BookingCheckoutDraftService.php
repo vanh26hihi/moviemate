@@ -27,6 +27,7 @@ class BookingCheckoutDraftService
             'showtime_id' => $showtimeId,
             'seat_ids' => $this->normalizeSeatIds($seatIds),
             'food_items' => [],
+            'discount_codes' => [],
             'customer_email' => $this->normalizedEmail($request->user()?->email),
             'checkout_token' => $this->tokens->issueCheckoutToken(),
             'actor_identity' => $this->actorIdentity($request),
@@ -45,6 +46,7 @@ class BookingCheckoutDraftService
             || ! is_int($draft['showtime_id'] ?? null)
             || ! is_array($draft['seat_ids'] ?? null)
             || ! is_array($draft['food_items'] ?? null)
+            || ! is_array($draft['discount_codes'] ?? null)
             || ! is_string($draft['checkout_token'] ?? null)
             || ! $this->tokens->isValidCheckoutToken($draft['checkout_token'])) {
             throw ValidationException::withMessages([
@@ -86,6 +88,26 @@ class BookingCheckoutDraftService
         return is_array($draft)
             && is_string($draft['checkout_token'] ?? null)
             && $this->tokens->isValidCheckoutToken($draft['checkout_token']);
+    }
+
+    /** @param list<string> $codes */
+    public function updateDiscountCodes(Request $request, array $codes): array
+    {
+        $draft = $this->current($request, true);
+        $draft['discount_codes'] = collect($codes)->map(fn ($code) => mb_strtoupper(trim((string) $code)))->filter()->unique()->values()->all();
+        $request->session()->put(self::SESSION_KEY, $draft);
+
+        return $draft;
+    }
+
+    public function promotionsAreLocked(Request $request): bool
+    {
+        $draft = $this->current($request, true);
+
+        return Booking::query()
+            ->where('checkout_idempotency_key_hash', $this->tokens->hash($draft['checkout_token']))
+            ->whereHas('payments')
+            ->exists();
     }
 
     public function foodMutationRateLimitKey(Request $request): string

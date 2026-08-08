@@ -33,6 +33,7 @@ class BookingCheckoutService
         private readonly BookingFoodService $food,
         private readonly SeatSelectionPolicy $seatSelectionPolicy,
         private readonly BookingExpirationService $expiration,
+        private readonly PromotionService $promotions,
     ) {}
 
     public function createPendingBooking(
@@ -46,6 +47,7 @@ class BookingCheckoutService
         ?User $counterActor = null,
         ?string $customerName = null,
         ?string $customerPhone = null,
+        array $discountCodes = [],
     ): BookingCheckoutResult {
         if (! in_array($salesChannel, Booking::SALES_CHANNELS, true)) {
             throw new InvalidArgumentException('Unsupported booking sales channel.');
@@ -71,6 +73,7 @@ class BookingCheckoutService
             $foodSelection,
             $salesChannel,
             $counterActor?->getKey(),
+            $discountCodes,
         );
         $existing = Booking::query()
             ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -98,6 +101,7 @@ class BookingCheckoutService
                     $counterActor,
                     $customerName,
                     $customerPhone,
+                    $discountCodes,
                 ): Booking {
                     $existing = Booking::query()
                         ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -171,10 +175,19 @@ class BookingCheckoutService
                         'total_amount' => $priceBreakdown->grandTotal,
                         'seat_subtotal' => $priceBreakdown->seatSubtotal,
                         'food_subtotal' => $priceBreakdown->foodSubtotal,
+                        'gross_amount' => $priceBreakdown->grandTotal,
+                        'promotion_discount_amount' => 0,
+                        'points_discount_amount' => 0,
                         'currency' => $priceBreakdown->currency,
                         'payment_status' => 'unpaid',
                         'booking_status' => 'pending_payment',
                         'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
+                    ])->save();
+
+                    $promotionQuote = $this->promotions->reserveForBooking($booking, $discountCodes, $priceBreakdown->grandTotal);
+                    $booking->forceFill([
+                        'promotion_discount_amount' => $promotionQuote->discountAmount,
+                        'total_amount' => $promotionQuote->finalAmount,
                     ])->save();
 
                     $this->seatLocks->acquire(

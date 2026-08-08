@@ -38,6 +38,9 @@ class Booking extends Model
         'total_amount',
         'seat_subtotal',
         'food_subtotal',
+        'gross_amount',
+        'promotion_discount_amount',
+        'points_discount_amount',
         'currency',
         'payment_status',
         'booking_status',
@@ -56,6 +59,9 @@ class Booking extends Model
         'total_amount' => 'decimal:2',
         'seat_subtotal' => 'integer',
         'food_subtotal' => 'integer',
+        'gross_amount' => 'integer',
+        'promotion_discount_amount' => 'integer',
+        'points_discount_amount' => 'integer',
     ];
 
     protected $hidden = [
@@ -126,6 +132,11 @@ class Booking extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function discountCodeRedemptions(): HasMany
+    {
+        return $this->hasMany(BookingDiscountCode::class);
     }
 
     public function authoritativePayment(): HasOne
