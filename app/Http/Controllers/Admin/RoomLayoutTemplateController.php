@@ -61,7 +61,23 @@ class RoomLayoutTemplateController extends Controller
             ? RoomType::query()->where('code', $layoutTemplate->room_type)->value('name')
             : null;
 
-        return view('admin.layout-templates.show', compact('layoutTemplate', 'usages', 'roomTypeName'));
+        $seatCells = $layoutTemplate->cells->where('cell_type', 'seat');
+        $normalSeats = $seatCells->where('seat_type', 'normal')->count();
+        $vipSeats = $seatCells->where('seat_type', 'vip')->count();
+        $couplePositions = $seatCells->where('seat_type', 'couple')->count();
+        $couplePairs = $seatCells->where('seat_type', 'couple')->pluck('pair_key')->filter()->unique()->count();
+        $aisleCells = $layoutTemplate->cells->where('cell_type', 'aisle')->count();
+        $statistics = [
+            'capacity' => $normalSeats + $vipSeats + $couplePairs,
+            'normal' => $normalSeats,
+            'vip' => $vipSeats,
+            'couple_pairs' => $couplePairs,
+            'couple_positions' => $couplePositions,
+            'aisles' => $aisleCells,
+            'usages' => $usages->total(),
+        ];
+
+        return view('admin.layout-templates.show', compact('layoutTemplate', 'usages', 'roomTypeName', 'statistics'));
     }
 
     public function edit(RoomLayoutTemplate $layoutTemplate): View
@@ -126,10 +142,10 @@ class RoomLayoutTemplateController extends Controller
             $template->save();
             $template->cells()->delete();
             $now = now();
-            $template->cells()->insert(array_map(fn (array $cell): array => $cell + [
+            $template->cells()->insert(array_map(fn (array $cell): array => array_merge($cell, [
                 'room_layout_template_id' => $template->id, 'metadata' => $cell['metadata'] ? json_encode($cell['metadata']) : null,
                 'created_at' => $now, 'updated_at' => $now,
-            ], $layout['cells']));
+            ]), $layout['cells']));
 
             return $template->fresh('cells');
         });

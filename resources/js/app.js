@@ -4,6 +4,7 @@
 import './showtime-calendar';
 import './showtime';
 import './seat-gap-guard';
+import './layout-template-editor';
 
 const ticketScannerWorkspaces = document.querySelectorAll('[data-ticket-scanner]');
 if (ticketScannerWorkspaces.length > 0) {
