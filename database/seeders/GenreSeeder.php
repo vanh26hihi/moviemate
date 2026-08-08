@@ -11,18 +11,25 @@ class GenreSeeder extends Seeder
     public function run(): void
     {
         $genres = [
-            ['name' => 'Action'],
-            ['name' => 'Comedy'],
-            ['name' => 'Drama'],
-            ['name' => 'Horror'],
-            ['name' => 'Science Fiction'],
-            ['name' => 'Romance'],
+            'Action',
+            'Adventure',
+            'Animation',
+            'Comedy',
+            'Crime',
+            'Drama',
+            'Family',
+            'Fantasy',
+            'Horror',
+            'Mystery',
+            'Romance',
+            'Science Fiction',
+            'Thriller',
+            'War',
         ];
 
-        foreach ($genres as $data) {
-            Genre::create([
-                'name' => $data['name'],
-                'slug' => Str::slug($data['name']),
+        foreach ($genres as $name) {
+            Genre::query()->updateOrCreate(['slug' => Str::slug($name)], [
+                'name' => $name,
                 'description' => null,
             ]);
         }

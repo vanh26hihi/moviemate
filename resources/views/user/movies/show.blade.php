@@ -18,7 +18,7 @@
 <div class="cinema-surface relative overflow-hidden">
     <div class="absolute inset-x-0 top-0 h-[28rem] opacity-40">
         @if($cover)
-            <img src="{{ $cover }}" alt="{{ $movie->title }}" class="h-full w-full scale-105 object-cover blur-sm" loading="lazy">
+            <img src="{{ $cover }}" alt="{{ $movie->title }}" class="h-full w-full scale-105 object-cover blur-sm" loading="lazy" data-movie-media onerror="this.hidden=true">
             <div class="absolute inset-0 bg-gradient-to-b from-dark-main/60 via-dark-main/80 to-dark-main"></div>
         @else
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,61,87,0.28),transparent_34%),radial-gradient(circle_at_82%_12%,rgba(124,58,237,0.22),transparent_32%)]"></div>
@@ -29,15 +29,7 @@
         <div class="grid grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:gap-12">
             <div class="lg:col-span-4">
                 <div class="poster-frame cinema-card overflow-hidden rounded-3xl shadow-2xl shadow-black/30">
-                    @if($poster)
-                        <img src="{{ $poster }}" alt="{{ $movie->title }}" loading="lazy">
-                    @else
-                        <div class="fallback-poster">
-                            <i class="ph-fill ph-film-slate"></i>
-                            <strong class="text-2xl">MovieMate</strong>
-                            <span>{{ $movie->title }}</span>
-                        </div>
-                    @endif
+                    <x-movie-media :src="$poster" :alt="$movie->title" fallback-title="MovieMate" :fallback-text="$movie->title" />
                 </div>
             </div>
 

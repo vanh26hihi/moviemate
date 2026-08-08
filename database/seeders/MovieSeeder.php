@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\Movie;
 use App\Models\Genre;
+use App\Models\Movie;
+use Database\Seeders\Support\RealMovieCatalog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -11,14 +12,14 @@ class MovieSeeder extends Seeder
 {
     public function run(): void
     {
-        $movies = [
+        $fictionalMovies = [
             [
                 'title' => 'The Great Adventure',
                 'description' => 'An epic journey.',
                 'duration' => 120,
                 'age_rating' => 'PG-13',
                 'release_date' => '2025-01-15',
-                'status' => 'now_showing',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Action'],
             ],
             [
@@ -27,7 +28,7 @@ class MovieSeeder extends Seeder
                 'duration' => 100,
                 'age_rating' => 'PG',
                 'release_date' => '2025-02-20',
-                'status' => 'coming_soon',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Romance', 'Drama'],
             ],
             [
@@ -36,7 +37,7 @@ class MovieSeeder extends Seeder
                 'duration' => 95,
                 'age_rating' => 'PG',
                 'release_date' => '2024-12-01',
-                'status' => 'now_showing',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Comedy'],
             ],
             [
@@ -45,7 +46,7 @@ class MovieSeeder extends Seeder
                 'duration' => 130,
                 'age_rating' => 'PG-13',
                 'release_date' => '2025-03-10',
-                'status' => 'coming_soon',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Science Fiction', 'Action'],
             ],
             [
@@ -54,7 +55,7 @@ class MovieSeeder extends Seeder
                 'duration' => 105,
                 'age_rating' => 'R',
                 'release_date' => '2024-10-31',
-                'status' => 'now_showing',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Horror'],
             ],
             [
@@ -63,7 +64,7 @@ class MovieSeeder extends Seeder
                 'duration' => 110,
                 'age_rating' => 'PG',
                 'release_date' => '2025-04-05',
-                'status' => 'coming_soon',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Drama'],
             ],
             [
@@ -72,7 +73,7 @@ class MovieSeeder extends Seeder
                 'duration' => 115,
                 'age_rating' => 'PG-13',
                 'release_date' => '2025-05-01',
-                'status' => 'now_showing',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Science Fiction'],
             ],
             [
@@ -81,25 +82,40 @@ class MovieSeeder extends Seeder
                 'duration' => 100,
                 'age_rating' => 'PG',
                 'release_date' => '2025-06-12',
-                'status' => 'coming_soon',
+                'status' => Movie::STATUS_INACTIVE,
                 'genres' => ['Horror', 'Drama'],
             ],
         ];
 
-        foreach ($movies as $data) {
-            $movie = Movie::create([
+        foreach ($fictionalMovies as $data) {
+            $movie = Movie::query()->updateOrCreate(['slug' => Str::slug($data['title'])], [
                 'title' => $data['title'],
-                'slug' => Str::slug($data['title']),
                 'description' => $data['description'],
+                'poster' => null,
+                'cover_image' => null,
                 'duration' => $data['duration'],
                 'age_rating' => $data['age_rating'],
                 'release_date' => $data['release_date'],
                 'status' => $data['status'],
             ]);
 
-            // Attach genres
             $genreIds = Genre::whereIn('name', $data['genres'])->pluck('id')->toArray();
-            $movie->genres()->attach($genreIds);
+            $movie->genres()->sync($genreIds);
+        }
+
+        foreach (RealMovieCatalog::movies() as $data) {
+            $movie = Movie::query()->updateOrCreate(['slug' => Str::slug($data['title'])], [
+                'title' => $data['title'],
+                'description' => $data['description'],
+                'poster' => $data['poster'],
+                'cover_image' => $data['cover_image'],
+                'duration' => $data['duration'],
+                'age_rating' => $data['age_rating'],
+                'release_date' => $data['release_date'],
+                'status' => $data['status'],
+            ]);
+
+            $movie->genres()->sync(Genre::query()->whereIn('name', $data['genres'])->pluck('id'));
         }
     }
 }

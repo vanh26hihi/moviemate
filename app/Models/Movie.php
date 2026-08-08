@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Storage;
 
 class Movie extends Model
 {
+    /** @var list<string> */
+    public const TRUSTED_REMOTE_MEDIA_HOSTS = ['media.themoviedb.org'];
+
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_COMING_SOON = 'coming_soon';
@@ -62,11 +65,38 @@ class Movie extends Model
 
     public static function imageUrl(?string $path): ?string
     {
+        if ($remoteUrl = static::trustedRemoteImageUrl($path)) {
+            return $remoteUrl;
+        }
+
         $path = static::canonicalImagePath($path);
 
         return $path && Storage::disk('public')->exists($path)
             ? '/storage/'.$path
             : null;
+    }
+
+    public static function trustedRemoteImageUrl(?string $url): ?string
+    {
+        if (! is_string($url) || trim($url) === '') {
+            return null;
+        }
+
+        $url = trim($url);
+        $parts = parse_url($url);
+        if (! is_array($parts)
+            || strtolower((string) ($parts['scheme'] ?? '')) !== 'https'
+            || ! in_array(strtolower((string) ($parts['host'] ?? '')), self::TRUSTED_REMOTE_MEDIA_HOSTS, true)
+            || array_intersect(['user', 'pass', 'port', 'query', 'fragment'], array_keys($parts)) !== []) {
+            return null;
+        }
+
+        $path = (string) ($parts['path'] ?? '');
+        if (! preg_match('#^/t/p/(?:w\d+|original)/[A-Za-z0-9][A-Za-z0-9._-]*\.(?:jpe?g|png|webp)$#i', $path)) {
+            return null;
+        }
+
+        return $url;
     }
 
     public static function storageDiskPath(?string $path): ?string

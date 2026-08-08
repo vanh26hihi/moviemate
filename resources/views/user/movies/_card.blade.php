@@ -54,20 +54,13 @@
         class="block"
     >
         <div data-movie-poster class="poster-frame relative overflow-hidden transition-[filter] duration-500 group-hover:brightness-105">
-            @if($movie->poster_url)
-                <img
-                    src="{{ $movie->poster_url }}"
-                    alt="{{ $movie->title }}"
-                    loading="lazy"
-                    class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                >
-            @else
-                <div class="fallback-poster">
-                    <i class="ph-fill ph-film-slate"></i>
-                    <strong class="text-lg">MovieMate</strong>
-                    <span>{{ $movie->title ?? 'Phim MovieMate' }}</span>
-                </div>
-            @endif
+            <x-movie-media
+                :src="$movie->poster_url"
+                :alt="$movie->title"
+                image-class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                fallback-title="MovieMate"
+                :fallback-text="$movie->title ?? 'Phim MovieMate'"
+            />
 
             {{-- Badge trạng thái và độ tuổi --}}
             <div class="absolute inset-x-0 top-0 z-10 p-3 flex items-start justify-between gap-2">
