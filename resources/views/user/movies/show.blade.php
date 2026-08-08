@@ -5,8 +5,13 @@
 @php
     $poster = $movie->poster_url;
     $cover = $movie->cover_url ?: $poster;
+    $showtimes = collect($showtimes ?? []);
+    $cinemas = collect($cinemas ?? []);
+    $selectedCinema = $selectedCinema ?? null;
+    $preferredCinema = $preferredCinema ?? null;
+    $selectedDate = $selectedDate ?? now(config('cinema.timezone', 'Asia/Ho_Chi_Minh'))->toDateString();
+    $dates = collect($dates ?? [['date' => $selectedDate, 'label' => 'Hôm nay', 'day' => now()->format('d/m')]]);
     $genresText = $movie->genres->pluck('name')->join(', ') ?: 'Đang cập nhật';
-    $showtimesByDate = $showtimes->groupBy(fn ($showtime) => \Carbon\Carbon::parse($showtime->show_date)->format('Y-m-d'));
 @endphp
 
 @section('content')
@@ -63,44 +68,22 @@
                 <div class="flex flex-wrap gap-3">
                     <a href="#showtimes" class="btn-primary"><i class="ph-fill ph-ticket"></i> Xem lịch chiếu</a>
                     @if($movie->trailer_url)
-                        <a href="{{ $movie->trailer_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary"><i class="ph-fill ph-play-circle text-xl"></i> Xem trailer</a>
+                        <a href="{{ $movie->trailer_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary"><i class="ph-fill ph-play-circle text-xl"></i> Xem video giới thiệu</a>
                     @endif
                 </div>
             </div>
         </div>
 
         <section id="showtimes" class="mt-14">
-            <div class="mb-6 flex items-center gap-3">
-                <span class="h-8 w-1 rounded-full bg-gradient-to-b from-brand-start to-brand-end"></span>
-                <div><h2 class="text-2xl font-extrabold app-text md:text-3xl">Lịch chiếu</h2><p class="mt-1 text-sm app-muted">Chọn giờ chiếu phù hợp tại MovieMate Cinema – FPT Polytechnic.</p></div>
-            </div>
-
-            @if($showtimes->isEmpty())
-                <div class="cinema-card p-8 text-center"><i class="ph-fill ph-calendar-x text-4xl text-brand-start"></i><h3 class="mt-4 text-xl font-extrabold app-text">Chưa có suất chiếu</h3><p class="mt-2 app-muted">Hiện chưa có suất chiếu khả dụng cho phim này.</p></div>
-            @else
-                <div class="space-y-5">
-                    @foreach($showtimesByDate as $date => $items)
-                        <div class="cinema-card p-5">
-                            <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div><p class="text-sm font-extrabold uppercase tracking-wider text-brand-start">{{ \Carbon\Carbon::parse($date)->translatedFormat('l') }}</p><h3 class="text-xl font-extrabold app-text">{{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</h3></div>
-                                <span class="text-sm app-muted">{{ $items->count() }} suất chiếu</span>
-                            </div>
-                            @php($first = $items->first())
-                            <div class="rounded-2xl border app-border app-secondary p-4">
-                                <h4 class="font-extrabold app-text">{{ $first->cinema->name }}</h4>
-                                <p class="mt-1 text-sm app-muted">{{ $first->cinema->address }}</p>
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    @foreach($items as $show)
-                                        <a href="{{ route('user.bookings.selectSeat', $show->id) }}" class="rounded-xl border border-brand-start/30 bg-brand-start/10 px-4 py-2 font-extrabold text-brand-start transition-colors hover:bg-brand-start hover:text-white">
-                                            {{ \Carbon\Carbon::parse($show->show_time)->format('H:i') }} · {{ $show->room->name }}
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
+            <div class="mb-6 flex items-center gap-3"><span class="h-8 w-1 rounded-full bg-gradient-to-b from-brand-start to-brand-end"></span><div><h2 class="text-2xl font-extrabold app-text md:text-3xl">Lịch chiếu theo rạp</h2><p class="mt-1 text-sm app-muted">Chọn chi nhánh và ngày; các rạp khác vẫn hiển thị khi chưa lọc.</p></div></div>
+            <form method="GET" action="{{ route('user.movies.show', $movie->slug) }}" data-showtime-filter-form data-filter-endpoint="{{ route('showtimes.filter') }}" data-filter-context="movie" data-movie-slug="{{ $movie->slug }}" class="cinema-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_1fr_auto]">
+                <label><span class="mb-1 block text-sm font-bold app-text">Rạp</span><select name="cinema" class="cinema-input"><option value="">Tất cả rạp</option>@foreach($cinemas as $filterCinema)<option value="{{ $filterCinema->code }}" @selected($selectedCinema?->is($filterCinema))>{{ $filterCinema->name }}</option>@endforeach</select></label>
+                <label><span class="mb-1 block text-sm font-bold app-text">Ngày</span><select name="date" class="cinema-input">@foreach($dates as $date)<option value="{{ $date['date'] }}" @selected($selectedDate === $date['date'])>{{ $date['label'] }} · {{ $date['day'] }}</option>@endforeach</select></label>
+                <button type="submit" class="btn-primary self-end">Xem lịch</button>
+            </form>
+            @if($preferredCinema && ! $selectedCinema)<p class="mb-4 text-sm app-muted">Rạp ưu tiên <strong class="app-text">{{ $preferredCinema->name }}</strong> được xếp trước; các rạp khác vẫn khả dụng.</p>@endif
+            <div data-showtime-filter-status class="sr-only" role="status" aria-live="polite"></div>
+            <div data-showtime-results>@include('user.partials.showtime-results', ['context' => 'movie', 'cinema' => $selectedCinema])</div>
         </section>
     </div>
 </div>

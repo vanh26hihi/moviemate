@@ -30,9 +30,33 @@ class RbacSeederTest extends TestCase
         $this->assertTrue($manager->hasPermission('admin.access'));
         $this->assertTrue($manager->hasPermission('cinema.update'));
         $this->assertFalse($manager->hasPermission('cinema.delete'));
-        $this->assertFalse($manager->hasPermission('users.view'));
+        $this->assertTrue($manager->hasPermission('users.view'));
+        $this->assertTrue($manager->hasPermission('cinemas.view'));
+        $this->assertTrue($manager->hasPermission('cinema_assignments.manage'));
+        foreach ([
+            'bookings.view',
+            'payments.view',
+            'payments.reconcile',
+            'ticket_deliveries.view',
+            'ticket_deliveries.retry',
+            'ticket_checkins.view',
+            'seats.maintenance.view',
+            'seats.maintenance.update',
+            'discounts.view',
+            'discounts.manage',
+            'reviews.view',
+            'reviews.moderate',
+            'reports.view',
+        ] as $permission) {
+            $this->assertTrue($manager->hasPermission($permission), "Manager thiếu quyền {$permission}");
+        }
+        $this->assertFalse($manager->hasPermission('activity_logs.view'));
+        $this->assertTrue($admin->hasPermission('activity_logs.view'));
+        $this->assertTrue($staff->hasPermission('ticket_checkins.view'));
+        $this->assertFalse($staff->hasPermission('activity_logs.view'));
         $this->assertTrue($staff->hasPermission('tickets.checkin'));
         $this->assertFalse($staff->hasPermission('admin.access'));
+        $this->assertFalse($staff->hasPermission('cinemas.view'));
         $this->assertSame(0, $user->permissions()->count());
     }
 }

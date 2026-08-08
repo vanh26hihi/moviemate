@@ -44,7 +44,7 @@ class FoodController extends Controller
 
         FoodItem::create($data);
 
-        return redirect()->route('admin.foods.index')->with('success', 'Food created');
+        return redirect()->route('admin.foods.index')->with('success', 'Đã tạo món ăn.');
     }
 
     public function edit(FoodItem $food)
@@ -68,13 +68,13 @@ class FoodController extends Controller
 
         $food->update($data);
 
-        return redirect()->route('admin.foods.index')->with('success', 'Food updated');
+        return redirect()->route('admin.foods.index')->with('success', 'Đã cập nhật món ăn.');
     }
 
     public function destroy(FoodItem $food)
     {
         $food->delete();
 
-        return redirect()->route('admin.foods.index')->with('success', 'Food deleted');
+        return redirect()->route('admin.foods.index')->with('success', 'Đã xóa món ăn.');
     }
 }

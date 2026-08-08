@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Domain\Bookings\BookingPriceBreakdown;
 use App\Models\Showtime;
+use App\Support\SeatPresentation;
 use Illuminate\Support\Collection;
 
 final readonly class BookingCheckoutPreview
@@ -16,11 +17,14 @@ final readonly class BookingCheckoutPreview
 
     public function seatSummaries(): Collection
     {
-        return $this->seats->map(fn ($seat): array => [
-            'id' => (int) $seat->id,
-            'seat_code' => (string) $seat->seat_code,
-            'type' => (string) $seat->type,
-            'price' => $this->prices->seatSnapshots[$seat->id],
+        return SeatPresentation::groups($this->seats)->map(fn (array $group): array => [
+            'id' => $group['seat_ids'][0] ?? 0,
+            'seat_ids' => $group['seat_ids'],
+            'seat_code' => $group['seat_code'],
+            'label' => $group['label'],
+            'type' => $group['type'],
+            'is_couple' => $group['is_couple'],
+            'price' => $group['seats']->sum(fn ($seat): int => (int) ($this->prices->seatSnapshots[$seat->id] ?? 0)),
         ]);
     }
 }

@@ -31,19 +31,22 @@ class BookingCheckoutConfirmController extends Controller
             'food_subtotal' => ['prohibited'],
             'total_amount' => ['prohibited'],
             'payment_status' => ['prohibited'],
-            'payment_method' => ['nullable', 'string', 'in:vnpay,zalopay'],
+            'payment_method' => ['nullable', 'string', 'in:vnpay,zalopay,payos'],
         ]);
 
         $draft = $drafts->current($request, true);
+        $provider = (string) $request->input('payment_method', config('payment.driver', 'vnpay'));
 
         try {
+            $drafts->assertMayCreateHold($request, $draft);
             $previews->preview($draft);
             $result = $checkout->confirm(
                 $draft,
                 $request->user()?->getAuthIdentifier(),
-                $request->input('payment_method', config('payment.driver', 'vnpay')),
+                $provider,
                 $request->ip(),
             );
+            $drafts->rememberActiveHold($request, $result->checkout->booking);
         } catch (FoodSelectionValidationException $exception) {
             return redirect()
                 ->route('user.bookings.review')
@@ -52,7 +55,11 @@ class BookingCheckoutConfirmController extends Controller
         } catch (PaymentInitiationException $exception) {
             return redirect()
                 ->route('user.bookings.review')
-                ->withErrors(['payment_method' => $exception->getMessage()])
+                ->withErrors(['payment_method' => match ($provider) {
+                    'vnpay' => 'Không thể khởi tạo thanh toán VNPAY. Vui lòng thử lại hoặc liên hệ hỗ trợ.',
+                    'payos' => 'Chưa thể kết nối tới phương thức thanh toán này. Vui lòng thử lại.',
+                    default => $exception->getMessage(),
+                }])
                 ->withInput();
         }
 
@@ -80,6 +87,10 @@ class BookingCheckoutConfirmController extends Controller
 
         return redirect()
             ->route($statusRoute, $booking)
-            ->with('warning', 'Yêu cầu ZaloPay chưa xác định. MovieMate đang đối soát lần thanh toán hiện tại và không tạo lần mới.');
+            ->with('warning', match ($provider) {
+                'vnpay' => 'Không thể khởi tạo thanh toán VNPAY. Vui lòng thử lại hoặc liên hệ hỗ trợ.',
+                'payos' => 'Chưa thể xác minh giao dịch lúc này. Hệ thống tiếp tục giữ trạng thái an toàn và bạn có thể kiểm tra lại sau.',
+                default => 'Yêu cầu ZaloPay chưa xác định. MovieMate đang đối soát lần thanh toán hiện tại và không tạo lần mới.',
+            });
     }
 }

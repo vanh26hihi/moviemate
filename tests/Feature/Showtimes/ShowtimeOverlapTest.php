@@ -156,6 +156,7 @@ class ShowtimeOverlapTest extends ShowtimeTestCase
         $this->existing($movie, $room);
         $legacyCinema = $this->cinema->replicate(['canonical_key']);
         $legacyCinema->canonical_key = 'legacy-'.uniqid();
+        $legacyCinema->code = 'LEGACY-'.str()->upper(str()->random(8));
         $legacyCinema->name = 'Legacy';
         $legacyCinema->is_primary = false;
         $legacyCinema->save();

@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'payos' => [
+        'client_id' => env('PAYOS_CLIENT_ID'),
+        'api_key' => env('PAYOS_API_KEY'),
+        'checksum_key' => env('PAYOS_CHECKSUM_KEY'),
+        'base_url' => env('PAYOS_BASE_URL', 'https://api-merchant.payos.vn'),
+        'connect_timeout_seconds' => (int) env('PAYOS_CONNECT_TIMEOUT_SECONDS', 3),
+        'request_timeout_seconds' => (int) env('PAYOS_REQUEST_TIMEOUT_SECONDS', 10),
+    ],
+
 ];

@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Xác nhận đơn - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 @php
@@ -8,8 +9,12 @@
     $checkoutDeadline = \Carbon\Carbon::createFromTimestamp((int) $draft['created_at'])
         ->addMinutes((int) config('booking.checkout_token_ttl_minutes', 15));
     $pendingMinutes = (int) config('booking.pending_ttl_minutes', 15);
-    $defaultProvider = ($paymentProviders['vnpay'] ?? false) ? 'vnpay' : 'zalopay';
+    $defaultProvider = ($paymentProviders['vnpay'] ?? false)
+        ? 'vnpay'
+        : (($paymentProviders['payos'] ?? false) ? 'payos' : 'zalopay');
 @endphp
+
+<x-validation-summary class="mx-auto mt-6 max-w-7xl px-4 sm:px-6 lg:px-8" :errors="$errors" :except="['payment_method']" />
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-5xl">
@@ -23,7 +28,7 @@
                     <p class="mt-2 app-muted">Vui lòng kiểm tra suất chiếu, ghế, đồ ăn, email và kênh thanh toán.</p>
                 </div>
                 <div class="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 sm:max-w-xs" data-countdown-wrapper>
-                    <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian phiên checkout còn lại</p>
+                    <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian phiên đặt vé còn lại</p>
                     <p class="mt-1 text-xl font-extrabold app-text" data-countdown="{{ $checkoutDeadline->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
                     <p class="mt-1 text-xs app-muted">Nếu hết giờ, bạn cần chọn lại ghế.</p>
                 </div>
@@ -37,6 +42,7 @@
                             <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->movie->title }}</dd></div>
                             <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($preview->showtime->show_time)->format('H:i') }}</dd></div>
                             <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->cinema->name }}</dd></div>
+                            <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->cinema->address }}</dd></div>
                             <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->room->name }}</dd></div>
                         </dl>
                     </section>
@@ -49,8 +55,12 @@
                         <div class="mt-4 space-y-3">
                             @foreach($preview->seatSummaries() as $seat)
                                 <div class="flex items-center justify-between gap-3 text-sm">
-                                    <span class="app-text">Ghế <strong>{{ $seat['seat_code'] }}</strong> · {{ $seatTypeLabels[$seat['type']] ?? ucfirst($seat['type']) }}</span>
-                                    <strong class="whitespace-nowrap app-text">{{ number_format($seat['price'], 0, ',', '.') }} VND</strong>
+                                    <span class="app-text">
+                                        @if($seat['is_couple'])<strong>{{ $seat['label'] }}</strong>
+                                        @else Ghế <strong>{{ $seat['seat_code'] }}</strong> · {{ $seatTypeLabels[$seat['type']] ?? \App\Support\StatusLabel::for('seat_type', $seat['type']) }}
+                                        @endif
+                                    </span>
+                                    <strong class="whitespace-nowrap app-text">{{ number_format($seat['price'], 0, ',', '.') }} VNĐ</strong>
                                 </div>
                             @endforeach
                         </div>
@@ -61,8 +71,8 @@
                         <div class="mt-4 space-y-3">
                             @forelse($preview->prices->foodLines as $line)
                                 <div class="flex items-start justify-between gap-3 text-sm">
-                                    <span class="app-text">{{ $line->snapshotName }} <strong>× {{ $line->quantity }}</strong><span class="mt-0.5 block text-xs app-muted">{{ number_format($line->unitPrice, 0, ',', '.') }} VND / phần</span></span>
-                                    <strong class="whitespace-nowrap app-text">{{ number_format($line->lineTotal, 0, ',', '.') }} VND</strong>
+                                    <span class="app-text">{{ $line->snapshotName }} <strong>× {{ $line->quantity }}</strong><span class="mt-0.5 block text-xs app-muted">{{ number_format($line->unitPrice, 0, ',', '.') }} VNĐ / phần</span></span>
+                                    <strong class="whitespace-nowrap app-text">{{ number_format($line->lineTotal, 0, ',', '.') }} VNĐ</strong>
                                 </div>
                             @empty
                                 <p class="text-sm app-muted">Không chọn đồ ăn. Đây là đơn chỉ gồm vé xem phim.</p>
@@ -74,13 +84,13 @@
                 <aside class="self-start rounded-2xl app-secondary p-5 sm:p-6 lg:sticky lg:top-24" aria-labelledby="payment-summary-title">
                     <div class="flex items-center justify-between gap-3">
                         <h2 id="payment-summary-title" class="font-bold app-text">Chi tiết thanh toán</h2>
-                        <span class="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-extrabold text-white">VND</span>
+                        <span class="rounded-lg bg-red-600 px-2.5 py-1 text-xs font-extrabold text-white">VNĐ</span>
                     </div>
 
                     <dl class="mt-5 space-y-3 text-sm">
-                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VND</dd></div>
-                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VND</dd></div>
-                        <div class="flex justify-between gap-3 border-t pt-4 app-border"><dt class="font-bold app-text">Tổng thanh toán</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format($preview->prices->grandTotal, 0, ',', '.') }} VND</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VNĐ</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VNĐ</dd></div>
+                        <div class="flex justify-between gap-3 border-t pt-4 app-border"><dt class="font-bold app-text">Tổng thanh toán</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format($preview->prices->grandTotal, 0, ',', '.') }} VNĐ</dd></div>
                     </dl>
 
                     <div class="mt-5 rounded-xl border app-border px-4 py-3">
@@ -104,6 +114,12 @@
                                     <span><strong class="block app-text">Thanh toán bằng VNPAY</strong><small class="app-muted">Bạn sẽ được chuyển đến VNPAY để quét QR hoặc chọn ngân hàng.</small></span>
                                     @unless($paymentProviders['vnpay'] ?? false)<small class="ml-auto text-warning">Chưa cấu hình</small>@endunless
                                 </label>
+                                <label class="flex cursor-pointer items-center gap-3 rounded-xl border app-border bg-white/5 p-3">
+                                    <input type="radio" name="payment_method" value="payos" class="accent-emerald-600" @checked(old('payment_method', $defaultProvider) === 'payos') @disabled(!($paymentProviders['payos'] ?? false))>
+                                    <i class="ph-bold ph-bank text-2xl text-emerald-500" aria-hidden="true"></i>
+                                    <span><strong class="block app-text">payOS — Chuyển khoản ngân hàng / VietQR</strong><small class="app-muted">Bạn sẽ được chuyển tới trang thanh toán bảo mật của payOS.</small></span>
+                                    @unless($paymentProviders['payos'] ?? false)<small class="ml-auto text-warning">Chưa cấu hình</small>@endunless
+                                </label>
                                 @if($paymentProviders['zalopay'] ?? false)
                                     <label class="flex cursor-pointer items-center gap-3 rounded-xl border app-border bg-white/5 p-3">
                                         <input type="radio" name="payment_method" value="zalopay" class="accent-blue-600" @checked(old('payment_method', $defaultProvider) === 'zalopay')>
@@ -121,7 +137,7 @@
                         </form>
                         <a href="{{ route('user.bookings.food') }}" class="btn-secondary w-full text-center"><i class="ph-bold ph-arrow-left" aria-hidden="true"></i>Quay lại đồ ăn</a>
                     </div>
-                    <p class="mt-4 text-xs leading-relaxed app-muted"><i class="ph-fill ph-shield-check mr-1 text-success" aria-hidden="true"></i>Tổng tiền hiển thị được tính lại trên máy chủ; trang này không gửi total từ trình duyệt.</p>
+                    <p class="mt-4 text-xs leading-relaxed app-muted"><i class="ph-fill ph-shield-check mr-1 text-success" aria-hidden="true"></i>Tổng tiền hiển thị được tính lại trên máy chủ; trang này không gửi tổng tiền từ trình duyệt.</p>
                 </aside>
             </div>
         </section>

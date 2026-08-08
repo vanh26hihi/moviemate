@@ -2,6 +2,7 @@
 
 @section('title', 'Sửa phim')
 @section('page-title', 'Sửa phim')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="admin-page-header">
@@ -21,17 +22,9 @@
     </div>
 </div>
 
-@if ($errors->any())
-    <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm">
-        <ul class="list-disc list-inside">
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+<x-validation-summary class="mb-5" :errors="$errors" :except="['poster', 'cover_image']" />
 
-<form action="{{ route('admin.movies.update', $movie) }}" method="POST" enctype="multipart/form-data" class="admin-form-card">
+<form action="{{ route('admin.movies.update', $movie) }}" method="POST" enctype="multipart/form-data" class="admin-form-card" data-submit-once>
     @csrf
     @method('PUT')
 
@@ -43,7 +36,7 @@
             </div>
 
             <div>
-                <label class="admin-label">Slug</label>
+                <label class="admin-label">Đường dẫn rút gọn</label>
                 <input type="text" name="slug" value="{{ old('slug', $movie->slug) }}" class="admin-input">
                 <p class="admin-help">Để trống nếu muốn hệ thống tự tạo slug từ tiêu đề.</p>
             </div>
@@ -54,7 +47,7 @@
             </div>
 
             <div>
-                <label class="admin-label">Trailer URL</label>
+                <label class="admin-label">Đường dẫn video giới thiệu</label>
                 <input type="url" name="trailer_url" value="{{ old('trailer_url', $movie->trailer_url) }}" class="admin-input">
             </div>
         </div>
@@ -84,38 +77,39 @@
                 </div>
             </div>
 
-            <div>
-                <label class="admin-label">Trạng thái *</label>
-                <select name="status" required class="admin-input">
-                    <option value="now_showing" {{ old('status', $movie->status) == 'now_showing' ? 'selected' : '' }}>Đang chiếu</option>
-                    <option value="coming_soon" {{ old('status', $movie->status) == 'coming_soon' ? 'selected' : '' }}>Sắp chiếu</option>
-                    <option value="stopped" {{ old('status', $movie->status) == 'stopped' ? 'selected' : '' }}>Ngừng chiếu</option>
-                </select>
-            </div>
+            <div><label class="admin-label">Trạng thái</label><div class="admin-input">{{ $movie->status_label }}</div><p class="admin-help">Trạng thái được quản lý riêng tại trang chi tiết phim.</p></div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="rounded-2xl app-card-soft border app-border p-4">
-                    <label class="admin-label">Poster hiện tại</label>
+                    <label class="admin-label">Ảnh áp phích hiện tại</label>
                     <div class="mb-3 aspect-[2/3] overflow-hidden rounded-xl bg-slate-950">
                         @if($movie->poster_url)
-                            <img src="{{ $movie->poster_url }}" alt="Poster" class="h-full w-full object-cover" loading="lazy">
+                            <img id="poster-preview" src="{{ $movie->poster_url }}" alt="Ảnh áp phích của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
+                            <div data-image-fallback class="admin-media-fallback hidden h-full w-full">MM</div>
                         @else
+                            <img id="poster-preview" alt="Xem trước poster" class="hidden h-full w-full object-cover">
                             <div class="admin-media-fallback h-full w-full">MM</div>
                         @endif
                     </div>
-                    <input type="file" name="poster" accept="image/*" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <input type="file" name="poster" accept="image/jpeg,image/png,image/webp" data-image-preview="poster-preview" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <p class="admin-help">Để trống để giữ ảnh hiện tại. Tối đa 4 MB, tỷ lệ 2:3.</p>
+                    @error('poster')<p class="mt-1 text-sm text-error">{{ $message }}</p>@enderror
                 </div>
 
                 <div class="rounded-2xl app-card-soft border app-border p-4">
-                    <label class="admin-label">Cover hiện tại</label>
-                    <div class="mb-3 aspect-[16/10] overflow-hidden rounded-xl bg-slate-950">
+                    <label class="admin-label">Ảnh bìa hiện tại</label>
+                    <div class="mb-3 aspect-video overflow-hidden rounded-xl bg-slate-950">
                         @if($movie->cover_url)
-                            <img src="{{ $movie->cover_url }}" alt="Cover" class="h-full w-full object-cover" loading="lazy">
+                            <img id="banner-preview" src="{{ $movie->cover_url }}" alt="Ảnh bìa của {{ $movie->title }}" class="h-full w-full object-cover" loading="lazy">
+                            <div data-image-fallback class="admin-media-fallback hidden h-full w-full">Ảnh bìa</div>
                         @else
-                            <div class="admin-media-fallback h-full w-full">Cover</div>
+                            <img id="banner-preview" alt="Xem trước banner" class="hidden h-full w-full object-cover">
+                            <div class="admin-media-fallback h-full w-full">Ảnh bìa</div>
                         @endif
                     </div>
-                    <input type="file" name="cover_image" accept="image/*" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <input type="file" name="cover_image" accept="image/jpeg,image/png,image/webp" data-image-preview="banner-preview" class="admin-input text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-brand-start/10 file:px-3 file:py-2 file:font-bold file:text-brand-start">
+                    <p class="admin-help">Để trống để giữ ảnh hiện tại. Tối đa 8 MB, tỷ lệ 16:9.</p>
+                    @error('cover_image')<p class="mt-1 text-sm text-error">{{ $message }}</p>@enderror
                 </div>
             </div>
 
@@ -135,7 +129,7 @@
 
     <div class="mt-8 flex flex-col sm:flex-row justify-end gap-3 border-t app-border pt-5">
         <a href="{{ route('admin.movies.index') }}" class="admin-btn-secondary">Hủy</a>
-        <button type="submit" class="admin-btn-primary">
+        <button type="submit" class="admin-btn-primary" data-loading-label="Đang cập nhật…">
             <i class="ph-bold ph-floppy-disk"></i>
             Cập nhật
         </button>

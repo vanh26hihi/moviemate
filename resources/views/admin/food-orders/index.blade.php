@@ -1,6 +1,6 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý Đơn đồ ăn - MovieMate Admin')
+@section('title', 'Quản lý đơn đồ ăn - Quản trị MovieMate')
 @section('page-title', 'Đơn đồ ăn')
 
 @section('content')
@@ -39,14 +39,14 @@
                                 <div class="text-xs app-muted">{{ $order->customer_phone }}</div>
                             </td>
                             <td class="px-5 py-4">{{ optional($order->pickupCinema)->name ?? 'Chưa chọn' }}</td>
-                            <td class="px-5 py-4 text-right font-bold">{{ number_format($order->total_amount,2) }}đ</td>
+                            <td class="px-5 py-4 text-right font-bold">{{ number_format((int) $order->total_amount, 0, ',', '.') }} VNĐ</td>
                             <td class="px-5 py-4">
                                 <span class="inline-flex px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider {{ $order->status === 'paid' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">
-                                    {{ ucfirst($order->status) }}
+                                    {{ \App\Support\StatusLabel::for('food_order', $order->status) }}
                                 </span>
                             </td>
                             <td class="px-5 py-4 text-center">
-                                <a href="{{ route('admin.food-orders.show', $order) }}" class="inline-flex items-center justify-center w-10 h-10 rounded-xl border app-border app-muted hover:app-text hover:border-brand-start transition-colors">
+                                <a href="{{ route('admin.food-orders.show', $order) }}" class="inline-flex items-center justify-center w-10 h-10 rounded-xl border app-border app-muted hover:app-text hover:border-brand-start transition-colors" title="Xem chi tiết" aria-label="Xem chi tiết đơn {{ $order->id }}">
                                     <i class="ph-bold ph-eye text-base"></i>
                                 </a>
                             </td>

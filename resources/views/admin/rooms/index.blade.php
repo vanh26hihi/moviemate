@@ -1,114 +1,164 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý phòng chiếu - MovieMate Admin')
-@section('page-title', 'Quản lý phòng chiếu')
+@section('title', __('rooms.index_title').' - MovieMate')
+@section('page-title', __('rooms.index_title'))
 
 @section('content')
 <div class="space-y-6">
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Cinema rooms</p>
-            <h1 class="text-3xl font-extrabold app-text">Phòng chiếu</h1>
-            <p class="app-muted mt-2">Quản lý phòng, loại phòng và sơ đồ ghế theo từng rạp.</p>
+            <p class="mb-2 text-sm font-extrabold uppercase tracking-[0.22em] text-brand-start">Phòng chiếu</p>
+            <h1 class="app-text text-3xl font-extrabold">{{ __('rooms.index_title') }}</h1>
+            <p class="app-muted mt-2">{{ __('rooms.description') }}</p>
         </div>
-        @can('rooms.create')<a href="{{ route('admin.rooms.create') }}" class="btn-primary">
-            <i class="ph-bold ph-plus"></i> Thêm phòng
-        </a>@endcan
+        @can('rooms.create')
+            <a href="{{ route('admin.rooms.create') }}" class="btn-primary" title="{{ __('rooms.add') }}">
+                <i class="ph-bold ph-plus" aria-hidden="true"></i> {{ __('rooms.add') }}
+            </a>
+        @endcan
     </div>
 
-    @if(session('success'))
-        <div class="rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-bold">
-            {{ session('success') }}
-        </div>
-    @endif
-
     <div class="cinema-card overflow-hidden">
-        <div class="p-5 border-b app-border">
-            <form method="GET" action="{{ route('admin.rooms.index') }}" class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-                <label class="flex items-center gap-3 px-4 app-input border app-border rounded-2xl">
-                    <i class="ph ph-magnifying-glass app-muted"></i>
-                    <input type="text" name="search" value="{{ $search ?? '' }}" placeholder="Tìm tên phòng..." class="w-full bg-transparent app-text focus:outline-none py-3">
+        <div class="border-b app-border p-5">
+            <form method="GET" action="{{ route('admin.rooms.index') }}" class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(240px,1fr)_220px_180px_auto_auto]">
+                <label class="flex items-center gap-3 rounded-2xl border app-border app-input px-4">
+                    <i class="ph ph-magnifying-glass app-muted" aria-hidden="true"></i>
+                    <span class="sr-only">{{ __('common.search') }}</span>
+                    <input type="search" name="search" value="{{ $search }}" placeholder="{{ __('rooms.search_placeholder') }}" class="w-full bg-transparent py-3 app-text focus:outline-none">
+                </label>
+                <label>
+                    <span class="sr-only">{{ __('rooms.fields.status') }}</span>
+                    <select name="status" class="cinema-input">
+                        <option value="">{{ __('rooms.all_statuses') }}</option>
+                        <option value="active" @selected($status === 'active')>{{ \App\Support\StatusLabel::for('room', 'active') }}</option>
+                        <option value="inactive" @selected($status === 'inactive')>{{ \App\Support\StatusLabel::for('room', 'inactive') }}</option>
+                    </select>
+                </label>
+                <label>
+                    <span class="sr-only">{{ __('rooms.fields.type') }}</span>
+                    <select name="room_type" class="cinema-input">
+                        <option value="">{{ __('rooms.all_types') }}</option>
+                        @foreach(['2D', '3D', 'IMAX'] as $type)
+                            <option value="{{ $type }}" @selected($roomType === $type)>{{ $type }}</option>
+                        @endforeach
+                    </select>
                 </label>
                 <button type="submit" class="btn-secondary !rounded-2xl">
-                    <i class="ph ph-funnel"></i> Lọc
+                    <i class="ph ph-funnel" aria-hidden="true"></i> {{ __('rooms.filter') }}
                 </button>
+                @if($search !== '' || $status !== '' || $roomType !== '')
+                    <a href="{{ route('admin.rooms.index') }}" class="btn-secondary !rounded-2xl">{{ __('rooms.clear_filter') }}</a>
+                @endif
             </form>
         </div>
 
         <div class="overflow-x-auto">
-            <table class="admin-table">
+            <table class="admin-table min-w-[1180px]">
                 <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Rạp</th>
-                        <th>Tên phòng</th>
-                        <th>Loại</th>
-                        <th>Layout published</th>
-                        <th>Trạng thái</th>
-                        <th class="text-right">Thao tác</th>
+                        <th>{{ __('rooms.fields.code') }}</th>
+                        <th>{{ __('rooms.fields.name') }}</th>
+                        <th>{{ __('rooms.fields.cinema') }}</th>
+                        <th>{{ __('rooms.fields.type') }}</th>
+                        <th>{{ __('rooms.fields.layout') }}</th>
+                        <th>{{ __('rooms.fields.total_seats') }}</th>
+                        <th>{{ __('rooms.fields.normal_seats') }}</th>
+                        <th>{{ __('rooms.fields.vip_seats') }}</th>
+                        <th>{{ __('rooms.fields.couple_seats') }}</th>
+                        <th>{{ __('rooms.fields.status') }}</th>
+                        <th>{{ __('rooms.fields.upcoming_showtimes') }}</th>
+                        <th class="text-right">{{ __('rooms.fields.actions') }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($rooms as $room)
+                        @php
+                            $published = $room->latestPublishedLayout;
+                            $publishedSeats = $published?->cells->where('cell_type', 'seat')->pluck('seat')->filter() ?? collect();
+                        @endphp
                         <tr>
-                            <td class="app-muted">#{{ $room->id }}</td>
+                            <td class="font-bold app-text">{{ $room->code }}</td>
+                            <td class="font-extrabold app-text">{{ $room->name }}</td>
                             <td>
-                                <p class="font-bold app-text">{{ $room->cinema->name ?? '-' }}</p>
+                                <p class="font-bold app-text">{{ $room->cinema->name ?? '—' }}</p>
                                 <p class="text-xs app-muted">{{ $room->cinema->city ?? '' }}</p>
                             </td>
-                            <td class="font-extrabold">{{ $room->name }}</td>
                             <td>{{ $room->room_type }}</td>
                             <td>
-                                @php
-                                    $published = $room->latestPublishedLayout;
-                                    $publishedSeats = $published?->cells->where('cell_type', 'seat')->pluck('seat')->filter() ?? collect();
-                                @endphp
                                 @if($published)
-                                    <p class="font-bold app-text">v{{ $published->version }} · {{ $published->rows }} × {{ $published->columns }}</p>
-                                    <p class="text-xs app-muted">{{ $publishedSeats->count() }} ghế · {{ $publishedSeats->where('type', 'vip')->count() }} VIP · {{ $publishedSeats->where('type', 'couple')->count() }} couple</p>
+                                    <p class="font-bold app-text">Phiên bản {{ $published->version }} · {{ $published->rows }} × {{ $published->columns }}</p>
+                                    <p class="text-xs app-muted">{{ $published->status_label }}</p>
                                 @else
-                                    <span class="text-xs text-warning">Chưa publish</span>
+                                    <span class="text-xs text-warning">{{ __('rooms.no_layout') }}</span>
                                 @endif
-                                @if($room->draftLayout)<span class="mt-1 inline-block status-badge bg-warning/10 text-warning">Có draft v{{ $room->draftLayout->version }}</span>@endif
-                            </td>
-                            <td>
-                                @if($room->status === 'active')
-                                    <span class="status-badge text-success bg-success/10">Hoạt động</span>
-                                @else
-                                    <span class="status-badge text-warning bg-warning/10">Tạm ngưng</span>
+                                @if($room->draftLayout)
+                                    <span class="status-badge mt-1 inline-block bg-warning/10 text-warning">{{ __('rooms.has_draft', ['version' => $room->draftLayout->version]) }}</span>
                                 @endif
                             </td>
+                            <td>{{ $publishedSeats->count() }}</td>
+                            <td>{{ $publishedSeats->where('type', 'normal')->count() }}</td>
+                            <td>{{ $publishedSeats->where('type', 'vip')->count() }}</td>
+                            <td>{{ $publishedSeats->where('type', 'couple')->count() }}</td>
                             <td>
-                                <div class="flex items-center justify-end gap-2">
-                                    @can('seats.manage')<a href="{{ route('admin.rooms.layout.show', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
-                                        <i class="ph ph-grid-four"></i> Layout
-                                    </a>@endcan
-                                    @can('seats.view') @if($published)<a href="{{ route('admin.rooms.layout.preview', ['room' => $room, 'version' => $published->version]) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">Preview</a>@endif @endcan
-                                    @can('rooms.update')<a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs">
-                                        <i class="ph ph-pencil-simple"></i> Sửa
-                                    </a>@endcan
-                                    @can('rooms.delete')<form action="{{ route('admin.rooms.destroy', $room) }}" method="POST" onsubmit="return confirm('Bạn có chắc muốn xóa phòng này?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:bg-error hover:border-error hover:text-white transition-colors">
-                                            <i class="ph ph-trash"></i>
-                                        </button>
-                                    </form>@endcan
+                                <span class="status-badge {{ $room->status === 'active' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">{{ $room->status_label }}</span>
+                            </td>
+                            <td>{{ $room->upcoming_showtimes_count }}</td>
+                            <td>
+                                <div class="flex min-w-max items-center justify-end gap-2">
+                                    @can('rooms.view')
+                                        <a href="{{ route('admin.rooms.show', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="{{ __('rooms.actions.view') }}" aria-label="{{ __('rooms.actions.view') }} {{ $room->name }}">
+                                            <i class="ph ph-eye" aria-hidden="true"></i> {{ __('rooms.actions.view') }}
+                                        </a>
+                                    @endcan
+                                    @can('seats.manage')
+                                        @if($room->status === 'active')
+                                            <a href="{{ route('admin.rooms.layout.show', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="{{ __('rooms.actions.layout') }}" aria-label="{{ __('rooms.actions.layout') }} {{ $room->name }}">
+                                                <i class="ph ph-grid-four" aria-hidden="true"></i> {{ __('rooms.actions.layout') }}
+                                            </a>
+                                        @elseif($published)
+                                            <a href="{{ route('admin.rooms.layout.preview', ['room' => $room, 'version' => $published->version]) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="{{ __('rooms.actions.preview') }}" aria-label="{{ __('rooms.actions.preview') }} {{ $room->name }}">
+                                                <i class="ph ph-grid-four" aria-hidden="true"></i> {{ __('rooms.actions.preview') }}
+                                            </a>
+                                        @endif
+                                    @endcan
+                                    @can('seats.maintenance.view')
+                                        @if($room->status === 'active' && $published)
+                                            <a href="{{ route('admin.rooms.seat-maintenance.index', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="Bảo trì ghế" aria-label="Bảo trì ghế {{ $room->name }}">
+                                                <i class="ph ph-wrench" aria-hidden="true"></i> Bảo trì ghế
+                                            </a>
+                                        @endif
+                                    @endcan
+                                    @can('rooms.update')
+                                        <a href="{{ route('admin.rooms.edit', $room) }}" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="{{ __('rooms.actions.edit') }}" aria-label="{{ __('rooms.actions.edit') }} {{ $room->name }}">
+                                            <i class="ph ph-pencil-simple" aria-hidden="true"></i> {{ __('rooms.actions.edit') }}
+                                        </a>
+                                        <form action="{{ route('admin.rooms.status.update', $room) }}" method="POST" onsubmit="return confirm(@js($room->status === 'active' ? __('rooms.confirm.deactivate') : __('rooms.confirm.activate')));">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="status" value="{{ $room->status === 'active' ? 'inactive' : 'active' }}">
+                                            <button type="submit" class="btn-secondary !rounded-xl !px-3 !py-2 text-xs" title="{{ $room->status === 'active' ? __('rooms.actions.deactivate') : __('rooms.actions.activate') }}" aria-label="{{ $room->status === 'active' ? __('rooms.actions.deactivate') : __('rooms.actions.activate') }} {{ $room->name }}">
+                                                {{ $room->status === 'active' ? __('rooms.actions.deactivate') : __('rooms.actions.activate') }}
+                                            </button>
+                                        </form>
+                                    @endcan
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center app-muted py-10">Không có phòng nào.</td>
+                            <td colspan="12" class="py-12 text-center app-muted">
+                                <i class="ph ph-armchair block text-4xl" aria-hidden="true"></i>
+                                <span class="mt-2 block">{{ __('rooms.empty') }}</span>
+                            </td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div class="p-5 border-t app-border">
-            {{ $rooms->links() }}
-        </div>
+        @if($rooms->hasPages())
+            <div class="border-t app-border p-5">{{ $rooms->links() }}</div>
+        @endif
     </div>
 </div>
 @endsection

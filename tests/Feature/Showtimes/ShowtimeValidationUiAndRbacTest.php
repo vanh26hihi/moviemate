@@ -143,12 +143,12 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
             ->assertSee('15 phút')
             ->assertSee('Phòng sẵn sàng')
             ->assertSee('Asia/Ho_Chi_Minh')
-            ->assertSee('layout v1');
+            ->assertSee('sơ đồ phiên bản 1');
 
         $this->actingAs($admin)->get(route('admin.showtimes.edit', $showtime))
             ->assertOk()
             ->assertSee('value="23:30"', false)
-            ->assertSee('Layout hiện tại: v1')
+            ->assertSee('Sơ đồ hiện tại: phiên bản 1')
             ->assertSee('Phim kết thúc');
 
         $this->actingAs($admin)->get(route('admin.showtimes.index'))
@@ -156,7 +156,7 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
             ->assertSee('01:30')
             ->assertSee('01:45')
             ->assertSee('11/06/2030 (+1 ngày)')
-            ->assertSee('P01 · Phòng 1 · layout v1');
+            ->assertSee('P01 · Phòng 1 · sơ đồ phiên bản 1');
     }
 
     public function test_conflict_message_is_vietnamese_and_rendered_on_form(): void

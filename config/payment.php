@@ -22,7 +22,7 @@ return [
         'hash_secret' => env('VNPAY_HASH_SECRET'),
         'payment_url' => env('VNPAY_PAYMENT_URL', 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
         'query_url' => env('VNPAY_QUERY_URL', 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction'),
-        'bank_code' => env('VNPAY_BANK_CODE', 'VNPAYQR'),
+        'bank_code' => env('VNPAY_BANK_CODE', ''),
         'locale' => env('VNPAY_LOCALE', 'vn'),
         'order_type' => env('VNPAY_ORDER_TYPE', 'other'),
         'payment_ttl_minutes' => (int) env('VNPAY_PAYMENT_TTL_MINUTES', 15),

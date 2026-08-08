@@ -67,7 +67,7 @@ class ZaloPayReturnTest extends PaymentTestCase
         $this->visitReturn($payment, $params)
             ->assertOk()
             ->assertSee('data-payment-state="review"', false)
-            ->assertSee('Giao dịch đang được đối soát');
+            ->assertSee('Giao dịch cần được hỗ trợ');
 
         $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
     }
@@ -112,7 +112,7 @@ class ZaloPayReturnTest extends PaymentTestCase
             ->assertOk()
             ->assertDontSee('data-paid-ticket-link', false)
             ->assertDontSee('data-qr-value', false)
-            ->assertDontSee('data-ticket-download', false);
+            ->assertDontSee('data-print-ticket', false);
     }
 
     public function test_return_state_expires_after_short_ttl(): void
@@ -130,12 +130,14 @@ class ZaloPayReturnTest extends PaymentTestCase
     public function test_return_state_rejects_wrong_audience_even_with_valid_signature(): void
     {
         $payment = $this->pendingPayment();
-        $state = $this->stateWithChangedClaim(
-            app(PaymentReturnTokenService::class)->issue($payment),
+        $legacy = $this->legacyStateWithChangedClaim($payment, 'aud', 'payment-return');
+        $state = $this->legacyStateWithChangedClaim(
+            $payment,
             'aud',
             'guest-ticket',
         );
 
+        $this->assertTrue(app(PaymentReturnTokenService::class)->verify($payment, $legacy));
         $this->assertFalse(app(PaymentReturnTokenService::class)->verify($payment, $state));
     }
 
@@ -219,10 +221,18 @@ class ZaloPayReturnTest extends PaymentTestCase
         return $params;
     }
 
-    private function stateWithChangedClaim(string $state, string $name, mixed $value): string
+    private function legacyStateWithChangedClaim(Payment $payment, string $name, mixed $value): string
     {
-        [, $payload] = explode('.', $state);
-        $claims = json_decode($this->base64UrlDecode($payload), true, 16, JSON_THROW_ON_ERROR);
+        $issuedAt = now()->getTimestamp();
+        $claims = [
+            'v' => 1,
+            'aud' => 'payment-return',
+            'pid' => $payment->id,
+            'attempt' => $payment->app_trans_id,
+            'iat' => $issuedAt,
+            'exp' => $issuedAt + 1800,
+            'nonce' => $this->base64UrlEncode(random_bytes(16)),
+        ];
         $claims[$name] = $value;
         $newPayload = $this->base64UrlEncode(json_encode($claims, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 
@@ -239,13 +249,5 @@ class ZaloPayReturnTest extends PaymentTestCase
     private function base64UrlEncode(string $value): string
     {
         return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
-    }
-
-    private function base64UrlDecode(string $value): string
-    {
-        return base64_decode(
-            strtr($value, '-_', '+/').str_repeat('=', (4 - strlen($value) % 4) % 4),
-            true,
-        );
     }
 }

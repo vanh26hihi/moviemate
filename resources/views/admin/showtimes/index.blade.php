@@ -1,13 +1,13 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý suất chiếu - MovieMate Admin')
+@section('title', 'Quản lý suất chiếu - Quản trị MovieMate')
 @section('page-title', 'Quản lý suất chiếu')
 
 @section('content')
 <div class="space-y-6">
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
-            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Showtimes</p>
+            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Suất chiếu</p>
             <h1 class="text-3xl font-extrabold app-text">Suất chiếu</h1>
             <p class="app-muted mt-2">Lịch vận hành phòng theo múi giờ {{ $cinemaTimezone }}, gồm {{ $cleaningBufferMinutes }} phút vệ sinh.</p>
         </div>
@@ -60,11 +60,11 @@
                         <tr>
                             <td>
                                 <span class="font-extrabold app-text text-sm block max-w-[240px]">{{ $showtime->movie->title }}</span>
-                                <span class="text-xs app-muted">{{ $showtime->room->code }} · {{ $showtime->room->name }} · layout v{{ $showtime->roomLayout?->version ?? '?' }}</span>
+                                <span class="text-xs app-muted">{{ $showtime->room->code }} · {{ $showtime->room->name }} · sơ đồ phiên bản {{ $showtime->roomLayout?->version ?? '?' }}</span>
                             </td>
                             <td>
                                 <span class="font-extrabold app-text block">{{ $window?->start->format('H:i') ?? '--:--' }}</span>
-                                <span class="text-xs app-muted">{{ $window?->start->format('d/m/Y') ?? 'Runtime không hợp lệ' }}</span>
+                                <span class="text-xs app-muted">{{ $window?->start->format('d/m/Y') ?? 'Thời lượng không hợp lệ' }}</span>
                             </td>
                             <td>
                                 <span class="font-bold app-text block">{{ $window?->movieEnd->format('H:i') ?? '--:--' }}</span>
@@ -76,13 +76,7 @@
                             </td>
                             <td><span class="app-text font-bold">{{ $window?->cleaningBufferMinutes ?? $cleaningBufferMinutes }} phút</span></td>
                             <td class="text-center">
-                                @if($showtime->status === 'active')
-                                    <span class="status-badge text-success bg-success/10">Đang chiếu</span>
-                                @elseif($showtime->status === 'cancelled')
-                                    <span class="status-badge text-error bg-error/10">Đã hủy</span>
-                                @else
-                                    <span class="status-badge text-warning bg-warning/10">Đã chiếu xong</span>
-                                @endif
+                                <span class="status-badge {{ $showtime->status === 'active' ? 'text-success bg-success/10' : ($showtime->status === 'cancelled' ? 'text-error bg-error/10' : 'text-warning bg-warning/10') }}">{{ $showtime->status_label }}</span>
                             </td>
                             <td>
                                 <div class="flex items-center justify-end gap-2">
@@ -90,11 +84,13 @@
                                         <a href="{{ route('admin.showtimes.edit', $showtime) }}" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa"><i class="ph-bold ph-pencil-simple text-xs"></i></a>
                                     @endcan
                                     @can('showtimes.delete')
-                                        <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn xóa suất chiếu này?');">
+                                        @if($showtime->status === 'active')
+                                        <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn hủy suất chiếu này? Suất đã có đơn đặt vé sẽ không thể hủy trực tiếp.');">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-white hover:bg-error hover:border-error transition-colors" title="Xóa"><i class="ph-bold ph-trash text-xs"></i></button>
+                                            <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-white hover:bg-error hover:border-error transition-colors" title="Hủy suất chiếu" aria-label="Hủy suất chiếu"><i class="ph-bold ph-x-circle text-xs" aria-hidden="true"></i></button>
                                         </form>
+                                        @endif
                                     @endcan
                                 </div>
                             </td>

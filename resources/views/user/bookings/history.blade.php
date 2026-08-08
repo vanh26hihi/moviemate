@@ -1,6 +1,7 @@
 @extends('layouts.user')
 
 @section('title', 'Lịch sử đặt vé - MovieMate')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -11,7 +12,7 @@
                     <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=FF3D57&color=fff&size=128" alt="Avatar" class="w-full h-full object-cover">
                 </div>
                 <h2 class="font-bold app-text mb-1">{{ Auth::user()->name }}</h2>
-                <p class="text-xs text-ai-start font-bold mb-5">Hạng {{ Auth::user()->role->name ?? 'Khách' }}</p>
+                <p class="text-xs text-ai-start font-bold mb-5">Hạng {{ Auth::user()->role?->display_name ?? 'Khách hàng' }}</p>
 
                 <div class="w-full rounded-2xl border border-ai-start/30 bg-ai-start/10 px-4 py-3 mb-4 text-left">
                     <p class="text-xs app-muted">Thành viên {{ Auth::user()->membership_tier }}</p>
@@ -58,29 +59,27 @@
                 </form>
             </div>
 
-            @if($errors->any())
-                <div class="mb-5 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-semibold">
-                    {{ $errors->first() }}
-                </div>
-            @endif
+            <x-validation-summary class="mb-5" :errors="$errors" />
 
             <div class="space-y-5">
                 @forelse($bookings as $booking)
                     @php
-                        $statusMap = [
-                            'pending' => ['label' => 'Chờ thanh toán', 'class' => 'bg-yellow-100 text-yellow-700'],
-                            'paid' => ['label' => 'Chưa sử dụng', 'class' => 'bg-brand-start text-white'],
-                            'used' => ['label' => 'Đã sử dụng', 'class' => 'bg-blue-100 text-blue-700'],
-                            'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-red-100 text-red-700'],
-                            'expired' => ['label' => 'Hết hạn', 'class' => 'bg-gray-100 text-gray-700'],
-                        ];
-                        $status = $statusMap[$booking->booking_status] ?? $statusMap['pending'];
+                        $statusClass = match($booking->booking_status) {
+                            'pending_payment' => 'bg-yellow-100 text-yellow-700',
+                            'paid' => 'bg-brand-start text-white',
+                            'used' => 'bg-blue-100 text-blue-700',
+                            'cancelled' => 'bg-red-100 text-red-700',
+                            default => 'bg-gray-100 text-gray-700',
+                        };
                         $poster = $booking->showtime->movie->poster_url;
+                        $canCancel = in_array($booking->id, $cancellableBookingIds, true);
+                        $canCancelPayOs = in_array($booking->id, $payOsCancellableBookingIds, true);
+                        $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
                     @endphp
 
                     <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
-                        <div class="absolute top-0 right-0 {{ $status['class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
-                            {{ $status['label'] }}
+                        <div class="absolute top-0 right-0 {{ $statusClass }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
+                            {{ $booking->status_label }}
                         </div>
 
                         <div class="flex flex-col sm:flex-row gap-5">
@@ -103,7 +102,7 @@
 
                                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mb-4">
                                     <div><p class="app-muted mb-0.5">Thời gian</p><p class="app-text font-semibold">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }} - {{ $booking->showtime?->show_date ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y') : 'Đang cập nhật' }}</p></div>
-                                    <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->bookingSeats->pluck('seat.seat_code')->join(', ') }}</p></div>
+                                    <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->seat_codes }}</p></div>
                                     <div><p class="app-muted mb-0.5">Rạp</p><p class="app-text font-semibold">{{ $booking->showtime->cinema->name }}</p></div>
                                     <div><p class="app-muted mb-0.5">Phòng</p><p class="app-text font-semibold">{{ $booking->showtime->room->name }}</p></div>
                                 </div>
@@ -111,27 +110,43 @@
                                 <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
                                     <div>
                                         <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
-                                        <p class="app-text font-bold text-lg">{{ number_format($booking->total_amount,0,',','.') }}đ</p>
+                                        <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
                                         @if($booking->loyalty_points_earned > 0)
                                             <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
                                         @endif
                                     </div>
-                                    <div class="flex gap-2">
-                                        @if($booking->booking_status === 'pending' && $booking->payment?->checkout_url)
-                                            <a href="{{ $booking->payment->checkout_url }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
+                                    <div class="flex flex-wrap gap-2">
+                                        @if($booking->booking_status === 'pending_payment')
+                                            <a href="{{ route('user.bookings.pending', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
                                                 Thanh toán tiếp
                                             </a>
-                                        @else
+                                        @endif
+
+                                        @if($canUseTicket)
                                             <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
                                                 Xem vé QR
                                             </a>
+                                            <form method="POST" action="{{ route('user.bookings.ticket-email.resend', $booking) }}" class="inline" data-submit-once>
+                                                @csrf
+                                                <button type="submit" data-loading-label="Đang gửi…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors">
+                                                    Gửi lại email vé
+                                                </button>
+                                            </form>
                                         @endif
-                                        @if(in_array($booking->booking_status, ['pending', 'paid'], true))
-                                            <form method="POST" action="{{ route('user.bookings.cancel', $booking) }}" class="inline">
+
+                                        @if($canCancel)
+                                            <form method="POST" action="{{ route('user.bookings.cancel', $booking) }}" class="inline" data-submit-once>
                                                 @csrf
                                                 @method('DELETE')
-                                                <button type="submit" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('{{ $booking->booking_status === 'pending' ? 'Bạn chắc chắn muốn hủy thanh toán này?' : 'Bạn chắc chắn muốn hủy vé này?' }}')">
-                                                    {{ $booking->booking_status === 'pending' ? 'Hủy thanh toán' : 'Hủy vé' }}
+                                                <button type="submit" data-loading-label="Đang hủy…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('Bạn chắc chắn muốn hủy đơn đặt vé này?')">
+                                                    Hủy đơn
+                                                </button>
+                                            </form>
+                                        @elseif($canCancelPayOs)
+                                            <form method="POST" action="{{ route('payments.payos.cancel-attempt', $booking) }}" class="inline" data-submit-once>
+                                                @csrf
+                                                <button type="submit" data-loading-label="Đang xác minh hủy…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors" onclick="return confirm('MovieMate sẽ yêu cầu payOS hủy liên kết trước khi giải phóng ghế. Tiếp tục?')">
+                                                    Hủy qua payOS
                                                 </button>
                                             </form>
                                         @endif

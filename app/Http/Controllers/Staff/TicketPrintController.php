@@ -1,0 +1,111 @@
+<?php
+
+namespace App\Http\Controllers\Staff;
+
+use App\Http\Controllers\Controller;
+use App\Models\Booking;
+use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\TicketPrintService;
+use App\Services\Tickets\TicketResolutionService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Str;
+
+final class TicketPrintController extends Controller
+{
+    public function start(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        $booking = $tickets->authorizedBooking($booking, $request->user());
+        $operation = $this->operation($request, $booking, true);
+        $prints->start($booking, $request->user(), $operation['id'], $operation['token']);
+
+        return redirect()->route('staff.tickets.print.show', $booking)
+            ->with('success', 'Đã bắt đầu lần in vé.');
+    }
+
+    public function show(
+        Request $request,
+        Booking $booking,
+        TicketResolutionService $tickets,
+        TicketPrintService $prints,
+        TicketCheckinCapability $capabilities,
+    ): Response {
+        $booking = $tickets->authorizedBooking($booking, $request->user());
+        $operation = $this->operation($request, $booking);
+        $state = $prints->active($booking, $request->user(), $operation['id'], $operation['token']);
+
+        return response()->view('staff.tickets.print', [
+            'booking' => $booking,
+            'printState' => $state,
+            'checkinCapability' => $capabilities->issue($booking),
+            'failureReasons' => TicketPrintService::FAILURE_REASONS,
+        ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
+            ->header('Pragma', 'no-cache');
+    }
+
+    public function succeed(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        $booking = $tickets->authorizedBooking($booking, $request->user());
+        $operation = $this->operation($request, $booking, allowCompleted: true);
+        $prints->succeed($booking, $request->user(), $operation['id'], $operation['token']);
+        $this->completeOperationSession($request, $booking, $operation);
+
+        return redirect()->route('staff.tickets.operations', $booking)
+            ->with('success', 'Đã xác nhận in vé thành công.');
+    }
+
+    public function fail(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        $validated = $request->validate([
+            'failure_code' => ['required', 'in:'.implode(',', array_keys(TicketPrintService::FAILURE_REASONS))],
+            'safe_note' => ['nullable', 'string', 'max:300', 'required_if:failure_code,other'],
+        ], [
+            'failure_code.required' => 'Vui lòng chọn lý do in lỗi.',
+            'safe_note.required_if' => 'Vui lòng mô tả ngắn gọn khi chọn lý do khác.',
+        ]);
+        $booking = $tickets->authorizedBooking($booking, $request->user());
+        $operation = $this->operation($request, $booking, allowCompleted: true);
+        $prints->fail($booking, $request->user(), $operation['id'], $operation['token'],
+            $validated['failure_code'], $validated['safe_note'] ?? null);
+        $this->completeOperationSession($request, $booking, $operation);
+
+        return redirect()->route('staff.tickets.operations', $booking)
+            ->with('success', 'Đã ghi nhận lỗi in vé.');
+    }
+
+    /** @return array{id:string, token:string} */
+    private function operation(Request $request, Booking $booking, bool $create = false, bool $allowCompleted = false): array
+    {
+        $key = $this->sessionKey($booking);
+        $operation = $request->session()->get($key);
+        if ($allowCompleted && ! is_array($operation)) {
+            $operation = $request->session()->get($this->completedSessionKey($booking));
+        }
+        if ($create && (! is_array($operation) || ! isset($operation['id'], $operation['token']))) {
+            $operation = ['id' => (string) Str::uuid(), 'token' => Str::random(64)];
+            $request->session()->put($key, $operation);
+        }
+        abort_unless(is_array($operation) && is_string($operation['id'] ?? null)
+            && is_string($operation['token'] ?? null), 410, 'Lần in này đã hết hiệu lực.');
+
+        return $operation;
+    }
+
+    private function sessionKey(Booking $booking): string
+    {
+        return 'ticket_print_operations.'.$booking->id;
+    }
+
+    /** @param array{id:string, token:string} $operation */
+    private function completeOperationSession(Request $request, Booking $booking, array $operation): void
+    {
+        $request->session()->put($this->completedSessionKey($booking), $operation);
+        $request->session()->forget($this->sessionKey($booking));
+    }
+
+    private function completedSessionKey(Booking $booking): string
+    {
+        return 'ticket_print_completed_operations.'.$booking->id;
+    }
+}

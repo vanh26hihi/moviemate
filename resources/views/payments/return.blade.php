@@ -4,29 +4,44 @@
 
 @section('content')
 @php
-    $providerLabel = $payment->provider === 'vnpay' ? 'VNPAY' : 'ZaloPay';
+    $providerLabel = match ($payment->provider) {
+        'vnpay' => 'VNPAY',
+        'payos' => 'payOS',
+        default => 'ZaloPay',
+    };
+    $isVerifiedPaid = $payment->status === \App\Models\Payment::STATUS_SUCCESS
+        && $payment->verified_at !== null
+        && $booking->payment_status === 'paid'
+        && in_array($booking->booking_status, ['paid', 'used'], true);
+    $stateStatus = $payment->status === \App\Models\Payment::STATUS_SUCCESS && ! $isVerifiedPaid
+        ? \App\Models\Payment::STATUS_REVIEW
+        : $payment->status;
+    if ($booking->booking_status === 'pending_payment'
+        && $stateStatus === \App\Models\Payment::STATUS_FAILED) {
+        $stateStatus = \App\Models\Payment::STATUS_PENDING;
+    }
     $states = [
         \App\Models\Payment::STATUS_PENDING => [
-            'title' => 'Đang chờ xác minh thanh toán',
-            'message' => "MovieMate chưa nhận được kết quả cuối cùng từ {$providerLabel}. Booking chưa phải là vé điện tử.",
+            'title' => 'Đang xác minh kết quả thanh toán',
+            'message' => "MovieMate chưa nhận được kết quả cuối cùng từ {$providerLabel}. Hệ thống sẽ cập nhật đơn khi có kết quả chính thức.",
             'icon' => 'ph-hourglass-medium',
             'colour' => 'text-warning',
         ],
         \App\Models\Payment::STATUS_SUCCESS => [
-            'title' => 'Thanh toán đã được xác minh',
-            'message' => 'Giao dịch đã được MovieMate xác minh và vé điện tử đã sẵn sàng.',
+            'title' => 'Đặt vé thành công',
+            'message' => 'Thanh toán đã được xác minh và vé điện tử đã sẵn sàng.',
             'icon' => 'ph-check-circle',
             'colour' => 'text-success',
         ],
         \App\Models\Payment::STATUS_FAILED => [
             'title' => 'Thanh toán không thành công',
-            'message' => "{$providerLabel} đã trả về trạng thái không thành công. Booking này chưa có vé điện tử.",
+            'message' => "{$providerLabel} đã trả về trạng thái không thành công. Đơn đặt vé này chưa có vé điện tử.",
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
         ],
         \App\Models\Payment::STATUS_REVIEW => [
-            'title' => 'Giao dịch đang được đối soát',
-            'message' => 'Dữ liệu cần được kiểm tra thêm. Đây chưa phải kết luận thanh toán thất bại và MovieMate chưa phát hành vé.',
+            'title' => 'Giao dịch cần được hỗ trợ',
+            'message' => 'Dữ liệu giao dịch cần bộ phận hỗ trợ kiểm tra thêm trước khi có kết luận chính thức.',
             'icon' => 'ph-magnifying-glass',
             'colour' => 'text-warning',
         ],
@@ -38,15 +53,35 @@
         ],
     ];
     $states[\App\Models\Payment::STATUS_UNRESOLVED] = $states[\App\Models\Payment::STATUS_PENDING];
-    $state = $states[$payment->status] ?? [
+    $states[\App\Models\Payment::STATUS_PROCESSING] = $states[\App\Models\Payment::STATUS_PENDING];
+    $isConfirmedCancellation = $booking->booking_status === 'cancelled'
+        && $payment->status === \App\Models\Payment::STATUS_FAILED;
+    if ($isConfirmedCancellation) {
+        $states[\App\Models\Payment::STATUS_FAILED] = [
+            'title' => 'Thanh toán đã được hủy',
+            'message' => $payment->provider === 'vnpay' && $payment->failure_reason === 'vnpay_customer_cancelled'
+                ? 'Bạn đã hủy giao dịch VNPAY. Các ghế đã giữ cho đơn này đã được giải phóng.'
+                : 'Các ghế đã giữ cho đơn này đã được giải phóng.',
+            'icon' => 'ph-x-circle',
+            'colour' => 'text-error',
+        ];
+    }
+    if (($cancelRequested ?? false) && ! $isConfirmedCancellation
+        && in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_PROCESSING], true)) {
+        $states[$stateStatus] = [
+            'title' => 'Đang xác minh việc hủy thanh toán',
+            'message' => 'Ghế của bạn vẫn được giữ tạm thời để tránh mất vé trong khi hệ thống xác minh trạng thái giao dịch.',
+            'icon' => 'ph-hourglass-medium',
+            'colour' => 'text-warning',
+        ];
+    }
+    $state = $states[$stateStatus] ?? [
         'title' => 'Đang xử lý trạng thái',
         'message' => 'MovieMate đang kiểm tra dữ liệu giao dịch hiện tại.',
         'icon' => 'ph-spinner-gap',
         'colour' => 'text-slate-500',
     ];
-    $isVerifiedPaid = $payment->status === \App\Models\Payment::STATUS_SUCCESS
-        && $booking->payment_status === 'paid'
-        && $booking->booking_status === 'paid';
+    $holdExpiresAt = $booking->expires_at ?? $payment->expires_at;
 @endphp
 
 <main class="user-page-shell px-4 py-8 sm:px-6 lg:px-8">
@@ -61,21 +96,21 @@
             <h1 id="payment-state-title" class="mt-2 text-2xl font-extrabold app-text sm:text-3xl">{{ $state['title'] }}</h1>
             <p class="mx-auto mt-3 max-w-xl leading-relaxed app-muted">{{ $state['message'] }}</p>
 
-            @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED], true) && $payment->expires_at)
+            @if(in_array($stateStatus, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_PROCESSING], true) && $holdExpiresAt)
                 <div class="mx-auto mt-6 max-w-md rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4" data-countdown-wrapper>
                     <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian lần thanh toán còn lại</p>
-                    <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $payment->expires_at->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
+                    <p class="mt-1 text-3xl font-extrabold app-text" data-countdown="{{ $holdExpiresAt->toIso8601String() }}" data-expired-label="Đã hết thời gian">--:--</p>
                 </div>
             @endif
 
             <dl class="mx-auto mt-7 max-w-xl rounded-2xl app-secondary p-5 text-left text-sm">
                 @if($canViewBooking)
-                    <div class="flex justify-between gap-4"><dt class="app-muted">Mã booking</dt><dd class="break-all text-right font-mono font-bold text-brand-start">{{ $booking->booking_code }}</dd></div>
+                    <div class="flex justify-between gap-4"><dt class="app-muted">Mã đặt vé</dt><dd class="break-all text-right font-mono font-bold text-brand-start">{{ $booking->booking_code }}</dd></div>
                 @else
                     <div class="flex justify-between gap-4"><dt class="app-muted">Lần thanh toán</dt><dd class="text-right font-mono font-bold text-brand-start">#{{ $payment->id }}</dd></div>
                 @endif
                 <div class="mt-3 flex justify-between gap-4"><dt class="app-muted">Kênh thanh toán</dt><dd class="font-bold app-text">{{ $providerLabel }}</dd></div>
-                <div class="mt-3 flex justify-between gap-4 border-t pt-3 app-border"><dt class="font-bold app-text">Số tiền</dt><dd class="font-extrabold text-brand-start">{{ number_format((int) $payment->amount, 0, ',', '.') }} {{ $payment->currency ?: 'VND' }}</dd></div>
+                <div class="mt-3 flex justify-between gap-4 border-t pt-3 app-border"><dt class="font-bold app-text">Số tiền</dt><dd class="font-extrabold text-brand-start">{{ number_format((int) $payment->amount, 0, ',', '.') }} {{ ($payment->currency ?: 'VND') === 'VND' ? 'VNĐ' : $payment->currency }}</dd></div>
             </dl>
 
             <p class="mx-auto mt-5 max-w-xl text-xs leading-relaxed app-muted">
@@ -84,9 +119,9 @@
                 và không thể tự đánh dấu giao dịch là đã thanh toán.
             </p>
 
-            @if(in_array($payment->status, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_REVIEW], true))
+            @if(in_array($stateStatus, [\App\Models\Payment::STATUS_PENDING, \App\Models\Payment::STATUS_UNRESOLVED, \App\Models\Payment::STATUS_PROCESSING, \App\Models\Payment::STATUS_REVIEW], true))
                 <div class="mx-auto mt-5 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-left text-sm leading-relaxed text-warning" role="note">
-                    <strong>Không tạo lại thanh toán một cách mù.</strong> Nếu {{ $providerLabel }} đã trừ tiền, hãy giữ mã booking và chờ MovieMate xác minh hoặc đối soát lần hiện tại.
+                    <strong>Không tạo lại thanh toán khi chưa rõ kết quả.</strong> Nếu {{ $providerLabel }} đã trừ tiền, hãy giữ mã đặt vé và chờ MovieMate xác minh hoặc đối soát giao dịch hiện tại.
                 </div>
             @endif
 
@@ -100,7 +135,7 @@
                     <p class="app-muted">Liên kết mở vé an toàn được gửi riêng qua email và không được cấp bởi trang quay lại thanh toán.</p>
                 @endif
                 @if($canViewBooking)
-                    <a href="{{ route('user.bookings.success', $booking) }}" class="btn-secondary">Xem chi tiết booking</a>
+                    <a href="{{ route('user.bookings.success', $booking) }}" class="btn-secondary">Xem chi tiết đơn đặt vé</a>
                 @endif
             </div>
         </section>

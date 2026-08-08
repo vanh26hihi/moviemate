@@ -1,58 +1,18 @@
 @extends('layouts.admin')
 
-@section('title', 'Thêm phòng chiếu - MovieMate Admin')
+@section('title', 'Thêm phòng chiếu - MovieMate')
 @section('page-title', 'Thêm phòng chiếu')
+@section('suppress-global-validation-summary', '1')
 
 @section('content')
 <div class="max-w-3xl">
     <div class="cinema-card p-6 sm:p-8">
-        <h1 class="text-2xl font-extrabold app-text mb-2">Thông tin phòng chiếu</h1>
-        <p class="app-muted mb-6">Tạo phòng mới và sau đó cấu hình sơ đồ ghế trong màn quản lý ghế.</p>
+        <h1 class="mb-2 text-2xl font-extrabold app-text">Thông tin phòng chiếu</h1>
+        <p class="mb-6 app-muted">Tạo phòng mới, sau đó thiết kế sơ đồ ghế riêng cho phòng.</p>
 
-        @if ($errors->any())
-            <div class="mb-6 rounded-2xl border border-error/30 bg-error/10 text-error px-4 py-3 text-sm font-bold">
-                {{ $errors->first() }}
-            </div>
-        @endif
-
-        <form action="{{ route('admin.rooms.store') }}" method="POST" class="space-y-5">
+        <form action="{{ route('admin.rooms.store') }}" method="POST" class="space-y-5" novalidate>
             @csrf
-
-            <div class="rounded-2xl app-card-soft border app-border p-4"><span class="app-muted text-sm">Cơ sở</span><strong class="block app-text">{{ $cinema->name }}</strong></div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                    <label class="cinema-label">Mã phòng *</label>
-                    <input type="text" name="code" value="{{ old('code') }}" required class="cinema-input" placeholder="Ví dụ: P04">
-                </div>
-                <div>
-                    <label class="cinema-label">Tên phòng *</label>
-                    <input type="text" name="name" value="{{ old('name') }}" required class="cinema-input" placeholder="Ví dụ: Phòng 1">
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                    <label class="cinema-label">Loại phòng *</label>
-                    <select name="room_type" required class="cinema-input">
-                        <option value="2D" {{ old('room_type', '2D') === '2D' ? 'selected' : '' }}>2D</option>
-                        <option value="3D" {{ old('room_type') === '3D' ? 'selected' : '' }}>3D</option>
-                        <option value="IMAX" {{ old('room_type') === 'IMAX' ? 'selected' : '' }}>IMAX</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="cinema-label">Trạng thái *</label>
-                    <select name="status" required class="cinema-input">
-                        <option value="active" {{ old('status') == 'active' ? 'selected' : '' }}>Hoạt động</option>
-                        <option value="inactive" {{ old('status') == 'inactive' ? 'selected' : '' }}>Không hoạt động</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="flex flex-col sm:flex-row gap-3 pt-3">
-                <button type="submit" class="btn-primary">Lưu phòng</button>
-                <a href="{{ route('admin.rooms.index') }}" class="btn-secondary">Hủy</a>
-            </div>
+            @include('admin.rooms._form')
         </form>
     </div>
 </div>

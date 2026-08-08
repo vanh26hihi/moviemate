@@ -3,6 +3,7 @@
 namespace Tests\Feature\Payments;
 
 use App\Mail\BookingTicketMail;
+use App\Models\ActivityLog;
 use App\Models\BookingTicketDelivery;
 use App\Services\BookingTokenService;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -40,6 +41,7 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $this->assertSame(1, $delivery->attempts);
         $this->assertNotNull($payment->booking->fresh()->ticket_emailed_at);
         Mail::assertSent(BookingTicketMail::class, 1);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'ticket_delivery.send_succeeded']);
     }
 
     public function test_email_contains_text_code_and_secure_fragment_link_without_external_qr(): void
@@ -84,6 +86,10 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $this->assertSame('paid', $payment->booking->fresh()->payment_status);
         $this->assertSame('paid', $payment->booking->fresh()->booking_status);
         $this->assertNull($payment->booking->fresh()->ticket_emailed_at);
+        $this->assertDatabaseHas('activity_logs', ['action' => 'ticket_delivery.send_failed']);
+        $serialized = json_encode(ActivityLog::query()->where('action', 'ticket_delivery.send_failed')->sole()->getAttributes());
+        $this->assertStringNotContainsString('SMTP unavailable', $serialized);
+        $this->assertStringNotContainsString('RuntimeException', $serialized);
     }
 
     public function test_failed_delivery_is_retried_after_backoff(): void
@@ -103,6 +109,19 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $this->assertSame(2, $delivery->attempts);
         Mail::assertSent(BookingTicketMail::class, 1);
         $this->assertSame('paid', $payment->booking->fresh()->payment_status);
+    }
+
+    public function test_used_booking_can_receive_existing_ticket_without_reactivating_qr(): void
+    {
+        Mail::fake();
+        $payment = $this->verifiedPayment();
+        $payment->booking->forceFill(['booking_status' => 'used', 'used_at' => now()])->save();
+
+        $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
+
+        $this->assertSame(BookingTicketDelivery::STATUS_SENT, BookingTicketDelivery::query()->sole()->status);
+        $this->assertSame('used', $payment->booking->fresh()->booking_status);
+        Mail::assertSent(BookingTicketMail::class, 1);
     }
 
     public function test_transport_failure_preserves_guest_session_and_retry_reuses_email_credential(): void
@@ -203,6 +222,25 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
             'attempts' => 1,
             'processing_started_at' => now()->subMinutes(10),
             'lease_expires_at' => now()->subMinute(),
+        ]);
+
+        $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
+
+        $delivery = BookingTicketDelivery::query()->sole();
+        $this->assertSame(BookingTicketDelivery::STATUS_SENT, $delivery->status);
+        $this->assertSame(2, $delivery->attempts);
+        Mail::assertSent(BookingTicketMail::class, 1);
+    }
+
+    public function test_old_processing_claim_without_a_lease_is_reclaimed(): void
+    {
+        Mail::fake();
+        $this->verifiedPayment();
+        BookingTicketDelivery::query()->update([
+            'status' => BookingTicketDelivery::STATUS_PROCESSING,
+            'attempts' => 1,
+            'processing_started_at' => now()->subMinutes(10),
+            'lease_expires_at' => null,
         ]);
 
         $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
@@ -346,6 +384,13 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
 
     private function configureProductionMailer(string $default, array $mailers): void
     {
+        foreach ($mailers as &$mailer) {
+            if (is_array($mailer) && ($mailer['transport'] ?? null) === 'smtp') {
+                $mailer += ['host' => 'smtp.example.test', 'port' => 2525];
+            }
+        }
+        unset($mailer);
+
         $this->app->detectEnvironment(static fn (): string => 'production');
         config([
             'mail.default' => $default,

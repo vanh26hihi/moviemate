@@ -6,13 +6,19 @@ use App\Domain\Payments\PaymentVerificationResult;
 use App\Domain\Payments\VerifiedPaymentData;
 use App\Models\Booking;
 use App\Models\BookingSeat;
-use App\Models\BookingTicketDelivery;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\ActivityLogger;
+use App\Services\Tickets\TicketDeliveryOutbox;
 use Illuminate\Support\Facades\DB;
 
 class VerifiedPaymentService
 {
+    public function __construct(
+        private readonly TicketDeliveryOutbox $ticketDeliveries,
+        private readonly ActivityLogger $activities,
+    ) {}
+
     public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
     {
         return $this->verifyEligiblePayment($payment, $data, false);
@@ -34,6 +40,20 @@ class VerifiedPaymentService
 
             if ($lockedPayment->status === Payment::STATUS_SUCCESS) {
                 return PaymentVerificationResult::duplicate();
+            }
+
+            if ($lockedPayment->status === Payment::STATUS_FAILED) {
+                $this->markReview(
+                    $lockedPayment,
+                    $data,
+                    $booking->booking_status === 'cancelled'
+                        ? 'late_success_after_terminal_cancellation'
+                        : 'success_conflicts_with_terminal_failure',
+                );
+
+                return PaymentVerificationResult::rejected(
+                    'Provider success conflicts with a recorded terminal failure and requires review.',
+                );
             }
 
             $eligible = $allowReview
@@ -155,22 +175,23 @@ class VerifiedPaymentService
                 ->lockForUpdate()
                 ->first();
             $foodOrder?->forceFill(['status' => 'paid'])->save();
-            $this->ensureTicketDelivery($booking);
+            $this->ticketDeliveries->enqueueVerifiedBooking($booking);
+            $this->activities->log(
+                'payment.verified',
+                $lockedPayment,
+                ['payment_status' => $payment->status],
+                ['payment_status' => Payment::STATUS_SUCCESS],
+                [
+                    'payment_id' => $lockedPayment->id,
+                    'booking_id' => $booking->id,
+                    'cinema_id' => $booking->cinema_id,
+                    'provider' => $lockedPayment->provider,
+                    'result' => 'verified_provider_success',
+                ],
+            );
 
             return PaymentVerificationResult::transitioned();
         });
-    }
-
-    private function ensureTicketDelivery(Booking $booking): void
-    {
-        BookingTicketDelivery::query()->firstOrCreate(
-            ['booking_id' => $booking->getKey()],
-            [
-                'status' => BookingTicketDelivery::STATUS_PENDING,
-                'attempts' => 0,
-                'available_at' => now(),
-            ],
-        );
     }
 
     private function markReview(
@@ -208,6 +229,12 @@ class VerifiedPaymentService
                 'card_type' => $data->cardType,
                 'provider_paid_at' => $data->providerPaidAt,
             ];
+        } elseif ($payment->provider === 'payos') {
+            $fields += [
+                'response_code' => $data->responseCode,
+                'transaction_status' => $data->transactionStatus,
+                'provider_paid_at' => $data->providerPaidAt,
+            ];
         }
 
         if (in_array($data->source, ['callback', 'ipn'], true)) {
@@ -231,6 +258,7 @@ class VerifiedPaymentService
                 && $payment->app_id === $data->appId
                 && $payment->app_trans_id === $data->merchantReference,
             'vnpay' => $payment->order_code === $data->merchantReference,
+            'payos' => $payment->order_code === $data->merchantReference,
             default => false,
         };
     }
