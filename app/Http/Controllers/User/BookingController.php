@@ -24,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use App\Services\BookingCancellationService;
 
 class BookingController extends Controller
 {
@@ -38,6 +39,7 @@ class BookingController extends Controller
         private readonly PublicShowtimeCatalog $showtimeCatalog,
         private readonly BookingExpirationService $expiration,
         private readonly BookingPaymentActionPolicy $paymentActions,
+        private readonly BookingCancellationService $cancellations,
     ) {}
 
     /**
@@ -214,7 +216,33 @@ class BookingController extends Controller
    
 
     }
+    public function cancel(Request $request, Booking $booking)
+{
+    $this->authorizeBookingView($request, $booking);
 
+    abort_unless(
+        Auth::check() && (int) $booking->user_id === (int) Auth::id(),
+        403
+    );
+
+    $result = $this->cancellations->cancelCustomer($booking->id);
+
+    if ($result->cancelled) {
+        return redirect()
+            ->route('user.bookings.history')
+            ->with('success', 'Vé đã được hủy thành công.');
+    }
+
+    if ($result->alreadyCancelled) {
+        return redirect()
+            ->route('user.bookings.history')
+            ->with('info', 'Vé này đã được hủy trước đó.');
+    }
+
+    return redirect()
+        ->route('user.bookings.history')
+        ->with('error', 'Vé này không thể hủy ở trạng thái hiện tại.');
+}
     public function ticket(Request $request, Booking $booking)
     {
         $this->authorizeBookingView($request, $booking);
