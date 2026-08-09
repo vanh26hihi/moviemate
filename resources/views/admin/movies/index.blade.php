@@ -117,21 +117,25 @@
             </option>
         </select>
 
-        <select
-            name="genre"
-            class="admin-input xl:w-52"
-        >
-            <option value="">Tất cả thể loại</option>
-
-            @foreach($genres as $genre)
-                <option
-                    value="{{ $genre->id }}"
-                    {{ $genreValue === (string) $genre->id ? 'selected' : '' }}
-                >
-                    {{ $genre->name }}
-                </option>
-            @endforeach
-        </select>
+        <div class="relative xl:w-56">
+            <i class="ph ph-tag absolute left-4 top-1/2 -translate-y-1/2 app-text-muted"></i>
+        
+            <select
+                name="genre"
+                class="admin-input w-full pl-11"
+            >
+                <option value="">Tất cả thể loại</option>
+        
+                @foreach($genres as $genre)
+                    <option
+                        value="{{ $genre->id }}"
+                        {{ $genreValue === (string) $genre->id ? 'selected' : '' }}
+                    >
+                        {{ $genre->name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
 
         <select
             name="country"
@@ -189,7 +193,19 @@
         </span>
 
         phim phù hợp
-
+        @if($genreValue !== '')
+        @php
+            $selectedGenre = $genres->firstWhere('id', (int) $genreValue);
+        @endphp
+    
+        @if($selectedGenre)
+            với thể loại
+    
+            <span class="font-extrabold text-brand-start">
+                {{ $selectedGenre->name }}
+            </span>
+        @endif
+    @endif
         @if($countryValue !== '')
             tại quốc gia
 
