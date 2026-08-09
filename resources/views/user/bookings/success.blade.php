@@ -1,19 +1,24 @@
 @extends('layouts.user')
 
 @php
-    $paymentState = $booking->payment?->status;
-    $isUsed = $booking->booking_status === 'used';
-    $isCancelled = $booking->booking_status === 'cancelled';
-    $isExpired = $booking->booking_status === 'expired' || $paymentState === \App\Models\Payment::STATUS_EXPIRED;
-    $isPaid = $isUsable;
+    $booking = $booking ?? null;
+    $hasBooking = $booking !== null;
+    $paymentState = $booking?->payment?->status;
+    $bookingStatus = $booking?->booking_status ?? 'paid';
+    $isUsed = $bookingStatus === 'used';
+    $isCancelled = $bookingStatus === 'cancelled';
+    $isExpired = $bookingStatus === 'expired' || $paymentState === \App\Models\Payment::STATUS_EXPIRED;
+    $isPaid = $isUsable ?? ($hasBooking ? true : false);
+    $paymentAction = $paymentAction ?? ['can_resume' => false];
+    $mailDeliveryReady = $mailDeliveryReady ?? false;
     $isReview = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired
         && $paymentState === \App\Models\Payment::STATUS_REVIEW;
     $isFailed = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview
         && $paymentState === \App\Models\Payment::STATUS_FAILED
-        && $booking->booking_status !== 'pending_payment';
+        && $bookingStatus !== 'pending_payment';
     $isPending = ! $isPaid && ! $isUsed && ! $isCancelled && ! $isExpired && ! $isReview && ! $isFailed
-        && $booking->booking_status === 'pending_payment';
-    $canAutoReconcileExpiry = $isPending && ! in_array($paymentState, [
+        && $bookingStatus === 'pending_payment';
+    $canAutoReconcileExpiry = $hasBooking && $isPending && ! in_array($paymentState, [
         \App\Models\Payment::STATUS_PROCESSING,
         \App\Models\Payment::STATUS_UNRESOLVED,
         \App\Models\Payment::STATUS_REVIEW,
@@ -80,10 +85,10 @@
         ],
     ];
     $state = $states[$stateKey];
-    $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
-    $foodItems = $booking->foodOrder?->items ?? collect();
+    $currency = ($booking?->currency ?: 'VND') === 'VND' ? 'VNĐ' : ($booking?->currency ?: 'VND');
+    $foodItems = $booking?->foodOrder?->items ?? collect();
     $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
-    $delivery = $booking->ticketDelivery;
+    $delivery = $booking?->ticketDelivery;
     $deliveryState = $delivery?->status ?? 'missing';
     $deliveryLabels = [
         'pending' => ['label' => 'Đang chờ gửi', 'message' => 'Yêu cầu đã nằm trong hàng đợi gửi vé.'],
@@ -99,10 +104,18 @@
             'message' => 'Hệ thống từng ghi nhận lần gửi, nhưng cấu hình hiện tại không thể giao thư thật. Hãy cấu hình mail rồi yêu cầu gửi lại.',
         ];
     }
-    $canRequestEmail = ! auth()->check() || $booking->user_id === auth()->id();
+    $canRequestEmail = $hasBooking && (! auth()->check() || $booking->user_id === auth()->id());
     $myTicketsUrl = auth()->check()
         ? route('user.bookings.history')
-        : route('user.bookings.ticket', $booking);
+        : ($booking ? route('user.bookings.ticket', $booking) : route('home'));
+    $ticketRoute = $booking ? route('user.bookings.ticket', $booking) : route('home');
+    $bookingCode = $booking?->booking_code ?? 'DEMO-2026-001';
+    $movieTitle = $booking?->movie_title ?? 'Tên phim demo';
+    $showtimeLabel = $booking?->showtime_label ?? '12/08/2026 · 19:30';
+    $cinemaName = $booking?->showtime?->cinema?->name ?? 'Rạp demo';
+    $cinemaAddress = $booking?->showtime?->cinema?->address ?? 'Địa chỉ demo';
+    $roomLabel = $booking?->room_label ?? 'Phòng demo';
+    $recipientEmail = $booking?->recipient_email ?? 'demo@moviemate.test';
 @endphp
 
 @section('title', $state['title'].' - MovieMate')
@@ -132,7 +145,7 @@
                             <p class="mt-1 text-sm app-muted">Mở vé điện tử và xuất trình mã QR khi đến rạp.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary" data-paid-ticket-link>
+                            <a href="{{ $ticketRoute }}" class="btn-primary" data-paid-ticket-link>
                                 <i class="ph-fill ph-ticket" aria-hidden="true"></i> Xem vé
                             </a>
                             <a href="{{ $myTicketsUrl }}" class="btn-secondary">
@@ -168,7 +181,7 @@
                 <div class="mx-auto mt-6 max-w-xl rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-center" data-countdown-wrapper>
                     <p class="text-xs font-bold uppercase tracking-wide text-warning">Thời gian giữ ghế còn lại</p>
                     <p class="mt-1 text-3xl font-extrabold app-text"
-                        data-countdown="{{ $booking->expires_at->toIso8601String() }}"
+                        data-countdown="{{ $booking?->expires_at?->toIso8601String() ?? now()->toIso8601String() }}"
                         data-expired-label="Thời gian giữ ghế đã hết."
                         @if($canAutoReconcileExpiry) data-expiry-reload="true" @endif>--:--</p>
                     <p class="mt-2 text-xs leading-relaxed app-muted">Đừng tạo thêm đơn đặt vé hoặc yêu cầu thanh toán mới khi giao dịch hiện tại chưa có kết quả rõ ràng.</p>
@@ -180,23 +193,23 @@
                     <div class="flex flex-wrap items-start justify-between gap-4 border-b pb-4 app-border">
                         <div>
                             <p class="text-xs app-muted">Mã đặt vé</p>
-                            <h2 id="booking-details-title" class="mt-1 break-all font-mono text-xl font-bold text-brand-start">{{ $booking->booking_code }}</h2>
+                            <h2 id="booking-details-title" class="mt-1 break-all font-mono text-xl font-bold text-brand-start">{{ $bookingCode }}</h2>
                         </div>
                         <span class="rounded-full border app-border px-3 py-1 text-xs font-bold {{ $state['colour'] }}">{{ $state['badge'] }}</span>
                     </div>
 
                     <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2">
-                        <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $booking->movie_title }}</dd></div>
-                        <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime_label }}</dd></div>
-                        <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime?->cinema?->name ?: 'Rạp đang cập nhật' }}</dd></div>
-                        <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-semibold app-text">{{ $booking->showtime?->cinema?->address ?: 'Địa chỉ đang cập nhật' }}</dd></div>
-                        <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $booking->room_label }}</dd></div>
+                        <div><dt class="app-muted">Phim</dt><dd class="mt-1 font-semibold app-text">{{ $movieTitle }}</dd></div>
+                        <div><dt class="app-muted">Ngày giờ</dt><dd class="mt-1 font-semibold app-text">{{ $showtimeLabel }}</dd></div>
+                        <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $cinemaName }}</dd></div>
+                        <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-semibold app-text">{{ $cinemaAddress }}</dd></div>
+                        <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $roomLabel }}</dd></div>
                     </dl>
 
                     <div class="mt-5 border-t pt-4 app-border">
                         <h3 class="text-sm font-bold app-text">Ghế</h3>
                         <div class="mt-3 flex flex-wrap gap-2">
-                            @foreach($booking->seat_display_groups as $seatGroup)
+                            @foreach($booking?->seat_display_groups ?? collect() as $seatGroup)
                                 <span class="rounded-xl app-secondary px-3 py-2 text-sm font-bold app-text">
                                     {{ $seatGroup['label'] }}
                                     @unless($seatGroup['is_couple'])
@@ -223,15 +236,15 @@
                     </div>
 
                     <dl class="mt-5 space-y-3 border-t pt-4 text-sm app-border">
-                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-semibold app-text">{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
-                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-semibold app-text">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
-                        @if((int) $booking->promotion_discount_amount > 0)<div class="flex justify-between gap-3 text-success"><dt>Giảm giá</dt><dd class="font-semibold">−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} {{ $currency }}</dd></div>@endif
-                        @if((int) $booking->points_discount_amount > 0)<div class="flex justify-between gap-3 text-ai-start"><dt>Đổi điểm</dt><dd class="font-semibold">−{{ number_format((int) $booking->points_discount_amount, 0, ',', '.') }} {{ $currency }}</dd></div>@endif
-                        <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng cộng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-semibold app-text">{{ number_format((int) ($booking?->seat_subtotal ?? 0), 0, ',', '.') }} {{ $currency }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-semibold app-text">{{ number_format((int) ($booking?->food_subtotal ?? 0), 0, ',', '.') }} {{ $currency }}</dd></div>
+                        @if((int) ($booking?->promotion_discount_amount ?? 0) > 0)<div class="flex justify-between gap-3 text-success"><dt>Giảm giá</dt><dd class="font-semibold">−{{ number_format((int) ($booking?->promotion_discount_amount ?? 0), 0, ',', '.') }} {{ $currency }}</dd></div>@endif
+                        @if((int) ($booking?->points_discount_amount ?? 0) > 0)<div class="flex justify-between gap-3 text-ai-start"><dt>Đổi điểm</dt><dd class="font-semibold">−{{ number_format((int) ($booking?->points_discount_amount ?? 0), 0, ',', '.') }} {{ $currency }}</dd></div>@endif
+                        <div class="flex justify-between gap-3 border-t pt-3 app-border"><dt class="font-bold app-text">Tổng cộng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) ($booking?->total_amount ?? 0), 0, ',', '.') }} {{ $currency }}</dd></div>
                     </dl>
                     <div class="mt-5 rounded-xl border app-border px-4 py-3">
                         <p class="text-xs app-muted">Email nhận vé</p>
-                        <p class="mt-1 break-all text-sm font-bold app-text">{{ $booking->recipient_email }}</p>
+                        <p class="mt-1 break-all text-sm font-bold app-text">{{ $recipientEmail }}</p>
                     </div>
                 </aside>
             </div>
@@ -244,18 +257,18 @@
 
             <div class="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
                 @if($isPaid)
-                    <a href="{{ route('user.bookings.ticket', $booking) }}" class="btn-primary" data-paid-ticket-link>
+                    <a href="{{ $ticketRoute }}" class="btn-primary" data-paid-ticket-link>
                         <i class="ph-fill ph-ticket" aria-hidden="true"></i>
                         Xem vé
                     </a>
                 @elseif($isPending && $paymentAction['can_resume'])
-                    <form method="POST" action="{{ route('payments.resume', $booking) }}" data-submit-once>
+                    <form method="POST" action="{{ $booking ? route('payments.resume', $booking) : route('home') }}" data-submit-once>
                         @csrf
                         <button type="submit" class="btn-primary w-full" data-expiry-action data-loading-label="Đang chuyển đến cổng thanh toán…">Tiếp tục thanh toán</button>
                         <p class="mt-2 text-center text-sm app-muted" data-submit-status aria-live="polite"></p>
                     </form>
                 @elseif($isCancelled)
-                    <a href="{{ route('user.movies.show', $booking->showtime->movie->slug) }}" class="btn-primary">Đặt vé lại</a>
+                    <a href="{{ $booking?->showtime?->movie?->slug ? route('user.movies.show', $booking->showtime->movie->slug) : route('home') }}" class="btn-primary">Đặt vé lại</a>
                 @endif
                 <a href="{{ route('home') }}" class="btn-secondary">Về trang chủ</a>
             </div>

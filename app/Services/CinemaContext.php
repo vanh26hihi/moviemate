@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\CinemaConfigurationException;
 use App\Models\Cinema;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /** Customer-facing branch selection. Admin authorization uses CinemaAccessService. */
 class CinemaContext
@@ -30,8 +31,20 @@ class CinemaContext
     /** @return Collection<int, Cinema> */
     public function activeCinemas(): Collection
     {
-        return Cinema::query()->active()->orderBy('name')
-            ->get(['id', 'code', 'name', 'address', 'city', 'district', 'timezone']);
+        if (! Schema::hasTable('cinemas')) {
+            return collect();
+        }
+
+        $available = Schema::getColumnListing('cinemas');
+        $columns = ['id', 'name', 'address', 'city'];
+
+        foreach (['code', 'district', 'timezone'] as $column) {
+            if (in_array($column, $available, true)) {
+                $columns[] = $column;
+            }
+        }
+
+        return Cinema::query()->active()->orderBy('name')->get(array_values(array_unique($columns)));
     }
 
     public function preference(): ?Cinema
