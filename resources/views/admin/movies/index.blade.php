@@ -66,13 +66,30 @@
             <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 app-text-muted"></i>
 
             <input
-                type="text"
-                name="search"
-                value="{{ $searchValue }}"
-                placeholder="Tìm theo tên phim, mô tả, quốc gia hoặc trạng thái..."
-                class="admin-input pl-11"
-                autocomplete="off"
-            >
+    type="text"
+    name="search"
+    value="{{ $searchValue }}"
+    placeholder="Tìm theo tên phim, slug, mô tả hoặc quốc gia..."
+    class="admin-input pl-11"
+    autocomplete="off"
+>
+@if($searchValue !== '')
+    <div class="mb-5 rounded-2xl border app-border app-card px-4 py-3 text-sm app-text-muted">
+        Kết quả tìm kiếm cho từ khóa
+
+        <span class="font-extrabold text-brand-start">
+            “{{ $searchValue }}”
+        </span>
+
+        :
+
+        <span class="font-extrabold app-text">
+            {{ $movies->total() }}
+        </span>
+
+        phim.
+    </div>
+@endif
         </label>
 
         <select
@@ -329,16 +346,18 @@
                                 <i class="ph-fill ph-film-slate text-3xl"></i>
                             </div>
 
-                            @if(
-                                $searchValue !== '' ||
-                                $statusValue !== '' ||
-                                $genreValue !== '' ||
-                                $countryValue !== ''
-                            )
-                                Không tìm thấy phim phù hợp với điều kiện lọc.
-                            @else
-                                Chưa có phim nào.
-                            @endif
+                            @if($searchValue !== '')
+    Không tìm thấy phim phù hợp với từ khóa
+    “{{ $searchValue }}”.
+@elseif(
+    $statusValue !== '' ||
+    $genreValue !== '' ||
+    $countryValue !== ''
+)
+    Không tìm thấy phim phù hợp với điều kiện lọc.
+@else
+    Chưa có phim nào.
+@endif
 
                         </td>
                     </tr>
