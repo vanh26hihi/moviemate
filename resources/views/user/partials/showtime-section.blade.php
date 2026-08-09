@@ -1,9 +1,156 @@
 @php
+    
+    $cityOptions = collect($cityOptions ?? [
+        'Hà Nội' => [],
+        'TP. Hồ Chí Minh' => [],
+        'Đà Nẵng' => [],
+    ]);
+    $brandTabs = collect($brandTabs ?? ['Tất cả', 'MovieMate', 'CGV', 'Lotte', 'Galaxy', 'BHD', 'Beta', 'Cinestar']);
+    $cinemaList = collect($cinemas ?? []);
+    $dateList = collect($scheduleDates ?? []);
+    $movieRows = collect($scheduleMovies ?? []);
+    $availableDates = collect($showtimeDates ?? []);
+    $selectedCinema = $selectedCinema ?? $cinemaList->first();
+    $selectedDate = $selectedDate ?? now('Asia/Ho_Chi_Minh')->toDateString();
+    $selectedCity = $selectedCity ?? null;
+    $selectedBrand = $selectedBrand ?? null;
+    $isNearby = (bool) ($isNearby ?? false);
+    $userLat = $userLat ?? null;
+    $userLng = $userLng ?? null;
+    $cityLabel = $selectedCity ?: 'Tất cả thành phố';
+    $brandLabel = $selectedBrand ?: 'Tất cả';
+    $nearbyParams = $isNearby ? ['nearby' => 1, 'lat' => $userLat, 'lng' => $userLng] : [];
+    $showtimeAjaxRoute = $showtimeAjaxRoute ?? 'ajax.showtimes';
+    $showtimeBaseRoute = $showtimeBaseRoute ?? 'home';
+    $nearestCinemaId = $isNearby ? optional($cinemaList->first(fn ($cinema) => ! is_null($cinema->distance ?? null)))->id : null;
+    $directionUrl = null;
+
+    if ($selectedCinema && ! is_null($selectedCinema->latitude) && ! is_null($selectedCinema->longitude)) {
+        $directionUrl = 'https://www.google.com/maps/dir/?api=1&destination=' . $selectedCinema->latitude . ',' . $selectedCinema->longitude;
+    } elseif ($selectedCinema && filled($selectedCinema->address)) {
+        $directionQuery = trim($selectedCinema->address . ', ' . ($selectedCinema->city ?? ''));
+        $directionUrl = 'https://www.google.com/maps/search/?api=1&query=' . urlencode($directionQuery);
+    }
+
+    $safeDate = function ($value, string $format = 'd/m') {
+        if (blank($value)) {
+            return '';
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value)->format($format);
+        } catch (\Throwable) {
+            return '';
+        }
+    };
+
+    $safeTime = function ($value) {
+        if (blank($value)) {
+            return '--:--';
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value)->format('H:i');
+        } catch (\Throwable) {
+            $time = (string) $value;
+
+            return preg_match('/^\d{2}:\d{2}/', $time) ? substr($time, 0, 5) : '--:--';
+        }
+    };
+
+    $showtimeRange = function ($showtime, $movie) use ($selectedDate, $safeTime) {
+        $start = $safeTime($showtime->show_time ?? null);
+        $duration = (int) ($movie?->duration ?? 0);
+
+        if ($start === '--:--' || $duration <= 0) {
+            return $start;
+        }
+
+        try {
+            $date = $showtime->show_date ?? $selectedDate;
+            $dateText = \Carbon\Carbon::parse($date)->toDateString();
+            $startAt = \Carbon\Carbon::parse($dateText.' '.$start, 'Asia/Ho_Chi_Minh');
+
+            return $start.' ~ '.$startAt->copy()->addMinutes($duration)->format('H:i');
+        } catch (\Throwable) {
+            return $start;
+        }
+    };
+
+    $isPastShowtime = function ($showtime) use ($selectedDate) {
+        if (blank($showtime?->show_time)) {
+            return false;
+        }
+
+        try {
+            $date = $showtime->show_date ?? $selectedDate;
+            $dateText = \Carbon\Carbon::parse($date)->toDateString();
+            $startAt = \Carbon\Carbon::parse($dateText.' '.$showtime->show_time, 'Asia/Ho_Chi_Minh');
+
+            return $startAt->lessThanOrEqualTo(now('Asia/Ho_Chi_Minh'));
+        } catch (\Throwable) {
+            return false;
+        }
+    };
+
+    $bookingUrl = function ($showtime) {
+        if ($showtime && \Illuminate\Support\Facades\Route::has('user.bookings.selectSeat')) {
+            return route('user.bookings.selectSeat', $showtime);
+        }
+
+        return url('/booking/select-seat');
+    };
+
+    $homeShowtimeUrl = function (array $params = []) use ($nearbyParams, $showtimeBaseRoute) {
+        return route($showtimeBaseRoute, array_filter(array_merge($nearbyParams, $params), fn ($value) => filled($value))) . '#home-showtime-calendar';
+    };
+
+    $cinemaBadge = function ($name) {
+        $words = preg_split('/\s+/', trim((string) $name));
+        $letters = collect($words)->filter()->take(2)->map(fn ($word) => mb_substr($word, 0, 1))->join('');
+
+        return mb_strtoupper($letters ?: 'MM');
+    };
+
     $cinemas = collect($cinemas ?? []);
     $entries = collect($scheduleShowtimes ?? []);
     $entriesByDate = $entries->groupBy('date');
     $selectedDate = $selectedDate ?? now(config('cinema.timezone', 'Asia/Ho_Chi_Minh'))->toDateString();
 @endphp
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+        <span class="text-sm font-bold app-muted">Vị trí</span>
+        <details class="relative group w-full sm:w-auto">
+            <summary class="list-none cursor-pointer inline-flex items-center justify-between gap-3 w-full sm:w-auto px-4 py-2.5 rounded-2xl app-secondary border app-border app-text font-bold text-sm hover:border-brand-start transition-colors">
+                <span class="inline-flex items-center gap-2">
+                    <i class="ph-fill ph-map-pin text-brand-start"></i>
+                    {{ $cityLabel }}
+                </span>
+                <i class="ph ph-caret-down app-muted transition-transform group-open:rotate-180"></i>
+            </summary>
+            <div class="absolute left-0 top-full mt-2 z-40 w-full sm:w-72 max-w-[calc(100vw-2rem)] rounded-2xl border app-border cinema-card p-2 shadow-2xl">
+                <a data-showtime-filter href="{{ $homeShowtimeUrl(['brand' => $selectedBrand, 'date' => $selectedDate]) }}" class="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-colors {{ ! $selectedCity ? 'bg-brand-start/10 text-brand-start' : 'app-text hover:bg-brand-start/10 hover:text-brand-start' }}">
+                    Tất cả thành phố
+                    @if(! $selectedCity)<i class="ph-bold ph-check"></i>@endif
+                </a>
+                @foreach($cityOptions->keys() as $city)
+                    <a data-showtime-filter href="{{ $homeShowtimeUrl(['city' => $city, 'brand' => $selectedBrand, 'date' => $selectedDate]) }}" class="flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-colors {{ $selectedCity === $city ? 'bg-brand-start/10 text-brand-start' : 'app-text hover:bg-brand-start/10 hover:text-brand-start' }}">
+                        {{ $city }}
+                        @if($selectedCity === $city)<i class="ph-bold ph-check"></i>@endif
+                    </a>
+                @endforeach
+            </div>
+        </details>
+        <button type="button" id="nearbyCinemaBtn" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border font-extrabold text-sm transition-colors {{ $isNearby ? 'bg-gradient-to-r from-brand-start to-brand-end border-transparent text-white shadow-lg shadow-brand-start/20' : 'bg-brand-start/10 border-brand-start/25 text-brand-start hover:bg-brand-start hover:text-white' }}">
+            <i class="ph-fill ph-navigation-arrow"></i>
+            <span data-nearby-label>Gần bạn</span>
+        </button>
+    </div>
+
+    <div class="text-xs app-muted">
+        {{ $cinemaList->count() }} rạp phù hợp · {{ $safeDate($selectedDate, 'd/m/Y') }}
+    </div>
+</div>
 <section id="home-showtime-calendar" data-showtime-calendar data-selected-date="{{ $selectedDate }}" class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
     <div class="cinema-card overflow-hidden rounded-[24px] border app-border shadow-2xl shadow-black/10">
         <header class="border-b app-border p-5 lg:p-6">
@@ -24,6 +171,20 @@
                     </button>
                 @endforeach
             </div>
+            <div class="min-w-0">
+    <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+        @foreach($brandTabs as $tab)
+            @php
+                $isAllBrandTab = in_array($tab, ['Tất cả', 'Tat ca'], true);
+                $brandValue = $isAllBrandTab ? null : $tab;
+                $isActiveBrand = ($isAllBrandTab && ! $selectedBrand) || $selectedBrand === $tab;
+            @endphp
+            <a data-showtime-filter href="{{ $homeShowtimeUrl(['city' => $selectedCity, 'brand' => $brandValue, 'date' => $selectedDate]) }}" class="shrink-0 px-4 py-2.5 rounded-full border text-sm font-bold transition-all {{ $isActiveBrand ? 'bg-gradient-to-r from-brand-start to-brand-end text-white border-transparent shadow-lg shadow-brand-start/20' : 'app-secondary app-border app-muted hover:text-brand-start hover:border-brand-start' }}">
+                {{ $tab }}
+            </a>
+        @endforeach
+    </div>
+</div>
             <div class="mt-5">
                 @foreach($scheduleDates as $date)
                     @php($dateEntries = collect($entriesByDate->get($date['date'], [])))
