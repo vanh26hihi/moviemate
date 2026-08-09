@@ -92,7 +92,23 @@
     const cinemaSelect = document.getElementById('cinema-select');
     const roomSelect = document.getElementById('room-select');
 
-   
+    function loadRooms(cinemaId, selectedRoomId = null) {
+        roomSelect.innerHTML = '<option value="">-- Đang tải phòng... --</option>';
+        if (!cinemaId) {
+            roomSelect.innerHTML = '<option value="">-- Chọn phòng --</option>';
+            return;
+        }
+
+        fetch(`/api/cinemas/${cinemaId}/rooms`)
+            .then(res => res.json())
+            .then(data => {
+                roomSelect.innerHTML = '<option value="">-- Chọn phòng --</option>' + data.map(room => {
+                    const selected = String(selectedRoomId || '') === String(room.id) ? 'selected' : '';
+                    return `<option value="${room.id}" ${selected}>${room.name}</option>`;
+                }).join('');
+            })
+            .catch(() => roomSelect.innerHTML = '<option value="">-- Lỗi tải phòng --</option>');
+    }
 
     cinemaSelect.addEventListener('change', function () {
         loadRooms(this.value);
