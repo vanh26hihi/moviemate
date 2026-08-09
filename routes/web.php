@@ -499,6 +499,8 @@ Route::prefix('admin')->name('admin.')
 Route::get('/manager', fn () => redirect()->route('admin.dashboard'))
     ->middleware(['auth', 'active', 'role:manager,admin', 'permission:admin.access'])
     ->name('manager.dashboard');
+Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
+    ->name('user.bookings.success');
 
 Route::prefix('staff')->name('staff.')
     ->middleware(['auth', 'active', 'role:staff,manager,admin'])
