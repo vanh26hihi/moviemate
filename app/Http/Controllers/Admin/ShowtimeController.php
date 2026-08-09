@@ -122,32 +122,15 @@ public function index(Request $request)
         return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được cập nhật.');
     }
 
-    public function destroy(Showtime $showtime)
-    {
-        $this->assertOperationalShowtime($showtime);
-        DB::transaction(function () use ($showtime): void {
-            $locked = Showtime::query()->whereKey($showtime->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status === 'cancelled') {
-                return;
-            }
-            if ($locked->status !== 'active') {
-                throw ValidationException::withMessages([
-                    'showtime' => 'Chỉ suất chiếu đang hoạt động mới có thể hủy.',
-                ]);
-            }
-            if ($locked->bookings()->exists()) {
-                throw ValidationException::withMessages([
-                    'showtime' => 'Suất chiếu đã có lịch sử đặt vé nên không thể hủy trực tiếp.',
-                ]);
-            }
+    <?php
+public function destroy(Showtime $showtime)
+{
+    $showtime->delete();
 
-            $before = $this->auditData($locked);
-            $locked->forceFill(['status' => 'cancelled'])->save();
-            $this->activityLogger->log('showtime.cancelled', $locked, $before, ['status' => 'cancelled']);
-        });
-
-        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được hủy và giữ lại trong lịch sử.');
-    }
+    return redirect()
+        ->route('admin.showtimes.index')
+        ->with('success', 'Suất chiếu đã được xóa.');
+}
 
     private function formData(): array
     {
