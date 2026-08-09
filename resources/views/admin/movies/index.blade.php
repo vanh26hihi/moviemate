@@ -81,40 +81,14 @@
         >
             <option value="">Tất cả trạng thái</option>
 
-            <option
-                value="draft"
-                {{ $statusValue === 'draft' ? 'selected' : '' }}
-            >
-                Bản nháp
-            </option>
-
-            <option
-                value="now_showing"
-                {{ $statusValue === 'now_showing' ? 'selected' : '' }}
-            >
-                Đang chiếu
-            </option>
-
-            <option
-                value="coming_soon"
-                {{ $statusValue === 'coming_soon' ? 'selected' : '' }}
-            >
-                Sắp chiếu
-            </option>
-
-            <option
-                value="inactive"
-                {{ $statusValue === 'inactive' ? 'selected' : '' }}
-            >
-                Ngừng hoạt động
-            </option>
-
-            <option
-                value="archived"
-                {{ $statusValue === 'archived' ? 'selected' : '' }}
-            >
-                Đã lưu trữ
-            </option>
+            @foreach($statusMeta as $statusKey => $meta)
+                <option
+                    value="{{ $statusKey }}"
+                    {{ $statusValue === $statusKey ? 'selected' : '' }}
+                >
+                    {{ $meta['label'] }}
+                </option>
+            @endforeach
         </select>
 
         <select
@@ -188,17 +162,8 @@
             {{ $movies->total() }}
         </span>
 
-        phim phù hợp
+        phim phù hợp.
 
-        @if($countryValue !== '')
-            tại quốc gia
-
-            <span class="font-extrabold text-brand-start">
-                {{ $countryValue }}
-            </span>
-        @endif
-
-        .
     </div>
 @endif
 
@@ -284,41 +249,11 @@
                             </div>
                         </td>
 
-                        @php
-    $statusMeta = [
-        'draft' => [
-            'label' => 'Bản nháp',
-            'class' => 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
-        ],
-        'coming_soon' => [
-            'label' => 'Sắp chiếu',
-            'class' => 'bg-warning/10 text-warning border border-warning/20',
-        ],
-        'now_showing' => [
-            'label' => 'Đang chiếu',
-            'class' => 'bg-success/10 text-success border border-success/20',
-        ],
-        'inactive' => [
-            'label' => 'Ngừng chiếu',
-            'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
-        ],
-        'archived' => [
-            'label' => 'Đã lưu trữ',
-            'class' => 'bg-slate-700/20 text-slate-400 border border-slate-600/20',
-        ],
-    ];
-
-    $movieStatus = $statusMeta[$movie->status] ?? [
-        'label' => $movie->status,
-        'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
-    ];
-@endphp
-
-<td class="border px-4 py-2">
-    <span class="admin-badge {{ $movieStatus['class'] }}">
-        {{ $movieStatus['label'] }}
-    </span>
-</td>
+                        <td>
+                            <span class="admin-badge {{ $movieStatus['class'] }}">
+                                {{ $movieStatus['label'] }}
+                            </span>
+                        </td>
 
                         <td>
                             <div class="flex items-center justify-end gap-2">
