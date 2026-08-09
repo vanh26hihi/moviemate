@@ -2,85 +2,63 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vé điện tử MovieMate</title>
 </head>
-@php
-    $verifiedPayment = $booking->payments
-        ->where('status', \App\Models\Payment::STATUS_SUCCESS)
-        ->sortByDesc('id')
-        ->first();
-    $provider = match ($verifiedPayment?->provider) {
-        'vnpay' => 'VNPAY',
-        'zalopay' => 'ZaloPay',
-        'payos' => 'payOS',
-        'counter_cash' => 'Tiền mặt tại quầy',
-        default => 'Cổng thanh toán',
-    };
-    $foodItems = $booking->foodOrder?->items ?? collect();
-@endphp
-<body style="margin:0;background:#f3f4f6;font-family:Arial,sans-serif;color:#111827">
-<div style="max-width:640px;margin:0 auto;padding:28px 16px">
-    <div style="overflow:hidden;border:1px solid #e5e7eb;border-radius:18px;background:#ffffff">
-        <div style="padding:24px;background:linear-gradient(120deg,#e91e3d,#ff6b20);color:#ffffff">
-            <p style="margin:0 0 6px;font-size:13px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase">MovieMate Cinema</p>
-            <h1 style="margin:0;font-size:28px">Thanh toán thành công</h1>
-            <p style="margin:8px 0 0;color:#fff1f2">Vé xem phim của bạn đã được phát hành an toàn.</p>
-        </div>
+<body style="margin:0;background:#080A12;font-family:Arial,sans-serif;color:#ffffff;">
+    <div style="max-width:640px;margin:0 auto;padding:28px 16px;">
+        <div style="background:#151A27;border:1px solid #2D3343;border-radius:18px;padding:24px;">
+            <h1 style="margin:0 0 8px;color:#FF3D57;">MovieMate</h1>
+            <p style="margin:0 0 22px;color:#9CA3AF;">Vé điện tử của bạn đã được thanh toán thành công.</p>
 
-        <div style="padding:24px">
-            <div style="margin-bottom:22px;padding:16px;border:1px dashed #fb7185;border-radius:12px;text-align:center">
-                <p style="margin:0;color:#6b7280;font-size:12px;text-transform:uppercase">Mã vé</p>
-                <p style="margin:10px 0 0;color:#e91e3d;font-family:monospace;font-size:21px;font-weight:bold;letter-spacing:1px">{{ $booking->booking_code }}</p>
+            <div style="text-align:center;margin-bottom:22px;">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ urlencode($booking->booking_code) }}"
+                     alt="QR vé {{ $booking->booking_code }}"
+                     style="background:#ffffff;padding:10px;border-radius:12px;">
+                <p style="margin:12px 0 0;font-size:20px;font-weight:bold;color:#FFB703;">{{ $booking->booking_code }}</p>
             </div>
 
-            <div style="margin-bottom:22px;text-align:center">
-                <img src="{{ $message->embedData($ticketQrPng, 'moviemate-ticket-qr.png', 'image/png') }}" width="220" height="220" alt="Mã QR xác minh vé MovieMate" style="display:block;margin:0 auto;max-width:220px;width:100%;height:auto">
-                <p style="margin:8px 0 0;color:#6b7280;font-size:12px">QR dùng để xác minh vé. Sau khi quét, MovieMate hiển thị đúng mã vé tương ứng.</p>
-            </div>
-
-            <table role="presentation" style="width:100%;border-collapse:collapse;font-size:14px">
-                @foreach([
-                    'Phim' => $booking->movie_title,
-                    'Rạp' => $booking->cinema_label,
-                    'Địa chỉ' => $booking->showtime?->cinema?->address,
-                    'Phòng' => $booking->room_label,
-                    'Suất chiếu' => $booking->showtime_label,
-                    'Ghế' => $booking->seat_codes,
-                    'Thanh toán' => $provider.' · '.($verifiedPayment?->provider === 'counter_cash' ? 'Đã thu tại quầy' : 'Đã xác minh'),
-                ] as $label => $value)
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                <tr>
+                    <td style="padding:10px 0;color:#9CA3AF;">Phim</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:bold;">{{ $booking->showtime?->movie?->title }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:10px 0;color:#9CA3AF;">Rạp</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:bold;">{{ $booking->showtime?->cinema?->name }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:10px 0;color:#9CA3AF;">Phòng</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:bold;">{{ $booking->showtime?->room?->name }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:10px 0;color:#9CA3AF;">Suất chiếu</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:bold;">
+                        {{ $booking->showtime?->show_date ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y') : '--' }}
+                        {{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:10px 0;color:#9CA3AF;">Ghế</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:bold;">{{ $booking->bookingSeats->pluck('seat.seat_code')->join(', ') }}</td>
+                </tr>
+                <tr>
+                    <td style="padding:10px 0;color:#9CA3AF;">Tổng thanh toán</td>
+                    <td style="padding:10px 0;text-align:right;font-weight:bold;color:#FF3D57;">{{ number_format($booking->total_amount, 0, ',', '.') }}đ</td>
+                </tr>
+                @if((float) $booking->discount_amount > 0)
                     <tr>
-                        <td style="padding:9px 0;color:#6b7280;vertical-align:top">{{ $label }}</td>
-                        <td style="padding:9px 0;text-align:right;font-weight:bold;vertical-align:top">{{ $value }}</td>
+                        <td style="padding:10px 0;color:#9CA3AF;">Voucher</td>
+                        <td style="padding:10px 0;text-align:right;font-weight:bold;color:#22C55E;">
+                            {{ $booking->voucher_code }} -{{ number_format($booking->discount_amount, 0, ',', '.') }}đ
+                        </td>
                     </tr>
-                @endforeach
+                @endif
             </table>
 
-            <div style="margin-top:18px;padding-top:16px;border-top:1px solid #e5e7eb">
-                <p style="margin:0 0 8px;font-size:13px;font-weight:bold;text-transform:uppercase">Đồ ăn</p>
-                @forelse($foodItems as $item)
-                    <p style="display:flex;justify-content:space-between;gap:12px;margin:6px 0;font-size:14px">
-                        <span>{{ $item->snapshot_name }} × {{ $item->quantity }}</span>
-                        <strong>{{ number_format((int) $item->line_total, 0, ',', '.') }} {{ $booking->currency_label }}</strong>
-                    </p>
-                @empty
-                    <p style="margin:0;color:#6b7280;font-size:14px">Không có đồ ăn trong đơn.</p>
-                @endforelse
-            </div>
-
-            <table role="presentation" style="width:100%;margin-top:16px;border-collapse:collapse;font-size:14px">
-                <tr><td style="padding:6px 0;color:#6b7280">Tiền ghế</td><td style="padding:6px 0;text-align:right;font-weight:bold">{{ $booking->formatted_seat_subtotal }}</td></tr>
-                <tr><td style="padding:6px 0;color:#6b7280">Tiền đồ ăn</td><td style="padding:6px 0;text-align:right;font-weight:bold">{{ $booking->formatted_food_subtotal }}</td></tr>
-                <tr><td style="padding:10px 0 0;font-weight:bold">Tổng thanh toán</td><td style="padding:10px 0 0;text-align:right;color:#e91e3d;font-size:18px;font-weight:bold">{{ $booking->formatted_total }}</td></tr>
-            </table>
-
-            <p style="margin:24px 0 0;text-align:center">
-                <a href="{{ $ticketAccessUrl }}" style="display:inline-block;padding:13px 22px;border-radius:10px;background:#e91e3d;color:#ffffff;text-decoration:none;font-weight:bold">Xem vé điện tử</a>
+            <p style="margin:24px 0 0;color:#9CA3AF;font-size:13px;line-height:1.6;">
+                Khi đến rạp, vui lòng đưa mã QR hoặc mã vé cho nhân viên soát vé.
             </p>
-            <p style="margin:20px 0 0;color:#4b5563;font-size:13px;line-height:1.65">Vui lòng mở vé và đưa mã QR cho nhân viên soát vé. Nên đến rạp trước giờ chiếu 15 phút. Nếu nút không mở được, hãy sử dụng liên kết trong email này trên cùng thiết bị và trình duyệt.</p>
-            <p style="margin:12px 0 0;color:#6b7280;font-size:12px;line-height:1.55">MovieMate không bao giờ yêu cầu bạn gửi lại mật khẩu, mã thanh toán hoặc thông tin ngân hàng qua email. Cần hỗ trợ, vui lòng liên hệ quầy MovieMate tại rạp.</p>
         </div>
     </div>
-</div>
 </body>
 </html>
