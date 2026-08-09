@@ -94,6 +94,7 @@ class BookingController extends Controller
             'seatPrices',
         ));
     }
+    
 
     /**
      * Show checkout page for selected seats.
@@ -177,6 +178,7 @@ class BookingController extends Controller
         $this->authorizeBookingView($request, $booking);
         $this->expiration->expire($booking->id);
         $booking->refresh();
+        abort_unless($booking->user_id === Auth::id(), 403);
 
         $booking->load([
             'user',
@@ -203,6 +205,14 @@ class BookingController extends Controller
             'mailDeliveryReady',
             'paymentAction',
         ));
+       
+
+    
+
+   
+
+   
+
     }
 
     public function ticket(Request $request, Booking $booking)
