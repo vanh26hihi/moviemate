@@ -501,6 +501,7 @@ Route::get('/manager', fn () => redirect()->route('admin.dashboard'))
     ->name('manager.dashboard');
 Route::get('/booking/success/{booking}', [BookingController::class, 'success'])
     ->name('user.bookings.success');
+    Route::resource('showtimes', AdminShowtimeController::class)->except(['show']);
 
 Route::prefix('staff')->name('staff.')
     ->middleware(['auth', 'active', 'role:staff,manager,admin'])
