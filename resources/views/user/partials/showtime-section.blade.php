@@ -184,6 +184,46 @@
             </a>
         @endforeach
     </div>
+    <div class="min-w-0 p-4 sm:p-5 lg:p-6">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-5">
+        <div>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+                <span class="px-3 py-1 rounded-full bg-brand-start/10 text-brand-start text-xs font-extrabold">{{ $brandLabel }}</span>
+                <span class="px-3 py-1 rounded-full app-secondary border app-border app-muted text-xs font-bold">{{ $cityLabel }}</span>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-extrabold app-text">
+                Lịch chiếu phim {{ $selectedCinema?->name ?? 'MovieMate' }}
+            </h3>
+            <p class="app-muted text-sm mt-1">{{ $selectedCinema?->address ?? 'Địa chỉ đang cập nhật' }}</p>
+        </div>
+        @if($directionUrl)
+            <a href="{{ $directionUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-brand-start hover:text-brand-end hover:underline font-extrabold text-sm">
+                <i class="ph-fill ph-navigation-arrow"></i>
+                Dẫn đường
+            </a>
+        @endif
+    </div>
+
+    <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-3 mb-5 border-b app-border">
+        @forelse($dateList as $date)
+            @php
+                $dateValue = $date['date'] ?? null;
+                $isActiveDate = $dateValue === $selectedDate;
+                $hasShowtimes = $dateValue && $availableDates->contains($dateValue);
+            @endphp
+
+            <a data-showtime-filter href="{{ $homeShowtimeUrl(['city' => $selectedCity, 'brand' => $selectedBrand, 'cinema_id' => $selectedCinema?->id, 'date' => $dateValue]) }}" class="shrink-0 min-w-24 px-4 py-3 rounded-2xl border text-center transition-all {{ $isActiveDate ? 'border-transparent bg-gradient-to-br from-brand-start to-brand-end text-white shadow-lg shadow-brand-start/20' : 'app-border app-secondary app-text hover:border-brand-start hover:text-brand-start' }}">
+                <span class="block text-2xl font-black leading-none">{{ $date['day'] ?? $safeDate($dateValue, 'd') }}</span>
+                <span class="block text-xs font-bold mt-1 {{ $isActiveDate ? 'text-white/85' : 'app-muted' }}">{{ $date['label'] ?? $safeDate($dateValue, 'd/m') }}</span>
+                @if($hasShowtimes)
+                    <span class="mt-2 mx-auto block w-1.5 h-1.5 rounded-full {{ $isActiveDate ? 'bg-white' : 'bg-brand-start' }}"></span>
+                @endif
+            </a>
+        @empty
+            <div class="app-muted text-sm">Chưa có dữ liệu ngày chiếu.</div>
+        @endforelse
+    </div>
+</div>
     <div class="relative z-10 grid grid-cols-1 lg:grid-cols-[32%_68%] min-w-0 overflow-hidden rounded-b-[24px]">
     <aside class="border-b lg:border-b-0 lg:border-r app-border">
         <div class="lg:max-h-[520px] overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto p-3 sm:p-4 overscroll-x-contain">
