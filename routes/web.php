@@ -143,6 +143,10 @@ Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
     Route::resource('foods', AdminFoodController::class)->except(['show']);
     Route::resource('food-orders', AdminFoodOrderController::class)->only(['index', 'show']);
     Route::resource('vouchers', AdminVoucherController::class)->except(['show']);
+    
+    Route::patch('/movies/{movie}/lifecycle', [AdminMovieController::class, 'lifecycle'])
+    ->name('movies.lifecycle');
+
 
     Route::resource('movies', AdminMovieController::class);
     Route::resource('genres', AdminGenreController::class)->except(['show']);
