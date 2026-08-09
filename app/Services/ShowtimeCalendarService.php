@@ -62,3 +62,57 @@ public function data(Request $request): array
         'userLng'
     );
 }
+
+$cinemas = $isNearby
+    ? $this->sortByDistance($cinemas, $userLat, $userLng)
+    : $cinemas->map(function (Cinema $cinema) {
+        $cinema->distance = null;
+
+        return $cinema;
+    })->values();
+
+private function sortByDistance($cinemas, ?float $userLat, ?float $userLng)
+{
+    return $cinemas
+        ->map(function (Cinema $cinema) use ($userLat, $userLng) {
+            $cinema->distance = $this->cinemaHasCoordinates($cinema)
+                ? $this->calculateDistance($userLat, $userLng, (float) $cinema->latitude, (float) $cinema->longitude)
+                : null;
+
+            return $cinema;
+        })
+        ->sortBy(fn (Cinema $cinema) => is_null($cinema->distance) ? PHP_FLOAT_MAX : $cinema->distance)
+        ->values();
+}
+
+private function normalizeCoordinate(mixed $value, float $min, float $max): ?float
+{
+    if (! is_numeric($value)) {
+        return null;
+    }
+
+    $coordinate = (float) $value;
+
+    return $coordinate >= $min && $coordinate <= $max ? $coordinate : null;
+}
+
+private function cinemaHasCoordinates(Cinema $cinema): bool
+{
+    return ! is_null($cinema->latitude)
+        && ! is_null($cinema->longitude)
+        && is_numeric($cinema->latitude)
+        && is_numeric($cinema->longitude);
+}
+
+private function calculateDistance(float $lat1, float $lng1, float $lat2, float $lng2): float
+{
+    $earthRadius = 6371;
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLng = deg2rad($lng2 - $lng1);
+
+    $a = sin($dLat / 2) * sin($dLat / 2)
+        + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
+        * sin($dLng / 2) * sin($dLng / 2);
+
+    return $earthRadius * (2 * atan2(sqrt($a), sqrt(1 - $a)));
+}
