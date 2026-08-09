@@ -137,21 +137,25 @@
             </select>
         </div>
 
-        <select
-            name="country"
-            class="admin-input xl:w-52"
-        >
-            <option value="">Tất cả quốc gia</option>
-
-            @foreach($countries as $countryItem)
-                <option
-                    value="{{ $countryItem }}"
-                    {{ $countryValue === $countryItem ? 'selected' : '' }}
-                >
-                    {{ $countryItem }}
-                </option>
-            @endforeach
-        </select>
+        <div class="relative xl:w-56">
+            <i class="ph ph-globe-hemisphere-east absolute left-4 top-1/2 -translate-y-1/2 app-text-muted"></i>
+        
+            <select
+                name="country"
+                class="admin-input w-full pl-11"
+            >
+                <option value="">Tất cả quốc gia</option>
+        
+                @foreach($countries as $countryItem)
+                    <option
+                        value="{{ $countryItem }}"
+                        {{ $countryValue === $countryItem ? 'selected' : '' }}
+                    >
+                        {{ $countryItem }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
 
         <button
             type="submit"
@@ -206,13 +210,13 @@
             </span>
         @endif
     @endif
-        @if($countryValue !== '')
-            tại quốc gia
+    @if($countryValue !== '')
+    tại quốc gia
 
-            <span class="font-extrabold text-brand-start">
-                {{ $countryValue }}
-            </span>
-        @endif
+    <span class="font-extrabold text-brand-start">
+        {{ $countryValue }}
+    </span>
+@endif
 
         .
     </div>
