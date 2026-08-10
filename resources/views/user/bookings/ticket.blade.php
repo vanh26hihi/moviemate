@@ -29,7 +29,7 @@
     <article class="cinema-ticket-document" data-ticket-document data-ticket-state="{{ $isUsable ? 'usable' : 'inactive' }}">
         <header class="cinema-ticket-header">
             <div>
-                <p class="cinema-ticket-brand"><i class="ph-fill ph-film-strip" aria-hidden="true"></i> MovieMate Cinema</p>
+                <x-brand.logo variant="white" class="brand-logo--ticket" />
                 <h1>VÉ ĐIỆN TỬ</h1>
                 <p class="cinema-ticket-subtitle">Vé điện tử chính thức · Xuất trình khi check-in</p>
             </div>

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng nhập quản trị - MovieMate</title>
+    <x-brand.head-icons />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>
         (function() {
@@ -33,11 +34,8 @@
     <div class="w-full max-w-md relative z-20">
         
         <div class="text-center mb-10">
-            <div class="inline-flex items-center justify-center w-24 h-24 rounded-[2rem] bg-dark-card border border-dark-border shadow-2xl mb-6 relative overflow-hidden group">
-                <div class="absolute inset-0 bg-gradient-to-tr from-brand-start/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <i class="ph-fill ph-film-strip text-5xl text-brand-start"></i>
-            </div>
-            <h1 class="text-3xl font-bold text-white mb-2 tracking-tight">Quản trị MovieMate</h1>
+            <x-brand.logo class="brand-logo--auth mx-auto mb-6" />
+            <h1 class="text-3xl font-bold app-text mb-2 tracking-tight">Khu vực quản trị</h1>
             <p class="text-text-sub">Hệ thống quản trị đặt vé xem phim</p>
         </div>
 

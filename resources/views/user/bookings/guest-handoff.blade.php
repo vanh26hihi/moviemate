@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <title>MovieMate - Chuyển đến đơn đặt vé</title>
+    <x-brand.head-icons />
     <style>
         body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #080a12; color: #fff; font-family: system-ui, sans-serif; }
     </style>

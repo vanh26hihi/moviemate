@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'MovieMate - Đặt vé xem phim thông minh cùng AI')</title>
     <meta name="description" content="@yield('meta_description', 'MovieMate - Nền tảng đặt vé xem phim trực tuyến tích hợp AI thông minh.')">
+    <x-brand.head-icons />
     @vite(['resources/css/app.css', 'resources/css/user.css', 'resources/js/app.js'])
     <script>
         (function() {
@@ -17,13 +18,8 @@
     <header class="app-header fixed w-full top-0 z-50 backdrop-blur-xl border-b app-border transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16 md:h-20">
-                <a href="{{ route('home') }}" class="flex items-center gap-2.5 shrink-0">
-                    <span class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-start to-brand-end text-white flex items-center justify-center shadow-lg shadow-brand-start/25">
-                        <i class="ph-fill ph-film-strip text-2xl"></i>
-                    </span>
-                    <span class="hidden text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end sm:inline md:text-2xl">
-                        MovieMate
-                    </span>
+                <a href="{{ route('home') }}" class="flex shrink-0 items-center" aria-label="MovieMate - Trang chủ">
+                    <x-brand.logo class="brand-logo--customer-header" />
                 </a>
 
                 <nav class="hidden md:flex items-center gap-1 rounded-full app-card border app-border p-1">
@@ -127,16 +123,13 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
                 <div class="col-span-2 md:col-span-1">
-                    <a href="{{ route('home') }}" class="flex items-center gap-2.5 mb-4">
-                        <span class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-start to-brand-end text-white flex items-center justify-center">
-                            <i class="ph-fill ph-film-strip text-2xl"></i>
-                        </span>
-                        <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end">MovieMate</span>
+                    <a href="{{ route('home') }}" class="mb-4 inline-flex items-center" aria-label="MovieMate - Trang chủ">
+                        <x-brand.logo class="brand-logo--footer" />
                     </a>
                     <p class="app-muted text-sm leading-relaxed mb-5">
                         Nền tảng đặt vé xem phim tích hợp AI thông minh, mang đến trải nghiệm điện ảnh tiện lợi và cá nhân hóa.
                     </p>
-                    <div class="flex gap-3" aria-label="MovieMate"><span class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center text-brand-start"><i class="ph-fill ph-film-strip text-lg"></i></span><span class="app-muted text-sm self-center">Điện ảnh trong tầm tay</span></div>
+                    <div class="flex gap-3"><x-brand.logo variant="mark" alt="" class="brand-logo--footer-mark" /><span class="app-muted text-sm self-center">Điện ảnh trong tầm tay</span></div>
                 </div>
 
                 <div>
