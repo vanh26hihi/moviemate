@@ -77,37 +77,6 @@
     </div>
 </section>
 
-<section id="showtimes" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-7">
-        <div>
-            <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Lịch chiếu nhanh</p>
-            <h2 class="text-3xl sm:text-4xl font-extrabold app-text">Suất chiếu gần nhất</h2>
-            <p class="mt-2 app-muted max-w-2xl">Chọn nhanh suất chiếu phù hợp với bạn.</p>
-        </div>
-        <a href="{{ route('user.movies.index', ['status' => 'now_showing']) }}" class="btn-secondary !py-2.5 w-fit">
-            Xem tất cả phim <i class="ph ph-arrow-right"></i>
-        </a>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-        @forelse(($quickShowtimes ?? collect())->take(6) as $showtime)
-            @include('components.quick-showtime-card', ['showtime' => $showtime])
-        @empty
-            <div class="col-span-full cinema-card rounded-3xl border app-border p-8 sm:p-10 text-center">
-                <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
-                    <i class="ph-fill ph-calendar-x text-4xl"></i>
-                </div>
-                <h3 class="text-2xl font-extrabold app-text">Chưa có suất chiếu gần nhất</h3>
-                <p class="mx-auto mt-2 max-w-xl app-muted">Vui lòng quay lại sau hoặc xem danh sách phim đang chiếu.</p>
-                <a href="{{ route('user.movies.index', ['status' => 'now_showing']) }}" class="btn-primary mt-6">
-                    <i class="ph-fill ph-film-strip"></i>
-                    Xem phim đang chiếu
-                </a>
-            </div>
-        @endforelse
-    </div>
-</section>
-
 <section class="relative overflow-hidden py-16">
     <div class="absolute inset-0 -z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(11,16,32,0.34)_48%,transparent_100%)]"></div>
     <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">

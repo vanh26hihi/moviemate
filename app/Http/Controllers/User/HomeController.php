@@ -41,10 +41,9 @@ class HomeController extends Controller
         $scheduleShowtimes = $this->customerCatalog->between(
             $today->toDateString(), $today->copy()->addDays(6)->toDateString(), $cinema,
         );
-        $quickShowtimes = collect();
 
         return view('user.home', compact(
-            'nowShowing', 'comingSoon', 'quickShowtimes', 'cinema', 'scheduleDates',
+            'nowShowing', 'comingSoon', 'cinema', 'scheduleDates',
             'selectedDate', 'scheduleShowtimes', 'cinemas'
         ));
     }
