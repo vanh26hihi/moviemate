@@ -124,7 +124,22 @@ $ticketStatus = $statusMeta[$booking->booking_status] ?? [
                     $ticketStatus = $statusMeta[$booking->booking_status] ?? [
                         'label' => $booking->status_label,
                         'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
+                        
                     ];
+                    <div class="mb-4 rounded-xl border app-border bg-white/5 px-4 py-3">
+    <div class="flex items-start gap-2">
+        <i class="ph ph-info mt-0.5 text-brand-start"></i>
+        <div>
+            <p class="text-xs font-bold app-text">
+                Trạng thái hiện tại
+            </p>
+
+            <p class="mt-1 text-xs app-muted leading-relaxed">
+                {{ $ticketStatus['description'] }}
+            </p>
+        </div>
+    </div>
+</div>
                 @endphp
                     <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
                         <div class="absolute top-0 right-0 {{ $actions['badge_class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
