@@ -22,6 +22,7 @@ final class PublicShowtimeCatalog
     public function __construct(
         private readonly TicketPricingService $pricing,
         private readonly ShowtimeScheduleService $schedule,
+        private readonly ShowtimeLifecycleService $lifecycle,
     ) {}
 
     public function date(?string $requested, ?Cinema $cinema = null): string
@@ -97,10 +98,33 @@ final class PublicShowtimeCatalog
     public function isSellable(Showtime $showtime): bool
     {
         $showtime->loadMissing(['movie', 'cinema.operatingHours', 'room.cinema.operatingHours', 'roomLayout.cells']);
-        if (! $this->structurallySellable($showtime)) {
+        if (! $this->operationallySellable($showtime)) {
             return false;
         }
         try {
+            if (! $this->schedule->windowFor($showtime)->start->isFuture()) {
+                return false;
+            }
+            $this->schedule->assertWithinOperatingHours($showtime->room, $this->schedule->windowFor($showtime));
+            $this->pricesFor($showtime);
+        } catch (PricingConfigurationException|ShowtimeScheduleException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function isCustomerSellable(Showtime $showtime): bool
+    {
+        $showtime->loadMissing(['movie', 'cinema.operatingHours', 'room.cinema.operatingHours', 'roomLayout.cells']);
+        if (! $this->operationallySellable($showtime)) {
+            return false;
+        }
+
+        try {
+            if (! $this->lifecycle->isCustomerBookingOpen($showtime)) {
+                return false;
+            }
             $this->schedule->assertWithinOperatingHours($showtime->room, $this->schedule->windowFor($showtime));
             $this->pricesFor($showtime);
         } catch (PricingConfigurationException|ShowtimeScheduleException) {
@@ -129,7 +153,8 @@ final class PublicShowtimeCatalog
      */
     private function sellable(Collection $showtimes): Collection
     {
-        $showtimes = $showtimes->filter(fn (Showtime $showtime): bool => $this->structurallySellable($showtime))->values();
+        $showtimes = $showtimes->filter(fn (Showtime $showtime): bool => $this->operationallySellable($showtime)
+            && $this->lifecycle->isCustomerBookingOpen($showtime))->values();
         $this->pricing->warmForShowtimes($showtimes);
 
         return $showtimes->filter(function (Showtime $showtime): bool {
@@ -148,7 +173,7 @@ final class PublicShowtimeCatalog
         })->values();
     }
 
-    private function structurallySellable(Showtime $showtime): bool
+    private function operationallySellable(Showtime $showtime): bool
     {
         if ($showtime->status !== 'active'
             || ! in_array($showtime->movie?->status, self::MOVIE_STATUSES, true)
@@ -160,13 +185,7 @@ final class PublicShowtimeCatalog
             || $showtime->roomLayout->cells->isEmpty()) {
             return false;
         }
-        $timezone = $showtime->cinema->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
-        $startsAt = CarbonImmutable::createFromFormat(
-            '!Y-m-d H:i:s',
-            $showtime->show_date->format('Y-m-d').' '.substr((string) $showtime->show_time, 0, 8),
-            $timezone,
-        );
 
-        return $startsAt !== false && $startsAt->isFuture();
+        return true;
     }
 }

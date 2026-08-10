@@ -26,11 +26,12 @@
                     @endforeach
                 </select>
                 <input type="date" name="show_date" value="{{ request('show_date') }}" class="cinema-input">
-                <select name="status" class="cinema-input">
-                    <option value="">Trạng thái</option>
-                    <option value="active" @selected(request('status') === 'active')>Đang chiếu</option>
-                    <option value="cancelled" @selected(request('status') === 'cancelled')>Đã hủy</option>
-                    <option value="finished" @selected(request('status') === 'finished')>Đã chiếu xong</option>
+                <select name="lifecycle" class="cinema-input">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="upcoming" @selected(request('lifecycle') === 'upcoming')>Sắp chiếu</option>
+                    <option value="playing" @selected(request('lifecycle') === 'playing')>Đang chiếu</option>
+                    <option value="completed" @selected(request('lifecycle') === 'completed')>Đã chiếu xong</option>
+                    <option value="cancelled" @selected(request('lifecycle') === 'cancelled')>Đã hủy</option>
                 </select>
                 <button type="submit" class="btn-secondary"><i class="ph ph-funnel"></i> Lọc</button>
             </form>
@@ -54,8 +55,16 @@
                     @forelse($showtimes as $showtime)
                         @php
                             $window = $scheduleWindows->get($showtime->id);
+                            $lifecycle = $lifecycleSnapshots->get($showtime->id);
                             $movieCrossesMidnight = $window && !$window->movieEnd->isSameDay($window->start);
                             $readyCrossesMidnight = $window && !$window->operationalEnd->isSameDay($window->start);
+                            $lifecycleClasses = match($lifecycle['state'] ?? null) {
+                                'upcoming' => 'text-brand-start bg-brand-start/10',
+                                'playing' => 'text-success bg-success/10',
+                                'completed' => 'app-muted app-secondary',
+                                'cancelled' => 'text-error bg-error/10',
+                                default => 'text-warning bg-warning/10',
+                            };
                         @endphp
                         <tr>
                             <td>
@@ -76,16 +85,25 @@
                             </td>
                             <td><span class="app-text font-bold">{{ $window?->cleaningBufferMinutes ?? $cleaningBufferMinutes }} phút</span></td>
                             <td class="text-center">
-                                <span class="status-badge {{ $showtime->status === 'active' ? 'text-success bg-success/10' : ($showtime->status === 'cancelled' ? 'text-error bg-error/10' : 'text-warning bg-warning/10') }}">{{ $showtime->status_label }}</span>
+                                <span
+                                    class="status-badge {{ $lifecycleClasses }}"
+                                    data-showtime-lifecycle
+                                    data-server-now="{{ ($lifecycle['now'] ?? null)?->toIso8601String() }}"
+                                    data-start-at="{{ ($lifecycle['starts_at'] ?? null)?->toIso8601String() }}"
+                                    data-end-at="{{ ($lifecycle['ends_at'] ?? null)?->toIso8601String() }}"
+                                    data-cancelled="{{ $showtime->status === 'cancelled' ? 'true' : 'false' }}"
+                                >{{ $lifecycle['label'] ?? 'Không xác định' }}</span>
                             </td>
                             <td>
                                 <div class="flex items-center justify-end gap-2">
                                     @can('showtimes.update')
-                                        <a href="{{ route('admin.showtimes.edit', $showtime) }}" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa"><i class="ph-bold ph-pencil-simple text-xs"></i></a>
+                                        @if(($lifecycle['state'] ?? null) === 'upcoming')
+                                        <a href="{{ route('admin.showtimes.edit', $showtime) }}" data-showtime-edit-action class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa"><i class="ph-bold ph-pencil-simple text-xs"></i></a>
+                                        @endif
                                     @endcan
                                     @can('showtimes.delete')
-                                        @if($showtime->status === 'active')
-                                        <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn hủy suất chiếu này? Suất đã có đơn đặt vé sẽ không thể hủy trực tiếp.');">
+                                        @if($showtime->status === 'active' && in_array($lifecycle['state'] ?? null, ['upcoming', 'playing'], true))
+                                        <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" data-showtime-cancel-action onsubmit="return confirm('Bạn có chắc muốn hủy suất chiếu này? Suất đã có đơn đặt vé sẽ không thể hủy trực tiếp.');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-white hover:bg-error hover:border-error transition-colors" title="Hủy suất chiếu" aria-label="Hủy suất chiếu"><i class="ph-bold ph-x-circle text-xs" aria-hidden="true"></i></button>

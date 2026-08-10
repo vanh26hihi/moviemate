@@ -3,6 +3,7 @@
 // independent, so the merge keeps both rather than choosing a side.
 import './showtime-calendar';
 import './showtime';
+import './showtime-lifecycle';
 import './seat-gap-guard';
 import './layout-template-editor';
 

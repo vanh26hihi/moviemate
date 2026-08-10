@@ -12,6 +12,7 @@ use App\Services\BookingFoodService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use App\Services\UnifiedBookingCheckoutService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -20,6 +21,52 @@ use Tests\Feature\Payments\PaymentTestCase;
 
 class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
 {
+    public function test_existing_authoritative_booking_and_payment_replay_continue_after_booking_cutoff(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-11 09:14:59', 'Asia/Ho_Chi_Minh'));
+
+        try {
+            $scenario = $this->bookingScenario(false);
+            $scenario['showtime']->forceFill(['show_date' => '2026-08-11', 'show_time' => '09:00:00'])->save();
+            $draft = [
+                'showtime_id' => $scenario['showtime']->id,
+                'seat_ids' => [$scenario['seats'][0]->id],
+                'customer_email' => 'cutoff-replay@example.test',
+                'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
+                'food_items' => [],
+            ];
+            $service = app(BookingCheckoutService::class);
+            $first = $service->createPendingBooking(
+                $draft['showtime_id'],
+                $draft['seat_ids'],
+                null,
+                $draft['customer_email'],
+                $draft['checkout_token'],
+                $draft['food_items'],
+            );
+            $payment = $this->pendingPayment($first->booking);
+            $this->assertFalse($first->replayed);
+
+            CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-11 09:15:00', 'Asia/Ho_Chi_Minh'));
+            $second = $service->createPendingBooking(
+                $draft['showtime_id'],
+                $draft['seat_ids'],
+                null,
+                $draft['customer_email'],
+                $draft['checkout_token'],
+                $draft['food_items'],
+            );
+
+            $this->assertTrue($second->replayed);
+            $this->assertSame($first->booking->id, $second->booking->id);
+            $this->assertSame($payment->id, $second->booking->payments()->sole()->id);
+            $this->assertDatabaseCount('bookings', 1);
+            $this->assertDatabaseCount('payments', 1);
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
     public function test_guest_seat_and_food_flow_uses_server_totals_and_redirects_to_zalopay(): void
     {
         $scenario = $this->bookingScenario(false);
