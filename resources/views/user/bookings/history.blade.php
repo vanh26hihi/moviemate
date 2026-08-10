@@ -49,7 +49,9 @@
                 <form method="GET" action="{{ route('user.bookings.history') }}" class="flex gap-2">
                     <select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
                         <option value="">Tất cả</option>
-                        <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Chờ thanh toán</option>
+                        <option value="pending_payment" {{ request('status') == 'pending_payment' ? 'selected' : '' }}>
+                            Chờ thanh toán
+                        </option>
                         <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Chưa sử dụng</option>
                         <option value="used" {{ request('status') == 'used' ? 'selected' : '' }}>Đã sử dụng</option>
                         <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Đã hủy</option>
@@ -68,7 +70,35 @@
                         $poster = $booking->showtime->movie->poster_url;
                         $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
                     @endphp
-
+                    @php
+                    $statusMeta = [
+                        'pending_payment' => [
+                            'label' => 'Chờ thanh toán',
+                            'class' => 'bg-warning/10 text-warning border border-warning/20',
+                        ],
+                        'paid' => [
+                            'label' => 'Đã thanh toán',
+                            'class' => 'bg-success/10 text-success border border-success/20',
+                        ],
+                        'used' => [
+                            'label' => 'Đã sử dụng',
+                            'class' => 'bg-ai-start/10 text-ai-start border border-ai-start/20',
+                        ],
+                        'cancelled' => [
+                            'label' => 'Đã hủy',
+                            'class' => 'bg-error/10 text-error border border-error/20',
+                        ],
+                        'expired' => [
+                            'label' => 'Hết hạn',
+                            'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
+                        ],
+                    ];
+                
+                    $ticketStatus = $statusMeta[$booking->booking_status] ?? [
+                        'label' => $booking->status_label,
+                        'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
+                    ];
+                @endphp
                     <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
                         <div class="absolute top-0 right-0 {{ $actions['badge_class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
                             {{ $actions['badge_label'] }}
@@ -91,7 +121,29 @@
                             <div class="flex-grow min-w-0">
                                 <h2 class="text-xl font-bold app-text mb-1 pr-20">{{ $booking->showtime->movie->title }}</h2>
                                 <p class="app-muted text-xs mb-4">Mã vé: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
-
+                                <div class="mb-4 flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $ticketStatus['class'] }}">
+                                        {{ $ticketStatus['label'] }}
+                                    </span>
+                                
+                                    @if($booking->paid_at)
+                                        <span class="text-xs app-muted">
+                                            Thanh toán lúc {{ $booking->paid_at->format('H:i d/m/Y') }}
+                                        </span>
+                                    @endif
+                                
+                                    @if($booking->used_at)
+                                        <span class="text-xs app-muted">
+                                            Sử dụng lúc {{ $booking->used_at->format('H:i d/m/Y') }}
+                                        </span>
+                                    @endif
+                                
+                                    @if($booking->booking_status === 'pending_payment' && $booking->expires_at)
+                                        <span class="text-xs text-warning font-semibold">
+                                            Hết hạn thanh toán lúc {{ $booking->expires_at->format('H:i d/m/Y') }}
+                                        </span>
+                                    @endif
+                                </div>
                                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mb-4">
                                     <div><p class="app-muted mb-0.5">Thời gian</p><p class="app-text font-semibold">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }} - {{ $booking->showtime?->show_date ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y') : 'Đang cập nhật' }}</p></div>
                                     <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->seat_codes }}</p></div>
