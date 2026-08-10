@@ -69,6 +69,33 @@
                         $actions = $bookingActions[$booking->id];
                         $poster = $booking->showtime->movie->poster_url;
                         $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
+                        $statusMeta = [
+    'pending_payment' => [
+        'label' => 'Chờ thanh toán',
+        'class' => 'bg-warning/10 text-warning border border-warning/20',
+    ],
+    'paid' => [
+        'label' => 'Đã thanh toán',
+        'class' => 'bg-success/10 text-success border border-success/20',
+    ],
+    'used' => [
+        'label' => 'Đã sử dụng',
+        'class' => 'bg-ai-start/10 text-ai-start border border-ai-start/20',
+    ],
+    'cancelled' => [
+        'label' => 'Đã hủy',
+        'class' => 'bg-error/10 text-error border border-error/20',
+    ],
+    'expired' => [
+        'label' => 'Hết hạn',
+        'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
+    ],
+];
+
+$ticketStatus = $statusMeta[$booking->booking_status] ?? [
+    'label' => $booking->status_label,
+    'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
+];
                     @endphp
                     @php
                     $statusMeta = [
@@ -121,6 +148,11 @@
                             <div class="flex-grow min-w-0">
                                 <h2 class="text-xl font-bold app-text mb-1 pr-20">{{ $booking->showtime->movie->title }}</h2>
                                 <p class="app-muted text-xs mb-4">Mã vé: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
+                                <div class="mb-4">
+                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $ticketStatus['class'] }}">
+                                        {{ $ticketStatus['label'] }}
+                                    </span>
+                                </div>
                                 <div class="mb-4 flex flex-wrap items-center gap-2">
                                     <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $ticketStatus['class'] }}">
                                         {{ $ticketStatus['label'] }}
