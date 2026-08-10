@@ -11,6 +11,7 @@ use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPublicDiscoveryFixtures;
 use Tests\TestCase;
 
@@ -68,6 +69,27 @@ class HomeShowtimeCalendarTest extends TestCase
         }
 
         $this->assertSame(1, $selectedCount);
+    }
+
+    public function test_homepage_removes_redundant_nearest_showtimes_without_query_regression(): void
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $response = $this->get(route('home'));
+        $queryCount = count(DB::getQueryLog());
+
+        DB::disableQueryLog();
+
+        $response->assertOk()
+            ->assertDontSee('Lịch chiếu nhanh')
+            ->assertDontSee('Suất chiếu gần nhất')
+            ->assertDontSee('Chưa có suất chiếu gần nhất')
+            ->assertSee('Lịch chiếu MovieMate')
+            ->assertSee('Chọn chi nhánh, ngày và suất chiếu phù hợp')
+            ->assertSee('Gần bạn');
+
+        $this->assertLessThanOrEqual(42, $queryCount, "Homepage query count increased to {$queryCount}.");
     }
 
     public function test_selected_date_panel_can_render_showtimes_and_other_dates_remain_safe_empty_states(): void
