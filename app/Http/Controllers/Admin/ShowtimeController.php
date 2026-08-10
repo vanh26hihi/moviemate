@@ -25,37 +25,38 @@ class ShowtimeController extends Controller
         private readonly ActivityLogger $activityLogger,
     ) {}
 
+    public function index(Request $request)
+    {
+        $query = Showtime::query()->with(['movie', 'cinema', 'room', 'roomLayout']);
+        $this->cinemaAccess->scope($query, $request->user(), 'showtimes.cinema_id');
 
-public function index(Request $request)
-{
-    $query = Showtime::with(['movie', 'cinema', 'room']);
+        foreach (['movie_id', 'status'] as $filter) {
+            if ($value = $request->query($filter)) {
+                $query->where($filter, $value);
+            }
+        }
+        if ($date = $request->query('show_date')) {
+            // This is only an administrator display filter. Conflict detection uses complete intervals in the service.
+            $query->whereDate('show_date', $date);
+        }
 
-    if ($movieId = $request->query('movie_id')) {
-        $query->where('movie_id', $movieId);
+        $showtimes = $query->orderByDesc('show_date')->orderBy('show_time')->paginate(15)->withQueryString();
+        $scheduleWindows = $showtimes->getCollection()->mapWithKeys(function (Showtime $showtime): array {
+            try {
+                return [$showtime->id => $this->schedule->windowFor($showtime)];
+            } catch (ShowtimeScheduleException) {
+                return [$showtime->id => null];
+            }
+        });
+
+        return view('admin.showtimes.index', [
+            'showtimes' => $showtimes,
+            'movies' => Movie::query()->orderBy('title')->get(),
+            'scheduleWindows' => $scheduleWindows,
+            'cleaningBufferMinutes' => $this->schedule->cleaningBufferMinutes(),
+            'cinemaTimezone' => $this->schedule->timezone(),
+        ]);
     }
-
-    if ($cinemaId = $request->query('cinema_id')) {
-        $query->where('cinema_id', $cinemaId);
-    }
-
-    if ($date = $request->query('show_date')) {
-        $query->whereDate('show_date', $date);
-    }
-
-    if ($status = $request->query('status')) {
-        $query->where('status', $status);
-    }
-
-    $showtimes = $query->orderByDesc('show_date')
-                       ->orderBy('show_time')
-                       ->paginate(15)
-                       ->withQueryString();
-
-    $movies   = Movie::all();
-    $cinemas  = Cinema::all();
-
-    return view('admin.showtimes.index', compact('showtimes', 'movies', 'cinemas'));
-}
 
     public function create()
     {
@@ -122,15 +123,32 @@ public function index(Request $request)
         return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được cập nhật.');
     }
 
-    <?php
-public function destroy(Showtime $showtime)
-{
-    $showtime->delete();
+    public function destroy(Showtime $showtime)
+    {
+        $this->assertOperationalShowtime($showtime);
+        DB::transaction(function () use ($showtime): void {
+            $locked = Showtime::query()->whereKey($showtime->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === 'cancelled') {
+                return;
+            }
+            if ($locked->status !== 'active') {
+                throw ValidationException::withMessages([
+                    'showtime' => 'Chỉ suất chiếu đang hoạt động mới có thể hủy.',
+                ]);
+            }
+            if ($locked->bookings()->exists()) {
+                throw ValidationException::withMessages([
+                    'showtime' => 'Suất chiếu đã có lịch sử đặt vé nên không thể hủy trực tiếp.',
+                ]);
+            }
 
-    return redirect()
-        ->route('admin.showtimes.index')
-        ->with('success', 'Suất chiếu đã được xóa.');
-}
+            $before = $this->auditData($locked);
+            $locked->forceFill(['status' => 'cancelled'])->save();
+            $this->activityLogger->log('showtime.cancelled', $locked, $before, ['status' => 'cancelled']);
+        });
+
+        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được hủy và giữ lại trong lịch sử.');
+    }
 
     private function formData(): array
     {
