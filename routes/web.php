@@ -31,6 +31,7 @@ use App\Http\Controllers\Admin\TicketCheckinController as AdminTicketCheckinCont
 use App\Http\Controllers\Admin\UserCinemaAssignmentController as AdminUserCinemaAssignmentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CinemaContextController;
 use App\Http\Controllers\Payments\PaymentInitiationController;
@@ -156,18 +157,28 @@ Route::post('/payments/payos/bookings/{booking}/cancel', PayOsCancellationContro
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', function () {
-        return view('user.auth.login');
+        return view('user.auth.login', [
+            'googleAuthConfigured' => GoogleAuthController::isConfigured(),
+        ]);
     })->name('login');
 
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])
         ->name('login.store');
 
     Route::get('/register', function () {
-        return view('user.auth.register');
+        return view('user.auth.register', [
+            'googleAuthConfigured' => GoogleAuthController::isConfigured(),
+        ]);
     })->name('register');
 
     Route::post('/register', [RegisteredUserController::class, 'store'])
         ->name('register.store');
+
+    Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])
+        ->name('auth.google.redirect');
+
+    Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])
+        ->name('auth.google.callback');
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])

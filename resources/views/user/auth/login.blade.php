@@ -79,7 +79,14 @@
                 </div>
 
                 <div class="mt-5">
-                    <button type="button" disabled class="flex cursor-not-allowed items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted opacity-60 text-sm font-medium"><i class="ph-fill ph-google-logo text-lg"></i> Google chưa khả dụng</button>
+                    @if ($googleAuthConfigured)
+                        <a href="{{ route('auth.google.redirect') }}" class="flex w-full items-center justify-center gap-2 rounded-xl border app-border app-input py-2.5 text-sm font-semibold app-text transition hover:border-brand-start hover:text-brand-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-start">
+                            <i class="ph-fill ph-google-logo text-lg" aria-hidden="true"></i>
+                            Tiếp tục với Google
+                        </a>
+                    @else
+                        <button type="button" disabled class="flex cursor-not-allowed items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted opacity-60 text-sm font-medium"><i class="ph-fill ph-google-logo text-lg" aria-hidden="true"></i> Google chưa được cấu hình</button>
+                    @endif
                 </div>
 
                 <p class="mt-6 text-center text-sm app-text-muted">
