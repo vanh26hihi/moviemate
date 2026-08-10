@@ -7,7 +7,7 @@
 <body style="margin:0;background:#080A12;font-family:Arial,sans-serif;color:#ffffff;">
     <div style="max-width:640px;margin:0 auto;padding:28px 16px;">
         <div style="background:#151A27;border:1px solid #2D3343;border-radius:18px;padding:24px;">
-            <h1 style="margin:0 0 8px;color:#FF3D57;">MovieMate</h1>
+            <img src="{{ $message->embed(public_path('images/brand/logo-on-dark.png')) }}" width="196" height="42" alt="MovieMate" style="display:block;width:196px;height:auto;margin:0 0 12px;">
             <p style="margin:0 0 22px;color:#9CA3AF;">Vé điện tử của bạn đã được thanh toán thành công.</p>
 
             <div style="text-align:center;margin-bottom:22px;">

@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="referrer" content="no-referrer">
     <title>MovieMate - Xác minh quyền truy cập</title>
+    <x-brand.head-icons />
     <style>
         body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #080a12; color: #fff; font-family: system-ui, sans-serif; }
         main { max-width: 32rem; padding: 2rem; text-align: center; }
