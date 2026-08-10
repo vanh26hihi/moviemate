@@ -1,32 +1,54 @@
 @extends('layouts.staff')
 
-@section('title', 'Soát vé - MovieMate')
-@section('page-title', 'Soát vé')
-@section('suppress-global-validation-summary', true)
+@section('title', 'Kiểm tra vé - MovieMate Staff')
+@section('page-title', 'Kiểm tra vé')
 
 @section('content')
-<div class="admin-page-header">
-    <div>
-        <h1 class="admin-page-title">Soát vé</h1>
-        <p class="admin-page-subtitle">Quét mã QR trên vé để xác minh và ghi nhận lịch sử.</p>
+<div class="max-w-3xl mx-auto">
+    <div class="app-card border app-border rounded-3xl p-8 sm:p-12 text-center shadow-2xl relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-[300px] h-[300px] bg-ai-start/10 rounded-full blur-[90px] -translate-y-1/2 translate-x-1/2"></div>
+
+        <div class="relative z-10">
+            <div class="w-20 h-20 rounded-3xl bg-ai-start/10 text-ai-start flex items-center justify-center mx-auto mb-5 border border-ai-start/20">
+                <i class="ph-bold ph-qr-code text-5xl"></i>
+            </div>
+
+            <h1 class="text-3xl font-bold app-text mb-2">Kiểm tra vé khách hàng</h1>
+            <p class="app-muted mb-8 max-w-xl mx-auto">
+                Nhập mã booking_code trên vé điện tử hoặc mã QR để kiểm tra trạng thái vé trong hệ thống.
+            </p>
+
+            <form action="{{ route('staff.tickets.check.submit') }}" method="POST" class="max-w-lg mx-auto">
+                @csrf
+                <label for="booking_code" class="block text-left text-sm font-bold app-text mb-3">Mã vé booking_code</label>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input
+                        id="booking_code"
+                        type="text"
+                        name="booking_code"
+                        value="{{ old('booking_code') }}"
+                        class="flex-grow px-4 py-3 app-input border app-border rounded-2xl app-text font-mono text-center sm:text-left focus:outline-none focus:border-ai-start uppercase tracking-widest"
+                        placeholder="MMT-2026-0001"
+                        autocomplete="off"
+                        autofocus
+                    >
+                    <button type="submit" class="px-6 py-3 bg-ai-start text-white font-bold rounded-2xl hover:bg-ai-end transition-colors whitespace-nowrap">
+                        Kiểm tra
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="{{ route('staff.tickets.index') }}" class="inline-flex items-center justify-center gap-2 px-5 py-3 app-secondary border app-border app-text rounded-2xl font-semibold hover:border-ai-start transition-colors">
+                    <i class="ph ph-list-checks"></i>
+                    Xem danh sách vé
+                </a>
+                <a href="{{ route('staff.dashboard') }}" class="inline-flex items-center justify-center gap-2 px-5 py-3 app-secondary border app-border app-text rounded-2xl font-semibold hover:border-brand-start transition-colors">
+                    <i class="ph ph-squares-four"></i>
+                    Về dashboard
+                </a>
+            </div>
+        </div>
     </div>
 </div>
-
-@if(session('checkin_result'))
-    @php($checkin = session('checkin_result'))
-    <section class="mb-6 rounded-2xl border p-5 {{ $checkin['result'] === 'accepted' ? 'border-success/40 bg-success/10' : ($checkin['result'] === 'already_used' ? 'border-warning/40 bg-warning/10' : 'border-error/40 bg-error/10') }}" role="alert">
-        <h2 class="text-lg font-extrabold">{{ \App\Support\StatusLabel::for('ticket_checkin', $checkin['result']) }}</h2>
-        <p class="mt-1">{{ $checkin['message'] }}</p>
-        @if($checkin['booking_code'])<p class="mt-2 font-mono text-sm">{{ $checkin['booking_code'] }} · {{ $checkin['used_at'] }}</p>@endif
-    </section>
-@endif
-
-<form method="POST" action="{{ route('staff.tickets.consume') }}" class="cinema-card mx-auto max-w-2xl p-6" autocomplete="off">
-    @csrf
-    <label for="ticket" class="text-sm font-bold app-text">Dữ liệu mã QR</label>
-    <input id="ticket" name="ticket" type="password" class="cinema-input mt-2" required maxlength="512" autocomplete="off" autofocus aria-describedby="ticket-help">
-    <p id="ticket-help" class="mt-2 text-sm app-muted">Mã được xử lý trên máy chủ và không được lưu trong lịch sử.</p>
-    @error('ticket')<p class="mt-2 text-sm text-error" role="alert">{{ $message }}</p>@enderror
-    <button class="btn-primary mt-5" type="submit"><i class="ph ph-qr-code"></i>Kiểm tra vé</button>
-</form>
 @endsection
