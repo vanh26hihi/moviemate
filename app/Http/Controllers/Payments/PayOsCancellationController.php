@@ -34,15 +34,4 @@ final class PayOsCancellationController extends Controller
             ? to_route('user.bookings.history')->with('success', 'Thanh toán đã được hủy và ghế đã được giải phóng.')
             : back()->with('warning', 'payOS chưa xác nhận hủy. Đơn đặt vé được giữ nguyên.');
     }
-    
-if ($payos->isPaidStatus($paymentInfo['status'] ?? null)) {
-    $wasMarkedPaid = $this->markBookingPaid($booking, $paymentInfo);
-
-    if ($wasMarkedPaid) {
-        $this->sendTicketEmail($booking);
-    }
-
-    return redirect()->route('user.bookings.success', $booking)
-        ->with('success', 'Thanh toán payOS thành công.');
-}
 }
