@@ -51,7 +51,7 @@ class BookingController extends Controller
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
                 ->route('user.movies.show', $showtime->movie->slug)
-                ->with('error', 'Suất chiếu này đã qua giờ hoặc không còn khả dụng.');
+                ->with('error', 'Suất chiếu này đã đóng nhận đặt vé.');
         }
 
         $layout = $this->layouts->resolveForShowtime($showtime);
@@ -94,7 +94,6 @@ class BookingController extends Controller
             'seatPrices',
         ));
     }
-    
 
     /**
      * Show checkout page for selected seats.
@@ -107,7 +106,7 @@ class BookingController extends Controller
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
                 ->route('user.movies.show', $showtime->movie->slug)
-                ->with('error', 'Suất chiếu này đã qua giờ hoặc không còn khả dụng.');
+                ->with('error', 'Suất chiếu này đã đóng nhận đặt vé.');
         }
 
         $seatIds = $this->parseSeatIds($request->query('selected_seats', ''));
@@ -205,13 +204,6 @@ class BookingController extends Controller
             'mailDeliveryReady',
             'paymentAction',
         ));
-       
-
-    
-
-   
-
-   
 
     }
 
@@ -283,7 +275,7 @@ class BookingController extends Controller
      */
     protected function isShowtimeAvailable(Showtime $showtime): bool
     {
-        return $this->showtimeCatalog->isSellable($showtime);
+        return $this->showtimeCatalog->isCustomerSellable($showtime);
     }
 
     private function assertExpectedCinema(Request $request, Showtime $showtime): void

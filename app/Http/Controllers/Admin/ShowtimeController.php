@@ -12,6 +12,7 @@ use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
+use App\Services\ShowtimeLifecycleService;
 use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class ShowtimeController extends Controller
     public function __construct(
         private readonly CinemaAccessService $cinemaAccess,
         private readonly ShowtimeScheduleService $schedule,
+        private readonly ShowtimeLifecycleService $lifecycle,
         private readonly ActivityLogger $activityLogger,
     ) {}
 
@@ -30,20 +32,28 @@ class ShowtimeController extends Controller
         $query = Showtime::query()->with(['movie', 'cinema', 'room', 'roomLayout']);
         $this->cinemaAccess->scope($query, $request->user(), 'showtimes.cinema_id');
 
-        foreach (['movie_id', 'status'] as $filter) {
-            if ($value = $request->query($filter)) {
-                $query->where($filter, $value);
-            }
+        if ($movieId = $request->query('movie_id')) {
+            $query->where('showtimes.movie_id', $movieId);
+        }
+        if ($state = $request->query('lifecycle')) {
+            $this->lifecycle->applyFilter($query, $state);
         }
         if ($date = $request->query('show_date')) {
             // This is only an administrator display filter. Conflict detection uses complete intervals in the service.
-            $query->whereDate('show_date', $date);
+            $query->whereDate('showtimes.show_date', $date);
         }
 
-        $showtimes = $query->orderByDesc('show_date')->orderBy('show_time')->paginate(15)->withQueryString();
+        $showtimes = $query->orderByDesc('showtimes.show_date')->orderBy('showtimes.show_time')->paginate(15)->withQueryString();
         $scheduleWindows = $showtimes->getCollection()->mapWithKeys(function (Showtime $showtime): array {
             try {
                 return [$showtime->id => $this->schedule->windowFor($showtime)];
+            } catch (ShowtimeScheduleException) {
+                return [$showtime->id => null];
+            }
+        });
+        $lifecycleSnapshots = $showtimes->getCollection()->mapWithKeys(function (Showtime $showtime): array {
+            try {
+                return [$showtime->id => $this->lifecycle->snapshot($showtime)];
             } catch (ShowtimeScheduleException) {
                 return [$showtime->id => null];
             }
@@ -53,6 +63,7 @@ class ShowtimeController extends Controller
             'showtimes' => $showtimes,
             'movies' => Movie::query()->orderBy('title')->get(),
             'scheduleWindows' => $scheduleWindows,
+            'lifecycleSnapshots' => $lifecycleSnapshots,
             'cleaningBufferMinutes' => $this->schedule->cleaningBufferMinutes(),
             'cinemaTimezone' => $this->schedule->timezone(),
         ]);
@@ -89,6 +100,7 @@ class ShowtimeController extends Controller
     {
         $this->assertOperationalShowtime($showtime);
         $showtime->loadMissing(['movie', 'roomLayout', 'cinema']);
+        $this->assertUpcomingForMutation($showtime);
 
         return view('admin.showtimes.edit', [
             ...$this->formData(),
@@ -100,6 +112,7 @@ class ShowtimeController extends Controller
     public function update(UpdateShowtimeRequest $request, Showtime $showtime)
     {
         $this->assertOperationalShowtime($showtime);
+        $this->assertUpcomingForMutation($showtime);
         $targetRoom = Room::query()->findOrFail($request->validated('room_id'));
         $this->cinemaAccess->authorizeCinema($request->user(), (int) $targetRoom->cinema_id);
 
@@ -134,6 +147,12 @@ class ShowtimeController extends Controller
             if ($locked->status !== 'active') {
                 throw ValidationException::withMessages([
                     'showtime' => 'Chỉ suất chiếu đang hoạt động mới có thể hủy.',
+                ]);
+            }
+            $locked->loadMissing(['movie', 'room.cinema']);
+            if ($this->lifecycle->state($locked) === ShowtimeLifecycleService::COMPLETED) {
+                throw ValidationException::withMessages([
+                    'showtime' => 'Suất chiếu đã kết thúc nên không thể hủy.',
                 ]);
             }
             if ($locked->bookings()->exists()) {
@@ -176,6 +195,15 @@ class ShowtimeController extends Controller
         $showtime->loadMissing('room');
         $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $showtime->cinema_id);
         abort_unless($showtime->room?->cinema_id === $showtime->cinema_id && $showtime->room?->status === 'active', 404);
+    }
+
+    private function assertUpcomingForMutation(Showtime $showtime): void
+    {
+        abort_unless(
+            $this->lifecycle->state($showtime) === ShowtimeLifecycleService::UPCOMING,
+            409,
+            'Chỉ có thể chỉnh sửa suất chiếu sắp diễn ra.',
+        );
     }
 
     /** @return array<string, mixed> */

@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Cinema;
 use App\Models\Movie;
 use App\Models\Showtime;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
@@ -14,7 +13,10 @@ use Illuminate\Support\Collection;
  */
 final class CustomerShowtimeCatalogService
 {
-    public function __construct(private readonly PublicShowtimeCatalog $catalog) {}
+    public function __construct(
+        private readonly PublicShowtimeCatalog $catalog,
+        private readonly ShowtimeLifecycleService $lifecycle,
+    ) {}
 
     /** @return Collection<int, array<string, mixed>> */
     public function forDate(string $date, ?Cinema $cinema = null, ?Movie $movie = null): Collection
@@ -34,12 +36,7 @@ final class CustomerShowtimeCatalogService
     public function present(Collection $showtimes): Collection
     {
         return $showtimes->map(function (Showtime $showtime): array {
-            $timezone = $showtime->cinema->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
-            $startsAt = CarbonImmutable::parse(
-                $showtime->show_date->toDateString().' '.substr((string) $showtime->show_time, 0, 8),
-                $timezone,
-            );
-            $endsAt = $startsAt->addMinutes(max(0, (int) $showtime->movie->duration));
+            $lifecycle = $this->lifecycle->snapshot($showtime);
 
             return [
                 'id' => (int) $showtime->id,
@@ -51,13 +48,15 @@ final class CustomerShowtimeCatalogService
                 'duration' => $showtime->movie->duration,
                 'age_rating' => $showtime->movie->age_rating,
                 'room_type' => $showtime->room->room_type_label,
-                'starts_at' => $startsAt,
-                'customer_visible_ends_at' => $endsAt,
+                'starts_at' => $lifecycle['starts_at'],
+                'customer_visible_ends_at' => $lifecycle['ends_at'],
+                'booking_closes_at' => $lifecycle['booking_closes_at'],
+                'server_now' => $lifecycle['now'],
                 'booking_url' => route('user.bookings.selectSeat', [
                     'showtime' => $showtime->id,
                     'cinema' => $showtime->cinema->code,
                 ]),
-                'bookable' => $showtime->status === 'active' && $startsAt->isFuture(),
+                'bookable' => $this->lifecycle->isCustomerBookingOpen($showtime, $lifecycle['now']),
                 'starting_price' => $showtime->getAttribute('starting_price') === null
                     ? null
                     : (int) $showtime->getAttribute('starting_price'),
