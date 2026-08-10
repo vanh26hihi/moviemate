@@ -153,6 +153,48 @@ $ticketStatus = $statusMeta[$booking->booking_status] ?? [
                                         {{ $ticketStatus['label'] }}
                                     </span>
                                 </div>
+                                <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+
+                                    @if($booking->paid_at)
+                                        <div class="rounded-xl border border-success/20 bg-success/5 px-3 py-2">
+                                            <p class="text-[11px] font-bold uppercase tracking-wide text-success">
+                                                Đã thanh toán
+                                            </p>
+                                
+                                            <p class="mt-1 text-xs app-text font-semibold">
+                                                {{ $booking->paid_at->format('H:i d/m/Y') }}
+                                            </p>
+                                        </div>
+                                    @endif
+                                
+                                    @if($booking->used_at)
+                                        <div class="rounded-xl border border-ai-start/20 bg-ai-start/5 px-3 py-2">
+                                            <p class="text-[11px] font-bold uppercase tracking-wide text-ai-start">
+                                                Đã sử dụng
+                                            </p>
+                                
+                                            <p class="mt-1 text-xs app-text font-semibold">
+                                                {{ $booking->used_at->format('H:i d/m/Y') }}
+                                            </p>
+                                        </div>
+                                    @endif
+                                
+                                    @if(
+                                        $booking->booking_status === 'pending_payment'
+                                        && $booking->expires_at
+                                    )
+                                        <div class="rounded-xl border border-warning/20 bg-warning/5 px-3 py-2">
+                                            <p class="text-[11px] font-bold uppercase tracking-wide text-warning">
+                                                Hạn thanh toán
+                                            </p>
+                                
+                                            <p class="mt-1 text-xs app-text font-semibold">
+                                                {{ $booking->expires_at->format('H:i d/m/Y') }}
+                                            </p>
+                                        </div>
+                                    @endif
+                                
+                                </div>
                                 <div class="mb-4 flex flex-wrap items-center gap-2">
                                     <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $ticketStatus['class'] }}">
                                         {{ $ticketStatus['label'] }}
