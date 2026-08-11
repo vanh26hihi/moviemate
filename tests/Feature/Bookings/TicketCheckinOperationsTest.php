@@ -26,6 +26,7 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     {
         $payment = $this->verifiedPayment();
         $booking = $payment->booking->fresh();
+        $ticket = $booking->admissionTickets()->sole();
         $capability = app(TicketCheckinCapability::class)->issue($booking);
         $staff = $this->userWithRole('staff');
 
@@ -35,6 +36,9 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
 
         $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $capability])
             ->assertRedirect(route('staff.tickets.check'))
+            ->assertSessionHas('ticket_lookup.id', $ticket->id);
+        $this->assertDatabaseCount('ticket_checkin_events', 0);
+        $this->post(route('staff.admission-tickets.admit', $ticket))
             ->assertSessionHas('checkin_result.result', 'accepted');
 
         $booking->refresh();
@@ -42,6 +46,7 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
         $this->assertNotNull($booking->used_at);
         $this->assertDatabaseHas('ticket_checkin_events', [
             'booking_id' => $booking->id, 'actor_user_id' => $staff->id,
+            'admission_ticket_id' => $ticket->id,
             'actor_role_snapshot' => 'staff', 'result' => 'accepted',
         ]);
         $this->assertDatabaseHas('activity_logs', ['action' => 'ticket.checkin_accepted']);
@@ -54,16 +59,18 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     {
         $payment = $this->verifiedPayment();
         $booking = $payment->booking->fresh();
+        $ticket = $booking->admissionTickets()->sole();
         $capability = app(TicketCheckinCapability::class)->issue($booking);
         $staff = $this->userWithRole('staff');
 
         $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $capability]);
-        $usedAt = $booking->fresh()->getRawOriginal('used_at');
+        $this->post(route('staff.admission-tickets.admit', $ticket));
+        $usedAt = $ticket->fresh()->getRawOriginal('used_at');
         $this->travel(2)->minutes();
-        $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $capability])
+        $this->actingAs($staff)->post(route('staff.admission-tickets.admit', $ticket))
             ->assertSessionHas('checkin_result.result', 'already_used');
 
-        $this->assertSame($usedAt, $booking->fresh()->getRawOriginal('used_at'));
+        $this->assertSame($usedAt, $ticket->fresh()->getRawOriginal('used_at'));
         $this->assertSame(1, TicketCheckinEvent::query()->where('result', 'accepted')->count());
         $this->assertSame(1, TicketCheckinEvent::query()->where('result', 'already_used')->count());
         $this->assertSame(1, ActivityLog::query()->where('action', 'ticket.checkin_duplicate')->count());
@@ -76,7 +83,7 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
         $staff = $this->userWithRole('staff');
 
         $this->actingAs($staff)->get(route('staff.tickets.operations', $booking))
-            ->assertOk()->assertSee('Soát vé');
+            ->assertOk()->assertSee('Mở màn hình soát vé');
         $this->assertDatabaseCount('ticket_checkin_events', 0);
 
         $this->post(route('staff.tickets.consume-booking', $booking))
@@ -109,26 +116,28 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     public function test_invalid_unpaid_cancelled_and_expired_scans_never_become_used(): void
     {
         $staff = $this->userWithRole('staff');
-        $unpaid = $this->payableBooking();
-        $unpaidCapability = app(TicketCheckinCapability::class)->issue($unpaid);
-        $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $unpaidCapability])
+        $unpaid = $this->verifiedPayment()->booking->fresh();
+        $unpaidTicket = $unpaid->admissionTickets()->sole();
+        $unpaid->forceFill(['booking_status' => 'pending_payment', 'payment_status' => 'unpaid'])->save();
+        $this->actingAs($staff)->post(route('staff.admission-tickets.admit', $unpaidTicket))
             ->assertSessionHas('checkin_result.result', 'unpaid');
 
-        $cancelled = $this->payableBooking(['booking_status' => 'cancelled']);
-        $this->actingAs($staff)->post(route('staff.tickets.consume'), [
-            'ticket' => app(TicketCheckinCapability::class)->issue($cancelled),
-        ])->assertSessionHas('checkin_result.result', 'cancelled');
+        $cancelled = $this->verifiedPayment()->booking->fresh();
+        $cancelledTicket = $cancelled->admissionTickets()->sole();
+        $cancelled->forceFill(['booking_status' => 'cancelled'])->save();
+        $this->actingAs($staff)->post(route('staff.admission-tickets.admit', $cancelledTicket))
+            ->assertSessionHas('checkin_result.result', 'cancelled');
 
-        $expired = $this->payableBooking(['booking_status' => 'expired']);
-        $this->actingAs($staff)->post(route('staff.tickets.consume'), [
-            'ticket' => app(TicketCheckinCapability::class)->issue($expired),
-        ])->assertSessionHas('checkin_result.result', 'expired');
+        $expired = $this->verifiedPayment()->booking->fresh();
+        $expiredTicket = $expired->admissionTickets()->sole();
+        $expired->forceFill(['booking_status' => 'expired'])->save();
+        $this->actingAs($staff)->post(route('staff.admission-tickets.admit', $expiredTicket))
+            ->assertSessionHas('checkin_result.result', 'expired');
 
-        $invalid = 'v1.'.$unpaid->id.'.'.str_repeat('A', 43);
-        $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $invalid])
-            ->assertSessionHas('checkin_result.result', 'invalid_token');
+        $invalid = 'v2.'.$unpaidTicket->id.'.'.str_repeat('A', 43);
+        $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $invalid])->assertNotFound();
 
-        $this->assertDatabaseCount('ticket_checkin_events', 4);
+        $this->assertDatabaseCount('ticket_checkin_events', 3);
         $this->assertSame(0, TicketCheckinEvent::query()->where('result', 'accepted')->count());
         $this->assertSame(0, ActivityLog::query()->where('action', 'ticket.checkin_accepted')->count());
         $this->assertNotSame('used', $unpaid->fresh()->booking_status);
@@ -140,7 +149,7 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     {
         $staff = $this->userWithRole('staff');
         for ($attempt = 0; $attempt < 12; $attempt++) {
-            $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => 'malformed'])->assertRedirect();
+            $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => 'malformed'])->assertNotFound();
         }
         $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => 'malformed'])->assertTooManyRequests();
         $this->assertDatabaseCount('ticket_checkin_events', 0);
@@ -153,6 +162,7 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
             ->map(fn (array $index): array => $index['columns'])
             ->values();
         foreach ([
+            ['admission_ticket_id'],
             ['booking_id'],
             ['showtime_id'],
             ['actor_user_id'],
@@ -166,7 +176,10 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
             $this->assertNotContains($forbiddenColumn, Schema::getColumnListing('ticket_checkin_events'));
         }
         $payment = $this->verifiedPayment();
+        $ticket = $payment->booking->admissionTickets()->sole();
         $event = TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $ticket->id,
+            'accepted_ticket_id' => $ticket->id,
             'booking_id' => $payment->booking_id,
             'showtime_id' => $payment->booking->showtime_id,
             'result' => 'accepted', 'scanned_at' => now(),
@@ -186,7 +199,10 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     public function test_checkin_event_delete_is_rejected_by_model(): void
     {
         $payment = $this->verifiedPayment();
+        $ticket = $payment->booking->admissionTickets()->sole();
         $event = TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $ticket->id,
+            'accepted_ticket_id' => $ticket->id,
             'booking_id' => $payment->booking_id, 'result' => 'accepted', 'scanned_at' => now(),
         ]);
 
@@ -197,7 +213,10 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     public function test_checkin_event_delete_is_rejected_by_database_trigger(): void
     {
         $payment = $this->verifiedPayment();
+        $ticket = $payment->booking->admissionTickets()->sole();
         $event = TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $ticket->id,
+            'accepted_ticket_id' => $ticket->id,
             'booking_id' => $payment->booking_id, 'result' => 'accepted', 'scanned_at' => now(),
         ]);
 
@@ -209,10 +228,11 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     {
         $payment = $this->verifiedPayment();
         $booking = $payment->booking->fresh();
+        $ticket = $booking->admissionTickets()->sole();
         $staff = $this->userWithRole('staff');
         $capability = app(TicketCheckinCapability::class)->issue($booking);
-        $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $capability]);
-        $this->actingAs($staff)->post(route('staff.tickets.consume'), ['ticket' => $capability]);
+        $this->actingAs($staff)->post(route('staff.admission-tickets.admit', $ticket));
+        $this->actingAs($staff)->post(route('staff.admission-tickets.admit', $ticket));
 
         $this->actingAs($this->userWithRole('manager'))->get(route('admin.bookings.show', $booking))
             ->assertOk()->assertSee($staff->name)->assertSee('Lần quét trùng')->assertSee('Xem toàn bộ lịch sử soát vé');
@@ -227,7 +247,8 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
     {
         [$owner, $payment] = $this->verifiedOwnerPayment();
         $booking = $payment->booking->fresh();
-        $capability = app(TicketQrPayload::class)->url($booking);
+        $ticket = $booking->admissionTickets()->sole();
+        $capability = app(TicketQrPayload::class)->url($ticket);
 
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
             ->assertOk()->assertSee('data-qr-value="'.$capability.'"', false)
@@ -235,11 +256,13 @@ final class TicketCheckinOperationsTest extends PaymentTestCase
 
         $this->get($capability)->assertOk()
             ->assertSee($booking->booking_code)
-            ->assertSee('QR dùng để xác minh vé.');
+            ->assertSee('QR riêng cho ghế');
 
-        $booking->forceFill(['booking_status' => 'used', 'used_at' => now()])->save();
+        $usedAt = now();
+        $ticket->forceFill(['used_at' => $usedAt])->save();
+        $booking->forceFill(['booking_status' => 'used', 'used_at' => $usedAt])->save();
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
-            ->assertOk()->assertSee('VÉ ĐÃ ĐƯỢC SỬ DỤNG')
+            ->assertOk()->assertSee('Đã sử dụng')
             ->assertSee('data-qr-value="'.$capability.'"', false);
     }
 

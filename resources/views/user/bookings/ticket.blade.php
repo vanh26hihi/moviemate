@@ -1,151 +1,91 @@
 @extends('layouts.user')
 
-@section('title', 'Vé điện tử - MovieMate')
+@section('title', 'Vé xem phim - MovieMate')
 @section('body_class', 'ticket-document-page')
 
 @php
-    $foodItems = $booking->foodOrder?->items ?? collect();
-    $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
-    $seatTypeLabels = ['normal' => 'Thường', 'vip' => 'VIP', 'couple' => 'Ghế đôi'];
-    $issuedAt = $booking->paid_at ?? $verifiedPayment?->verified_at ?? $booking->created_at;
-    $backUrl = $backUrl ?? (auth()->check()
-        ? route('user.bookings.history')
-        : route('user.bookings.success', $booking));
-    $backLabel = $backLabel ?? 'Về vé của tôi';
+    $tickets = isset($singleAdmissionTicket)
+        ? collect([$singleAdmissionTicket])
+        : ($isDeliverable ? $booking->admissionTickets : collect());
+    $backUrl = $backUrl ?? (auth()->check() ? route('user.bookings.history') : route('user.bookings.success', $booking));
+    $backLabel = $backLabel ?? 'Về đơn đặt vé';
     $ticketRecipient = $ticketRecipient ?? $booking->recipient_email;
-    $ticketCustomer = $ticketCustomer ?? ($booking->user?->name ?? 'Khách MovieMate');
+    $ticketCustomer = $ticketCustomer ?? ($booking->user?->name ?? $booking->customer_name ?? 'Khách MovieMate');
+    $currency = ($booking->currency ?: 'VND') === 'VND' ? 'VNĐ' : $booking->currency;
 @endphp
 
 @section('content')
-<div class="ticket-preview-shell">
-    <div class="ticket-toolbar print-hidden" aria-label="Thao tác vé">
-        <a href="{{ $backUrl }}" class="ticket-toolbar-link">
-            <i class="ph-bold ph-arrow-left" aria-hidden="true"></i>
-            {{ $backLabel }}
-        </a>
+<div class="ticket-preview-shell space-y-6">
+    <div class="ticket-toolbar print-hidden"><a href="{{ $backUrl }}" class="ticket-toolbar-link"><i class="ph-bold ph-arrow-left"></i>{{ $backLabel }}</a></div>
 
-    </div>
+    <header class="cinema-card p-6">
+        <p class="text-sm font-bold uppercase tracking-widest app-muted">Đơn đặt vé</p>
+        <h1 class="mt-1 text-2xl font-extrabold app-heading">{{ $booking->booking_code }}</h1>
+        <p class="mt-2 app-muted">Mỗi ghế hành khách có một vé xem phim và trạng thái sử dụng độc lập.</p>
+    </header>
 
-    <article class="cinema-ticket-document" data-ticket-document data-ticket-state="{{ $isUsable ? 'usable' : 'inactive' }}">
-        <header class="cinema-ticket-header">
-            <div>
-                <x-brand.logo variant="white" class="brand-logo--ticket" />
-                <h1>VÉ ĐIỆN TỬ</h1>
-                <p class="cinema-ticket-subtitle">Vé điện tử chính thức · Xuất trình khi check-in</p>
-            </div>
-            <div class="cinema-ticket-status" aria-label="Trạng thái vé">
-                @if($ticketState === 'valid')
-                    <i class="ph-bold ph-seal-check" aria-hidden="true"></i>
-                    VÉ HỢP LỆ
-                @elseif($ticketState === 'used')
-                    <i class="ph-bold ph-check-circle" aria-hidden="true"></i>
-                    VÉ ĐÃ ĐƯỢC SỬ DỤNG
-                @else
-                    <i class="ph-bold ph-prohibit" aria-hidden="true"></i>
-                    VÉ KHÔNG CÒN HIỆU LỰC
-                @endif
-            </div>
-        </header>
-
-        <div class="cinema-ticket-body">
-            <section class="cinema-ticket-main" aria-labelledby="ticket-movie-title">
-                <div class="cinema-ticket-code-block">
-                    <p>Mã vé</p>
-                    <strong>{{ $booking->booking_code }}</strong>
-                </div>
-
-                <h2 id="ticket-movie-title">{{ $booking->showtime?->movie?->title ?? 'Thông tin phim đang cập nhật' }}</h2>
-
-                <dl class="cinema-ticket-highlights">
-                    <div>
-                        <dt>Ngày chiếu</dt>
-                        <dd>{{ $booking->showtime?->show_date?->format('d/m/Y') ?? 'Đang cập nhật' }}</dd>
+    <section aria-labelledby="admission-ticket-title">
+        <h2 id="admission-ticket-title" class="text-2xl font-extrabold app-heading">Vé xem phim</h2>
+        <div class="mt-4 grid gap-5 lg:grid-cols-2">
+            @forelse($tickets as $admissionTicket)
+                @php
+                    $state = match (true) {
+                        $booking->payment_status === 'refunded' => 'refunded',
+                        $booking->booking_status === 'cancelled' => 'cancelled',
+                        $booking->booking_status === 'expired' => 'expired',
+                        $admissionTicket->used_at !== null => 'used',
+                        $isDeliverable => 'valid',
+                        default => 'invalid',
+                    };
+                    $qrPayload = $ticketQrPayloads->get($admissionTicket->id);
+                @endphp
+                <article class="cinema-card overflow-hidden" data-admission-ticket="{{ $admissionTicket->id }}" data-ticket-state="{{ $state }}">
+                    <header class="flex items-center justify-between gap-4 bg-slate-950 p-5 text-white">
+                        <div><p class="text-xs font-bold tracking-widest">VÉ XEM PHIM</p><h3 class="mt-1 text-xl font-extrabold">Ghế {{ $admissionTicket->seat_code }}</h3></div>
+                        <span class="rounded-full px-3 py-1 text-xs font-bold {{ $state === 'valid' ? 'bg-success/20 text-success' : ($state === 'used' ? 'bg-warning/20 text-warning' : 'bg-error/20 text-error') }}">
+                            {{ match($state) { 'valid' => 'Chưa sử dụng', 'used' => 'Đã sử dụng', 'cancelled' => 'Đã hủy', 'expired' => 'Hết hạn', 'refunded' => 'Đã hoàn tiền', default => 'Không hợp lệ' } }}
+                        </span>
+                    </header>
+                    <div class="grid gap-5 p-5 sm:grid-cols-[1fr_auto]">
+                        <dl class="space-y-2 text-sm">
+                            <div><dt class="app-muted">Phim</dt><dd class="font-bold app-text">{{ $booking->showtime?->movie?->title }}</dd></div>
+                            <div><dt class="app-muted">Suất</dt><dd class="font-bold app-text">{{ $booking->showtime_label }}</dd></div>
+                            <div><dt class="app-muted">Chi nhánh · Phòng</dt><dd class="font-bold app-text">{{ $booking->showtime?->cinema?->name }} · {{ $booking->showtime?->room?->name }}</dd></div>
+                            <div><dt class="app-muted">Mã vé bảo mật</dt><dd class="break-all font-mono font-bold app-text">{{ $admissionTicket->ticket_code }}</dd></div>
+                            @if($admissionTicket->used_at)<div><dt class="app-muted">Sử dụng lúc</dt><dd class="font-bold app-text">{{ $admissionTicket->used_at->format('d/m/Y H:i:s') }}</dd></div>@endif
+                        </dl>
+                        @if($qrPayload)
+                            <div class="text-center"><canvas data-qr-value="{{ $qrPayload }}" data-qr-size="180" width="180" height="180" aria-label="QR vé ghế {{ $admissionTicket->seat_code }}"></canvas><p class="mt-2 text-xs app-muted">QR riêng cho ghế {{ $admissionTicket->seat_code }}</p></div>
+                        @endif
                     </div>
-                    <div>
-                        <dt>Giờ chiếu</dt>
-                        <dd class="ticket-accent">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }}</dd>
-                    </div>
-                    <div>
-                        <dt>Phòng</dt>
-                        <dd>{{ $booking->showtime?->room?->name ?? 'Đang cập nhật' }}</dd>
-                    </div>
-                    <div>
-                        <dt>Ghế</dt>
-                        <dd class="ticket-accent">{{ $booking->seat_codes ?: 'Đang cập nhật' }}</dd>
-                    </div>
-                </dl>
-
-                <dl class="cinema-ticket-details">
-                    <div><dt>Chi nhánh</dt><dd>{{ $booking->showtime?->cinema?->name ?? 'Đang cập nhật' }}</dd></div>
-                    <div><dt>Địa chỉ</dt><dd>{{ $booking->showtime?->cinema?->address ?? 'Đang cập nhật' }}</dd></div>
-                    <div><dt>Khách hàng</dt><dd>{{ $ticketCustomer }}</dd></div>
-                    <div><dt>Email</dt><dd class="ticket-break">{{ $ticketRecipient }}</dd></div>
-                    <div><dt>Thanh toán</dt><dd>{{ $verifiedPayment ? 'Đã thanh toán và xác minh' : $booking->payment_status_label }}</dd></div>
-                    <div><dt>Trạng thái vé</dt><dd>{{ match($ticketState) { 'valid' => 'Vé hợp lệ', 'used' => 'Vé đã được sử dụng', 'cancelled' => 'Vé đã hủy', 'refunded' => 'Vé đã hoàn tiền', 'expired' => 'Vé đã hết hạn', default => 'Vé không hợp lệ' } }}</dd></div>
-                    @if($ticketState === 'used')<div><dt>Soát vé lúc</dt><dd>{{ $booking->acceptedTicketCheckin?->scanned_at?->format('d/m/Y H:i:s') ?? $booking->used_at?->format('d/m/Y H:i:s') ?? 'Đã sử dụng' }}</dd></div>@endif
-                    <div><dt>Xác nhận lúc</dt><dd>{{ ($booking->paid_at ?? $verifiedPayment?->paid_at)?->format('d/m/Y H:i') ?? 'Đang cập nhật' }}</dd></div>
-                </dl>
-
-                <section class="cinema-ticket-order" aria-labelledby="ticket-order-title">
-                    <h3 id="ticket-order-title">Chi tiết đơn</h3>
-                    <div class="cinema-ticket-seats">
-                        @foreach($booking->seat_display_groups as $seatGroup)
-                            <span>
-                                {{ $seatGroup['label'] }}
-                                @unless($seatGroup['is_couple'])
-                                    · {{ $seatTypeLabels[$seatGroup['type']] ?? \App\Support\StatusLabel::for('seat_type', $seatGroup['type']) }}
-                                @endunless
-                            </span>
-                        @endforeach
-                    </div>
-
-                    <div class="cinema-ticket-foods">
-                        @forelse($foodItems as $item)
-                            <p><span>{{ $item->snapshot_name }} × {{ $item->quantity }}</span><strong>{{ number_format((int) $item->line_total, 0, ',', '.') }} {{ $currency }}</strong></p>
-                        @empty
-                            <p><span>Đồ ăn</span><strong>Không có</strong></p>
-                        @endforelse
-                    </div>
-
-                    <dl class="cinema-ticket-totals">
-                        <div><dt>Tiền ghế</dt><dd>{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
-                        <div><dt>Tiền đồ ăn</dt><dd>{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
-                        @if((int) $booking->promotion_discount_amount > 0)<div><dt>Giảm giá</dt><dd>−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} {{ $currency }}</dd></div>@endif
-                        @if((int) $booking->points_discount_amount > 0)<div><dt>Đổi điểm</dt><dd>−{{ number_format((int) $booking->points_discount_amount, 0, ',', '.') }} {{ $currency }}</dd></div>@endif
-                        <div class="cinema-ticket-grand-total"><dt>Tổng cộng</dt><dd>{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</dd></div>
-                    </dl>
-                </section>
-            </section>
-
-            <aside class="cinema-ticket-stub" aria-label="Cuống vé check-in">
-                <p class="cinema-ticket-stub-label">SOÁT VÉ</p>
-                @if($ticketQrPayload)
-                    <div class="cinema-ticket-qr">
-                        <canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="240" width="240" height="240" aria-label="Mã QR xác minh vé MovieMate"></canvas>
-                        <span data-qr-fallback class="hidden">QR chưa tải</span>
-                    </div>
-                    <p class="cinema-ticket-instruction">{{ $ticketState === 'used' ? 'Mã vé này đã được sử dụng và không thể kích hoạt lại.' : 'QR dùng để xác minh vé. Sau khi quét, MovieMate hiển thị đúng mã vé tương ứng. Vui lòng đến trước giờ chiếu 15 phút.' }}</p>
-                @else
-                    <div class="cinema-ticket-inactive">
-                        <i class="ph-bold ph-qr-code" aria-hidden="true"></i>
-                        <p>Đơn đặt vé này không có mã QR sử dụng được.</p>
-                    </div>
-                @endif
-
-                <dl>
-                    <div><dt>PHÒNG</dt><dd>{{ $booking->showtime?->room?->name ?? '—' }}</dd></div>
-                    <div><dt>GHẾ</dt><dd>{{ $booking->seat_codes ?: '—' }}</dd></div>
-                    <div><dt>GIỜ</dt><dd>{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '—' }}</dd></div>
-                </dl>
-                <p class="cinema-ticket-stub-code">{{ $booking->booking_code }}</p>
-            </aside>
+                </article>
+            @empty
+                <p class="cinema-card p-6 app-muted">Đơn chưa có vé xem phim hợp lệ để sử dụng.</p>
+            @endforelse
         </div>
+    </section>
 
-        <footer class="cinema-ticket-footer">
-            <p>Phát hành lúc {{ $issuedAt?->format('d/m/Y H:i') ?? 'Đang cập nhật' }}</p>
-            <p>MovieMate Cinema · Vé chỉ có hiệu lực cho suất chiếu ghi trên vé</p>
-        </footer>
-    </article>
+    @if($booking->foodPickupVoucher)
+        <section class="cinema-card p-6" aria-labelledby="food-voucher-title">
+            <h2 id="food-voucher-title" class="text-2xl font-extrabold app-heading">Phiếu nhận đồ ăn</h2>
+            <p class="mt-1 app-muted">Một phiếu duy nhất cho toàn bộ đồ ăn trong đơn. Phiếu này không phải vé xem phim.</p>
+            <p class="mt-4 font-mono font-bold app-text">{{ $booking->foodPickupVoucher->voucher_code }}</p>
+            <div class="mt-4 space-y-2">
+                @foreach($booking->foodOrder->items as $item)
+                    <div class="flex justify-between gap-4"><span>{{ $item->snapshot_name }}</span><strong>× {{ $item->quantity }}</strong></div>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
+    <section class="cinema-card p-6" aria-labelledby="booking-summary-title">
+        <h2 id="booking-summary-title" class="text-xl font-extrabold app-heading">Chi tiết đơn đặt vé</h2>
+        <dl class="mt-4 space-y-2">
+            <div class="flex justify-between"><dt>Khách hàng</dt><dd class="font-bold">{{ $ticketCustomer }} · {{ $ticketRecipient }}</dd></div>
+            <div class="flex justify-between"><dt>Tiền ghế</dt><dd class="font-bold">{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
+            <div class="flex justify-between"><dt>Tiền đồ ăn</dt><dd class="font-bold">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} {{ $currency }}</dd></div>
+            <div class="flex justify-between border-t pt-2 text-lg"><dt class="font-extrabold">Tổng đơn</dt><dd class="font-extrabold">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} {{ $currency }}</dd></div>
+        </dl>
+    </section>
 </div>
 @endsection

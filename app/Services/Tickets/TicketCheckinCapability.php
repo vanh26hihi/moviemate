@@ -3,18 +3,23 @@
 namespace App\Services\Tickets;
 
 use App\Exceptions\BookingTokenConfigurationException;
+use App\Models\AdmissionTicket;
 use App\Models\Booking;
 
 final class TicketCheckinCapability
 {
-    private const VERSION = 'v1';
+    private const VERSION = 'v2';
 
-    public function issue(Booking $booking): string
+    public function __construct(private readonly TicketArtifactProvisioner $provisioner) {}
+
+    public function issue(AdmissionTicket|Booking $subject): string
     {
-        return self::VERSION.'.'.$booking->getKey().'.'.$this->signature($booking);
+        $ticket = $this->ticket($subject);
+
+        return self::VERSION.'.'.$ticket->getKey().'.'.$this->signature($ticket);
     }
 
-    public function bookingId(?string $capability): ?int
+    public function ticketId(?string $capability): ?int
     {
         if (! is_string($capability)
             || preg_match('/^'.self::VERSION.'\.([1-9][0-9]{0,18})\.[A-Za-z0-9_-]{43}$/D', $capability, $matches) !== 1) {
@@ -26,28 +31,47 @@ final class TicketCheckinCapability
         return is_int($id) ? $id : null;
     }
 
-    public function isValid(Booking $booking, ?string $capability): bool
+    public function bookingId(?string $capability): ?int
     {
-        if ($this->bookingId($capability) !== $booking->getKey()) {
+        return $this->ticketId($capability);
+    }
+
+    public function isValid(AdmissionTicket|Booking $subject, ?string $capability): bool
+    {
+        $ticket = $this->ticket($subject);
+        if ($this->ticketId($capability) !== $ticket->getKey()) {
             return false;
         }
 
         $parts = explode('.', (string) $capability);
 
-        return isset($parts[2]) && hash_equals($this->signature($booking), $parts[2]);
+        return isset($parts[2]) && hash_equals($this->signature($ticket), $parts[2]);
     }
 
-    private function signature(Booking $booking): string
+    private function signature(AdmissionTicket $ticket): string
     {
+        $ticket->loadMissing('booking');
         $payload = implode(':', [
             self::VERSION,
-            $booking->getKey(),
-            $booking->booking_code,
-            $booking->showtime_id,
-            $booking->getRawOriginal('paid_at') ?? '',
+            $ticket->getKey(),
+            $ticket->ticket_code,
+            $ticket->booking_id,
+            $ticket->booking_seat_id,
+            $ticket->booking->getRawOriginal('paid_at') ?? '',
         ]);
 
         return rtrim(strtr(base64_encode(hash_hmac('sha256', $payload, $this->key(), true)), '+/', '-_'), '=');
+    }
+
+    private function ticket(AdmissionTicket|Booking $subject): AdmissionTicket
+    {
+        if ($subject instanceof AdmissionTicket) {
+            return $subject;
+        }
+
+        $this->provisioner->provision($subject);
+
+        return $subject->admissionTickets()->orderBy('id')->firstOrFail();
     }
 
     private function key(): string

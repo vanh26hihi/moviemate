@@ -71,7 +71,7 @@ class GuestBookingAccessTest extends TestCase
             ->assertOk()
             ->assertDontSee('data-qr-value', false)
             ->assertDontSee('data-print-ticket', false)
-            ->assertSee('không có mã QR sử dụng được');
+            ->assertSee('Đơn chưa có vé xem phim hợp lệ để sử dụng.');
     }
 
     public function test_used_booking_without_verified_payment_is_history_without_a_usable_qr(): void
@@ -89,7 +89,7 @@ class GuestBookingAccessTest extends TestCase
             ->assertOk()
             ->assertDontSee('data-qr-value', false)
             ->assertDontSee('data-print-ticket', false)
-            ->assertSee('VÉ ĐÃ ĐƯỢC SỬ DỤNG');
+            ->assertSee('Đơn chưa có vé xem phim hợp lệ để sử dụng.');
     }
 
     public function test_token_for_one_guest_booking_cannot_open_another_booking(): void

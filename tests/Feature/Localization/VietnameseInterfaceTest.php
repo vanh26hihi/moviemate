@@ -105,8 +105,8 @@ class VietnameseInterfaceTest extends TestCase
             'errors/429.blade.php' => 'Thao tác quá nhanh',
             'errors/500.blade.php' => 'Hệ thống tạm gián đoạn',
             'errors/503.blade.php' => 'Hệ thống đang bảo trì',
-            'emails/booking-ticket.blade.php' => 'Mã vé',
-            'user/bookings/ticket.blade.php' => 'Vé điện tử',
+            'emails/booking-ticket.blade.php' => 'Đơn đặt vé',
+            'user/bookings/ticket.blade.php' => 'Vé xem phim',
         ];
 
         foreach ($expectations as $view => $copy) {

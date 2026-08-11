@@ -70,8 +70,11 @@ final class DemoReadinessTest extends TestCase
         $this->assertSame($layout->id, $showtime->room_layout_id);
         $this->assertTrue(app(PublicShowtimeCatalog::class)->isSellable($showtime));
 
-        $this->assertSame(0, Payment::query()->whereIn('provider', Payment::SUPPORTED_PROVIDERS)
+        $this->assertSame(3, Payment::query()->whereIn('provider', Payment::SUPPORTED_PROVIDERS)
             ->where('status', Payment::STATUS_SUCCESS)->count());
+        $this->assertDatabaseCount('bookings', 4);
+        $this->assertDatabaseCount('admission_tickets', 6);
+        $this->assertDatabaseCount('food_pickup_vouchers', 1);
     }
 
     public function test_demo_seeders_are_idempotent(): void

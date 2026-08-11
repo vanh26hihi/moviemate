@@ -2,7 +2,7 @@
 
 namespace App\Services\Tickets;
 
-use App\Models\Booking;
+use App\Models\AdmissionTicket;
 use App\Models\TicketCheckinEvent;
 use App\Models\User;
 use App\Services\ActivityLogSanitizer;
@@ -16,9 +16,13 @@ final class TicketCheckinRecorder
         private readonly ActivityLogSanitizer $sanitizer,
     ) {}
 
-    public function record(Booking $booking, User $actor, string $result, ?string $reason = null, array $context = []): TicketCheckinEvent
+    public function record(AdmissionTicket $ticket, User $actor, string $result, ?string $reason = null, array $context = []): TicketCheckinEvent
     {
+        $booking = $ticket->booking;
+
         return TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $ticket->getKey(),
+            'accepted_ticket_id' => $result === TicketCheckinEvent::RESULT_ACCEPTED ? $ticket->getKey() : null,
             'booking_id' => $booking->getKey(),
             'showtime_id' => $booking->showtime_id,
             'actor_user_id' => $actor->getKey(),

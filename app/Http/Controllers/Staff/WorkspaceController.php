@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdmissionTicket;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\BookingTicketPrint;
@@ -32,8 +33,9 @@ final class WorkspaceController extends Controller
             $stats['sold'] = (clone $base)->whereBetween('paid_at', $day)->whereIn('booking_status', ['paid', 'used'])->count();
             $stats['checked_in'] = TicketCheckinEvent::query()->where('result', TicketCheckinEvent::RESULT_ACCEPTED)
                 ->whereBetween('scanned_at', $day)->whereHas('booking', fn (Builder $query) => $query->where('cinema_id', $cinema->id))->count();
-            $stats['waiting_print'] = (clone $base)->where('payment_status', 'paid')->where('booking_status', 'paid')
-                ->whereDoesntHave('ticketPrint')->count();
+            $stats['waiting_print'] = AdmissionTicket::query()->where('print_count', 0)
+                ->whereHas('booking', fn (Builder $query) => $query->where('cinema_id', $cinema->id)
+                    ->where('payment_status', 'paid')->whereIn('booking_status', ['paid', 'used']))->count();
             $stats['print_attention'] = BookingTicketPrint::query()
                 ->whereIn('status', [BookingTicketPrint::STATUS_RETRY_ALLOWED, BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION])
                 ->whereHas('booking', fn (Builder $query) => $query->where('cinema_id', $cinema->id))->count();
@@ -78,7 +80,7 @@ final class WorkspaceController extends Controller
                 ->when($validated['status'] ?? null, fn (Builder $query, string $status) => $query->where('booking_status', $status))
                 ->when($validated['channel'] ?? null, fn (Builder $query, string $channel) => $query->where('sales_channel', $channel))
                 ->with(['showtime.movie:id,title', 'showtime.room:id,name', 'bookingSeats.seat', 'createdByStaff:id,name',
-                    'authoritativePayment.settledBy:id,name', 'ticketPrint', 'acceptedTicketCheckin'])
+                    'authoritativePayment.settledBy:id,name', 'admissionTickets.printState', 'admissionTickets.acceptedCheckin'])
                 ->latest('id')->paginate(20)->withQueryString();
         }
 
@@ -105,11 +107,12 @@ final class WorkspaceController extends Controller
         $bookings = Booking::query()->whereRaw('1 = 0')->paginate(20);
         if ($cinema) {
             $bookings = Booking::query()->where('cinema_id', $cinema->id)
-                ->where('payment_status', 'paid')->where('booking_status', 'paid')
-                ->where(function (Builder $query): void {
-                    $query->whereDoesntHave('ticketPrint')->orWhereHas('ticketPrint', fn (Builder $print) => $print
+                ->where('payment_status', 'paid')->whereIn('booking_status', ['paid', 'used'])
+                ->whereHas('admissionTickets', function (Builder $tickets): void {
+                    $tickets->where('print_count', 0)->orWhereHas('printState', fn (Builder $print) => $print
                         ->whereIn('status', [BookingTicketPrint::STATUS_RETRY_ALLOWED, BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION, BookingTicketPrint::STATUS_RETRY_AUTHORIZED]));
-                })->with(['showtime.movie:id,title', 'showtime.room:id,name', 'bookingSeats.seat', 'ticketPrint.lastFailedBy:id,name'])
+                })->with(['showtime.movie:id,title', 'showtime.room:id,name', 'bookingSeats.seat',
+                    'admissionTickets.bookingSeat.seat', 'admissionTickets.printState.lastFailedBy:id,name'])
                 ->oldest('paid_at')->paginate(20);
         }
 

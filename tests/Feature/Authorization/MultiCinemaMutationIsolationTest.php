@@ -3,6 +3,7 @@
 namespace Tests\Feature\Authorization;
 
 use App\Models\Booking;
+use App\Models\BookingSeat;
 use App\Models\BookingTicketDelivery;
 use App\Models\Cinema;
 use App\Models\Movie;
@@ -284,7 +285,15 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'attempts' => 1,
             'available_at' => now(),
         ]);
+        $bookingSeat = BookingSeat::query()->create([
+            'booking_id' => $booking->id, 'showtime_id' => $showtime->id, 'seat_id' => $seat->id,
+            'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY, 'price' => 50000,
+            'pricing_unit_key' => 'seat:'.$seat->id, 'pricing_unit_label' => 'A1',
+            'seat_type_snapshot' => 'normal', 'final_unit_amount' => 50000,
+        ]);
+        $admissionTicket = $bookingSeat->admissionTicket()->firstOrFail();
         $checkin = TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $admissionTicket->id,
             'booking_id' => $booking->id,
             'showtime_id' => $showtime->id,
             'result' => TicketCheckinEvent::RESULT_REJECTED,

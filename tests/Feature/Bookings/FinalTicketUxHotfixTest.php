@@ -47,7 +47,9 @@ final class FinalTicketUxHotfixTest extends PaymentTestCase
 
     public function test_qr_wrapper_rejects_tampering_foreign_hosts_and_queries(): void
     {
-        $booking = $this->pendingPayment()->booking;
+        $payment = $this->pendingPayment();
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))->assertJsonPath('return_code', 1);
+        $booking = $payment->booking->fresh();
         $capability = app(TicketCheckinCapability::class)->issue($booking);
         $payload = route('tickets.verify', ['capability' => $capability]);
         $tampered = substr($payload, 0, -1).($payload[-1] === 'A' ? 'B' : 'A');

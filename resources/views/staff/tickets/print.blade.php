@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="referrer" content="no-referrer">
-    <title>In vé cứng {{ $booking->booking_code }} - MovieMate</title>
+    <title>In vé xem phim {{ $ticket->ticket_code }} - MovieMate</title>
     <x-brand.head-icons />
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/staff-ticket-print.js'])
     <style>
@@ -18,7 +18,7 @@
         <header class="brand"><div class="brand-name">MOVIEMATE</div><p class="ticket-title">VÉ XEM PHIM</p></header>
         <hr class="rule">
         <h1 class="movie">{{ $booking->showtime?->movie?->title }}</h1>
-        <p class="code">{{ $booking->booking_code }}</p>
+        <p class="code">{{ $ticket->ticket_code }}</p>
         <hr class="rule">
         <dl class="facts">
             <div class="fact"><dt>Rạp</dt><dd>{{ $booking->showtime?->cinema?->name }}</dd></div>
@@ -27,16 +27,10 @@
             <div class="fact"><dt>Ngày</dt><dd>{{ $booking->showtime?->show_date?->format('d/m/Y') }}</dd></div>
             <div class="fact"><dt>Giờ</dt><dd>{{ \Carbon\CarbonImmutable::parse($booking->showtime?->show_time)->format('H:i') }}</dd></div>
             <div class="fact"><dt>Phòng</dt><dd>{{ $booking->showtime?->room?->name }}</dd></div>
-            <div class="fact strong"><dt>Ghế</dt><dd>{{ $booking->seat_codes }}</dd></div>
+            <div class="fact strong"><dt>Ghế</dt><dd>{{ $ticket->seat_code }}</dd></div>
         </dl>
         <hr class="rule">
-        <div class="money-line"><span>Tiền vé</span><strong>{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} VNĐ</strong></div>
-        @forelse($booking->foodOrder?->items ?? [] as $item)
-            <div class="food-line"><span>{{ $item->snapshot_name }} × {{ $item->quantity }}</span><strong>{{ number_format((int) $item->line_total, 0, ',', '.') }} VNĐ</strong></div>
-        @empty
-            <div class="money-line"><span>Đồ ăn</span><strong>0 VNĐ</strong></div>
-        @endforelse
-        <div class="money-line money-total"><span>Tổng</span><span>{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</span></div>
+        <div class="money-line"><span>Đơn đặt vé</span><strong>{{ $booking->booking_code }}</strong></div>
         <hr class="rule">
         <dl class="facts">
             <div class="fact"><dt>Kênh</dt><dd>{{ $booking->sales_channel === 'counter' ? 'Tại quầy' : 'Online' }}</dd></div>
@@ -45,7 +39,7 @@
             <div class="fact"><dt>Thời gian in</dt><dd>{{ now($booking->showtime?->cinema?->timezone)->format('d/m/Y H:i') }}</dd></div>
         </dl>
         <hr class="rule">
-        <div class="qr"><canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="256" width="256" height="256" aria-label="QR bảo mật xác minh vé"></canvas><p class="code">{{ $booking->booking_code }}</p><p class="qr-note">QR bảo mật dùng để xác minh vé. Việc in không đồng nghĩa vé đã được soát.</p></div>
+        <div class="qr"><canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="256" width="256" height="256" aria-label="QR bảo mật xác minh vé"></canvas><p class="code">{{ $ticket->ticket_code }}</p><p class="qr-note">QR xác minh riêng cho ghế {{ $ticket->seat_code }}. Việc in không đồng nghĩa vé đã được sử dụng.</p></div>
         <hr class="rule">
         <footer class="footer">Vui lòng đến trước giờ chiếu 15 phút.<br>Giữ vé trong suốt thời gian xem phim.</footer>
     </article>
@@ -54,10 +48,10 @@
         <h2>Hoàn tất lần in</h2>
         <p>Hộp thoại trình duyệt không thể xác nhận máy in vật lý. Hãy chọn kết quả thực tế.</p>
         <button type="button" class="btn-primary" data-staff-print-trigger><i class="ph ph-printer"></i>In vé ngay</button>
-        <form method="POST" action="{{ route('staff.tickets.print.succeed', $booking) }}" class="mt-4" data-submit-once>@csrf
+        <form method="POST" action="{{ route('staff.admission-tickets.print.succeed', $ticket) }}" class="mt-4" data-submit-once>@csrf
             <button type="submit" class="btn-primary">Đã in thành công</button>
         </form>
-        <form method="POST" action="{{ route('staff.tickets.print.fail', $booking) }}" class="mt-5 space-y-3" data-submit-once>@csrf
+        <form method="POST" action="{{ route('staff.admission-tickets.print.fail', $ticket) }}" class="mt-5 space-y-3" data-submit-once>@csrf
             <label class="cinema-label">Lý do in lỗi<select name="failure_code" class="cinema-input mt-1" required><option value="">Chọn lý do</option>@foreach($failureReasons as $code => $label)<option value="{{ $code }}">{{ $label }}</option>@endforeach</select></label>
             <label class="cinema-label">Ghi chú an toàn<textarea name="safe_note" class="cinema-input mt-1" maxlength="300"></textarea></label>
             <button type="submit" class="btn-secondary text-error">Báo lỗi in</button>

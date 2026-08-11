@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Services\Tickets\TicketArtifactProvisioner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class BookingSeat extends Model
 {
@@ -34,6 +36,13 @@ class BookingSeat extends Model
         'pricing_breakdown' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::created(function (BookingSeat $bookingSeat): void {
+            app(TicketArtifactProvisioner::class)->provisionSeat($bookingSeat);
+        });
+    }
+
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
@@ -47,5 +56,10 @@ class BookingSeat extends Model
     public function showtime(): BelongsTo
     {
         return $this->belongsTo(Showtime::class);
+    }
+
+    public function admissionTicket(): HasOne
+    {
+        return $this->hasOne(AdmissionTicket::class);
     }
 }

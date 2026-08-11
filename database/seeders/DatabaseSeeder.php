@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
             DemoUserSeeder::class,
             FoodItemSeeder::class,
             DiscountCodeSeeder::class,
+            Phase1TicketOperationsSeeder::class,
         ]);
     }
 }

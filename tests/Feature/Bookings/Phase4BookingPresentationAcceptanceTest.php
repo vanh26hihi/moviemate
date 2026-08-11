@@ -63,10 +63,10 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
     public static function nonUsableBookingStates(): array
     {
         return [
-            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'VÉ KHÔNG CÒN HIỆU LỰC'],
-            'expired' => ['expired', Payment::STATUS_EXPIRED, 'VÉ KHÔNG CÒN HIỆU LỰC'],
-            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'VÉ KHÔNG CÒN HIỆU LỰC'],
-            'used' => ['used', Payment::STATUS_SUCCESS, 'VÉ ĐÃ ĐƯỢC SỬ DỤNG'],
+            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'Đơn chưa có vé xem phim hợp lệ để sử dụng.'],
+            'expired' => ['expired', Payment::STATUS_EXPIRED, 'Đơn chưa có vé xem phim hợp lệ để sử dụng.'],
+            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'Đơn chưa có vé xem phim hợp lệ để sử dụng.'],
+            'used' => ['used', Payment::STATUS_SUCCESS, 'Đơn chưa có vé xem phim hợp lệ để sử dụng.'],
         ];
     }
 }

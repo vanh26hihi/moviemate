@@ -35,7 +35,7 @@ final class TicketCheckinEvent extends Model
     ];
 
     protected $fillable = [
-        'booking_id', 'showtime_id', 'actor_user_id', 'actor_role_snapshot',
+        'admission_ticket_id', 'accepted_ticket_id', 'booking_id', 'showtime_id', 'actor_user_id', 'actor_role_snapshot',
         'result', 'reason_code', 'scanned_at', 'request_id', 'route_name',
         'safe_ip_hash', 'user_agent_summary', 'context',
     ];
@@ -58,6 +58,11 @@ final class TicketCheckinEvent extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function admissionTicket(): BelongsTo
+    {
+        return $this->belongsTo(AdmissionTicket::class);
     }
 
     public function showtime(): BelongsTo
