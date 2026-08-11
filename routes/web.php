@@ -45,6 +45,7 @@ use App\Http\Controllers\Payments\ZaloPayCallbackController;
 use App\Http\Controllers\Payments\ZaloPayReturnController;
 use App\Http\Controllers\Staff\CounterPaymentController as StaffCounterPaymentController;
 use App\Http\Controllers\Staff\CounterSaleController as StaffCounterSaleController;
+use App\Http\Controllers\Staff\FoodPickupVoucherPrintController as StaffFoodPickupVoucherPrintController;
 use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
@@ -86,7 +87,7 @@ Route::get('/cinemas/{cinema:code}', [UserCinemaController::class, 'show'])
 Route::get('/showtimes/filter', ShowtimeFilterController::class)->middleware('throttle:60,1')->name('showtimes.filter');
 Route::get('/tickets/verify/{capability}', TicketVerificationController::class)
     ->middleware('throttle:60,1')
-    ->where('capability', 'v1\\.[1-9][0-9]{0,18}\\.[A-Za-z0-9_-]{43}')
+    ->where('capability', 'v2\\.[1-9][0-9]{0,18}\\.[A-Za-z0-9_-]{43}')
     ->name('tickets.verify');
 
 Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
@@ -543,10 +544,26 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.fail');
         Route::post('/tickets/{booking}/print/recover-expired', [StaffTicketPrintController::class, 'recoverExpired'])
             ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.recover-expired');
+        Route::post('/admission-tickets/{admissionTicket}/print', [StaffTicketPrintController::class, 'startTicket'])
+            ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.start');
+        Route::post('/admission-tickets/{admissionTicket}/reprint', [StaffTicketPrintController::class, 'reprintTicket'])
+            ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.reprint');
+        Route::get('/admission-tickets/{admissionTicket}/print', [StaffTicketPrintController::class, 'showTicket'])
+            ->whereNumber('admissionTicket')->middleware('permission:tickets.print')->name('admission-tickets.print.show');
+        Route::post('/admission-tickets/{admissionTicket}/print/succeed', [StaffTicketPrintController::class, 'succeedTicket'])
+            ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.succeed');
+        Route::post('/admission-tickets/{admissionTicket}/print/fail', [StaffTicketPrintController::class, 'failTicket'])
+            ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.fail');
+        Route::post('/admission-tickets/{admissionTicket}/print/recover-expired', [StaffTicketPrintController::class, 'recoverExpiredTicket'])
+            ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.recover-expired');
+        Route::post('/food-pickup-vouchers/{foodPickupVoucher}/print', StaffFoodPickupVoucherPrintController::class)
+            ->whereNumber('foodPickupVoucher')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('food-pickup-vouchers.print');
         Route::get('/tickets/check', [StaffTicketCheckinController::class, 'show'])
             ->middleware('permission:tickets.checkin')->name('tickets.check');
         Route::post('/tickets/check', [StaffTicketCheckinController::class, 'store'])
             ->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume');
+        Route::post('/admission-tickets/{admissionTicket}/admit', [StaffTicketCheckinController::class, 'confirm'])
+            ->whereNumber('admissionTicket')->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('admission-tickets.admit');
         Route::post('/tickets/{booking}/check-in', [StaffTicketCheckinController::class, 'storeBooking'])
             ->whereNumber('booking')->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume-booking');
         Route::get('/counter', [StaffCounterSaleController::class, 'index'])

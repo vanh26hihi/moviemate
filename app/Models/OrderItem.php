@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Tickets\TicketArtifactProvisioner;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,13 @@ class OrderItem extends Model
         'price' => 'decimal:2',
         'total' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        static::created(function (OrderItem $item): void {
+            app(TicketArtifactProvisioner::class)->provisionFoodForOrderItem($item);
+        });
+    }
 
     public function food(): BelongsTo
     {

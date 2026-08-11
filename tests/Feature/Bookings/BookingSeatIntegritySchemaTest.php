@@ -86,16 +86,16 @@ class BookingSeatIntegritySchemaTest extends TestCase
     {
         $scenario = $this->bookingScenario(false);
         $booking = $this->bookingForScenario($scenario);
-        $migration = require database_path('migrations/2026_08_04_105000_harden_booking_seat_integrity.php');
+        $migration = $this->migration();
         $migration->down();
 
-        $seat = BookingSeat::query()->create([
+        $seat = BookingSeat::withoutEvents(fn () => BookingSeat::query()->create([
             'booking_id' => $booking->id,
             'showtime_id' => null,
             'seat_id' => $scenario['seats'][0]->id,
             'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
             'price' => 50000,
-        ]);
+        ]));
 
         $migration->up();
 
@@ -108,16 +108,16 @@ class BookingSeatIntegritySchemaTest extends TestCase
         $first = $this->bookingScenario(false);
         $second = $this->bookingScenario(false);
         $booking = $this->bookingForScenario($first);
-        $migration = require database_path('migrations/2026_08_04_105000_harden_booking_seat_integrity.php');
+        $migration = $this->migration();
         $migration->down();
 
-        BookingSeat::query()->create([
+        BookingSeat::withoutEvents(fn () => BookingSeat::query()->create([
             'booking_id' => $booking->id,
             'showtime_id' => $second['showtime']->id,
             'seat_id' => $second['seats'][0]->id,
             'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
             'price' => 50000,
-        ]);
+        ]));
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('belongs to showtime');
@@ -281,17 +281,21 @@ class BookingSeatIntegritySchemaTest extends TestCase
 
     private function legacySeat(array $scenario, int $bookingId, ?string $activeLock): BookingSeat
     {
-        return BookingSeat::query()->create([
+        return BookingSeat::withoutEvents(fn () => BookingSeat::query()->create([
             'booking_id' => $bookingId,
             'showtime_id' => $scenario['showtime']->id,
             'seat_id' => $scenario['seats'][0]->id,
             'active_lock_key' => $activeLock,
             'price' => 50_000,
-        ]);
+        ]));
     }
 
     private function migration(): Migration
     {
+        foreach (['ticket_checkin_events', 'booking_ticket_print_events', 'booking_ticket_prints', 'admission_tickets'] as $table) {
+            Schema::dropIfExists($table);
+        }
+
         return require database_path('migrations/2026_08_04_105000_harden_booking_seat_integrity.php');
     }
 }

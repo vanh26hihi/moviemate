@@ -188,7 +188,10 @@ class BookingController extends Controller
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
+            'admissionTickets.bookingSeat.seat',
+            'admissionTickets.acceptedCheckin',
             'foodOrder.items',
+            'foodPickupVoucher',
             'acceptedTicketCheckin',
         ]);
 
@@ -219,14 +222,19 @@ class BookingController extends Controller
             'showtime.cinema',
             'showtime.room',
             'bookingSeats.seat',
+            'admissionTickets.bookingSeat.seat',
+            'admissionTickets.acceptedCheckin',
             'foodOrder.items',
+            'foodPickupVoucher',
             'acceptedTicketCheckin',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $isDeliverable = $this->ticketEligibility->isDeliverable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
-        $ticketQrPayload = $isDeliverable ? $this->ticketQrPayloads->url($booking) : null;
+        $ticketQrPayloads = $isDeliverable
+            ? $booking->admissionTickets->mapWithKeys(fn ($ticket) => [$ticket->id => $this->ticketQrPayloads->url($ticket)])
+            : collect();
         $ticketState = match (true) {
             $booking->payment_status === 'refunded' => 'refunded',
             $booking->booking_status === 'cancelled' => 'cancelled',
@@ -237,7 +245,7 @@ class BookingController extends Controller
         };
 
         return response()->view('user.bookings.ticket', compact(
-            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'ticketQrPayload', 'ticketState'
+            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'ticketQrPayloads', 'ticketState'
         ))->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache');
     }

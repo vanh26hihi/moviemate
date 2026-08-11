@@ -265,6 +265,7 @@ final class CounterSalesR8Test extends TestCase
         $this->post(route('staff.tickets.print.succeed', $booking))->assertRedirect();
         $capability = app(TicketCheckinCapability::class)->issue($booking->fresh());
         $this->actingAs($checker)->post(route('staff.tickets.consume'), ['ticket' => $capability])->assertRedirect();
+        $this->post(route('staff.admission-tickets.admit', $booking->admissionTickets()->firstOrFail()))->assertRedirect();
 
         $this->assertSame($creator->id, $booking->fresh()->created_by_staff_id);
         $this->assertSame($settler->id, Payment::query()->sole()->settled_by_user_id);

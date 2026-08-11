@@ -43,10 +43,10 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $capability = app(TicketQrPayload::class)->url($booking);
 
         $this->actingAs($staff)->post(route('staff.tickets.resolve'), ['ticket' => $capability])
-            ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé hợp lệ và đã thanh toán.')
-            ->assertSee('Chưa có dữ liệu in')->assertSee('Chưa soát vé');
+            ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé xem phim theo ghế')
+            ->assertSee('Chưa sử dụng');
         $this->post(route('staff.tickets.resolve'), ['ticket' => strtolower($booking->booking_code)])
-            ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé hợp lệ và đã thanh toán.');
+            ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé xem phim theo ghế');
 
         $booking->refresh();
         $this->assertSame('paid', $booking->booking_status);
@@ -231,6 +231,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $otherCinema = Cinema::factory()->create(['is_primary' => false, 'status' => 'active']);
         $booking->forceFill(['cinema_id' => $otherCinema->id])->save();
         BookingTicketPrint::query()->create([
+            'admission_ticket_id' => $booking->admissionTickets()->sole()->id,
             'booking_id' => $booking->id,
             'status' => BookingTicketPrint::STATUS_PRINTED,
             'attempts_count' => 1,
@@ -295,20 +296,20 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->post(route('staff.tickets.print.succeed', $booking));
 
         $this->get(route('staff.tickets.operations', $booking))->assertOk()
-            ->assertSee('In lại 1 lần')->assertSee('Vé in mờ/không đọc được')
-            ->assertSee('In lại vé')->assertSee('Lịch sử vận hành')
+            ->assertSee('Số bản đã in')->assertSee('Vé bị nhòe mực')
+            ->assertSee('In lại vé')->assertSee('Lịch sử in')
             ->assertDontSee('phê duyệt', false);
 
         $manager = $this->userWithRole('manager');
         $this->actingAs($manager)->get(route('admin.bookings.show', $booking))->assertOk()
             ->assertSee('Số lần in')->assertSee('Số lần in lại')
             ->assertSee('Người in gần nhất')->assertSee('Lý do in lại gần nhất')
-            ->assertSee('Vé in mờ/không đọc được')->assertSee('Yêu cầu in lại')
+            ->assertSee('Vé bị nhòe mực')->assertSee('Yêu cầu in lại')
             ->assertDontSee('Cho phép thêm một lần in')
             ->assertDontSee('Phê duyệt in lại');
     }
 
-    public function test_unpaid_cancelled_refunded_expired_and_used_bookings_cannot_start_print(): void
+    public function test_ineligible_bookings_cannot_print_but_used_ticket_can_be_reprinted_without_resetting_use(): void
     {
         $staff = $this->userWithRole('staff');
         $bookings = [
@@ -316,12 +317,19 @@ final class TicketOperationsR3Test extends PaymentTestCase
             $this->verifiedBooking(['booking_status' => 'cancelled']),
             $this->verifiedBooking(['payment_status' => 'refunded']),
             $this->verifiedBooking(['booking_status' => 'expired']),
-            $this->verifiedBooking(['booking_status' => 'used', 'used_at' => now()]),
         ];
         foreach ($bookings as $booking) {
             $this->actingAs($staff)->post(route('staff.tickets.print.start', $booking))->assertStatus(409);
         }
         $this->assertDatabaseCount('booking_ticket_prints', 0);
+
+        $used = $this->verifiedBooking(['booking_status' => 'used', 'used_at' => now()]);
+        $ticket = $used->admissionTickets()->sole();
+        $usedAt = $used->getRawOriginal('used_at');
+        $this->actingAs($staff)->post(route('staff.tickets.print.start', $used))->assertRedirect();
+        $this->post(route('staff.tickets.print.succeed', $used))->assertRedirect();
+        $this->assertSame($usedAt, $used->fresh()->getRawOriginal('used_at'));
+        $this->assertNull($ticket->fresh()->used_at);
     }
 
     public function test_print_events_are_append_only_and_contain_no_capability_columns(): void

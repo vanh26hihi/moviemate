@@ -2,15 +2,16 @@
 
 namespace App\Services\Tickets;
 
+use App\Models\AdmissionTicket;
 use App\Models\Booking;
 
 final class TicketQrPayload
 {
     public function __construct(private readonly TicketCheckinCapability $capabilities) {}
 
-    public function url(Booking $booking): string
+    public function url(AdmissionTicket|Booking $subject): string
     {
-        return route('tickets.verify', ['capability' => $this->capabilities->issue($booking)]);
+        return route('tickets.verify', ['capability' => $this->capabilities->issue($subject)]);
     }
 
     public function capabilityFrom(?string $payload): ?string
@@ -19,7 +20,7 @@ final class TicketQrPayload
             return null;
         }
 
-        if ($this->capabilities->bookingId($payload) !== null) {
+        if ($this->capabilities->ticketId($payload) !== null) {
             return $payload;
         }
 
@@ -29,7 +30,7 @@ final class TicketQrPayload
         }
 
         $candidate = rawurldecode((string) str($path)->afterLast('/'));
-        if ($this->capabilities->bookingId($candidate) === null) {
+        if ($this->capabilities->ticketId($candidate) === null) {
             return null;
         }
 

@@ -24,7 +24,10 @@ final class AdminTicketOperationsTest extends PaymentTestCase
         }
 
         $delivery = $this->verifiedDelivery();
+        $ticket = $delivery->booking->admissionTickets()->sole();
         $event = TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $ticket->id,
+            'accepted_ticket_id' => $ticket->id,
             'booking_id' => $delivery->booking_id,
             'showtime_id' => $delivery->booking->showtime_id,
             'result' => TicketCheckinEvent::RESULT_ACCEPTED,
@@ -141,8 +144,10 @@ final class AdminTicketOperationsTest extends PaymentTestCase
     public function test_checkin_history_remains_read_only_filtered_and_contains_no_capability(): void
     {
         $delivery = $this->verifiedDelivery();
+        $ticket = $delivery->booking->admissionTickets()->sole();
         $actor = $this->userWithRole('staff');
         $event = TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $ticket->id,
             'booking_id' => $delivery->booking_id,
             'showtime_id' => $delivery->booking->showtime_id,
             'actor_user_id' => $actor->id,
@@ -152,7 +157,7 @@ final class AdminTicketOperationsTest extends PaymentTestCase
             'scanned_at' => now(),
             'context' => ['source' => 'test'],
         ]);
-        $secret = 'v1.'.$delivery->booking_id.'.'.str_repeat('A', 43);
+        $secret = 'v2.'.$ticket->id.'.'.str_repeat('A', 43);
 
         $response = $this->actingAs($this->userWithRole('manager'))->get(route('admin.ticket-checkins.index', [
             'booking_code' => $delivery->booking->booking_code, 'duplicates_only' => 'yes',

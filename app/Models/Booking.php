@@ -116,11 +116,22 @@ class Booking extends Model
                 throw new \LogicException('Booking channel and creator attribution are immutable.');
             }
         });
+
     }
 
     public function bookingSeats(): HasMany
     {
         return $this->hasMany(BookingSeat::class);
+    }
+
+    public function admissionTickets(): HasMany
+    {
+        return $this->hasMany(AdmissionTicket::class);
+    }
+
+    public function foodPickupVoucher(): HasOne
+    {
+        return $this->hasOne(FoodPickupVoucher::class);
     }
 
     public function payment(): HasOne

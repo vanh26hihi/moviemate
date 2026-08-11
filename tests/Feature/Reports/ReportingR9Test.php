@@ -275,11 +275,11 @@ final class ReportingR9Test extends TestCase
         $cancelled = $this->booking($normal, [50_000], 50_000, null, Booking::SALES_CHANNEL_ONLINE, null, false);
         $cancelled->forceFill(['booking_status' => 'cancelled', 'payment_status' => 'unpaid'])->save();
 
-        BookingTicketPrint::query()->create(['booking_id' => $vnpay->id, 'status' => 'printed', 'attempts_count' => 1, 'printed_by_user_id' => $printer->id, 'printed_at' => now()]);
-        BookingTicketPrint::query()->create(['booking_id' => $payos->id, 'status' => 'retry_allowed', 'attempts_count' => 1, 'last_failed_by_user_id' => $printer->id, 'last_failed_at' => now()]);
-        BookingTicketPrint::query()->create(['booking_id' => $zalopay->id, 'status' => 'retry_authorized', 'attempts_count' => 1, 'retry_authorized_by_user_id' => $admin->id, 'retry_authorized_at' => now()]);
+        BookingTicketPrint::query()->create(['admission_ticket_id' => $vnpay->admissionTickets()->firstOrFail()->id, 'booking_id' => $vnpay->id, 'status' => 'printed', 'attempts_count' => 1, 'printed_by_user_id' => $printer->id, 'printed_at' => now()]);
+        BookingTicketPrint::query()->create(['admission_ticket_id' => $payos->admissionTickets()->firstOrFail()->id, 'booking_id' => $payos->id, 'status' => 'retry_allowed', 'attempts_count' => 1, 'last_failed_by_user_id' => $printer->id, 'last_failed_at' => now()]);
+        BookingTicketPrint::query()->create(['admission_ticket_id' => $zalopay->admissionTickets()->firstOrFail()->id, 'booking_id' => $zalopay->id, 'status' => 'retry_authorized', 'attempts_count' => 1, 'retry_authorized_by_user_id' => $admin->id, 'retry_authorized_at' => now()]);
         $this->checkin($vnpay, $checker, 'accepted');
-        $this->checkin($vnpay, $checker, 'accepted');
+        $this->checkin($vnpay, $checker, 'already_used');
         $this->checkin($counter, $checker, 'accepted');
 
         return compact('admin', 'creator', 'settler', 'printer', 'checker', 'primary', 'other');
@@ -363,7 +363,10 @@ final class ReportingR9Test extends TestCase
 
     private function checkin(Booking $booking, User $actor, string $result): void
     {
+        $admissionTicket = $booking->admissionTickets()->firstOrFail();
         TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $admissionTicket->id,
+            'accepted_ticket_id' => $result === TicketCheckinEvent::RESULT_ACCEPTED ? $admissionTicket->id : null,
             'booking_id' => $booking->id, 'showtime_id' => $booking->showtime_id, 'actor_user_id' => $actor->id,
             'actor_role_snapshot' => 'staff', 'result' => $result, 'scanned_at' => now(),
         ]);

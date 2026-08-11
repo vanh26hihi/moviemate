@@ -230,7 +230,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
         $this->actingAs($this->userWithRole('manager'))
             ->get(route('staff.tickets.operations', $booking))
             ->assertOk()->assertSee($booking->booking_code)
-            ->assertSee('Trạng thái in vé')->assertDontSee('data-qr-value', false)
+            ->assertSee('Vé xem phim theo ghế')->assertSee('Số bản đã in')->assertDontSee('data-qr-value', false)
             ->assertDontSee($booking->recipient_email);
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.bookings.ticket-email.resend', $booking))

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Authorization;
 
 use App\Models\Booking;
+use App\Models\BookingSeat;
 use App\Models\BookingTicketDelivery;
 use App\Models\Cinema;
 use App\Models\Movie;
@@ -192,7 +193,14 @@ final class MultiCinemaAuthorizationTest extends TestCase
             'booking_id' => $booking->id, 'status' => BookingTicketDelivery::STATUS_PENDING,
             'attempts' => 0, 'available_at' => now(),
         ]);
+        $bookingSeat = BookingSeat::query()->create([
+            'booking_id' => $booking->id, 'showtime_id' => $showtime->id, 'seat_id' => $seat->id,
+            'price' => 50000, 'pricing_unit_key' => 'seat:'.$seat->id,
+            'pricing_unit_label' => 'A1', 'seat_type_snapshot' => 'normal', 'final_unit_amount' => 50000,
+        ]);
+        $admissionTicket = $bookingSeat->admissionTicket()->firstOrFail();
         $checkin = TicketCheckinEvent::query()->create([
+            'admission_ticket_id' => $admissionTicket->id,
             'booking_id' => $booking->id, 'showtime_id' => $showtime->id,
             'actor_user_id' => $actorId, 'actor_role_snapshot' => $actorId ? 'staff' : null,
             'result' => TicketCheckinEvent::RESULT_REJECTED, 'scanned_at' => now(),
