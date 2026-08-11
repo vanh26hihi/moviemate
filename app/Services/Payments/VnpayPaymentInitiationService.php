@@ -22,6 +22,7 @@ class VnpayPaymentInitiationService
         private readonly VnpayConfig $config,
         private readonly PaymentReturnTokenService $returnTokens,
         private readonly VnpayPaymentUrlBuilder $urls,
+        private readonly AuthoritativeBookingPaymentAmount $bookingAmounts,
     ) {}
 
     public function initiate(Booking $booking, string $clientIp): PaymentInitiationResult
@@ -154,7 +155,6 @@ class VnpayPaymentInitiationService
     private function authoritativeAmount(Booking $booking): int
     {
         try {
-            $bookingTotal = VndAmount::fromDatabase($booking->getRawOriginal('total_amount'));
             $seatSubtotal = VndAmount::fromDatabase($booking->getRawOriginal('seat_subtotal'));
             $foodSubtotal = VndAmount::fromDatabase($booking->getRawOriginal('food_subtotal'));
             $seatRows = BookingSeat::query()->where('booking_id', $booking->id)->lockForUpdate()->get();
@@ -173,13 +173,11 @@ class VnpayPaymentInitiationService
         }
 
         if (! $seatRowsTotal->equals($seatSubtotal)
-            || ! $orderSubtotal->equals($foodSubtotal)
-            || ! $seatSubtotal->add($foodSubtotal)->equals($bookingTotal)
-            || $bookingTotal->value() <= 0) {
+            || ! $orderSubtotal->equals($foodSubtotal)) {
             throw new PaymentInitiationException('Stored booking pricing failed server verification.');
         }
 
-        return $bookingTotal->value();
+        return $this->bookingAmounts->resolve($booking);
     }
 
     private function transactionReference(): string

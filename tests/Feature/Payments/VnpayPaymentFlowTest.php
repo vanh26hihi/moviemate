@@ -6,9 +6,16 @@ use App\Domain\Payments\VnpayConfig;
 use App\Domain\Payments\VnpaySigner;
 use App\Exceptions\PaymentInitiationException;
 use App\Models\ActivityLog;
+use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
+use App\Models\CinemaPricingRule;
+use App\Models\DiscountCode;
+use App\Models\FoodItem;
+use App\Models\LoyaltyAccount;
+use App\Models\LoyaltySetting;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\User;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use App\Services\Payments\PaymentInitiationService;
@@ -19,6 +26,167 @@ use Illuminate\Support\Facades\Log;
 
 class VnpayPaymentFlowTest extends VnpayPaymentTestCase
 {
+    public function test_removed_promotion_cannot_leak_into_the_final_provider_amount(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        CinemaPricingRule::query()
+            ->where('cinema_id', $scenario['cinema']->id)
+            ->where('name', 'Booking fixture base')
+            ->update(['amount_vnd' => 80_000]);
+        $food = FoodItem::query()->create([
+            'name' => 'Promotion replacement combo',
+            'price' => 55_000,
+            'active' => true,
+        ]);
+        foreach ([['OLD20K', 20_000], ['FINAL10K', 10_000]] as [$code, $discount]) {
+            DiscountCode::query()->create([
+                'code' => $code,
+                'name' => $code,
+                'discount_type' => 'fixed',
+                'discount_value' => $discount,
+            ]);
+        }
+
+        $this->get(route('user.bookings.checkout', [
+            'showtime' => $scenario['showtime'],
+            'selected_seats' => $scenario['seats'][0]->id,
+        ]))->assertOk();
+        $this->post(route('user.bookings.food.store'), [
+            'customer_email' => 'promotion-change@example.test',
+            'food_items' => [['food_id' => $food->id, 'quantity' => 1]],
+        ])->assertRedirect(route('user.bookings.review'));
+        foreach ([['apply', 'OLD20K'], ['remove', 'OLD20K'], ['apply', 'FINAL10K']] as [$action, $code]) {
+            $this->from(route('user.bookings.review'))->post(route('user.bookings.promotions'), [
+                'action' => $action,
+                'code' => $code,
+            ])->assertRedirect(route('user.bookings.review'));
+        }
+
+        $response = $this->post(route('user.bookings.confirm'), ['payment_method' => 'vnpay']);
+        $booking = Booking::query()->with(['discountCodeRedemptions', 'payments'])->sole();
+        parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $parameters);
+
+        $response->assertRedirectContains('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
+        $this->assertSame(10_000, $booking->promotion_discount_amount);
+        $this->assertSame(125_000, (int) $booking->total_amount);
+        $this->assertSame(125_000, $booking->payments->sole()->amount);
+        $this->assertSame('12500000', $parameters['vnp_Amount']);
+        $this->assertSame(['FINAL10K'], $booking->discountCodeRedemptions->pluck('code_snapshot')->all());
+    }
+
+    public function test_promotion_then_loyalty_points_produce_one_authoritative_provider_amount(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        CinemaPricingRule::query()
+            ->where('cinema_id', $scenario['cinema']->id)
+            ->where('name', 'Booking fixture base')
+            ->update(['amount_vnd' => 80_000]);
+        $food = FoodItem::query()->create([
+            'name' => 'Promotion and loyalty combo',
+            'price' => 55_000,
+            'active' => true,
+        ]);
+        DiscountCode::query()->create([
+            'code' => 'STACK20K',
+            'name' => 'Promotion before points',
+            'discount_type' => 'fixed',
+            'discount_value' => 20_000,
+        ]);
+        $user = User::factory()->create();
+        LoyaltyAccount::query()->create([
+            'user_id' => $user->id,
+            'points_balance' => 100,
+            'lifetime_earned' => 100,
+        ]);
+        LoyaltySetting::current()->update([
+            'point_value_vnd' => 100,
+            'max_points_discount_percent' => 100,
+            'minimum_points_redemption' => 1,
+        ]);
+        $checkout = app(BookingCheckoutService::class)->createPendingBooking(
+            $scenario['showtime']->id,
+            [$scenario['seats'][0]->id],
+            $user->id,
+            $user->email,
+            app(BookingTokenService::class)->issueCheckoutToken(),
+            [['food_id' => $food->id, 'quantity' => 1]],
+            discountCodes: ['STACK20K'],
+            pointsToUse: 100,
+        );
+
+        $result = app(PaymentInitiationService::class)->initiate($checkout->booking, 'vnpay');
+        parse_str((string) parse_url($result->orderUrl, PHP_URL_QUERY), $parameters);
+
+        $this->assertSame(135_000, $checkout->booking->gross_amount);
+        $this->assertSame(20_000, $checkout->booking->promotion_discount_amount);
+        $this->assertSame(10_000, $checkout->booking->points_discount_amount);
+        $this->assertSame(105_000, (int) $checkout->booking->total_amount);
+        $this->assertSame(105_000, $result->payment->amount);
+        $this->assertSame('10500000', $parameters['vnp_Amount']);
+        $this->assertSame('reserved', $checkout->booking->discountCodeRedemptions()->sole()->status);
+        $this->assertSame('reserved', $checkout->booking->pointRedemption()->sole()->status);
+    }
+
+    public function test_discounted_review_confirms_with_the_net_amount_and_redirects_to_vnpay(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        CinemaPricingRule::query()
+            ->where('cinema_id', $scenario['cinema']->id)
+            ->where('name', 'Booking fixture base')
+            ->update(['amount_vnd' => 80_000]);
+        $food = FoodItem::query()->create([
+            'name' => 'Promotion payment combo',
+            'price' => 55_000,
+            'active' => true,
+        ]);
+        DiscountCode::query()->create([
+            'code' => 'PAYMENT20K',
+            'name' => 'Payment redirect regression',
+            'discount_type' => 'fixed',
+            'discount_value' => 20_000,
+        ]);
+
+        $this->get(route('user.bookings.checkout', [
+            'showtime' => $scenario['showtime'],
+            'selected_seats' => $scenario['seats'][0]->id,
+        ]))->assertOk();
+        $this->post(route('user.bookings.food.store'), [
+            'customer_email' => 'promotion-payment@example.test',
+            'food_items' => [['food_id' => $food->id, 'quantity' => 1]],
+        ])->assertRedirect(route('user.bookings.review'));
+        $this->from(route('user.bookings.review'))->post(route('user.bookings.promotions'), [
+            'action' => 'apply',
+            'code' => 'PAYMENT20K',
+        ])->assertRedirect(route('user.bookings.review'));
+
+        $this->get(route('user.bookings.review'))
+            ->assertOk()
+            ->assertViewHas('promotion', fn ($promotion): bool => $promotion->discountAmount === 20_000
+                && $promotion->finalAmount === 115_000)
+            ->assertSee('80.000 VNĐ')
+            ->assertSee('55.000 VNĐ')
+            ->assertSee('115.000 VNĐ');
+
+        $response = $this->post(route('user.bookings.confirm'), ['payment_method' => 'vnpay']);
+        $booking = Booking::query()->with(['discountCodeRedemptions', 'payments'])->sole();
+        $payment = $booking->payments->sole();
+        parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $parameters);
+
+        $response->assertRedirectContains('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
+        $this->assertSame(80_000, $booking->seat_subtotal);
+        $this->assertSame(55_000, $booking->food_subtotal);
+        $this->assertSame(135_000, $booking->gross_amount);
+        $this->assertSame(20_000, $booking->promotion_discount_amount);
+        $this->assertSame(0, $booking->points_discount_amount);
+        $this->assertSame(115_000, (int) $booking->total_amount);
+        $this->assertSame(115_000, $payment->amount);
+        $this->assertSame('11500000', $parameters['vnp_Amount']);
+        $this->assertSame('PAYMENT20K', $booking->discountCodeRedemptions->sole()->code_snapshot);
+        $this->assertSame(20_000, $booking->discountCodeRedemptions->sole()->discount_amount);
+        $this->assertSame('reserved', $booking->discountCodeRedemptions->sole()->status);
+        $this->assertNotSame(route('user.bookings.pending', $booking), $response->headers->get('Location'));
+    }
+
     public function test_initiation_persists_attempt_before_building_a_valid_signed_url(): void
     {
         $booking = $this->payableBooking();

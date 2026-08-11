@@ -23,6 +23,7 @@ final class PayOsPaymentInitiationService
         private readonly PaymentReturnTokenService $returnTokens,
         private readonly PayOsGateway $gateway,
         private readonly PayOsPaymentReconciliationService $reconciliation,
+        private readonly AuthoritativeBookingPaymentAmount $bookingAmounts,
     ) {}
 
     public function initiate(Booking $booking): PaymentInitiationResult
@@ -173,7 +174,6 @@ final class PayOsPaymentInitiationService
         }
 
         try {
-            $total = VndAmount::fromDatabase($booking->getRawOriginal('total_amount'));
             $seatSubtotal = VndAmount::fromDatabase($booking->getRawOriginal('seat_subtotal'));
             $foodSubtotal = VndAmount::fromDatabase($booking->getRawOriginal('food_subtotal'));
             $seatTotal = $seatRows->reduce(
@@ -191,13 +191,11 @@ final class PayOsPaymentInitiationService
         }
 
         if (! $seatTotal->equals($seatSubtotal)
-            || ! $orderTotal->equals($foodSubtotal)
-            || ! $seatSubtotal->add($foodSubtotal)->equals($total)
-            || $total->value() <= 0) {
+            || ! $orderTotal->equals($foodSubtotal)) {
             throw new PaymentInitiationException('Stored booking pricing failed server verification.');
         }
 
-        return $total->value();
+        return $this->bookingAmounts->resolve($booking);
     }
 
     private function validStoredCheckoutUrl(Payment $payment): bool
