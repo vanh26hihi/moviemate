@@ -3,7 +3,6 @@
 namespace App\Services\Payments;
 
 use App\Domain\Payments\AppTransIdGenerator;
-use App\Domain\Payments\VndAmount;
 use App\Domain\Payments\ZaloPayConfig;
 use App\Exceptions\PaymentInitiationException;
 use App\Exceptions\ZaloPayResponseException;
@@ -13,7 +12,6 @@ use App\Models\Payment;
 use App\Services\ZaloPay\ZaloPayGateway;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 
 class ZaloPayPaymentInitiationService
 {
@@ -23,6 +21,7 @@ class ZaloPayPaymentInitiationService
         private readonly PaymentReturnTokenService $returnTokens,
         private readonly ZaloPayGateway $gateway,
         private readonly PaymentReconciliationService $reconciliation,
+        private readonly AuthoritativeBookingPaymentAmount $bookingAmounts,
     ) {}
 
     public function initiate(Booking $booking): PaymentInitiationResult
@@ -55,11 +54,7 @@ class ZaloPayPaymentInitiationService
                 return [$activeAttempt, true];
             }
 
-            try {
-                $amount = VndAmount::fromDecimal($lockedBooking->getRawOriginal('total_amount'));
-            } catch (InvalidArgumentException $exception) {
-                throw new PaymentInitiationException($exception->getMessage(), previous: $exception);
-            }
+            $amount = $this->bookingAmounts->resolve($lockedBooking);
 
             $now = now();
             $attemptExpiry = $now->copy()->addSeconds($this->config->expireDurationSeconds);

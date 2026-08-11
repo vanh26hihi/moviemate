@@ -6,13 +6,57 @@ use App\Domain\Payments\PayOsSigner;
 use App\Exceptions\PaymentInitiationException;
 use App\Exceptions\PayOsResponseException;
 use App\Exceptions\PayOsTransportException;
+use App\Models\Order;
 use App\Models\Payment;
+use App\Services\CinemaContext;
 use App\Services\Payments\PaymentInitiationService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
 class PayOsInitiationTest extends PayOsPaymentTestCase
 {
+    public function test_discounted_booking_sends_the_authoritative_net_amount_to_payos(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake(function (Request $request) {
+            $data = $request->data();
+
+            return Http::response($this->providerEnvelope([
+                'orderCode' => $data['orderCode'],
+                'amount' => $data['amount'],
+                'currency' => 'VND',
+                'paymentLinkId' => 'discounted124c33293c43417ab7879e',
+                'status' => 'PENDING',
+                'checkoutUrl' => 'https://pay.payos.vn/web/discounted124c33293c43417ab7879e',
+            ]));
+        });
+        $booking = $this->payableBooking();
+        $booking->bookingSeats()->update(['price' => 80_000]);
+        $booking->forceFill([
+            'seat_subtotal' => 80_000,
+            'food_subtotal' => 55_000,
+            'gross_amount' => 135_000,
+            'promotion_discount_amount' => 20_000,
+            'points_discount_amount' => 0,
+            'total_amount' => 115_000,
+        ])->save();
+        Order::query()->create([
+            'booking_id' => $booking->id,
+            'customer_name' => '',
+            'customer_email' => $booking->customer_email,
+            'pickup_cinema_id' => app(CinemaContext::class)->id(),
+            'subtotal' => 55_000,
+            'total_amount' => 55_000,
+            'status' => 'pending',
+        ]);
+
+        $result = app(PaymentInitiationService::class)->initiate($booking->fresh(), 'payos');
+
+        $this->assertSame(115_000, $result->payment->amount);
+        $this->assertSame('https://pay.payos.vn/web/discounted124c33293c43417ab7879e', $result->orderUrl);
+        Http::assertSent(fn (Request $request): bool => $request['amount'] === 115_000);
+    }
+
     public function test_configured_availability_and_unconfigured_state_are_safe(): void
     {
         $this->assertTrue(app(PaymentInitiationService::class)->availability()['payos']);

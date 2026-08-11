@@ -2,15 +2,18 @@
 
 namespace Tests\Feature\Checkout;
 
+use App\Exceptions\PaymentInitiationException;
 use App\Models\Booking;
 use App\Models\FoodItem;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Services\BookingCheckoutResult;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingExpirationService;
 use App\Services\BookingFoodService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
+use App\Services\Payments\PaymentInitiationService;
 use App\Services\UnifiedBookingCheckoutService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
@@ -21,6 +24,67 @@ use Tests\Feature\Payments\PaymentTestCase;
 
 class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
 {
+    public function test_definitive_initiation_failure_without_an_attempt_is_not_reported_as_pending(): void
+    {
+        $booking = $this->payableBooking();
+        $bookings = \Mockery::mock(BookingCheckoutService::class);
+        $bookings->shouldReceive('createPendingBooking')
+            ->once()
+            ->andReturn(new BookingCheckoutResult($booking, null, false));
+        $payments = \Mockery::mock(PaymentInitiationService::class);
+        $payments->shouldReceive('assertAvailable')->once()->with('vnpay');
+        $payments->shouldReceive('initiate')
+            ->once()
+            ->andThrow(new PaymentInitiationException('Definitive pre-provider failure.'));
+        $service = new UnifiedBookingCheckoutService($bookings, $payments);
+
+        try {
+            $service->confirm([
+                'showtime_id' => $booking->showtime_id,
+                'seat_ids' => [],
+                'customer_email' => 'failure@example.test',
+                'checkout_token' => 'test-token',
+                'food_items' => [],
+            ], null, 'vnpay');
+            $this->fail('A failure without a payment attempt must return to the safe error flow.');
+        } catch (PaymentInitiationException $exception) {
+            $this->assertSame('Payment initiation failed before an attempt was created.', $exception->getMessage());
+            $this->assertInstanceOf(PaymentInitiationException::class, $exception->getPrevious());
+        }
+
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    public function test_discounted_booking_sends_the_authoritative_net_amount_to_zalopay(): void
+    {
+        Http::fake(['*' => Http::response($this->successfulCreate(), 200)]);
+        $booking = $this->payableBooking();
+        $booking->bookingSeats()->update(['price' => 80_000]);
+        $booking->forceFill([
+            'seat_subtotal' => 80_000,
+            'food_subtotal' => 55_000,
+            'gross_amount' => 135_000,
+            'promotion_discount_amount' => 20_000,
+            'points_discount_amount' => 0,
+            'total_amount' => 115_000,
+        ])->save();
+        Order::query()->create([
+            'booking_id' => $booking->id,
+            'customer_name' => '',
+            'customer_email' => $booking->customer_email,
+            'pickup_cinema_id' => app(CinemaContext::class)->id(),
+            'subtotal' => 55_000,
+            'total_amount' => 55_000,
+            'status' => 'pending',
+        ]);
+
+        $result = app(PaymentInitiationService::class)->initiate($booking->fresh(), 'zalopay');
+
+        $this->assertSame(115_000, $result->payment->amount);
+        $this->assertSame('https://zalopay.example.test/pay', $result->orderUrl);
+        Http::assertSent(fn (Request $request): bool => $request['amount'] === 115_000);
+    }
+
     public function test_existing_authoritative_booking_and_payment_replay_continue_after_booking_cutoff(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-11 09:14:59', 'Asia/Ho_Chi_Minh'));

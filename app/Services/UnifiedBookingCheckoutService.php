@@ -43,10 +43,18 @@ class UnifiedBookingCheckoutService
                 $payment->payment,
                 $payment->orderUrl,
             );
-        } catch (PaymentInitiationException|PayOsResponseException|PayOsTransportException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException) {
+        } catch (PaymentInitiationException|PayOsResponseException|PayOsTransportException|ZaloPayResponseException|ZaloPayTransportException|VnpayResponseException|VnpayTransportException $exception) {
+            $payment = $checkout->booking->payments()->latest('id')->first();
+            if ($payment === null) {
+                throw new PaymentInitiationException(
+                    'Payment initiation failed before an attempt was created.',
+                    previous: $exception,
+                );
+            }
+
             return new UnifiedBookingCheckoutResult(
                 $checkout,
-                $checkout->booking->payments()->latest('id')->first(),
+                $payment,
                 null,
                 true,
             );
