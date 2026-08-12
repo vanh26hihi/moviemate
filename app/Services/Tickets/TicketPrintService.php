@@ -5,15 +5,19 @@ namespace App\Services\Tickets;
 use App\Models\AdmissionTicket;
 use App\Models\BookingTicketPrint;
 use App\Models\BookingTicketPrintEvent;
+use App\Models\SeatIncidentResolution;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
+use App\Services\Seats\SeatIncidentResolutionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class TicketPrintService
 {
+    public const INCIDENT_REPRINT_REASON = 'seat_incident_relocation';
+
     public const FAILURE_REASONS = [
         'paper_jam' => 'Kẹt giấy',
         'out_of_paper' => 'Hết giấy',
@@ -44,6 +48,7 @@ final class TicketPrintService
         private readonly BookingTicketEligibility $eligibility,
         private readonly ActivityLogger $activities,
         private readonly CinemaAccessService $cinemaAccess,
+        private readonly SeatIncidentResolutionService $incidentResolutions,
     ) {}
 
     public function start(AdmissionTicket $ticket, User $actor, string $operationId, string $token): BookingTicketPrint
@@ -87,6 +92,15 @@ final class TicketPrintService
 
         return DB::transaction(function () use ($ticket, $actor, $operationId, $token, $reason, $safeNote): BookingTicketPrint {
             $ticket = $this->authorizedLockedTicket($ticket, $actor);
+            $incidentReplacementPending = SeatIncidentResolution::query()
+                ->where('reprint_required', true)->whereNull('reprint_satisfied_at')
+                ->whereHas('impact', fn ($query) => $query->where('booking_seat_id', $ticket->booking_seat_id)
+                    ->where('resolution_status', 'unresolved')
+                    ->whereHas('incident', fn ($incident) => $incident->where('status', 'open')))
+                ->exists();
+            if ($incidentReplacementPending) {
+                throw new HttpException(409, 'Vé đang chờ in thay thế do đổi ghế. Vui lòng dùng thao tác in theo sự cố.');
+            }
             $state = BookingTicketPrint::query()->where('admission_ticket_id', $ticket->id)->lockForUpdate()->firstOrFail();
             if ($state->status === BookingTicketPrint::STATUS_PRINTING) {
                 return $this->sameActiveOperation($state, $actor, $operationId, $token)
@@ -108,11 +122,66 @@ final class TicketPrintService
                 'active_operation_id' => $operationId,
                 'active_operation_token_hash' => hash('sha256', $token),
                 'active_operator_user_id' => $actor->id,
+                'active_seat_incident_resolution_id' => null,
                 'active_operation_expires_at' => now()->addMinutes(self::OPERATION_TTL_MINUTES),
             ])->save();
             $this->event($state, $actor, 'reprint_requested', $reason, $safeNote, $operationId);
             $this->event($state, $actor, 'print_started', $reason, $safeNote, $operationId);
             $this->activities->log('ticket.reprint_requested', $ticket->booking, context: $this->activityContext($ticket, $state, $actor) + ['reprint_reason_code' => $reason]);
+
+            return $state;
+        }, 3);
+    }
+
+    public function incidentReprint(
+        AdmissionTicket $ticket,
+        SeatIncidentResolution $resolution,
+        User $actor,
+        string $operationId,
+        string $token,
+    ): BookingTicketPrint {
+        return DB::transaction(function () use ($ticket, $resolution, $actor, $operationId, $token): BookingTicketPrint {
+            $ticket = $this->authorizedLockedTicket($ticket, $actor);
+            $resolution = SeatIncidentResolution::query()->with(['impact.incident'])->lockForUpdate()->findOrFail($resolution->id);
+            abort_unless($resolution->resolution_type !== SeatIncidentResolution::TYPE_REQUIRES_REFUND
+                && $resolution->reprint_required
+                && $resolution->reprint_satisfied_at === null
+                && $resolution->impact->resolution_status === 'unresolved'
+                && $resolution->impact->incident->status === 'open'
+                && (int) $resolution->impact->booking_seat_id === (int) $ticket->booking_seat_id
+                && (int) $ticket->print_count > 0, 409, 'Không có yêu cầu in lại do đổi ghế đang chờ xử lý.');
+
+            $state = BookingTicketPrint::query()->where('admission_ticket_id', $ticket->id)->lockForUpdate()->firstOrFail();
+            if ($state->status === BookingTicketPrint::STATUS_PRINTING) {
+                return $this->sameActiveOperation($state, $actor, $operationId, $token)
+                    && (int) $state->active_seat_incident_resolution_id === (int) $resolution->id
+                    ? $state
+                    : throw new HttpException(409, 'Một lần in khác đang được xử lý.');
+            }
+            if (! in_array($state->status, [
+                BookingTicketPrint::STATUS_PRINTED,
+                BookingTicketPrint::STATUS_RETRY_ALLOWED,
+                BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION,
+                BookingTicketPrint::STATUS_RETRY_AUTHORIZED,
+            ], true)) {
+                throw new HttpException(409, 'Vé chưa đủ điều kiện in thay thế.');
+            }
+
+            $state->forceFill([
+                'status' => BookingTicketPrint::STATUS_PRINTING,
+                'attempts_count' => $state->attempts_count + 1,
+                'active_operation_id' => $operationId,
+                'active_operation_token_hash' => hash('sha256', $token),
+                'active_operator_user_id' => $actor->id,
+                'active_seat_incident_resolution_id' => $resolution->id,
+                'active_operation_expires_at' => now()->addMinutes(self::OPERATION_TTL_MINUTES),
+            ])->save();
+            $this->event($state, $actor, 'incident_reprint_requested', self::INCIDENT_REPRINT_REASON, null, $operationId, $resolution->id);
+            $this->event($state, $actor, 'print_started', self::INCIDENT_REPRINT_REASON, null, $operationId, $resolution->id);
+            $this->activities->log('ticket.incident_reprint_requested', $ticket->booking, context: $this->activityContext($ticket, $state, $actor) + [
+                'reprint_reason_code' => self::INCIDENT_REPRINT_REASON,
+                'seat_incident_resolution_id' => $resolution->id,
+            ]);
 
             return $state;
         }, 3);
@@ -136,6 +205,7 @@ final class TicketPrintService
             }
             $this->assertCurrentOperation($state, $actor, $operationId, $token);
             $printedAt = now();
+            $incidentResolutionId = $state->active_seat_incident_resolution_id;
             $state->forceFill([
                 'status' => BookingTicketPrint::STATUS_PRINTED,
                 'printed_by_user_id' => $actor->id,
@@ -148,7 +218,21 @@ final class TicketPrintService
                 'last_printed_at' => $printedAt,
                 'last_printed_by_user_id' => $actor->id,
             ])->save();
-            $this->event($state, $actor, 'print_succeeded', null, null, $operationId);
+            if ($incidentResolutionId) {
+                $this->incidentResolutions->completeRequiredReprint(
+                    SeatIncidentResolution::query()->findOrFail($incidentResolutionId),
+                    (int) $ticket->id,
+                );
+            }
+            $this->event(
+                $state,
+                $actor,
+                'print_succeeded',
+                $incidentResolutionId ? self::INCIDENT_REPRINT_REASON : null,
+                null,
+                $operationId,
+                $incidentResolutionId,
+            );
             $this->activities->log('ticket.print_succeeded', $ticket->booking, context: $this->activityContext($ticket, $state, $actor));
 
             return $state;
@@ -166,6 +250,7 @@ final class TicketPrintService
                 return $state;
             }
             $this->assertCurrentOperation($state, $actor, $operationId, $token);
+            $incidentResolutionId = $state->active_seat_incident_resolution_id;
             $state->forceFill([
                 'status' => BookingTicketPrint::STATUS_RETRY_ALLOWED,
                 'last_failed_by_user_id' => $actor->id,
@@ -174,7 +259,7 @@ final class TicketPrintService
                 'last_completed_operation_id' => $operationId,
                 ...$this->clearActiveOperation(),
             ])->save();
-            $this->event($state, $actor, 'print_failed', $reason, $this->safeNote($note), $operationId);
+            $this->event($state, $actor, 'print_failed', $reason, $this->safeNote($note), $operationId, $incidentResolutionId);
             $this->activities->log('ticket.print_failed', $ticket->booking, context: $this->activityContext($ticket, $state, $actor) + ['failure_code' => $reason]);
 
             return $state;
@@ -194,6 +279,7 @@ final class TicketPrintService
             abort_unless($state->active_operator_user_id === $actor->id, 403);
             abort_unless($state->active_operation_expires_at?->isPast(), 409, 'Phiên in vẫn còn hiệu lực.');
             $operationId = $state->active_operation_id;
+            $incidentResolutionId = $state->active_seat_incident_resolution_id;
             $state->forceFill([
                 'status' => BookingTicketPrint::STATUS_RETRY_ALLOWED,
                 'last_failed_by_user_id' => $actor->id,
@@ -202,7 +288,7 @@ final class TicketPrintService
                 'last_completed_operation_id' => $operationId,
                 ...$this->clearActiveOperation(),
             ])->save();
-            $this->event($state, $actor, 'print_failed', $reason, $this->safeNote($note), $operationId);
+            $this->event($state, $actor, 'print_failed', $reason, $this->safeNote($note), $operationId, $incidentResolutionId);
 
             return $state;
         }, 3);
@@ -234,12 +320,13 @@ final class TicketPrintService
         abort_unless($this->sameActiveOperation($state, $actor, $operationId, $token), 410, 'Lần in này đã hết hiệu lực.');
     }
 
-    private function event(BookingTicketPrint $state, User $actor, string $type, ?string $reason, ?string $note, ?string $operationId): void
+    private function event(BookingTicketPrint $state, User $actor, string $type, ?string $reason, ?string $note, ?string $operationId, ?int $incidentResolutionId = null): void
     {
         BookingTicketPrintEvent::query()->create([
             'booking_ticket_print_id' => $state->id,
             'admission_ticket_id' => $state->admission_ticket_id,
             'booking_id' => $state->booking_id,
+            'seat_incident_resolution_id' => $incidentResolutionId,
             'actor_user_id' => $actor->id,
             'actor_role_snapshot' => Str::limit((string) $actor->role?->slug, 64, ''),
             'event_type' => $type,
@@ -271,6 +358,7 @@ final class TicketPrintService
             'active_operation_id' => null,
             'active_operation_token_hash' => null,
             'active_operator_user_id' => null,
+            'active_seat_incident_resolution_id' => null,
             'active_operation_expires_at' => null,
         ];
     }

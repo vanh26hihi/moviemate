@@ -36,6 +36,19 @@
         </div>
     </article>
 
+    @if(($relocations ?? collect())->isNotEmpty())
+        <section class="cinema-card border-l-4 border-brand-start p-6" aria-labelledby="relocation-notice-title">
+            <h2 id="relocation-notice-title" class="text-xl font-extrabold app-heading">Cập nhật ghế do sự cố</h2>
+            @foreach($relocations as $relocation)
+                <p class="mt-2 app-text">Ghế {{ $relocation->originalSeat->seat_code }} đã được đổi sang <strong>{{ $relocation->replacementSeat->seat_code }}</strong> do sự cố ghế.</p>
+            @endforeach
+            <p class="mt-3 font-bold text-success">Bạn không phải thanh toán thêm.</p>
+            @if($relocations->contains(fn($relocation) => $relocation->reprint_required && !$relocation->reprint_satisfied_at))
+                <p class="mt-2 text-sm app-muted">Vé giấy cũ cần được thay thế. Vui lòng đến quầy nhân viên.</p>
+            @endif
+        </section>
+    @endif
+
     @if($booking->foodOrder?->items->isNotEmpty())
         <section class="cinema-card p-6" aria-labelledby="food-title">
             <h2 id="food-title" class="text-xl font-extrabold app-heading">Đồ ăn</h2>

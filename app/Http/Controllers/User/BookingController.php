@@ -8,6 +8,7 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\FoodItem;
 use App\Models\Seat;
+use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
@@ -236,9 +237,14 @@ class BookingController extends Controller
             $isUsable => 'valid',
             default => 'invalid',
         };
+        $relocations = SeatIncidentResolution::query()
+            ->whereIn('resolution_type', [SeatIncidentResolution::TYPE_EQUIVALENT, SeatIncidentResolution::TYPE_UPGRADE])
+            ->whereHas('impact.bookingSeat', fn ($query) => $query->where('booking_id', $booking->id))
+            ->with(['originalSeat:id,seat_code', 'replacementSeat:id,seat_code'])
+            ->oldest('id')->get();
 
         return response()->view('user.bookings.ticket', compact(
-            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'bookingQrPayload', 'ticketState'
+            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'bookingQrPayload', 'ticketState', 'relocations'
         ))->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache');
     }

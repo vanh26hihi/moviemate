@@ -13,6 +13,7 @@ use App\Services\Admin\AdminSeatMaintenanceQuery;
 use App\Services\CinemaAccessService;
 use App\Services\Seats\SeatIncidentImpactClassifier;
 use App\Services\Seats\SeatMaintenanceService;
+use App\Services\Seats\SeatRelocationCandidateService;
 use App\Support\StatusLabel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -56,6 +57,7 @@ final class SeatMaintenanceController extends Controller
         SeatIncident $incident,
         CinemaAccessService $cinemaAccess,
         SeatIncidentImpactClassifier $classifier,
+        SeatRelocationCandidateService $candidates,
     ): View {
         $cinemaAccess->authorizeCinema(auth()->user(), (int) $room->cinema_id);
         abort_unless((int) $incident->room_id === (int) $room->id
@@ -80,8 +82,14 @@ final class SeatMaintenanceController extends Controller
                         : $classifier->classify($booking),
                 ];
             })->values();
+        if ($groups->contains(fn (array $group): bool => $group['classification'] === 'paid')) {
+            $incident->impacts->load(['resolution.originalSeat', 'resolution.replacementSeat']);
+        } else {
+            $incident->impacts->each(fn ($impact) => $impact->setRelation('resolution', null));
+        }
+        $relocationOptions = $candidates->forIncident($incident);
 
-        return view('admin.rooms.seat-incident-show', compact('room', 'incident', 'groups'));
+        return view('admin.rooms.seat-incident-show', compact('room', 'incident', 'groups', 'relocationOptions'));
     }
 
     public function bulk(

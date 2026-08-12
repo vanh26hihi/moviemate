@@ -26,6 +26,7 @@
         <div class="mt-4 grid gap-5 xl:grid-cols-2">
             @foreach($booking->admissionTickets as $ticket)
                 @php($state = $ticket->printState)
+                @php($incidentResolution = $incidentReprints->get($ticket->booking_seat_id))
                 <article class="cinema-card p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div><p class="text-sm app-muted">Ghế hành khách</p><h3 class="text-3xl font-extrabold text-brand-start">{{ $ticket->seat_code }}</h3><p class="mt-1 break-all font-mono text-xs app-muted">{{ $ticket->ticket_code }}</p></div>
@@ -37,7 +38,15 @@
 
                     @can('tickets.print')
                         <div class="mt-5">
-                            @if(!$state)
+                            @if($incidentResolution)
+                                <div class="rounded-xl bg-warning/10 p-4">
+                                    <p class="font-extrabold text-warning">Cần in lại do đổi ghế</p>
+                                    <p class="mt-1 text-sm app-muted">Lý do được hệ thống xác thực từ sự cố ghế; không cần nhập thủ công.</p>
+                                    <form method="POST" action="{{ route('staff.admission-tickets.print.incident-reprint', [$ticket, $incidentResolution]) }}" class="mt-3" data-submit-once>
+                                        @csrf<button class="btn-primary" type="submit">In vé thay thế</button>
+                                    </form>
+                                </div>
+                            @elseif(!$state)
                                 <form method="POST" action="{{ route('staff.admission-tickets.print.start', $ticket) }}" data-submit-once>@csrf<button class="btn-primary" type="submit">In vé</button></form>
                             @elseif(in_array($state->status, ['printed', 'retry_allowed', 'retry_requires_authorization', 'retry_authorized'], true))
                                 <form method="POST" action="{{ route('staff.admission-tickets.print.reprint', $ticket) }}" class="space-y-3" data-submit-once>
@@ -59,7 +68,7 @@
 
                     @if($state?->events->isNotEmpty())
                         <details class="mt-5"><summary class="cursor-pointer font-bold">Lịch sử in</summary><ul class="mt-3 space-y-2 text-sm">
-                            @foreach($state->events->sortByDesc('id') as $event)<li>#{{ $event->attempt_number }} · {{ $event->event_type }} · {{ $event->actor?->name ?? 'Hệ thống' }} @if($event->failure_code)· {{ \App\Services\Tickets\TicketPrintService::REPRINT_REASONS[$event->failure_code] ?? \App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? $event->failure_code }}@endif</li>@endforeach
+                            @foreach($state->events->sortByDesc('id') as $event)<li>#{{ $event->attempt_number }} · {{ $event->event_type }} · {{ $event->actor?->name ?? 'Hệ thống' }} @if($event->failure_code)· {{ $event->failure_code === \App\Services\Tickets\TicketPrintService::INCIDENT_REPRINT_REASON ? 'Đổi ghế do sự cố' : (\App\Services\Tickets\TicketPrintService::REPRINT_REASONS[$event->failure_code] ?? \App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? $event->failure_code) }}@endif</li>@endforeach
                         </ul></details>
                     @endif
                 </article>

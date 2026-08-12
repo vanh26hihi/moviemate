@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\SeatIncidentResolution;
 use App\Services\CinemaAccessService;
 use App\Services\Tickets\BookingLookupCapability;
 use App\Services\Tickets\BookingQrPayload;
@@ -58,12 +59,19 @@ final class TicketWorkspaceController extends Controller
             $booking->payment_status !== 'paid' || ! $verified => 'Vé chưa có thanh toán được xác minh.',
             default => 'Vé hợp lệ và đã thanh toán.',
         };
+        $incidentReprints = SeatIncidentResolution::query()
+            ->where('reprint_required', true)->whereNull('reprint_satisfied_at')
+            ->whereHas('impact', fn ($query) => $query->where('resolution_status', 'unresolved')
+                ->whereHas('incident', fn ($incident) => $incident->where('status', 'open'))
+                ->whereHas('bookingSeat', fn ($seat) => $seat->where('booking_id', $booking->id)))
+            ->with('impact:id,booking_seat_id')->get()->keyBy('impact.booking_seat_id');
 
         return view('staff.tickets.operations', [
             'booking' => $booking,
             'customerName' => PrivacyMask::name($booking->customer_name ?: $booking->user?->name),
             'customerEmail' => PrivacyMask::email($booking->recipient_email),
             'eligibilityMessage' => $eligibility,
+            'incidentReprints' => $incidentReprints,
         ]);
     }
 }

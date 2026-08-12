@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\AdmissionTicket;
 use App\Models\Booking;
+use App\Models\SeatIncidentResolution;
 use App\Services\Tickets\BookingPrintAmountAllocator;
 use App\Services\Tickets\TicketPrintService;
 use App\Services\Tickets\TicketResolutionService;
@@ -38,6 +39,21 @@ final class TicketPrintController extends Controller
     public function reprintTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
     {
         return $this->reprintResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
+    }
+
+    public function incidentReprintTicket(
+        Request $request,
+        AdmissionTicket $admissionTicket,
+        SeatIncidentResolution $resolution,
+        TicketResolutionService $tickets,
+        TicketPrintService $prints,
+    ): RedirectResponse {
+        $ticket = $tickets->authorizedTicket($admissionTicket, $request->user());
+        $operation = $this->newOperation($request, $ticket);
+        $prints->incidentReprint($ticket, $resolution, $request->user(), $operation['id'], $operation['token']);
+
+        return redirect()->route('staff.admission-tickets.print.show', $ticket)
+            ->with('success', 'Đã bắt đầu in vé thay thế do đổi ghế.');
     }
 
     public function show(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints, BookingPrintAmountAllocator $amounts): Response|RedirectResponse
