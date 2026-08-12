@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Services\Tickets\BookingPrintAmountAllocator;
 use App\Services\Tickets\FoodPickupVoucherPrintService;
 use App\Services\Tickets\TicketPrintService;
 use App\Services\Tickets\TicketResolutionService;
@@ -21,10 +22,11 @@ final class PrintAllController extends Controller
         TicketResolutionService $tickets,
         TicketPrintService $ticketPrints,
         FoodPickupVoucherPrintService $voucherPrints,
+        BookingPrintAmountAllocator $amounts,
     ): Response {
         $tickets->authorizedBooking($booking, $request->user());
 
-        $booking = DB::transaction(function () use ($booking, $request, $ticketPrints, $voucherPrints): Booking {
+        [$booking, $printAmounts] = DB::transaction(function () use ($booking, $request, $ticketPrints, $voucherPrints, $amounts): array {
             $booking = Booking::query()
                 ->with(['payments', 'admissionTickets.printState', 'foodPickupVoucher', 'foodOrder.items'])
                 ->lockForUpdate()
@@ -35,6 +37,8 @@ final class PrintAllController extends Controller
                 || ($booking->foodPickupVoucher && $booking->foodPickupVoucher->print_count > 0)) {
                 throw new HttpException(409, 'In toàn bộ chỉ dùng cho lần in đầu. Hãy in lại từng tài liệu và cung cấp lý do.');
             }
+
+            $printAmounts = $amounts->allocate($booking);
 
             foreach ($booking->admissionTickets as $ticket) {
                 $operationId = (string) Str::uuid();
@@ -47,7 +51,7 @@ final class PrintAllController extends Controller
                 $voucherPrints->record($booking->foodPickupVoucher, $request->user(), null);
             }
 
-            return $booking->fresh([
+            return [$booking->fresh([
                 'showtime.movie',
                 'showtime.cinema',
                 'showtime.room',
@@ -56,10 +60,13 @@ final class PrintAllController extends Controller
                 'admissionTickets.lastPrintedBy:id,name',
                 'foodOrder.items',
                 'foodPickupVoucher.lastPrintedBy:id,name',
-            ]);
+            ]), $printAmounts];
         }, 3);
 
-        return response()->view('staff.tickets.print-all', ['booking' => $booking])
+        return response()->view('staff.tickets.print-all', [
+            'booking' => $booking,
+            'printAmounts' => $printAmounts,
+        ])
             ->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache');
     }

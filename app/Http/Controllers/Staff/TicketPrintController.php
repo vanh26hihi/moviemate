@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\AdmissionTicket;
 use App\Models\Booking;
+use App\Services\Tickets\BookingPrintAmountAllocator;
 use App\Services\Tickets\TicketPrintService;
 use App\Services\Tickets\TicketResolutionService;
 use Illuminate\Http\RedirectResponse;
@@ -39,14 +40,14 @@ final class TicketPrintController extends Controller
         return $this->reprintResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
     }
 
-    public function show(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): Response|RedirectResponse
+    public function show(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints, BookingPrintAmountAllocator $amounts): Response|RedirectResponse
     {
-        return $this->showResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints);
+        return $this->showResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints, $amounts);
     }
 
-    public function showTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints): Response|RedirectResponse
+    public function showTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints, BookingPrintAmountAllocator $amounts): Response|RedirectResponse
     {
-        return $this->showResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
+        return $this->showResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints, $amounts);
     }
 
     public function succeed(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
@@ -102,7 +103,7 @@ final class TicketPrintController extends Controller
         return redirect()->route('staff.admission-tickets.print.show', $ticket)->with('success', 'Đã ghi nhận lý do và bắt đầu in lại.');
     }
 
-    private function showResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints): Response|RedirectResponse
+    private function showResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints, BookingPrintAmountAllocator $amounts): Response|RedirectResponse
     {
         $operation = $this->currentOperation($request, $ticket);
         if ($operation === null) {
@@ -119,12 +120,13 @@ final class TicketPrintController extends Controller
         }
         $booking = $ticket->booking;
         $booking->loadMissing(['payments.settledBy:id,name', 'createdByStaff:id,name', 'foodOrder.items']);
+        $printAmounts = $amounts->allocate($booking);
 
         return response()->view('staff.tickets.print', [
             'ticket' => $ticket,
             'booking' => $booking,
             'printState' => $state,
-            'ticketQrPayload' => $ticket->ticket_code,
+            'allocatedAmount' => $printAmounts->forTicket($ticket),
             'failureReasons' => TicketPrintService::FAILURE_REASONS,
             'printOperationId' => $operation['id'],
         ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')->header('Pragma', 'no-cache');

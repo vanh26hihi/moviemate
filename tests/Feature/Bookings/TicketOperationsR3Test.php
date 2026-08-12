@@ -115,9 +115,9 @@ final class TicketOperationsR3Test extends PaymentTestCase
 
         $this->get(route('staff.tickets.print.show', $booking))
             ->assertOk()->assertSee($booking->booking_code)->assertSee('data-staff-print-trigger', false)
-            ->assertSee('MOVIEMATE')->assertSee('VÉ XEM PHIM')->assertSee('width:80mm', false)
-            ->assertSee('data-qr-value="'.$booking->admissionTickets()->sole()->ticket_code.'"', false)
-            ->assertDontSee('data-qr-value="'.$booking->booking_code.'"', false)
+            ->assertSee('MOVIEMATE')->assertSee('VÉ VÀO PHÒNG CHIẾU PHIM')->assertSee('width:80mm', false)
+            ->assertSee($booking->admissionTickets()->sole()->ticket_code)
+            ->assertDontSee('data-qr-value', false)
             ->assertDontSee('provider')->assertDontSee('ticket_email_token');
         $this->get(route('staff.tickets.print.show', $booking))->assertOk();
         $this->assertSame(1, BookingTicketPrint::query()->sole()->attempts_count);

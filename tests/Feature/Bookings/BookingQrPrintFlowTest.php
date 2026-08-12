@@ -154,6 +154,11 @@ final class BookingQrPrintFlowTest extends PaymentTestCase
             'food_item_id' => $food->id, 'quantity' => 1, 'snapshot_name' => 'Coca',
             'unit_price' => 30000, 'line_total' => 30000, 'price' => 30000, 'total' => 30000,
         ]);
+        $booking->forceFill([
+            'food_subtotal' => 30000,
+            'gross_amount' => (int) $booking->seat_subtotal + 30000,
+            'total_amount' => (int) $booking->seat_subtotal + 30000,
+        ])->save();
 
         return $this->verifyBooking($booking);
     }
