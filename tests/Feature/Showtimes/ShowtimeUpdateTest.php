@@ -109,7 +109,7 @@ class ShowtimeUpdateTest extends ShowtimeTestCase
         $before = $showtime->getAttributes();
 
         $this->actingAs($this->userWithRole('admin'))->put(route('admin.showtimes.update', $showtime), $this->payload($movie, $room, [
-            'show_time' => '18:30', 'price' => 999999, 'status' => 'finished',
+            'show_time' => '18:30', 'price' => 999999,
         ]))->assertSessionHasErrors('show_time');
 
         $after = $showtime->fresh()->getAttributes();

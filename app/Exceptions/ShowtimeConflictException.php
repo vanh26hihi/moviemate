@@ -22,6 +22,6 @@ class ShowtimeConflictException extends ShowtimeScheduleException
             $conflictingWindow->movieEnd->format('d/m/Y H:i'),
             $conflictingWindow->operationalEnd->format('d/m/Y H:i'),
             $conflictingWindow->cleaningBufferMinutes,
-        ), 'show_time');
+        ), 'show_time', 'ROOM_CONFLICT');
     }
 }

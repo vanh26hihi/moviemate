@@ -11,15 +11,25 @@
             Chi nhánh: {{ $showtime->cinema?->name ?? $cinema?->name ?? '—' }} · Sơ đồ hiện tại: phiên bản {{ $showtime->roomLayout->version }}
         </p>
 
-        <form method="POST" action="{{ route('admin.showtimes.update', $showtime) }}" class="space-y-6">
-            @csrf
-            @method('PUT')
-            @include('admin.showtimes._form-fields')
-            <div class="flex justify-end gap-3">
-                <a href="{{ route('admin.showtimes.index') }}" class="btn-secondary">Hủy</a>
-                <button class="btn-primary">Cập nhật</button>
+        @error('showtime')<div class="rounded-2xl border border-error/30 bg-error/10 p-4 text-sm text-error mb-6">{{ $message }}</div>@enderror
+
+        @if($hasBookingHistory)
+            <div class="rounded-2xl border border-warning/30 bg-warning/10 p-5">
+                <p class="font-bold app-text">Suất chiếu đã phát sinh đơn đặt vé nên không thể thay đổi phim, phòng, ngày hoặc giờ chiếu.</p>
+                <p class="mt-2 text-sm app-muted">Dữ liệu lịch chiếu được giữ nguyên để bảo toàn lịch sử đặt vé.</p>
+                <a href="{{ route('admin.showtimes.index') }}" class="btn-secondary mt-5">Quay lại danh sách</a>
             </div>
-        </form>
+        @else
+            <form method="POST" action="{{ route('admin.showtimes.update', $showtime) }}" class="space-y-6">
+                @csrf
+                @method('PUT')
+                @include('admin.showtimes._form-fields')
+                <div class="flex justify-end gap-3">
+                    <a href="{{ route('admin.showtimes.index') }}" class="btn-secondary">Hủy</a>
+                    <button class="btn-primary">Cập nhật</button>
+                </div>
+            </form>
+        @endif
     </div>
 </div>
 @endsection

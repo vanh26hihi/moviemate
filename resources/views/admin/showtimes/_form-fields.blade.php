@@ -30,7 +30,7 @@
                         ? $showtime->roomLayout
                         : $room->latestPublishedLayout;
                 @endphp
-                <option value="{{ $room->id }}" data-cinema-id="{{ $room->cinema_id }}" data-layout-version="{{ $layout->version }}" data-cleaning-buffer="{{ $room->cleaning_buffer_minutes ?? $room->cinema->default_cleaning_buffer_minutes ?? $cleaningBufferMinutes }}" @selected($roomValue == $room->id)>
+                <option value="{{ $room->id }}" data-cinema-id="{{ $room->cinema_id }}" data-timezone="{{ $room->cinema->timezone ?? $cinemaTimezone }}" data-layout-version="{{ $layout->version }}" data-cleaning-buffer="{{ $room->cleaning_buffer_minutes ?? $room->cinema->default_cleaning_buffer_minutes ?? $cleaningBufferMinutes }}" @selected($roomValue == $room->id)>
                     {{ $room->code }} — {{ $room->name }} (sơ đồ phiên bản {{ $layout->version }})
                 </option>
             @endforeach
@@ -57,21 +57,14 @@
         <p id="showtime-price-preview" class="mt-2 text-sm font-bold text-brand-start" aria-live="polite">Chọn phòng và thời gian để xem giá theo loại ghế.</p>
     </div>
 
-    <div>
-        <label class="cinema-label" for="status">Trạng thái *</label>
-        <select id="status" name="status" class="cinema-input">
-            @foreach(['active' => 'Đang chiếu', 'cancelled' => 'Đã hủy', 'finished' => 'Đã chiếu xong'] as $value => $label)
-                <option value="{{ $value }}" @selected(old('status', $editing ? $showtime->status : 'active') === $value)>{{ $label }}</option>
-            @endforeach
-        </select>
-        @error('status')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
-    </div>
+    <input type="hidden" name="status" value="active">
+    @error('status')<p class="text-sm text-error md:col-span-2">{{ $message }}</p>@enderror
 </div>
 
 <section id="schedule-preview" class="rounded-2xl border app-border p-5 bg-white/5" data-cleaning-buffer="{{ $cleaningBufferMinutes }}" data-timezone="{{ $cinemaTimezone }}">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h2 class="font-extrabold app-text">Xem trước thời gian vận hành phòng</h2>
-        <span class="text-xs app-muted">Múi giờ: {{ $cinemaTimezone }}</span>
+        <span class="text-xs app-muted">Múi giờ: <span id="schedule-timezone-label">{{ $cinemaTimezone }}</span></span>
     </div>
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
         <div><span class="app-muted block">Thời lượng phim</span><strong id="preview-runtime" class="app-text">-- phút</strong></div>
@@ -94,11 +87,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const movieEndOutput = document.getElementById('preview-movie-end');
     const roomReadyOutput = document.getElementById('preview-room-ready');
     const cleaningOutput = document.getElementById('preview-cleaning-buffer');
+    const timezoneLabel = document.getElementById('schedule-timezone-label');
 
     const pad = value => String(value).padStart(2, '0');
     const formatWallClock = value => `${pad(value.getUTCDate())}/${pad(value.getUTCMonth() + 1)}/${value.getUTCFullYear()} ${pad(value.getUTCHours())}:${pad(value.getUTCMinutes())}`;
 
     function refreshSchedulePreview() {
+        timezoneLabel.textContent = room.selectedOptions[0]?.dataset.timezone ?? preview.dataset.timezone;
         const runtime = Number(movie.selectedOptions[0]?.dataset.runtime);
         const buffer = Number(room.selectedOptions[0]?.dataset.cleaningBuffer ?? preview.dataset.cleaningBuffer);
         cleaningOutput.textContent = Number.isInteger(buffer) ? `${buffer} phút` : '-- phút';

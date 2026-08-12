@@ -109,12 +109,8 @@ class ShowtimeOverlapTest extends ShowtimeTestCase
 
         $this->actingAs($this->userWithRole('admin'))->post(route('admin.showtimes.store'), $this->payload($movie, $room))
             ->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
-        $this->actingAs($this->userWithRole('admin'))->post(route('admin.showtimes.store'), $this->payload($movie, $room, [
-            'status' => 'cancelled',
-        ]))->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
-
         $this->assertDatabaseHas('showtimes', ['id' => $cancelled->id, 'status' => 'cancelled']);
-        $this->assertDatabaseCount('showtimes', 3);
+        $this->assertDatabaseCount('showtimes', 2);
     }
 
     public function test_previous_day_occupancy_blocks_after_midnight_and_boundary_is_allowed(): void

@@ -29,7 +29,9 @@ class ShowtimeController extends Controller
 
     public function index(Request $request)
     {
-        $query = Showtime::query()->with(['movie', 'cinema', 'room', 'roomLayout']);
+        $query = Showtime::query()
+            ->with(['movie', 'cinema', 'room', 'roomLayout'])
+            ->withExists(['bookings', 'bookingSeats']);
         $this->cinemaAccess->scope($query, $request->user(), 'showtimes.cinema_id');
 
         if ($movieId = $request->query('movie_id')) {
@@ -79,14 +81,16 @@ class ShowtimeController extends Controller
         $room = Room::query()->findOrFail($request->validated('room_id'));
         $this->cinemaAccess->authorizeCinema($request->user(), (int) $room->cinema_id);
         try {
-            DB::transaction(function () use ($request): void {
-                $showtime = $this->schedule->schedule($request->validated());
-                $this->activityLogger->log(
-                    'showtime.created',
-                    $showtime,
-                    after: $this->auditData($showtime),
-                );
-            });
+            $this->schedule->schedule(
+                $request->validated(),
+                function (Showtime $showtime): void {
+                    $this->activityLogger->log(
+                        'showtime.created',
+                        $showtime,
+                        after: $this->auditData($showtime),
+                    );
+                },
+            );
         } catch (ShowtimeScheduleException|PricingConfigurationException $exception) {
             $field = $exception instanceof ShowtimeScheduleException ? $exception->field : 'room_id';
 
@@ -106,6 +110,7 @@ class ShowtimeController extends Controller
             ...$this->formData(),
             'showtime' => $showtime,
             'showtimeWindow' => $this->schedule->windowFor($showtime),
+            'hasBookingHistory' => $this->schedule->hasBookingHistory($showtime),
         ]);
     }
 
@@ -116,17 +121,19 @@ class ShowtimeController extends Controller
         $targetRoom = Room::query()->findOrFail($request->validated('room_id'));
         $this->cinemaAccess->authorizeCinema($request->user(), (int) $targetRoom->cinema_id);
 
-        $before = $this->auditData($showtime);
         try {
-            DB::transaction(function () use ($request, $showtime, $before): void {
-                $updated = $this->schedule->reschedule($showtime, $request->validated());
-                $this->activityLogger->log(
-                    'showtime.updated',
-                    $updated,
-                    $before,
-                    $this->auditData($updated),
-                );
-            });
+            $this->schedule->reschedule(
+                $showtime,
+                $request->validated(),
+                function (Showtime $updated, Showtime $before): void {
+                    $this->activityLogger->log(
+                        'showtime.updated',
+                        $updated,
+                        $this->auditData($before),
+                        $this->auditData($updated),
+                    );
+                },
+            );
         } catch (ShowtimeScheduleException|PricingConfigurationException $exception) {
             $field = $exception instanceof ShowtimeScheduleException ? $exception->field : 'room_id';
 
@@ -171,12 +178,14 @@ class ShowtimeController extends Controller
 
     private function formData(): array
     {
+        $cinema = $this->cinemaAccess->currentCinema(auth()->user());
+
         return [
             'movies' => Movie::query()->whereIn('status', Movie::SCHEDULABLE_STATUSES)->orderBy('title')->get(),
             'rooms' => $this->operationalRooms(),
-            'cinema' => $this->cinemaAccess->currentCinema(auth()->user()),
+            'cinema' => $cinema,
             'cleaningBufferMinutes' => $this->schedule->cleaningBufferMinutes(),
-            'cinemaTimezone' => $this->schedule->timezone(),
+            'cinemaTimezone' => $cinema?->timezone ?? $this->schedule->timezone(),
         ];
     }
 
@@ -200,7 +209,8 @@ class ShowtimeController extends Controller
     private function assertUpcomingForMutation(Showtime $showtime): void
     {
         abort_unless(
-            $this->lifecycle->state($showtime) === ShowtimeLifecycleService::UPCOMING,
+            $showtime->status === 'active'
+                && $this->lifecycle->state($showtime) === ShowtimeLifecycleService::UPCOMING,
             409,
             'Chỉ có thể chỉnh sửa suất chiếu sắp diễn ra.',
         );
