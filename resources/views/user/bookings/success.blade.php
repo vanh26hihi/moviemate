@@ -36,7 +36,7 @@
     $states = [
         'paid' => [
             'title' => 'Đặt vé thành công',
-            'message' => 'Thanh toán đã được xác minh và vé điện tử đã sẵn sàng. Bạn có thể mở vé và lưu mã QR để sử dụng tại rạp.',
+            'message' => 'Thanh toán đã được xác minh. Đơn đặt vé và QR đơn đặt vé đã sẵn sàng để xuất trình tại quầy.',
             'icon' => 'ph-check-circle',
             'colour' => 'text-success',
             'badge' => 'Đã thanh toán',
@@ -50,21 +50,21 @@
         ],
         'review' => [
             'title' => 'Giao dịch cần được hỗ trợ',
-            'message' => 'Giao dịch này cần bộ phận hỗ trợ kiểm tra thêm trước khi phát hành vé. Bạn không cần thao tác gì thêm; MovieMate sẽ cập nhật khi có kết quả chính thức.',
+            'message' => 'Giao dịch này cần bộ phận hỗ trợ kiểm tra thêm trước khi xác nhận đơn đặt vé. Bạn không cần thao tác gì thêm; MovieMate sẽ cập nhật khi có kết quả chính thức.',
             'icon' => 'ph-magnifying-glass',
             'colour' => 'text-warning',
             'badge' => 'Cần hỗ trợ',
         ],
         'failed' => [
             'title' => 'Thanh toán không thành công',
-            'message' => 'Giao dịch không thành công nên đơn đặt vé này không có vé điện tử. Bạn có thể chọn lại ghế và thanh toán lần khác.',
+            'message' => 'Giao dịch không thành công nên đơn đặt vé này chưa đủ điều kiện nhận vé. Bạn có thể chọn lại ghế và thanh toán lần khác.',
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
             'badge' => 'Không thành công',
         ],
         'expired' => [
             'title' => 'Đơn đặt vé đã hết hạn',
-            'message' => 'Thời gian giữ ghế đã kết thúc và ghế đã được giải phóng. Nếu bạn vừa thanh toán, hệ thống sẽ kiểm tra và liên hệ hỗ trợ thay vì tự phát hành vé.',
+            'message' => 'Thời gian giữ ghế đã kết thúc và ghế đã được giải phóng. Nếu bạn vừa thanh toán, hệ thống sẽ kiểm tra và liên hệ hỗ trợ thay vì tự xác nhận đơn đặt vé.',
             'icon' => 'ph-clock-countdown',
             'colour' => 'text-slate-400',
             'badge' => 'Hết hạn',
@@ -84,11 +84,11 @@
     $delivery = $booking?->ticketDelivery;
     $deliveryState = $delivery?->status ?? 'missing';
     $deliveryLabels = [
-        'pending' => ['label' => 'Đang chờ gửi', 'message' => 'Yêu cầu đã nằm trong hàng đợi gửi vé.'],
-        'processing' => ['label' => 'Đang gửi', 'message' => 'Hệ thống đang chuyển vé tới mail transport.'],
+        'pending' => ['label' => 'Đang chờ gửi', 'message' => 'Yêu cầu đã nằm trong hàng đợi gửi tài liệu nhận vé.'],
+        'processing' => ['label' => 'Đang gửi', 'message' => 'Hệ thống đang chuyển tài liệu nhận vé tới mail transport.'],
         'sent' => ['label' => 'Đã gửi', 'message' => 'Mail transport đã tiếp nhận thư. Vui lòng kiểm tra cả thư rác.'],
         'failed' => ['label' => 'Sẽ thử lại', 'message' => 'Lần gửi gần nhất chưa thành công và được giữ lại để thử lại an toàn.'],
-        'missing' => ['label' => 'Chưa xếp hàng', 'message' => 'Chưa ghi nhận trạng thái gửi email vé.'],
+        'missing' => ['label' => 'Chưa xếp hàng', 'message' => 'Chưa ghi nhận trạng thái gửi tài liệu nhận vé.'],
     ];
     $deliveryCopy = $deliveryLabels[$deliveryState] ?? $deliveryLabels['missing'];
     if ($deliveryState === 'sent' && ! $mailDeliveryReady) {
@@ -134,22 +134,22 @@
                 <section class="mt-6 rounded-2xl border border-brand-start/25 bg-brand-start/5 p-4 sm:p-5" aria-labelledby="paid-ticket-actions-title">
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <h2 id="paid-ticket-actions-title" class="font-extrabold app-text">Vé của bạn đã sẵn sàng</h2>
-                            <p class="mt-1 text-sm app-muted">Mở vé điện tử và xuất trình mã QR khi đến rạp.</p>
+                            <h2 id="paid-ticket-actions-title" class="font-extrabold app-text">Đơn đặt vé của bạn đã sẵn sàng</h2>
+                            <p class="mt-1 text-sm app-muted">Vui lòng xuất trình mã đơn hoặc QR đơn đặt vé tại quầy để nhận vé.</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             <a href="{{ $ticketRoute }}" class="btn-primary" data-paid-ticket-link>
-                                <i class="ph-fill ph-ticket" aria-hidden="true"></i> Xem vé
+                                <i class="ph-fill ph-ticket" aria-hidden="true"></i> Xem đơn đặt vé
                             </a>
                             <a href="{{ $myTicketsUrl }}" class="btn-secondary">
-                                <i class="ph-bold ph-ticket" aria-hidden="true"></i> Về vé của tôi
+                                <i class="ph-bold ph-ticket" aria-hidden="true"></i> Về lịch sử đặt vé
                             </a>
                         </div>
                     </div>
 
                     <div class="mt-4 grid gap-3 border-t pt-4 app-border sm:grid-cols-[1fr_auto] sm:items-center">
                         <div class="min-w-0 text-sm">
-                            <p class="font-bold app-text">Email vé: {{ $deliveryCopy['label'] }}</p>
+                            <p class="font-bold app-text">Tài liệu nhận vé qua email: {{ $deliveryCopy['label'] }}</p>
                             <p class="mt-1 break-all app-muted">{{ $booking->recipient_email }}</p>
                             <p class="mt-1 app-muted">{{ $deliveryCopy['message'] }}</p>
                             @if($delivery?->sent_at)
@@ -161,7 +161,7 @@
                                 @csrf
                                 <button type="submit" class="btn-secondary w-full" data-loading-label="Đang ghi nhận…">
                                     <i class="ph-bold ph-envelope-simple" aria-hidden="true"></i>
-                                    Gửi lại email vé
+                                    Gửi lại tài liệu nhận vé
                                 </button>
                                 <p class="mt-1 text-center text-xs app-muted" data-submit-status aria-live="polite"></p>
                             </form>
@@ -251,7 +251,7 @@
                 @if($isPaid)
                     <a href="{{ $ticketRoute }}" class="btn-primary" data-paid-ticket-link>
                         <i class="ph-fill ph-ticket" aria-hidden="true"></i>
-                        Xem vé
+                        Xem đơn đặt vé
                     </a>
                 @elseif($isPending && $paymentAction['can_resume'])
                     <form method="POST" action="{{ $booking ? route('payments.resume', $booking) : route('home') }}" data-submit-once>

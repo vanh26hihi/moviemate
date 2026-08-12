@@ -18,7 +18,7 @@
                 </div>
 
                 <h1 class="hero-title text-4xl sm:text-5xl lg:text-6xl font-extrabold app-text max-w-4xl">
-                    Chọn phim hay, đặt ghế nhanh, vào rạp bằng vé QR.
+                    Chọn phim hay, đặt ghế nhanh, nhận vé tại quầy bằng QR đơn đặt vé.
                 </h1>
                 <p class="mt-5 text-base sm:text-lg app-muted leading-relaxed max-w-2xl">
                     MovieMate kết hợp lịch chiếu rõ ràng, chọn ghế trực quan và AI gợi ý phim để mỗi buổi xem đều dễ quyết định hơn.

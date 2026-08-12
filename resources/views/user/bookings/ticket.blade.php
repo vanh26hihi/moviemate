@@ -58,9 +58,9 @@
     </section>
 
     @if($bookingQrPayload)
-        <p class="rounded-2xl bg-brand-start/10 p-4 text-center font-bold text-brand-start">Vui lòng xuất trình mã đơn hoặc QR tại quầy để nhận vé.</p>
+        <p class="rounded-2xl bg-brand-start/10 p-4 text-center font-bold text-brand-start">Vui lòng xuất trình mã đơn hoặc QR đơn đặt vé tại quầy để nhận vé.</p>
     @else
-        <p class="rounded-2xl bg-warning/10 p-4 text-center font-bold text-warning">Đơn chưa đủ điều kiện phát hành QR nhận vé.</p>
+        <p class="rounded-2xl bg-warning/10 p-4 text-center font-bold text-warning">Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.</p>
     @endif
 </div>
 @endsection

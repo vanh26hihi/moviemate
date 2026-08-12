@@ -38,7 +38,7 @@
             <section class="cinema-card p-5"><h2 class="font-extrabold app-heading">Thông tin khách (không bắt buộc)</h2>
                 <label class="cinema-label mt-4 block">Tên khách<input class="cinema-input mt-1" name="customer_name" maxlength="120" value="{{ old('customer_name') }}"></label>
                 <label class="cinema-label mt-3 block">Điện thoại<input class="cinema-input mt-1" name="customer_phone" maxlength="30" value="{{ old('customer_phone') }}"></label>
-                <label class="cinema-label mt-3 block">Email<input class="cinema-input mt-1" type="email" name="customer_email" maxlength="255" value="{{ old('customer_email') }}"><span class="mt-1 block text-xs app-muted">Chỉ gửi vé điện tử khi có email.</span></label>
+                <label class="cinema-label mt-3 block">Email<input class="cinema-input mt-1" type="email" name="customer_email" maxlength="255" value="{{ old('customer_email') }}"><span class="mt-1 block text-xs app-muted">Chỉ gửi tài liệu nhận vé khi có email.</span></label>
             </section>
             <section class="cinema-card p-5"><h2 class="font-extrabold app-heading">Bảng giá</h2>@foreach($seatPrices as $type=>$price)<div class="mt-2 flex justify-between text-sm"><span>{{ \App\Support\StatusLabel::for('seat_type',$type) }}</span><strong>{{ number_format($price->finalAmount,0,',','.') }} VNĐ</strong></div>@endforeach<button class="btn-primary mt-5 w-full" type="submit">Giữ ghế tại quầy</button></section>
         </aside>

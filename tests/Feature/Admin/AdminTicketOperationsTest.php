@@ -54,8 +54,8 @@ final class AdminTicketOperationsTest extends PaymentTestCase
         $response = $this->actingAs($this->userWithRole('manager'))
             ->get(route('admin.bookings.show', $delivery->booking));
 
-        $response->assertOk()->assertSee('Vé điện tử')->assertSee('Gửi lỗi')
-            ->assertSee('Không thể kết nối máy chủ email')->assertSee('Gửi lại vé')
+        $response->assertOk()->assertSee('Tài liệu nhận vé')->assertSee('Gửi lỗi')
+            ->assertSee('Không thể kết nối máy chủ email')->assertSee('Gửi lại tài liệu nhận vé')
             ->assertSee('d***@e***.test')->assertDontSee('delivery.operations@example.test')
             ->assertDontSee('guest-capability-secret')->assertDontSee('email-capability-secret');
     }
@@ -109,12 +109,12 @@ final class AdminTicketOperationsTest extends PaymentTestCase
         $manager = $this->userWithRole('manager');
         $failed = $this->failedDelivery();
         $this->actingAs($manager)->get(route('admin.bookings.show', $failed->booking))
-            ->assertOk()->assertSee('Gửi lại vé');
+            ->assertOk()->assertSee('Gửi lại tài liệu nhận vé');
 
         $sent = $this->verifiedDelivery();
         $sent->forceFill(['status' => BookingTicketDelivery::STATUS_SENT, 'sent_at' => now()])->save();
         $this->actingAs($manager)->get(route('admin.bookings.show', $sent->booking))
-            ->assertOk()->assertDontSee('Gửi lại vé');
+            ->assertOk()->assertDontSee('Gửi lại tài liệu nhận vé');
     }
 
     public function test_booking_retry_endpoint_is_rate_limited_per_actor_and_booking(): void

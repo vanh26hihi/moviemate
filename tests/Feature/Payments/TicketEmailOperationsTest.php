@@ -57,7 +57,7 @@ class TicketEmailOperationsTest extends PaymentTestCase
         $foreignRecipient = 'attacker@example.test';
         $this->actingAs($owner)->post(route('user.bookings.ticket-email.resend', $payment->booking), [
             'email' => $foreignRecipient,
-        ])->assertRedirect()->assertSessionHas('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
+        ])->assertRedirect()->assertSessionHas('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
 
         $this->actingAs($owner)->post(route('user.bookings.ticket-email.resend', $payment->booking))
             ->assertRedirect();
@@ -115,7 +115,7 @@ class TicketEmailOperationsTest extends PaymentTestCase
         $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.11'])
             ->post(route('user.bookings.ticket-email.resend', $booking))
             ->assertRedirect()
-            ->assertSessionHas('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
+            ->assertSessionHas('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
 
         $other = $this->payableBooking();
         $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.12'])

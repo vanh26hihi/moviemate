@@ -182,7 +182,7 @@ class ZaloPayReturnTest extends PaymentTestCase
         $this->visitReturn($payment, $this->returnParams($payment))
             ->assertOk()
             ->assertDontSee('data-paid-ticket-link', false)
-            ->assertSee('Liên kết mở vé an toàn được gửi riêng qua email')
+            ->assertSee('Liên kết mở đơn đặt vé an toàn được gửi riêng qua email')
             ->assertDontSee($payment->booking->booking_code)
             ->assertDontSee('guest_token=', false)
             ->assertDontSee('?state=', false)

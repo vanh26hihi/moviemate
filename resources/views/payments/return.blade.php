@@ -29,13 +29,13 @@
         ],
         \App\Models\Payment::STATUS_SUCCESS => [
             'title' => 'Đặt vé thành công',
-            'message' => 'Thanh toán đã được xác minh và vé điện tử đã sẵn sàng.',
+            'message' => 'Thanh toán đã được xác minh. Đơn đặt vé và QR đơn đặt vé đã sẵn sàng để xuất trình tại quầy.',
             'icon' => 'ph-check-circle',
             'colour' => 'text-success',
         ],
         \App\Models\Payment::STATUS_FAILED => [
             'title' => 'Thanh toán không thành công',
-            'message' => "{$providerLabel} đã trả về trạng thái không thành công. Đơn đặt vé này chưa có vé điện tử.",
+            'message' => "{$providerLabel} đã trả về trạng thái không thành công. Đơn đặt vé này chưa đủ điều kiện nhận vé.",
             'icon' => 'ph-x-circle',
             'colour' => 'text-error',
         ],
@@ -47,7 +47,7 @@
         ],
         \App\Models\Payment::STATUS_EXPIRED => [
             'title' => 'Lần thanh toán đã hết hạn',
-            'message' => 'Thời hạn thanh toán đã kết thúc. Không có mã QR hoặc vé để tải xuống.',
+            'message' => 'Thời hạn thanh toán đã kết thúc. Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.',
             'icon' => 'ph-clock-countdown',
             'colour' => 'text-slate-500',
         ],
@@ -129,10 +129,10 @@
                 @if($isVerifiedPaid && $canViewTicket)
                     <a href="{{ route('user.bookings.ticket', $booking) }}" data-paid-ticket-link class="btn-primary">
                         <i class="ph-fill ph-ticket" aria-hidden="true"></i>
-                        Mở vé điện tử
+                        Mở đơn đặt vé
                     </a>
                 @elseif($isVerifiedPaid)
-                    <p class="app-muted">Liên kết mở vé an toàn được gửi riêng qua email và không được cấp bởi trang quay lại thanh toán.</p>
+                    <p class="app-muted">Liên kết mở đơn đặt vé an toàn được gửi riêng qua email và không được cấp bởi trang quay lại thanh toán.</p>
                 @endif
                 @if($canViewBooking)
                     <a href="{{ route('user.bookings.success', $booking) }}" class="btn-secondary">Xem chi tiết đơn đặt vé</a>

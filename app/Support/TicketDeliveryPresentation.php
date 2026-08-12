@@ -15,7 +15,7 @@ final class TicketDeliveryPresentation
             'temporary_server_error' => 'Lỗi tạm thời của máy chủ email',
             'booking_not_paid' => 'Đơn không còn đủ điều kiện nhận vé',
             'delivery_lease_lost' => 'Quyền xử lý đã được chuyển cho tiến trình khác',
-            default => 'Lỗi gửi vé chưa xác định',
+            default => 'Lỗi gửi tài liệu nhận vé chưa xác định',
         };
     }
 }

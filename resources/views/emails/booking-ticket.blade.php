@@ -77,7 +77,7 @@
             <p style="margin:24px 0 0;text-align:center">
                 <a href="{{ $ticketAccessUrl }}" style="display:inline-block;padding:13px 22px;border-radius:10px;background:#e91e3d;color:#ffffff;text-decoration:none;font-weight:bold">Xem đơn đặt vé</a>
             </p>
-            <p style="margin:20px 0 0;color:#4b5563;font-size:13px;line-height:1.65">Vui lòng xuất trình mã đơn hoặc QR tại quầy để nhận vé. QR này dùng để tra cứu đơn tại quầy, không phải vé vào phòng chiếu.</p>
+            <p style="margin:20px 0 0;color:#4b5563;font-size:13px;line-height:1.65">Vui lòng xuất trình mã đơn hoặc QR đơn đặt vé tại quầy để nhận vé. QR này dùng để tra cứu đơn tại quầy, không phải vé vào phòng chiếu.</p>
             <p style="margin:12px 0 0;color:#6b7280;font-size:12px;line-height:1.55">MovieMate không bao giờ yêu cầu bạn gửi lại mật khẩu, mã thanh toán hoặc thông tin ngân hàng qua email. Cần hỗ trợ, vui lòng liên hệ quầy MovieMate tại rạp.</p>
         </div>
     </div>

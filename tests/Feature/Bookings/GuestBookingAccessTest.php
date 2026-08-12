@@ -65,13 +65,13 @@ class GuestBookingAccessTest extends TestCase
 
         $this->get(route('user.bookings.success', $booking))
             ->assertOk()
-            ->assertDontSee('Xem vé QR của tôi');
+            ->assertDontSee('Xem đơn đặt vé');
 
         $this->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertDontSee('data-qr-value', false)
             ->assertDontSee('data-print-ticket', false)
-            ->assertSee('Đơn chưa đủ điều kiện phát hành QR nhận vé.');
+            ->assertSee('Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.');
     }
 
     public function test_paid_booking_without_verified_payment_has_no_usable_qr(): void
@@ -88,7 +88,7 @@ class GuestBookingAccessTest extends TestCase
             ->assertOk()
             ->assertDontSee('data-qr-value', false)
             ->assertDontSee('data-print-ticket', false)
-            ->assertSee('Đơn chưa đủ điều kiện phát hành QR nhận vé.');
+            ->assertSee('Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.');
     }
 
     public function test_token_for_one_guest_booking_cannot_open_another_booking(): void

@@ -214,7 +214,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
             ->assertSee('Bắp rang snapshot')
             ->assertSee($failedPayment->status_label)
             ->assertDontSee('Soát vé')
-            ->assertSee('Gửi lỗi')->assertSee('Không thể kết nối máy chủ email')->assertSee('Gửi lại vé')
+            ->assertSee('Gửi lỗi')->assertSee('Không thể kết nối máy chủ email')->assertSee('Gửi lại tài liệu nhận vé')
             ->assertSee(number_format((int) $payment->amount, 0, ',', '.').' VNĐ')
             ->assertDontSee('Lịch sử hoạt động')
             ->assertDontSee('guest-secret-value')
@@ -250,15 +250,15 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'email' => 'attacker@example.test',
         ]);
 
-        $response->assertRedirect()->assertSessionHas('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
+        $response->assertRedirect()->assertSessionHas('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
         $this->assertDatabaseCount('booking_ticket_deliveries', 1);
         $this->assertSame(1, ActivityLog::query()->where('action', 'booking.ticket_resend_requested')->count());
         $log = ActivityLog::query()->where('action', 'booking.ticket_resend_requested')->sole();
         $this->assertStringNotContainsString('attacker@example.test', json_encode($log->toArray()));
 
-        $html = $this->withSession(['success' => 'Yêu cầu gửi lại vé đã được ghi nhận.'])
+        $html = $this->withSession(['success' => 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.'])
             ->actingAs($manager)->get(route('admin.bookings.show', $booking))->getContent();
-        $this->assertSame(1, substr_count(strip_tags($html), 'Yêu cầu gửi lại vé đã được ghi nhận.'));
+        $this->assertSame(1, substr_count(strip_tags($html), 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.'));
     }
 
     public function test_provider_query_uses_server_selected_payment_and_ignores_browser_result(): void
