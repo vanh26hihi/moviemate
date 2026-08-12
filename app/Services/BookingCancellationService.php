@@ -126,6 +126,43 @@ final class BookingCancellationService
         });
     }
 
+    public function cancelForSeatIncident(int $bookingId, int $incidentId): BookingCancellationResult
+    {
+        return DB::transaction(function () use ($bookingId, $incidentId): BookingCancellationResult {
+            $booking = Booking::query()->lockForUpdate()->findOrFail($bookingId);
+
+            if ($booking->booking_status === 'cancelled') {
+                return BookingCancellationResult::alreadyCancelled();
+            }
+
+            $payments = Payment::query()
+                ->where('booking_id', $booking->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $retained = $payments->contains(fn (Payment $payment): bool => in_array($payment->status, [
+                Payment::STATUS_PROCESSING,
+                Payment::STATUS_UNRESOLVED,
+                Payment::STATUS_REVIEW,
+            ], true));
+            if ($booking->booking_status !== 'pending_payment'
+                || $booking->payment_status !== 'unpaid'
+                || $retained
+                || $payments->contains(fn (Payment $payment): bool => $payment->hasAuthoritativeSuccessEvidence())) {
+                return BookingCancellationResult::notCancellable();
+            }
+
+            return $this->transitionLockedBooking(
+                $booking,
+                $this->lockActiveSeats($booking),
+                'seat_incident',
+                'booking.cancelled_by_seat_incident',
+                ['seat_incident_id' => $incidentId, 'source' => 'seat_incident'],
+            );
+        }, 3);
+    }
+
     public function cancelVerifiedPayment(
         int $paymentId,
         string $provider,

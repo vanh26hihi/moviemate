@@ -413,6 +413,9 @@ Route::prefix('admin')->name('admin.')
         Route::get('/rooms/{room}/seat-maintenance', [AdminSeatMaintenanceController::class, 'index'])
             ->whereNumber('room')
             ->middleware('permission:seats.maintenance.view')->name('rooms.seat-maintenance.index');
+        Route::get('/rooms/{room}/seat-maintenance/incidents/{incident}', [AdminSeatMaintenanceController::class, 'showIncident'])
+            ->whereNumber('room')->whereNumber('incident')
+            ->middleware('permission:seats.maintenance.view')->name('rooms.seat-incidents.show');
         Route::patch('/rooms/{room}/seat-maintenance/{seat}', [AdminSeatMaintenanceController::class, 'update'])
             ->whereNumber('room')->whereNumber('seat')->scopeBindings()
             ->middleware('permission:seats.maintenance.update')->name('rooms.seat-maintenance.update');
