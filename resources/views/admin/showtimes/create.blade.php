@@ -14,7 +14,7 @@
             @include('admin.showtimes._form-fields', ['showtime' => null])
             <div class="flex justify-end gap-3">
                 <a href="{{ route('admin.showtimes.index') }}" class="btn-secondary">Hủy</a>
-                <button class="btn-primary">Lưu suất chiếu</button>
+                <button class="btn-primary" data-showtime-save>Lưu suất chiếu</button>
             </div>
         </form>
     </div>

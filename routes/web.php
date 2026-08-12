@@ -26,6 +26,7 @@ use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\SeatIncidentResolutionController as AdminSeatIncidentResolutionController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
+use App\Http\Controllers\Admin\ShowtimePreviewController as AdminShowtimePreviewController;
 use App\Http\Controllers\Admin\UserCinemaAssignmentController as AdminUserCinemaAssignmentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -436,6 +437,10 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:seats.manage')->name('seats.manage');
         Route::post('/seats/generate/{room}', [AdminSeatController::class, 'generate'])
             ->middleware('permission:seats.manage')->name('seats.generate');
+
+        Route::post('/showtimes/preview', AdminShowtimePreviewController::class)
+            ->middleware(['permission:showtimes.create', 'throttle:60,1'])
+            ->name('showtimes.preview');
 
         Route::resource('showtimes', AdminShowtimeController::class)->except(['show'])
             ->middlewareFor('index', 'permission:showtimes.view')
