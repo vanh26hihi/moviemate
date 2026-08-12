@@ -9,6 +9,7 @@ use App\Models\BookingTicketPrint;
 use App\Models\Cinema;
 use App\Models\CinemaPricingRule;
 use App\Models\Movie;
+use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Room;
 use App\Models\RoomLayout;
@@ -17,6 +18,7 @@ use App\Models\Seat;
 use App\Models\SeatIncident;
 use App\Models\SeatIncidentImpact;
 use App\Models\SeatIncidentResolution;
+use App\Models\SeatIncidentSeat;
 use App\Models\Showtime;
 use App\Models\UserCinemaAssignment;
 use App\Services\BookingCheckoutService;
@@ -123,6 +125,49 @@ final class SeatRelocationWorkflowTest extends TestCase
         $this->assertCommercialSnapshots($snapshots, $scenario['booking'], $scenario['bookingSeat'], $scenario['payment']);
     }
 
+    public function test_different_single_seat_type_uses_value_for_upgrade_without_mutating_commercial_state(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario('B1');
+        $scenario['bookingSeat']->forceFill([
+            'price' => 40000, 'base_amount' => 40000, 'surcharge_total' => 0, 'final_unit_amount' => 40000,
+        ])->save();
+        $scenario['booking']->forceFill([
+            'seat_subtotal' => 40000, 'food_subtotal' => 15000, 'gross_amount' => 55000,
+            'promotion_discount_amount' => 5000, 'total_amount' => 50000,
+        ])->save();
+        $scenario['payment']->forceFill(['amount' => 50000])->save();
+        $foodOrder = Order::query()->create([
+            'booking_id' => $scenario['booking']->id,
+            'customer_name' => 'Relocation Customer',
+            'customer_email' => $scenario['booking']->customer_email,
+            'pickup_cinema_id' => $scenario['cinema']->id,
+            'subtotal' => 15000,
+            'total_amount' => 15000,
+            'status' => 'paid',
+        ]);
+        $snapshots = $this->commercialSnapshots($scenario['booking'], $scenario['bookingSeat'], $scenario['payment']);
+        $foodSnapshot = $this->raw($foodOrder, ['booking_id', 'subtotal', 'total_amount', 'status']);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+
+        $options = app(SeatRelocationCandidateService::class)->forIncident($incident)[$impact->id];
+        $this->assertTrue($options['equivalent']->isEmpty());
+        $this->assertSame(['A1', 'A2', 'A3'], $options['upgrade']->pluck('label')->all());
+        $this->assertSame([50000, 50000, 50000], $options['upgrade']->pluck('hypothetical_amount')->all());
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHas('success');
+
+        $resolution = SeatIncidentResolution::query()->firstOrFail();
+        $this->assertSame('upgrade', $resolution->resolution_type);
+        $this->assertSame(40000, $resolution->original_pre_promotion_amount);
+        $this->assertSame(50000, $resolution->replacement_hypothetical_amount);
+        $this->assertCommercialSnapshots($snapshots, $scenario['booking'], $scenario['bookingSeat'], $scenario['payment']);
+        $this->assertSame($foodSnapshot, $this->raw($foodOrder->fresh(), ['booking_id', 'subtotal', 'total_amount', 'status']));
+    }
+
     public function test_downgrade_and_retained_payment_are_rejected_server_side(): void
     {
         $scenario = $this->scenario('B1', 'review');
@@ -184,6 +229,82 @@ final class SeatRelocationWorkflowTest extends TestCase
         $this->assertDatabaseCount('seat_incident_resolutions', 0);
     }
 
+    public function test_candidate_inventory_excludes_held_booked_maintenance_and_active_incident_seats(): void
+    {
+        $scenario = $this->scenario();
+        $incidentSeat = Seat::query()->create([
+            'room_id' => $scenario['room']->id, 'row' => 'E', 'number' => 1, 'seat_code' => 'E1',
+            'type' => 'normal', 'status' => 'active',
+        ]);
+        RoomLayoutCell::query()->create([
+            'room_layout_id' => $scenario['layout']->id, 'x_position' => 5, 'y_position' => 4,
+            'cell_type' => 'seat', 'seat_id' => $incidentSeat->id,
+        ]);
+        $held = $this->booking($scenario['showtime'], 'HELD', 'pending_payment', 'unpaid');
+        $this->bookingSeat($held, $scenario['seats']['A2'], 50000);
+        $booked = $this->booking($scenario['showtime'], 'BOOKED', 'paid', 'paid');
+        $this->bookingSeat($booked, $scenario['seats']['A3'], 50000);
+        $scenario['seats']['B1']->forceFill(['status' => 'maintenance'])->save();
+        $otherIncident = SeatIncident::query()->create([
+            'cinema_id' => $scenario['cinema']->id, 'room_id' => $scenario['room']->id,
+            'reported_by_user_id' => $scenario['manager']->id, 'status' => 'open', 'reason' => 'seat_broken',
+        ]);
+        SeatIncidentSeat::query()->create([
+            'seat_incident_id' => $otherIncident->id, 'seat_id' => $incidentSeat->id,
+            'active_lock_key' => SeatIncidentSeat::ACTIVE_LOCK_KEY,
+        ]);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+
+        $options = app(SeatRelocationCandidateService::class)->forIncident($incident)[$impact->id];
+
+        $this->assertTrue($options['equivalent']->isEmpty());
+        $this->assertTrue($options['upgrade']->isEmpty());
+    }
+
+    public function test_candidate_inventory_excludes_wrong_room_and_unreferenced_showtime_layout(): void
+    {
+        $scenario = $this->scenario();
+        $foreignRoom = Room::factory()->create([
+            'cinema_id' => $scenario['cinema']->id, 'code' => 'R'.str()->random(6), 'total_seats' => 1,
+        ]);
+        $foreignSeat = Seat::query()->create([
+            'room_id' => $foreignRoom->id, 'row' => 'Z', 'number' => 1, 'seat_code' => 'Z1',
+            'type' => 'normal', 'status' => 'active',
+        ]);
+        $otherLayout = RoomLayout::query()->create([
+            'room_id' => $scenario['room']->id, 'version' => 2, 'name' => 'Other showtime layout',
+            'rows' => 5, 'columns' => 8, 'status' => 'archived',
+        ]);
+        $otherLayoutSeat = Seat::query()->create([
+            'room_id' => $scenario['room']->id, 'row' => 'E', 'number' => 2, 'seat_code' => 'E2',
+            'type' => 'normal', 'status' => 'active',
+        ]);
+        RoomLayoutCell::query()->create([
+            'room_layout_id' => $otherLayout->id, 'x_position' => 2, 'y_position' => 5,
+            'cell_type' => 'seat', 'seat_id' => $otherLayoutSeat->id,
+        ]);
+        Showtime::query()->create([
+            'movie_id' => $scenario['showtime']->movie_id, 'cinema_id' => $scenario['cinema']->id,
+            'room_id' => $scenario['room']->id, 'room_layout_id' => $otherLayout->id,
+            'show_date' => now()->addDays(4)->toDateString(), 'show_time' => '19:00:00',
+            'price' => 50000, 'vip_price' => 70000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active',
+        ]);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $options = app(SeatRelocationCandidateService::class)->forIncident($incident)[$impact->id];
+
+        $this->assertNotContains('E2', $options['equivalent']->pluck('label')->all());
+        $this->assertNotContains('E2', $options['upgrade']->pluck('label')->all());
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $foreignSeat->id,
+        ])->assertNotFound();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $otherLayoutSeat->id,
+        ])->assertSessionHasErrors('replacement_seat_id');
+        $this->assertSame($scenario['seats']['A1']->id, $scenario['bookingSeat']->fresh()->seat_id);
+    }
+
     public function test_requires_refund_rechecks_candidates_and_keeps_paid_artifacts(): void
     {
         $scenario = $this->scenario();
@@ -233,6 +354,13 @@ final class SeatRelocationWorkflowTest extends TestCase
         $ticketIds = $scenario['booking']->admissionTickets()->pluck('id')->sort()->values()->all();
         $incident = $this->incident($scenario);
         $impact = $incident->impacts()->oldest('id')->firstOrFail();
+        $options = app(SeatRelocationCandidateService::class)->forIncident($incident)[$impact->id];
+
+        $this->assertSame([$scenario['seats']['D1']->id], $options['equivalent']->pluck('seat_id')->all());
+        $this->assertTrue($options['upgrade']->isEmpty());
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHasErrors('replacement_seat_id');
 
         $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
             'replacement_seat_id' => $scenario['seats']['D1']->id,

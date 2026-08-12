@@ -88,7 +88,7 @@ final class SeatRelocationCandidateService
                         $candidate['hypothetical_amount'] = $originalAmount;
                     }
                     $equivalent->push($candidate);
-                } elseif ($originalType === 'normal' && $candidate['type'] === 'vip') {
+                } elseif ($originalType !== 'couple' && $candidate['type'] !== 'couple') {
                     try {
                         $candidate['hypothetical_amount'] = $this->currentAmount($showtime, $candidate['type']);
                         if ($candidate['hypothetical_amount'] >= $originalAmount) {
