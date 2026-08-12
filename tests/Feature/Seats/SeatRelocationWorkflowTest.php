@@ -1,0 +1,601 @@
+<?php
+
+namespace Tests\Feature\Seats;
+
+use App\Mail\SeatRelocationMail;
+use App\Models\Booking;
+use App\Models\BookingSeat;
+use App\Models\BookingTicketPrint;
+use App\Models\Cinema;
+use App\Models\CinemaPricingRule;
+use App\Models\Movie;
+use App\Models\Payment;
+use App\Models\Room;
+use App\Models\RoomLayout;
+use App\Models\RoomLayoutCell;
+use App\Models\Seat;
+use App\Models\SeatIncident;
+use App\Models\SeatIncidentResolution;
+use App\Models\Showtime;
+use App\Models\UserCinemaAssignment;
+use App\Services\BookingCheckoutService;
+use App\Services\BookingTokenService;
+use App\Services\CinemaContext;
+use App\Services\Seats\SeatRelocationCandidateService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Tests\TestCase;
+
+final class SeatRelocationWorkflowTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seedRbac();
+    }
+
+    public function test_resolution_schema_has_required_keys_indexes_and_uniqueness(): void
+    {
+        $indexes = collect(Schema::getIndexes('seat_incident_resolutions'));
+        $this->assertTrue($indexes->contains(fn (array $index): bool => ($index['unique'] ?? false)
+            && ($index['columns'] ?? []) === ['seat_incident_impact_id']));
+        $this->assertTrue($indexes->contains('name', 'seat_incident_resolutions_operation_index'));
+        $this->assertTrue($indexes->contains('name', 'seat_incident_resolutions_state_index'));
+        $this->assertContains('seat_incident_resolution_id', collect(Schema::getColumns('booking_ticket_print_events'))->pluck('name'));
+        $this->assertContains('active_seat_incident_resolution_id', collect(Schema::getColumns('booking_ticket_prints'))->pluck('name'));
+        foreach (Schema::getForeignKeys('seat_incident_resolutions') as $foreign) {
+            $this->assertNotSame('cascade', strtolower((string) ($foreign['on_delete'] ?? '')));
+        }
+    }
+
+    public function test_equivalent_relocation_preserves_identity_commercial_state_and_notifies_after_commit(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $bookingSeat = $scenario['bookingSeat'];
+        $ticketId = $bookingSeat->admissionTicket->id;
+        $snapshots = $this->commercialSnapshots($scenario['booking'], $bookingSeat, $scenario['payment']);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [
+            $scenario['room'], $incident, $impact,
+        ]), ['replacement_seat_id' => $scenario['seats']['A2']->id])->assertSessionHas('success');
+
+        $this->assertSame($bookingSeat->id, $bookingSeat->fresh()->id);
+        $this->assertSame($scenario['seats']['A2']->id, $bookingSeat->fresh()->seat_id);
+        $this->assertSame($ticketId, $bookingSeat->admissionTicket->fresh()->id);
+        $this->assertDatabaseHas('seat_incident_resolutions', [
+            'seat_incident_impact_id' => $impact->id,
+            'resolution_type' => 'equivalent',
+            'original_seat_id' => $scenario['seats']['A1']->id,
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+            'reprint_required' => false,
+        ]);
+        $this->assertSame('resolved', $impact->fresh()->resolution_status);
+        $this->assertSame('resolved', $incident->fresh()->status);
+        $this->assertSame('maintenance', $scenario['seats']['A1']->fresh()->status);
+        $this->assertCommercialSnapshots($snapshots, $scenario['booking'], $bookingSeat, $scenario['payment']);
+        Mail::assertSent(SeatRelocationMail::class, fn (SeatRelocationMail $mail): bool => $mail->hasTo($scenario['booking']->customer_email)
+            && $mail->relocations[0]['original'] === 'A1'
+            && $mail->relocations[0]['replacement'] === 'A2'
+        );
+    }
+
+    public function test_upgrade_is_allowed_only_after_equivalents_are_exhausted_and_never_reprices(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $options = app(SeatRelocationCandidateService::class)->forIncident($incident)[$impact->id];
+        $this->assertSame(['A2', 'A3'], $options['equivalent']->pluck('label')->all());
+        $this->assertSame(['B1'], $options['upgrade']->pluck('label')->all());
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['B1']->id,
+        ])->assertSessionHasErrors('replacement_seat_id');
+        Seat::query()->whereIn('id', [$scenario['seats']['A2']->id, $scenario['seats']['A3']->id])->update(['status' => 'maintenance']);
+        $snapshots = $this->commercialSnapshots($scenario['booking'], $scenario['bookingSeat'], $scenario['payment']);
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['B1']->id,
+        ])->assertSessionHas('success');
+
+        $resolution = SeatIncidentResolution::query()->firstOrFail();
+        $this->assertSame('upgrade', $resolution->resolution_type);
+        $this->assertSame(50000, $resolution->original_pre_promotion_amount);
+        $this->assertSame(70000, $resolution->replacement_hypothetical_amount);
+        $this->assertCommercialSnapshots($snapshots, $scenario['booking'], $scenario['bookingSeat'], $scenario['payment']);
+    }
+
+    public function test_downgrade_and_retained_payment_are_rejected_server_side(): void
+    {
+        $scenario = $this->scenario('B1', 'review');
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $before = $this->seatCommercial($scenario['bookingSeat']);
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHasErrors('impact');
+        $this->assertSame($before, $this->seatCommercial($scenario['bookingSeat']->fresh()));
+        $this->assertDatabaseCount('seat_incident_resolutions', 0);
+
+        $scenario['booking']->forceFill(['booking_status' => 'paid', 'payment_status' => 'paid'])->save();
+        $scenario['payment']->forceFill(['status' => 'success', 'verified_at' => now(), 'paid_at' => now()])->save();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHasErrors('replacement_seat_id');
+        $this->assertDatabaseCount('seat_incident_resolutions', 0);
+    }
+
+    public function test_same_type_candidate_with_lower_current_value_is_not_offered_or_accepted(): void
+    {
+        $scenario = $this->scenario();
+        CinemaPricingRule::query()->where('name', 'Relocation base')->update(['amount_vnd' => 40000]);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $options = app(SeatRelocationCandidateService::class)->forIncident($incident)[$impact->id];
+        $this->assertTrue($options['equivalent']->isEmpty());
+        $this->assertSame(['B1'], $options['upgrade']->pluck('label')->all());
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHasErrors('replacement_seat_id');
+        $this->assertSame($scenario['seats']['A1']->id, $scenario['bookingSeat']->fresh()->seat_id);
+        $this->assertDatabaseCount('seat_incident_resolutions', 0);
+    }
+
+    public function test_stale_candidate_collision_preserves_both_bookings_without_history(): void
+    {
+        $scenario = $this->scenario();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        app(SeatRelocationCandidateService::class)->forIncident($incident);
+        $competitor = $this->booking($scenario['showtime'], 'COMPETE', 'pending_payment', 'unpaid');
+        $competingSeat = $this->bookingSeat($competitor, $scenario['seats']['A2'], 50000);
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHasErrors('replacement_seat_id');
+
+        $this->assertSame($scenario['seats']['A1']->id, $scenario['bookingSeat']->fresh()->seat_id);
+        $this->assertSame($scenario['seats']['A2']->id, $competingSeat->fresh()->seat_id);
+        $this->assertDatabaseCount('seat_incident_resolutions', 0);
+    }
+
+    public function test_requires_refund_rechecks_candidates_and_keeps_paid_artifacts(): void
+    {
+        $scenario = $this->scenario();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.requires-refund', [$scenario['room'], $incident, $impact]))
+            ->assertSessionHasErrors('impact');
+
+        Seat::query()->whereIn('id', collect($scenario['seats'])->except('A1')->pluck('id'))->update(['status' => 'maintenance']);
+        $commercialBefore = $this->commercialSnapshots($scenario['booking'], $scenario['bookingSeat'], $scenario['payment']);
+        $ticketId = $scenario['bookingSeat']->admissionTicket->id;
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.requires-refund', [$scenario['room'], $incident, $impact]))
+            ->assertSessionHas('warning');
+
+        $this->assertDatabaseHas('seat_incident_resolutions', ['resolution_type' => 'requires_refund', 'replacement_seat_id' => null]);
+        $this->assertSame('unresolved', $impact->fresh()->resolution_status);
+        $this->assertSame('open', $incident->fresh()->status);
+        $this->assertCommercialSnapshots($commercialBefore, $scenario['booking'], $scenario['bookingSeat'], $scenario['payment']);
+        $this->assertDatabaseHas('admission_tickets', ['id' => $ticketId]);
+    }
+
+    public function test_multi_seat_relocation_changes_only_affected_booking_seat(): void
+    {
+        $scenario = $this->scenario();
+        $unaffected = $this->bookingSeat($scenario['booking'], $scenario['seats']['A3'], 50000);
+        $scenario['booking']->forceFill(['seat_subtotal' => 100000, 'gross_amount' => 100000, 'total_amount' => 100000])->save();
+        $scenario['payment']->forceFill(['amount' => 100000])->save();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHas('success');
+
+        $this->assertSame($scenario['seats']['A2']->id, $scenario['bookingSeat']->fresh()->seat_id);
+        $this->assertSame($scenario['seats']['A3']->id, $unaffected->fresh()->seat_id);
+        $this->assertDatabaseCount('admission_tickets', 2);
+    }
+
+    public function test_couple_relocation_moves_two_existing_rows_atomically_as_one_operation(): void
+    {
+        $scenario = $this->scenario('C1');
+        $second = $this->bookingSeat($scenario['booking'], $scenario['seats']['C2'], 50000, 'couple:C', 100000);
+        $scenario['booking']->forceFill(['seat_subtotal' => 100000, 'gross_amount' => 100000, 'total_amount' => 100000])->save();
+        $scenario['payment']->forceFill(['amount' => 100000])->save();
+        $firstIds = [$scenario['bookingSeat']->id, $second->id];
+        $ticketIds = $scenario['booking']->admissionTickets()->pluck('id')->sort()->values()->all();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->oldest('id')->firstOrFail();
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['D1']->id,
+        ])->assertSessionHas('success');
+
+        $this->assertSame($firstIds, $scenario['booking']->bookingSeats()->pluck('id')->sort()->values()->all());
+        $this->assertSame([$scenario['seats']['D1']->id, $scenario['seats']['D2']->id], $scenario['booking']->bookingSeats()->pluck('seat_id')->sort()->values()->all());
+        $this->assertSame($ticketIds, $scenario['booking']->admissionTickets()->pluck('id')->sort()->values()->all());
+        $this->assertSame(1, SeatIncidentResolution::query()->pluck('operation_id')->unique()->count());
+        $this->assertSame(2, SeatIncidentResolution::query()->count());
+    }
+
+    public function test_resolution_is_idempotent_and_branch_scoped(): void
+    {
+        $scenario = $this->scenario();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $foreignCinema = Cinema::factory()->create(['is_primary' => false]);
+        $foreignManager = $this->userWithRole('manager');
+        $foreignManager->cinemaAssignments()->delete();
+        UserCinemaAssignment::query()->create([
+            'user_id' => $foreignManager->id, 'cinema_id' => $foreignCinema->id,
+            'status' => UserCinemaAssignment::STATUS_ACTIVE, 'assigned_at' => now(),
+        ]);
+        $this->actingAs($foreignManager)->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertForbidden();
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHas('success');
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A3']->id,
+        ])->assertSessionHasErrors('impact');
+        $this->assertDatabaseCount('seat_incident_resolutions', 1);
+    }
+
+    public function test_printed_relocation_requires_server_authorized_reprint_and_resolves_after_success(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $ticket = $scenario['bookingSeat']->admissionTicket;
+        $this->markPrinted($ticket);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHas('success');
+        $resolution = SeatIncidentResolution::query()->firstOrFail();
+        $this->assertTrue($resolution->reprint_required);
+        $this->assertNull($resolution->reprint_satisfied_at);
+        $this->assertSame('unresolved', $impact->fresh()->resolution_status);
+        $this->assertSame('open', $incident->fresh()->status);
+
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->get(route('staff.tickets.operations', $scenario['booking']))
+            ->assertOk()->assertSee('Cần in lại do đổi ghế');
+        $this->post(route('staff.admission-tickets.print.incident-reprint', [$ticket, $resolution]))
+            ->assertRedirect(route('staff.admission-tickets.print.show', $ticket));
+        $state = BookingTicketPrint::query()->where('admission_ticket_id', $ticket->id)->firstOrFail();
+        $this->assertSame($resolution->id, $state->active_seat_incident_resolution_id);
+        $this->assertDatabaseHas('booking_ticket_print_events', [
+            'admission_ticket_id' => $ticket->id,
+            'seat_incident_resolution_id' => $resolution->id,
+            'event_type' => 'incident_reprint_requested',
+            'failure_code' => 'seat_incident_relocation',
+        ]);
+        $this->post(route('staff.admission-tickets.print.succeed', $ticket))->assertSessionHas('success');
+
+        $this->assertSame(2, $ticket->fresh()->print_count);
+        $this->assertNotNull($resolution->fresh()->reprint_satisfied_at);
+        $this->assertSame('resolved', $impact->fresh()->resolution_status);
+        $this->assertSame('resolved', $incident->fresh()->status);
+        $this->assertDatabaseHas('booking_ticket_print_events', [
+            'seat_incident_resolution_id' => $resolution->id,
+            'event_type' => 'print_succeeded',
+            'failure_code' => 'seat_incident_relocation',
+        ]);
+    }
+
+    public function test_failed_incident_reprint_keeps_relocation_and_requirement_retryable(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $ticket = $scenario['bookingSeat']->admissionTicket;
+        $this->markPrinted($ticket);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ]);
+        $resolution = SeatIncidentResolution::query()->firstOrFail();
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.admission-tickets.print.incident-reprint', [$ticket, $resolution]));
+        $this->post(route('staff.admission-tickets.print.fail', $ticket), ['failure_code' => 'paper_jam'])
+            ->assertSessionHas('success');
+
+        $this->assertSame($scenario['seats']['A2']->id, $scenario['bookingSeat']->fresh()->seat_id);
+        $this->assertNull($resolution->fresh()->reprint_satisfied_at);
+        $this->assertSame('unresolved', $impact->fresh()->resolution_status);
+        $this->assertSame(1, $ticket->fresh()->print_count);
+        $this->actingAs($staff)->post(route('staff.admission-tickets.print.incident-reprint', [$ticket, $resolution]))
+            ->assertRedirect(route('staff.admission-tickets.print.show', $ticket));
+    }
+
+    public function test_fake_incident_reprint_and_generic_reason_bypass_are_rejected(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $ticket = $scenario['bookingSeat']->admissionTicket;
+        $this->markPrinted($ticket);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ]);
+        $resolution = SeatIncidentResolution::query()->firstOrFail();
+        $other = $this->booking($scenario['showtime'], 'OTHER', 'paid', 'paid');
+        $otherSeat = $this->bookingSeat($other, $scenario['seats']['A3'], 50000);
+        $otherPayment = Payment::createForProvider('vnpay', ['booking_id' => $other->id, 'payment_method' => 'vnpay', 'amount' => 50000, 'status' => 'success', 'verified_at' => now(), 'paid_at' => now()]);
+        $this->markPrinted($otherSeat->admissionTicket);
+        $staff = $this->userWithRole('staff');
+
+        $this->actingAs($staff)->post(route('staff.admission-tickets.print.incident-reprint', [$otherSeat->admissionTicket, $resolution]))
+            ->assertStatus(409);
+        $this->post(route('staff.admission-tickets.print.reprint', $ticket), ['reason_code' => 'customer_request'])
+            ->assertStatus(409);
+        $this->post(route('staff.admission-tickets.print.reprint', $otherSeat->admissionTicket), ['incident_reprint' => true])
+            ->assertSessionHasErrors('reason_code');
+        $this->assertSame(1, $otherSeat->admissionTicket->fresh()->print_count);
+        $this->assertSame('success', $otherPayment->fresh()->status);
+    }
+
+    public function test_unprinted_relocation_remains_first_print_and_renders_current_seat(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $ticket = $scenario['bookingSeat']->admissionTicket;
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ]);
+        $this->assertFalse(SeatIncidentResolution::query()->firstOrFail()->reprint_required);
+        $this->assertSame(0, $ticket->fresh()->print_count);
+
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.admission-tickets.print.start', $ticket))
+            ->assertRedirect(route('staff.admission-tickets.print.show', $ticket));
+        $this->get(route('staff.admission-tickets.print.show', $ticket))
+            ->assertOk()->assertSee('A2')->assertSee('50.000 VNĐ');
+        $this->assertDatabaseMissing('booking_ticket_print_events', ['event_type' => 'reprint_requested']);
+    }
+
+    public function test_customer_sees_current_seat_history_and_one_unchanged_booking_qr(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $owner = $this->userWithRole('user');
+        $scenario['booking']->forceFill(['user_id' => $owner->id])->save();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ]);
+
+        $html = $this->actingAs($owner)->get(route('user.bookings.ticket', $scenario['booking']))
+            ->assertOk()->assertSee('Ghế A1 đã được đổi sang')->assertSee('A2')->assertSee('Bạn không phải thanh toán thêm.')
+            ->getContent();
+        $this->assertSame(1, substr_count($html, 'QR ĐƠN ĐẶT VÉ'));
+        $this->assertSame($scenario['seats']['A2']->id, $scenario['bookingSeat']->fresh()->seat_id);
+    }
+
+    public function test_manager_candidate_ui_and_staff_queue_surface_task_specific_actions(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $ticket = $scenario['bookingSeat']->admissionTicket;
+        $this->markPrinted($ticket);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->get(route('admin.rooms.seat-incidents.show', [$scenario['room'], $incident]))
+            ->assertOk()->assertSee('TƯƠNG ĐƯƠNG')->assertSee('NÂNG HẠNG')->assertSee('A2')->assertSee('B1');
+        $this->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ]);
+
+        $this->actingAs($this->userWithRole('staff'))->get(route('staff.prints.index'))
+            ->assertOk()->assertSee($scenario['booking']->booking_code)->assertSee('Cần in lại do đổi ghế');
+    }
+
+    public function test_smtp_failure_does_not_rollback_committed_relocation(): void
+    {
+        $scenario = $this->scenario();
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('SMTP unavailable'));
+
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHas('success');
+
+        $this->assertSame($scenario['seats']['A2']->id, $scenario['bookingSeat']->fresh()->seat_id);
+        $this->assertDatabaseHas('seat_incident_resolutions', ['seat_incident_impact_id' => $impact->id]);
+    }
+
+    public function test_incident_relocation_bypasses_only_the_ordinary_customer_seat_gap_rule(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        try {
+            app(BookingCheckoutService::class)->createPendingBooking(
+                $scenario['showtime']->id,
+                [$scenario['seats']['A2']->id],
+                null,
+                'gap-customer@example.test',
+                app(BookingTokenService::class)->issueCheckoutToken(),
+            );
+            $this->fail('Ordinary checkout must retain the no-isolated-seat rule.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('seat_ids', $exception->errors());
+        }
+
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHas('success');
+        $this->assertSame($scenario['seats']['A2']->id, $scenario['bookingSeat']->fresh()->seat_id);
+    }
+
+    public function test_candidate_customer_staff_and_history_queries_are_bounded(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $owner = $this->userWithRole('user');
+        $scenario['booking']->forceFill(['user_id' => $owner->id])->save();
+        $this->markPrinted($scenario['bookingSeat']->admissionTicket);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+
+        $start = $queries;
+        $this->actingAs($scenario['manager'])->get(route('admin.rooms.seat-incidents.show', [$scenario['room'], $incident]))->assertOk();
+        $managerQueries = $queries - $start;
+        $this->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ]);
+        $start = $queries;
+        $this->actingAs($owner)->get(route('user.bookings.ticket', $scenario['booking']))->assertOk();
+        $customerQueries = $queries - $start;
+        $start = $queries;
+        $this->actingAs($this->userWithRole('staff'))->get(route('staff.tickets.operations', $scenario['booking']))->assertOk();
+        $staffQueries = $queries - $start;
+
+        $this->assertLessThanOrEqual(35, $managerQueries, "Manager candidate/history detail issued {$managerQueries} queries.");
+        $this->assertLessThanOrEqual(25, $customerQueries, "Customer relocated booking issued {$customerQueries} queries.");
+        $this->assertLessThanOrEqual(30, $staffQueries, "Staff replacement-print detail issued {$staffQueries} queries.");
+    }
+
+    private function scenario(string $originalCode = 'A1', string $paymentStatus = 'success'): array
+    {
+        $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
+        $room = Room::factory()->create(['cinema_id' => $cinema->id, 'code' => 'R'.str()->random(6), 'total_seats' => 9]);
+        $layout = RoomLayout::query()->create(['room_id' => $room->id, 'version' => 1, 'name' => 'Relocation', 'rows' => 4, 'columns' => 8, 'status' => 'published', 'published_at' => now()]);
+        $definitions = [
+            ['A1', 'normal', null, null], ['A2', 'normal', null, null], ['A3', 'normal', null, null], ['B1', 'vip', null, null],
+            ['C1', 'couple', 'C', 'left'], ['C2', 'couple', 'C', 'right'],
+            ['D1', 'couple', 'D', 'left'], ['D2', 'couple', 'D', 'right'],
+        ];
+        $seats = collect();
+        foreach ($definitions as [$code, $type, $pair, $position]) {
+            $seat = Seat::query()->create([
+                'room_id' => $room->id, 'row' => $code[0], 'number' => (int) substr($code, 1), 'seat_code' => $code,
+                'type' => $type, 'pair_code' => $pair, 'pair_position' => $position, 'status' => 'active',
+            ]);
+            RoomLayoutCell::query()->create([
+                'room_layout_id' => $layout->id,
+                'x_position' => (int) substr($code, 1),
+                'y_position' => ord($code[0]) - ord('A') + 1,
+                'cell_type' => 'seat', 'seat_id' => $seat->id,
+            ]);
+            $seats->put($code, $seat);
+        }
+        CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation base', 'rule_type' => 'base', 'amount_vnd' => 50000, 'priority' => 500, 'status' => 'active']);
+        CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000, 'priority' => 500, 'status' => 'active']);
+        CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000, 'priority' => 500, 'status' => 'active']);
+        $movie = Movie::query()->create(['title' => 'Relocation Movie', 'slug' => 'relocation-'.str()->random(8), 'duration' => 100, 'status' => 'now_showing']);
+        $showtime = Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'show_date' => now()->addDays(3)->toDateString(), 'show_time' => '19:00:00', 'price' => 50000, 'vip_price' => 70000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active']);
+        $booking = $this->booking($showtime, 'RELOCATE', $paymentStatus === 'success' ? 'paid' : 'pending_payment', $paymentStatus === 'success' ? 'paid' : 'unpaid');
+        $original = $seats[$originalCode];
+        $isCouple = $original->type === 'couple';
+        $bookingSeat = $this->bookingSeat($booking, $original, $isCouple ? 50000 : ($original->type === 'vip' ? 70000 : 50000), $isCouple ? 'couple:C' : 'seat:'.$original->id, $isCouple ? 100000 : ($original->type === 'vip' ? 70000 : 50000));
+        $payment = Payment::createForProvider('vnpay', [
+            'booking_id' => $booking->id, 'payment_method' => 'vnpay', 'amount' => (int) $booking->total_amount,
+            'status' => $paymentStatus, 'verified_at' => $paymentStatus === 'success' ? now() : null, 'paid_at' => $paymentStatus === 'success' ? now() : null,
+        ]);
+        $manager = $this->userWithRole('manager');
+
+        return compact('cinema', 'room', 'layout', 'seats', 'showtime', 'booking', 'bookingSeat', 'payment', 'manager');
+    }
+
+    private function incident(array $scenario): SeatIncident
+    {
+        $this->actingAs($scenario['manager'])->patch(route('admin.rooms.seat-maintenance.update', [$scenario['room'], $scenario['bookingSeat']->seat_id]), [
+            'status' => 'maintenance', 'reason' => 'seat_broken',
+        ])->assertRedirect();
+
+        return SeatIncident::query()->with('impacts')->latest('id')->firstOrFail();
+    }
+
+    private function booking(Showtime $showtime, string $suffix, string $bookingStatus, string $paymentStatus): Booking
+    {
+        return Booking::query()->create([
+            'showtime_id' => $showtime->id, 'booking_code' => 'MMT-2026-'.str()->upper(str()->random(16)),
+            'customer_name' => 'Relocation Customer', 'customer_email' => strtolower($suffix).'@example.test',
+            'seat_subtotal' => 50000, 'food_subtotal' => 0, 'gross_amount' => 50000,
+            'promotion_discount_amount' => 0, 'total_amount' => 50000,
+            'booking_status' => $bookingStatus, 'payment_status' => $paymentStatus, 'expires_at' => now()->addMinutes(15),
+        ]);
+    }
+
+    private function bookingSeat(Booking $booking, Seat $seat, int $price, ?string $unitKey = null, ?int $unitAmount = null): BookingSeat
+    {
+        return BookingSeat::query()->create([
+            'booking_id' => $booking->id, 'showtime_id' => $booking->showtime_id, 'seat_id' => $seat->id,
+            'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY, 'price' => $price,
+            'pricing_unit_key' => $unitKey ?: 'seat:'.$seat->id, 'pricing_unit_label' => $seat->seat_code,
+            'seat_type_snapshot' => $seat->type, 'base_amount' => 50000,
+            'surcharge_total' => max(0, ($unitAmount ?? $price) - 50000), 'final_unit_amount' => $unitAmount ?? $price,
+        ]);
+    }
+
+    private function markPrinted($ticket): void
+    {
+        $ticket->forceFill(['print_count' => 1, 'last_printed_at' => now()])->save();
+        BookingTicketPrint::query()->create([
+            'admission_ticket_id' => $ticket->id, 'booking_id' => $ticket->booking_id,
+            'status' => BookingTicketPrint::STATUS_PRINTED, 'attempts_count' => 1,
+            'printed_at' => now(),
+        ]);
+    }
+
+    private function commercialSnapshots(Booking $booking, BookingSeat $bookingSeat, Payment $payment): array
+    {
+        $booking = $booking->fresh();
+        $bookingSeat = $bookingSeat->fresh();
+        $payment = $payment->fresh();
+
+        return [
+            $this->raw($booking, ['seat_subtotal', 'food_subtotal', 'gross_amount', 'promotion_discount_amount', 'total_amount', 'booking_status', 'payment_status']),
+            $this->seatCommercial($bookingSeat),
+            $this->raw($payment, ['status', 'amount', 'currency', 'provider_transaction_id', 'verified_at', 'settled_at']),
+        ];
+    }
+
+    private function assertCommercialSnapshots(array $snapshots, Booking $booking, BookingSeat $bookingSeat, Payment $payment): void
+    {
+        $this->assertSame($snapshots[0], $this->raw($booking->fresh(), ['seat_subtotal', 'food_subtotal', 'gross_amount', 'promotion_discount_amount', 'total_amount', 'booking_status', 'payment_status']));
+        $this->assertSame($snapshots[1], $this->seatCommercial($bookingSeat->fresh()));
+        $this->assertSame($snapshots[2], $this->raw($payment->fresh(), ['status', 'amount', 'currency', 'provider_transaction_id', 'verified_at', 'settled_at']));
+    }
+
+    private function seatCommercial(BookingSeat $bookingSeat): array
+    {
+        return $this->raw($bookingSeat, [
+            'price', 'pricing_unit_key', 'pricing_unit_label', 'seat_type_snapshot', 'base_amount',
+            'surcharge_total', 'final_unit_amount', 'pricing_breakdown', 'pricing_fingerprint', 'active_lock_key',
+        ]);
+    }
+
+    private function raw($model, array $keys): array
+    {
+        return collect($keys)->mapWithKeys(fn (string $key): array => [$key => $model->getRawOriginal($key)])->all();
+    }
+}

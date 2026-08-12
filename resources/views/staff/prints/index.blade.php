@@ -14,7 +14,7 @@
                         <div><p class="font-mono text-lg font-black text-brand-start">{{ $booking->booking_code }}</p><p class="font-bold app-text">{{ $booking->showtime?->movie?->title }}</p><p class="text-sm app-muted">{{ $booking->showtime_label }} · {{ $booking->showtime?->room?->name }}</p></div>
                         <a class="btn-secondary" href="{{ route('staff.tickets.operations',$booking) }}">Mở vận hành vé</a>
                     </div>
-                    <div class="mt-4 flex flex-wrap gap-2">@foreach($booking->admissionTickets as $ticket)<span class="status-badge {{ $ticket->print_count > 0 ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">Ghế {{ $ticket->seat_code }} · {{ $ticket->print_count > 0 ? 'Đã in '.$ticket->print_count.' lần' : 'Chưa in' }}</span>@endforeach</div>
+                    <div class="mt-4 flex flex-wrap gap-2">@foreach($booking->admissionTickets as $ticket)<span class="status-badge {{ $incidentReprintSeatIds->has($ticket->booking_seat_id) || $ticket->print_count === 0 ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success' }}">Ghế {{ $ticket->seat_code }} · {{ $incidentReprintSeatIds->has($ticket->booking_seat_id) ? 'Cần in lại do đổi ghế' : ($ticket->print_count > 0 ? 'Đã in '.$ticket->print_count.' lần' : 'Chưa in') }}</span>@endforeach</div>
                 </article>
             @endforeach
         </div>

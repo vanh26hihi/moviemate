@@ -9,6 +9,7 @@ use App\Models\BookingSeat;
 use App\Models\BookingTicketPrint;
 use App\Models\RoomLayoutCell;
 use App\Models\Seat;
+use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
 use App\Services\CinemaAccessService;
 use Carbon\CarbonImmutable;
@@ -91,15 +92,31 @@ final class WorkspaceController extends Controller
         if ($cinema) {
             $bookings = Booking::query()->where('cinema_id', $cinema->id)
                 ->where('payment_status', 'paid')->where('booking_status', 'paid')
-                ->whereHas('admissionTickets', function (Builder $tickets): void {
-                    $tickets->where('print_count', 0)->orWhereHas('printState', fn (Builder $print) => $print
-                        ->whereIn('status', [BookingTicketPrint::STATUS_RETRY_ALLOWED, BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION, BookingTicketPrint::STATUS_RETRY_AUTHORIZED]));
+                ->where(function (Builder $eligible): void {
+                    $eligible->whereHas('admissionTickets', function (Builder $tickets): void {
+                        $tickets->where('print_count', 0)->orWhereHas('printState', fn (Builder $print) => $print
+                            ->whereIn('status', [BookingTicketPrint::STATUS_RETRY_ALLOWED, BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION, BookingTicketPrint::STATUS_RETRY_AUTHORIZED]));
+                    })->orWhereExists(fn ($query) => $query->selectRaw('1')
+                        ->from('seat_incident_resolutions')
+                        ->join('seat_incident_impacts', 'seat_incident_impacts.id', '=', 'seat_incident_resolutions.seat_incident_impact_id')
+                        ->join('booking_seats', 'booking_seats.id', '=', 'seat_incident_impacts.booking_seat_id')
+                        ->join('seat_incidents', 'seat_incidents.id', '=', 'seat_incident_impacts.seat_incident_id')
+                        ->whereColumn('booking_seats.booking_id', 'bookings.id')
+                        ->where('seat_incident_resolutions.reprint_required', true)
+                        ->whereNull('seat_incident_resolutions.reprint_satisfied_at')
+                        ->where('seat_incident_impacts.resolution_status', 'unresolved')
+                        ->where('seat_incidents.status', 'open'));
                 })->with(['showtime.movie:id,title', 'showtime.room:id,name', 'bookingSeats.seat',
                     'admissionTickets.bookingSeat.seat', 'admissionTickets.printState.lastFailedBy:id,name'])
                 ->oldest('paid_at')->paginate(20);
         }
+        $incidentReprintSeatIds = SeatIncidentResolution::query()
+            ->where('reprint_required', true)->whereNull('reprint_satisfied_at')
+            ->whereHas('impact.bookingSeat', fn ($query) => $query->whereIn('booking_id', $bookings->pluck('id')))
+            ->whereHas('impact.incident', fn ($query) => $query->where('status', 'open'))
+            ->with('impact:id,booking_seat_id')->get()->pluck('impact.booking_seat_id')->map(fn ($id): int => (int) $id)->flip();
 
-        return view('staff.prints.index', compact('cinema', 'bookings'));
+        return view('staff.prints.index', compact('cinema', 'bookings', 'incidentReprintSeatIds'));
     }
 
     /** @return array{0: CarbonImmutable, 1: CarbonImmutable} */

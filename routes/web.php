@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\RoomController as AdminRoomController;
 use App\Http\Controllers\Admin\RoomLayoutTemplateController as AdminRoomLayoutTemplateController;
 use App\Http\Controllers\Admin\RoomTypeController as AdminRoomTypeController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
+use App\Http\Controllers\Admin\SeatIncidentResolutionController as AdminSeatIncidentResolutionController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\UserCinemaAssignmentController as AdminUserCinemaAssignmentController;
@@ -416,6 +417,12 @@ Route::prefix('admin')->name('admin.')
         Route::get('/rooms/{room}/seat-maintenance/incidents/{incident}', [AdminSeatMaintenanceController::class, 'showIncident'])
             ->whereNumber('room')->whereNumber('incident')
             ->middleware('permission:seats.maintenance.view')->name('rooms.seat-incidents.show');
+        Route::post('/rooms/{room}/seat-maintenance/incidents/{incident}/impacts/{impact}/relocate', [AdminSeatIncidentResolutionController::class, 'relocate'])
+            ->whereNumber('room')->whereNumber('incident')->whereNumber('impact')
+            ->middleware('permission:seats.maintenance.update')->name('rooms.seat-incidents.relocate');
+        Route::post('/rooms/{room}/seat-maintenance/incidents/{incident}/impacts/{impact}/requires-refund', [AdminSeatIncidentResolutionController::class, 'requireRefund'])
+            ->whereNumber('room')->whereNumber('incident')->whereNumber('impact')
+            ->middleware('permission:seats.maintenance.update')->name('rooms.seat-incidents.requires-refund');
         Route::patch('/rooms/{room}/seat-maintenance/{seat}', [AdminSeatMaintenanceController::class, 'update'])
             ->whereNumber('room')->whereNumber('seat')->scopeBindings()
             ->middleware('permission:seats.maintenance.update')->name('rooms.seat-maintenance.update');
@@ -525,6 +532,9 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.start');
         Route::post('/admission-tickets/{admissionTicket}/reprint', [StaffTicketPrintController::class, 'reprintTicket'])
             ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.reprint');
+        Route::post('/admission-tickets/{admissionTicket}/incident-reprint/{resolution}', [StaffTicketPrintController::class, 'incidentReprintTicket'])
+            ->whereNumber('admissionTicket')->whereNumber('resolution')
+            ->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.incident-reprint');
         Route::get('/admission-tickets/{admissionTicket}/print', [StaffTicketPrintController::class, 'showTicket'])
             ->whereNumber('admissionTicket')->middleware('permission:tickets.print')->name('admission-tickets.print.show');
         Route::post('/admission-tickets/{admissionTicket}/print/succeed', [StaffTicketPrintController::class, 'succeedTicket'])

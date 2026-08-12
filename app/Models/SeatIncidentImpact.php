@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class SeatIncidentImpact extends Model
 {
@@ -34,5 +35,10 @@ final class SeatIncidentImpact extends Model
     public function bookingSeat(): BelongsTo
     {
         return $this->belongsTo(BookingSeat::class);
+    }
+
+    public function resolution(): HasOne
+    {
+        return $this->hasOne(SeatIncidentResolution::class, 'seat_incident_impact_id');
     }
 }
