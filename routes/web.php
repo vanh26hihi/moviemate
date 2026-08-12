@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\BookingOperationController as AdminBookingOperationController;
+use App\Http\Controllers\Admin\BulkShowtimeController as AdminBulkShowtimeController;
 use App\Http\Controllers\Admin\CinemaContextController as AdminCinemaContextController;
 use App\Http\Controllers\Admin\CinemaController as AdminCinemaController;
 use App\Http\Controllers\Admin\CinemaOperatingHoursController as AdminCinemaOperatingHoursController;
@@ -441,6 +442,16 @@ Route::prefix('admin')->name('admin.')
         Route::post('/showtimes/preview', AdminShowtimePreviewController::class)
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.preview');
+
+        Route::get('/showtimes/bulk', [AdminBulkShowtimeController::class, 'index'])
+            ->middleware('permission:showtimes.create')
+            ->name('showtimes.bulk.index');
+        Route::post('/showtimes/bulk/preview', [AdminBulkShowtimeController::class, 'preview'])
+            ->middleware(['permission:showtimes.create', 'throttle:60,1'])
+            ->name('showtimes.bulk.preview');
+        Route::post('/showtimes/bulk', [AdminBulkShowtimeController::class, 'store'])
+            ->middleware(['permission:showtimes.create', 'throttle:60,1'])
+            ->name('showtimes.bulk.store');
 
         Route::resource('showtimes', AdminShowtimeController::class)->except(['show'])
             ->middlewareFor('index', 'permission:showtimes.view')
