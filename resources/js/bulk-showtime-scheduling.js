@@ -12,6 +12,7 @@ function initializeBulkShowtimeWorkspace(workspace) {
     const total = workspace.querySelector('[data-summary-total]');
     const valid = workspace.querySelector('[data-summary-valid]');
     const invalid = workspace.querySelector('[data-summary-invalid]');
+    const initialRowsElement = workspace.querySelector('[data-bulk-initial-rows]');
     let rowCounter = 0;
     let version = 0;
     let previewController = null;
@@ -166,7 +167,19 @@ function initializeBulkShowtimeWorkspace(workspace) {
     addButton.addEventListener('click', () => addRow());
     previewButton.addEventListener('click', preview);
     form.addEventListener('submit', publish);
-    addRow();
+    let initialRows = [];
+    try {
+        initialRows = JSON.parse(initialRowsElement?.textContent || '[]');
+    } catch {
+        initialRows = [];
+    }
+
+    if (initialRows.length > 0) {
+        initialRows.forEach((row) => addRow(row));
+        setMessage(workspace.dataset.initialMessage || 'Đã tạo ý định sao chép. Hãy kiểm tra toàn bộ lô trước khi đăng.');
+    } else {
+        addRow();
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

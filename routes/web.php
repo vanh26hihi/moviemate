@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\SeatIncidentResolutionController as AdminSeatInci
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\ShowtimePreviewController as AdminShowtimePreviewController;
+use App\Http\Controllers\Admin\ShowtimeScheduleCopyController as AdminShowtimeScheduleCopyController;
 use App\Http\Controllers\Admin\UserCinemaAssignmentController as AdminUserCinemaAssignmentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -442,6 +443,13 @@ Route::prefix('admin')->name('admin.')
         Route::post('/showtimes/preview', AdminShowtimePreviewController::class)
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.preview');
+
+        Route::get('/showtimes/copy', [AdminShowtimeScheduleCopyController::class, 'index'])
+            ->middleware('permission:showtimes.create')
+            ->name('showtimes.copy.index');
+        Route::post('/showtimes/copy/generate', [AdminShowtimeScheduleCopyController::class, 'generate'])
+            ->middleware(['permission:showtimes.create', 'throttle:60,1'])
+            ->name('showtimes.copy.generate');
 
         Route::get('/showtimes/bulk', [AdminBulkShowtimeController::class, 'index'])
             ->middleware('permission:showtimes.create')

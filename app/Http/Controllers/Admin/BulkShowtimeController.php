@@ -28,16 +28,37 @@ final class BulkShowtimeController extends Controller
 
     public function index(Request $request): View
     {
+        $initialRows = collect($request->session()->get('bulk_showtime_rows', []))
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
+        $initialMovieIds = $initialRows->pluck('movie_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values();
+        $initialRoomIds = $initialRows->pluck('room_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values();
+
         $roomQuery = Room::query()
-            ->operational()
-            ->whereHas('latestPublishedLayout')
             ->with(['cinema', 'latestPublishedLayout']);
         $this->cinemaAccess->scope($roomQuery, $request->user(), 'rooms.cinema_id');
+        $roomQuery->where(function ($query) use ($initialRoomIds): void {
+            $query->where(function ($available): void {
+                $available->operational()->whereHas('latestPublishedLayout');
+            });
+            if ($initialRoomIds->isNotEmpty()) {
+                $query->orWhereIn('rooms.id', $initialRoomIds);
+            }
+        });
+
+        $movieQuery = Movie::query()->where(function ($query) use ($initialMovieIds): void {
+            $query->whereIn('status', Movie::SCHEDULABLE_STATUSES);
+            if ($initialMovieIds->isNotEmpty()) {
+                $query->orWhereIn('movies.id', $initialMovieIds);
+            }
+        });
 
         return view('admin.showtimes.bulk', [
-            'movies' => Movie::query()->whereIn('status', Movie::SCHEDULABLE_STATUSES)->orderBy('title')->get(),
+            'movies' => $movieQuery->orderBy('title')->get(),
             'rooms' => $roomQuery->orderBy('cinema_id')->orderBy('code')->get(),
             'cinema' => $this->cinemaAccess->currentCinema($request->user()),
+            'initialRows' => $initialRows->all(),
+            'copyMessage' => $request->session()->get('bulk_showtime_copy_message'),
         ]);
     }
 
