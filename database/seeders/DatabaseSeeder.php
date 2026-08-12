@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             GenreSeeder::class,
             CinemaSeeder::class,
             RoomTypeSeeder::class,
+            PresentationFormatSeeder::class,
             RoomSeeder::class,
             RoomLayoutTemplateSeeder::class,
             MovieSeeder::class,

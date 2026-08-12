@@ -9,13 +9,17 @@ final class RoomTypeSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach ([['2D', 10], ['3D', 20], ['IMAX', 30]] as [$code, $sortOrder]) {
-            RoomType::query()->updateOrCreate(['code' => $code], [
-                'name' => $code,
+        RoomType::query()->whereIn('code', ['2D', '3D'])->delete();
+
+        foreach ([['STANDARD', 'Tiêu chuẩn', 10], ['IMAX', 'IMAX', 20]] as [$code, $name, $sortOrder]) {
+            $roomType = RoomType::query()->firstOrNew(['code' => $code]);
+            $roomType->forceFill([
+                'slug' => $code,
+                'name' => $name,
                 'description' => null,
                 'is_active' => true,
                 'sort_order' => $sortOrder,
-            ]);
+            ])->save();
         }
     }
 }

@@ -43,7 +43,7 @@ final class DemoReadinessTest extends TestCase
             $this->assertFalse($customer->hasPermission($permission));
         }
 
-        $this->assertGreaterThanOrEqual(3, Room::query()->distinct()->count('room_type'));
+        $this->assertSame(['IMAX', 'STANDARD'], Room::query()->distinct()->orderBy('room_type')->pluck('room_type')->all());
         $this->assertSame(1, Room::query()->where('code', 'DEMO')->count());
         $room = Room::query()->where('code', 'DEMO')->firstOrFail();
         $layout = $room->latestPublishedLayout()->firstOrFail();

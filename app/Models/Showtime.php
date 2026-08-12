@@ -50,6 +50,11 @@ class Showtime extends Model
         return $this->belongsTo(RoomLayout::class);
     }
 
+    public function presentationFormat(): BelongsTo
+    {
+        return $this->belongsTo(PresentationFormat::class);
+    }
+
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
