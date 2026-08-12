@@ -24,11 +24,11 @@ class Review extends Model
 
     public const MODERATION_REJECTED = 'rejected';
 
-    protected $fillable = ['user_id', 'movie_id', 'booking_id', 'rating', 'comment', 'sentiment', 'status', 'moderation_status', 'moderation_flags', 'moderation_reason', 'is_verified', 'first_published_at', 'reward_awarded_at', 'moderated_by_user_id', 'moderated_at'];
+    protected $fillable = ['user_id', 'movie_id', 'booking_id', 'rating', 'comment', 'sentiment', 'status', 'moderation_status', 'moderation_flags', 'moderation_reason', 'is_verified', 'first_published_at', 'moderated_by_user_id', 'moderated_at'];
 
     protected function casts(): array
     {
-        return ['rating' => 'integer', 'moderation_flags' => 'array', 'is_verified' => 'boolean', 'first_published_at' => 'datetime', 'reward_awarded_at' => 'datetime', 'moderated_at' => 'datetime'];
+        return ['rating' => 'integer', 'moderation_flags' => 'array', 'is_verified' => 'boolean', 'first_published_at' => 'datetime', 'moderated_at' => 'datetime'];
     }
 
     public function movie(): BelongsTo

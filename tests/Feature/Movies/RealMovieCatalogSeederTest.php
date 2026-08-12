@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Movies;
 
-use App\Models\LoyaltyTransaction;
 use App\Models\Movie;
 use App\Models\Review;
 use Database\Seeders\GenreSeeder;
@@ -65,6 +64,5 @@ final class RealMovieCatalogSeederTest extends TestCase
         }
 
         $this->assertSame(0, Review::query()->count());
-        $this->assertSame(0, LoyaltyTransaction::query()->where('type', 'review_reward')->count());
     }
 }

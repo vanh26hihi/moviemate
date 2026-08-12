@@ -68,7 +68,6 @@ class AdminRouteAccessTest extends TestCase
         $this->assertTrue(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.create'));
         $this->assertFalse(app('router')->getRoutes()->hasNamedRoute('admin.cinemas.destroy'));
         $this->actingAs($manager)->get(route('admin.users.index'))->assertOk();
-        $this->actingAs($manager)->get(route('admin.loyalty.index'))->assertForbidden();
         $this->actingAs($manager)->get(route('admin.roles.index'))->assertForbidden();
     }
 
@@ -78,7 +77,6 @@ class AdminRouteAccessTest extends TestCase
 
         $this->actingAs($admin)->get(route('admin.dashboard'))->assertOk();
         $this->actingAs($admin)->get(route('admin.users.index'))->assertOk();
-        $this->actingAs($admin)->get(route('admin.loyalty.index'))->assertOk();
         $this->actingAs($admin)->get(route('admin.roles.index'))->assertOk();
     }
 
@@ -100,13 +98,10 @@ class AdminRouteAccessTest extends TestCase
         $customer = $this->userWithRole('user');
         $this->actingAs($customer)->get(route('user.profile'))->assertOk();
 
-        $this->assertTrue(app('router')->getRoutes()->hasNamedRoute('user.loyalty.history'));
-        $loyaltyHistoryUrl = route('user.loyalty.history');
         $this->actingAs($customer)
             ->get(route('user.bookings.history'))
             ->assertOk()
-            ->assertSee('Lịch sử điểm')
-            ->assertSee('href="'.$loyaltyHistoryUrl.'"', false);
+            ->assertDontSee('Lịch sử điểm');
 
         $customer->status = 'inactive';
         $customer->save();

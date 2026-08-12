@@ -37,7 +37,6 @@ class PayOsInitiationTest extends PayOsPaymentTestCase
             'food_subtotal' => 55_000,
             'gross_amount' => 135_000,
             'promotion_discount_amount' => 20_000,
-            'points_discount_amount' => 0,
             'total_amount' => 115_000,
         ])->save();
         Order::query()->create([

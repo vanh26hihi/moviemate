@@ -40,7 +40,6 @@ class Booking extends Model
         'food_subtotal',
         'gross_amount',
         'promotion_discount_amount',
-        'points_discount_amount',
         'currency',
         'payment_status',
         'booking_status',
@@ -61,7 +60,6 @@ class Booking extends Model
         'food_subtotal' => 'integer',
         'gross_amount' => 'integer',
         'promotion_discount_amount' => 'integer',
-        'points_discount_amount' => 'integer',
     ];
 
     protected $hidden = [
@@ -148,11 +146,6 @@ class Booking extends Model
     public function discountCodeRedemptions(): HasMany
     {
         return $this->hasMany(BookingDiscountCode::class);
-    }
-
-    public function pointRedemption(): HasOne
-    {
-        return $this->hasOne(BookingPointRedemption::class);
     }
 
     public function authoritativePayment(): HasOne

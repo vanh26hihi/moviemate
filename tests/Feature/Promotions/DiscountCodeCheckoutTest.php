@@ -4,7 +4,6 @@ namespace Tests\Feature\Promotions;
 
 use App\Models\Cinema;
 use App\Models\DiscountCode;
-use App\Models\LoyaltySetting;
 use App\Models\User;
 use App\Services\PromotionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,7 +60,7 @@ final class DiscountCodeCheckoutTest extends TestCase
 
     public function test_non_combinable_and_maximum_code_rules_are_rejected(): void
     {
-        LoyaltySetting::current()->update(['max_discount_codes_per_booking' => 1]);
+        config(['promotions.max_discount_codes_per_booking' => 1]);
         $cinema = Cinema::factory()->create();
         foreach (['ONE', 'TWO'] as $code) {
             DiscountCode::query()->create(['code' => $code, 'name' => $code, 'discount_type' => 'fixed', 'discount_value' => 100]);

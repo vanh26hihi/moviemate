@@ -33,7 +33,6 @@ class BookingCheckoutService
         private readonly SeatSelectionPolicy $seatSelectionPolicy,
         private readonly BookingExpirationService $expiration,
         private readonly PromotionService $promotions,
-        private readonly LoyaltyService $loyalty,
         private readonly ShowtimeLifecycleService $lifecycle,
     ) {}
 
@@ -49,7 +48,6 @@ class BookingCheckoutService
         ?string $customerName = null,
         ?string $customerPhone = null,
         array $discountCodes = [],
-        int $pointsToUse = 0,
     ): BookingCheckoutResult {
         if (! in_array($salesChannel, Booking::SALES_CHANNELS, true)) {
             throw new InvalidArgumentException('Unsupported booking sales channel.');
@@ -76,7 +74,6 @@ class BookingCheckoutService
             $salesChannel,
             $counterActor?->getKey(),
             $discountCodes,
-            $pointsToUse,
         );
         $existing = Booking::query()
             ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -105,7 +102,6 @@ class BookingCheckoutService
                     $customerName,
                     $customerPhone,
                     $discountCodes,
-                    $pointsToUse,
                 ): Booking {
                     $existing = Booking::query()
                         ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -181,7 +177,6 @@ class BookingCheckoutService
                         'food_subtotal' => $priceBreakdown->foodSubtotal,
                         'gross_amount' => $priceBreakdown->grandTotal,
                         'promotion_discount_amount' => 0,
-                        'points_discount_amount' => 0,
                         'currency' => $priceBreakdown->currency,
                         'payment_status' => 'unpaid',
                         'booking_status' => 'pending_payment',
@@ -189,11 +184,9 @@ class BookingCheckoutService
                     ])->save();
 
                     $promotionQuote = $this->promotions->reserveForBooking($booking, $discountCodes, $priceBreakdown->grandTotal);
-                    $loyaltyQuote = $this->loyalty->reserveForBooking($booking, $pointsToUse, $promotionQuote->finalAmount);
                     $booking->forceFill([
                         'promotion_discount_amount' => $promotionQuote->discountAmount,
-                        'points_discount_amount' => $loyaltyQuote->discountAmount,
-                        'total_amount' => $loyaltyQuote->finalAmount,
+                        'total_amount' => $promotionQuote->finalAmount,
                     ])->save();
 
                     $this->seatLocks->acquire(

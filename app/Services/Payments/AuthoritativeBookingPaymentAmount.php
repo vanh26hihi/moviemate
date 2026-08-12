@@ -19,16 +19,14 @@ final class AuthoritativeBookingPaymentAmount
             $promotionDiscount = VndAmount::fromDatabase(
                 $booking->getRawOriginal('promotion_discount_amount'),
             );
-            $pointsDiscount = VndAmount::fromDatabase($booking->getRawOriginal('points_discount_amount'));
             $calculatedGross = $seatSubtotal->add($foodSubtotal);
-            $discounts = $promotionDiscount->add($pointsDiscount);
         } catch (Throwable $exception) {
             throw new PaymentInitiationException('Stored booking pricing is invalid.', previous: $exception);
         }
 
         if (! $calculatedGross->equals($gross)
-            || $discounts->compareTo($gross) > 0
-            || $gross->value() - $discounts->value() !== $total->value()
+            || $promotionDiscount->compareTo($gross) > 0
+            || $gross->value() - $promotionDiscount->value() !== $total->value()
             || $total->value() <= 0) {
             throw new PaymentInitiationException('Stored booking pricing failed server verification.');
         }

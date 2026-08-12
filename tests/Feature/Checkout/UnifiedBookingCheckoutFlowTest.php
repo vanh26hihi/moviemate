@@ -15,6 +15,7 @@ use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use App\Services\Payments\PaymentInitiationService;
 use App\Services\UnifiedBookingCheckoutService;
+use App\Services\ZeroPayableBookingSettlement;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -36,7 +37,7 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
         $payments->shouldReceive('initiate')
             ->once()
             ->andThrow(new PaymentInitiationException('Definitive pre-provider failure.'));
-        $service = new UnifiedBookingCheckoutService($bookings, $payments);
+        $service = new UnifiedBookingCheckoutService($bookings, $payments, app(ZeroPayableBookingSettlement::class));
 
         try {
             $service->confirm([
@@ -65,7 +66,6 @@ class UnifiedBookingCheckoutFlowTest extends PaymentTestCase
             'food_subtotal' => 55_000,
             'gross_amount' => 135_000,
             'promotion_discount_amount' => 20_000,
-            'points_discount_amount' => 0,
             'total_amount' => 115_000,
         ])->save();
         Order::query()->create([

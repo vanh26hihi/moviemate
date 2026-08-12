@@ -10,6 +10,8 @@ class Payment extends Model
 {
     public const PROVIDER_COUNTER_CASH = 'counter_cash';
 
+    public const PROVIDER_INTERNAL_ZERO = 'internal_zero';
+
     public const SUPPORTED_PROVIDERS = ['zalopay', 'vnpay', 'payos'];
 
     public const STATUS_PENDING = 'pending';
