@@ -33,7 +33,6 @@ class PricingRuleSeeder extends Seeder
                 ['name' => 'Giá cơ bản '.$cinema->code, 'rule_type' => 'base', 'amount_vnd' => 80_000],
                 ['name' => 'Phụ thu VIP '.$cinema->code, 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 30_000],
                 ['name' => 'Giá ghế đôi '.$cinema->code, 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 80_000],
-                ['name' => 'Phụ thu 3D '.$cinema->code, 'rule_type' => 'room_type', 'room_type' => '3D', 'amount_vnd' => 25_000],
                 ['name' => 'Phụ thu suất tối '.$cinema->code, 'rule_type' => 'time_window', 'time_start' => '18:00', 'time_end' => '22:00', 'amount_vnd' => 15_000],
                 ['name' => 'Phụ thu cuối tuần '.$cinema->code, 'rule_type' => 'weekend', 'days_of_week' => [6, 7], 'amount_vnd' => 10_000],
                 ['name' => 'Ngày hội MovieMate '.$cinema->code, 'rule_type' => 'holiday', 'date_start' => CarbonImmutable::now($cinema->timezone)->addMonth()->startOfMonth()->toDateString(), 'date_end' => CarbonImmutable::now($cinema->timezone)->addMonth()->startOfMonth()->toDateString(), 'amount_vnd' => 20_000],

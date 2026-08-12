@@ -251,7 +251,7 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
         $editQueries = count(DB::getQueryLog());
 
         DB::flushQueryLog();
-        $room = $this->room('Q');
+        $room = $this->room('Q', $template->room_type);
         app(ApplyRoomLayoutTemplateService::class)->apply(
             $room, $template, 'Tiêu chuẩn hiệu năng phòng Q', null, $this->admin, true,
         );
@@ -284,11 +284,11 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
         $this->assertLessThanOrEqual(25, $customerMovieQueries);
     }
 
-    private function room(string $suffix): Room
+    private function room(string $suffix, string $roomType = '2D'): Room
     {
         return Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'R'.$suffix, 'name' => 'Room '.$suffix,
-            'room_type' => '2D', 'status' => 'active', 'total_seats' => 0,
+            'room_type' => $roomType, 'status' => 'active', 'total_seats' => 0,
         ]);
     }
 
