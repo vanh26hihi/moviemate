@@ -14,7 +14,6 @@ use App\Models\RoomLayout;
 use App\Models\RoomLayoutCell;
 use App\Models\Seat;
 use App\Models\Showtime;
-use App\Models\TicketCheckinEvent;
 use App\Models\User;
 use App\Services\Reports\AdminReportingService;
 use App\Services\Reports\ReportScopeFactory;
@@ -117,7 +116,7 @@ final class ReportingR9Test extends TestCase
         $this->assertSame(290_000, $this->report($fixture['admin'], ['sales_channel' => 'online'])['summary']['revenue']);
     }
 
-    public function test_print_and_checkin_use_independent_current_and_append_only_evidence(): void
+    public function test_print_operations_use_current_and_append_only_evidence(): void
     {
         $fixture = $this->fixture();
         $operations = $this->report($fixture['admin'])['ticketOperations'];
@@ -127,9 +126,6 @@ final class ReportingR9Test extends TestCase
         $this->assertSame(1, $operations['printFailed']);
         $this->assertSame(1, $operations['printWaiting']);
         $this->assertSame(1, $operations['unprinted']);
-        $this->assertSame(2, $operations['checkedIn']);
-        $this->assertSame(2, $operations['notCheckedIn']);
-        $this->assertSame(50, $operations['checkinPercent']);
         $this->assertSame(['unresolved' => 1, 'review' => 1, 'total' => 2], $this->report($fixture['admin'])['attention']);
     }
 
@@ -185,7 +181,7 @@ final class ReportingR9Test extends TestCase
             ->assertSee('Phim đang chiếu')
             ->assertSee('Kênh bán')
             ->assertSee('Phương thức thanh toán')
-            ->assertSee('Vận hành in vé & soát vé', false)
+            ->assertSee('Vận hành in vé', false)
             ->assertSee('Giao dịch cần hỗ trợ')
             ->assertDontSee('private-customer@example.test')
             ->assertDontSee('R9-SECRET-TRANSACTION')
@@ -278,9 +274,6 @@ final class ReportingR9Test extends TestCase
         BookingTicketPrint::query()->create(['admission_ticket_id' => $vnpay->admissionTickets()->firstOrFail()->id, 'booking_id' => $vnpay->id, 'status' => 'printed', 'attempts_count' => 1, 'printed_by_user_id' => $printer->id, 'printed_at' => now()]);
         BookingTicketPrint::query()->create(['admission_ticket_id' => $payos->admissionTickets()->firstOrFail()->id, 'booking_id' => $payos->id, 'status' => 'retry_allowed', 'attempts_count' => 1, 'last_failed_by_user_id' => $printer->id, 'last_failed_at' => now()]);
         BookingTicketPrint::query()->create(['admission_ticket_id' => $zalopay->admissionTickets()->firstOrFail()->id, 'booking_id' => $zalopay->id, 'status' => 'retry_authorized', 'attempts_count' => 1, 'retry_authorized_by_user_id' => $admin->id, 'retry_authorized_at' => now()]);
-        $this->checkin($vnpay, $checker, 'accepted');
-        $this->checkin($vnpay, $checker, 'already_used');
-        $this->checkin($counter, $checker, 'accepted');
 
         return compact('admin', 'creator', 'settler', 'printer', 'checker', 'primary', 'other');
     }
@@ -358,17 +351,6 @@ final class ReportingR9Test extends TestCase
         return Payment::createForProvider('vnpay', [
             'booking_id' => $booking->id, 'payment_method' => 'vnpay', 'order_code' => 'R9-'.str()->upper(str()->random(18)),
             'amount' => (int) $booking->total_amount, 'currency' => 'VND', 'status' => $status,
-        ]);
-    }
-
-    private function checkin(Booking $booking, User $actor, string $result): void
-    {
-        $admissionTicket = $booking->admissionTickets()->firstOrFail();
-        TicketCheckinEvent::query()->create([
-            'admission_ticket_id' => $admissionTicket->id,
-            'accepted_ticket_id' => $result === TicketCheckinEvent::RESULT_ACCEPTED ? $admissionTicket->id : null,
-            'booking_id' => $booking->id, 'showtime_id' => $booking->showtime_id, 'actor_user_id' => $actor->id,
-            'actor_role_snapshot' => 'staff', 'result' => $result, 'scanned_at' => now(),
         ]);
     }
 

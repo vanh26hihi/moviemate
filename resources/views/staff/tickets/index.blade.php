@@ -1,15 +1,15 @@
 @extends('layouts.staff')
 
-@section('title', 'Tra cứu vé - MovieMate')
-@section('page-title', 'Tra cứu và quét vé')
+@section('title', 'Tra cứu & in đơn - MovieMate')
+@section('page-title', 'Tra cứu & in đơn')
 @section('suppress-global-validation-summary', true)
 
 @section('content')
 <div class="space-y-6" data-ticket-scanner>
     <header class="admin-page-header">
         <div>
-            <h1 class="admin-page-title">Tra cứu vé</h1>
-            <p class="admin-page-subtitle">Quét QR để xem trước dữ liệu xác thực. Bước này không in và không soát vé.</p>
+            <h1 class="admin-page-title">Tra cứu & in đơn</h1>
+            <p class="admin-page-subtitle">Quét QR đơn đặt vé hoặc nhập mã đơn để mở các tài liệu cần in.</p>
         </div>
         <span class="status-badge bg-brand-start/10 text-brand-start">{{ $cinema?->name ?? 'Tất cả chi nhánh được phép' }}</span>
     </header>
@@ -29,11 +29,11 @@
         <form method="POST" action="{{ route('staff.tickets.resolve') }}" class="cinema-card p-6" autocomplete="off" data-submit-once>
             @csrf
             <h2 class="text-xl font-extrabold app-heading">Tra cứu thủ công</h2>
-            <label for="ticket" class="cinema-label mt-5 block">Mã vé hoặc dữ liệu QR bảo mật</label>
+            <label for="ticket" class="cinema-label mt-5 block">Mã đơn hoặc QR đơn đặt vé</label>
             <textarea id="ticket" name="ticket" data-scanner-input class="cinema-input mt-2 min-h-32" required maxlength="512" autocomplete="off" spellcheck="false">{{ old('ticket') }}</textarea>
-            <p class="mt-2 text-sm app-muted">Nhập chính xác mã MMT-… hoặc URL/dữ liệu QR bảo mật. Máy chủ luôn xác minh vé và phạm vi chi nhánh trước khi hiển thị.</p>
+            <p class="mt-2 text-sm app-muted">Nhập chính xác mã MMT-… hoặc dữ liệu QR bảo mật. Máy chủ luôn xác minh đơn và phạm vi chi nhánh trước khi hiển thị.</p>
             @error('ticket')<p class="mt-2 text-sm text-error" role="alert">{{ $message }}</p>@enderror
-            <button class="btn-primary mt-5" type="submit"><i class="ph ph-magnifying-glass"></i>Xem trước vé</button>
+            <button class="btn-primary mt-5" type="submit"><i class="ph ph-magnifying-glass"></i>Mở đơn</button>
         </form>
     </div>
 </div>

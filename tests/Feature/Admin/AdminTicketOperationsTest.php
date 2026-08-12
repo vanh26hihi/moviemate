@@ -4,7 +4,6 @@ namespace Tests\Feature\Admin;
 
 use App\Models\ActivityLog;
 use App\Models\BookingTicketDelivery;
-use App\Models\TicketCheckinEvent;
 use Illuminate\Support\Facades\DB;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -17,26 +16,15 @@ final class AdminTicketOperationsTest extends PaymentTestCase
         $this->seedRbac();
     }
 
-    public function test_standalone_delivery_routes_are_removed_and_checkin_routes_stay_protected(): void
+    public function test_standalone_delivery_and_digital_checkin_routes_are_removed(): void
     {
         foreach (['admin.ticket-deliveries.index', 'admin.ticket-deliveries.show', 'admin.ticket-deliveries.retry'] as $route) {
             $this->assertFalse(app('router')->getRoutes()->hasNamedRoute($route));
         }
 
-        $delivery = $this->verifiedDelivery();
-        $ticket = $delivery->booking->admissionTickets()->sole();
-        $event = TicketCheckinEvent::query()->create([
-            'admission_ticket_id' => $ticket->id,
-            'accepted_ticket_id' => $ticket->id,
-            'booking_id' => $delivery->booking_id,
-            'showtime_id' => $delivery->booking->showtime_id,
-            'result' => TicketCheckinEvent::RESULT_ACCEPTED,
-            'reason_code' => 'verified_paid_ticket',
-            'scanned_at' => now(),
-        ]);
-        $this->get(route('admin.ticket-checkins.index'))->assertRedirect(route('login'));
-        $this->actingAs($this->userWithRole('staff'))->get(route('admin.ticket-checkins.show', $event))->assertForbidden();
-        $this->actingAs($this->userWithRole('manager'))->get(route('admin.ticket-checkins.index'))->assertOk();
+        foreach (['admin.ticket-checkins.index', 'admin.ticket-checkins.show', 'staff.tickets.check', 'staff.tickets.consume'] as $route) {
+            $this->assertFalse(app('router')->getRoutes()->hasNamedRoute($route));
+        }
     }
 
     public function test_verified_payment_still_enqueues_exactly_one_automatic_delivery(): void
@@ -75,7 +63,7 @@ final class AdminTicketOperationsTest extends PaymentTestCase
     public function test_failed_delivery_retry_uses_stored_recipient_and_preserves_attempt_history(): void
     {
         $delivery = $this->failedDelivery();
-        $before = $delivery->booking->only(['booking_status', 'payment_status', 'customer_email', 'used_at']);
+        $before = $delivery->booking->only(['booking_status', 'payment_status', 'customer_email']);
 
         $this->actingAs($this->userWithRole('manager'))
             ->post(route('admin.bookings.ticket-email.resend', $delivery->booking), [
@@ -141,41 +129,12 @@ final class AdminTicketOperationsTest extends PaymentTestCase
         $this->actingAs($manager)->post(route('admin.bookings.ticket-email.resend', $delivery->booking))->assertTooManyRequests();
     }
 
-    public function test_checkin_history_remains_read_only_filtered_and_contains_no_capability(): void
-    {
-        $delivery = $this->verifiedDelivery();
-        $ticket = $delivery->booking->admissionTickets()->sole();
-        $actor = $this->userWithRole('staff');
-        $event = TicketCheckinEvent::query()->create([
-            'admission_ticket_id' => $ticket->id,
-            'booking_id' => $delivery->booking_id,
-            'showtime_id' => $delivery->booking->showtime_id,
-            'actor_user_id' => $actor->id,
-            'actor_role_snapshot' => 'staff',
-            'result' => TicketCheckinEvent::RESULT_ALREADY_USED,
-            'reason_code' => 'booking_already_used',
-            'scanned_at' => now(),
-            'context' => ['source' => 'test'],
-        ]);
-        $secret = 'v2.'.$ticket->id.'.'.str_repeat('A', 43);
-
-        $response = $this->actingAs($this->userWithRole('manager'))->get(route('admin.ticket-checkins.index', [
-            'booking_code' => $delivery->booking->booking_code, 'duplicates_only' => 'yes',
-        ]));
-        $response->assertOk()->assertSee($delivery->booking->booking_code)->assertSee('Quét trùng')->assertDontSee($secret);
-        $this->actingAs($this->userWithRole('manager'))->get(route('admin.ticket-checkins.show', $event))
-            ->assertOk()->assertSee('Bản ghi chỉ đọc')->assertDontSee($secret)->assertDontSee('safe_ip_hash');
-    }
-
-    public function test_booking_detail_and_checkin_pages_keep_bounded_query_counts(): void
+    public function test_booking_detail_keeps_a_bounded_query_count(): void
     {
         $delivery = $this->verifiedDelivery();
         $manager = $this->userWithRole('manager');
 
-        foreach ([
-            [route('admin.bookings.show', $delivery->booking), 30, 'booking detail'],
-            [route('admin.ticket-checkins.index'), 16, 'check-in index'],
-        ] as [$url, $limit, $label]) {
+        foreach ([[route('admin.bookings.show', $delivery->booking), 30, 'booking detail']] as [$url, $limit, $label]) {
             DB::flushQueryLog();
             DB::enableQueryLog();
             $response = $this->actingAs($manager)->get($url);

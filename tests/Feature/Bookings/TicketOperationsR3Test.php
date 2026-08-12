@@ -6,7 +6,7 @@ use App\Models\BookingTicketPrint;
 use App\Models\BookingTicketPrintEvent;
 use App\Models\Cinema;
 use App\Models\UserCinemaAssignment;
-use App\Services\Tickets\TicketQrPayload;
+use App\Services\Tickets\BookingQrPayload;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -40,18 +40,16 @@ final class TicketOperationsR3Test extends PaymentTestCase
     {
         $booking = $this->verifiedBooking();
         $staff = $this->userWithRole('staff');
-        $capability = app(TicketQrPayload::class)->url($booking);
+        $capability = app(BookingQrPayload::class)->value($booking);
 
         $this->actingAs($staff)->post(route('staff.tickets.resolve'), ['ticket' => $capability])
             ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé xem phim theo ghế')
-            ->assertSee('Chưa sử dụng');
+            ->assertSee('Vé vật lý');
         $this->post(route('staff.tickets.resolve'), ['ticket' => strtolower($booking->booking_code)])
             ->assertOk()->assertSee($booking->booking_code)->assertSee('Vé xem phim theo ghế');
 
         $booking->refresh();
         $this->assertSame('paid', $booking->booking_status);
-        $this->assertNull($booking->used_at);
-        $this->assertDatabaseCount('ticket_checkin_events', 0);
         $this->assertDatabaseCount('booking_ticket_prints', 0);
         $this->assertDatabaseCount('booking_ticket_print_events', 0);
     }
@@ -60,7 +58,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
     {
         $booking = $this->verifiedBooking();
         $staff = $this->userWithRole('staff');
-        $capability = app(TicketQrPayload::class)->url($booking);
+        $capability = app(BookingQrPayload::class)->value($booking);
         $tampered = substr($capability, 0, -1).($capability[-1] === 'A' ? 'B' : 'A');
 
         $this->actingAs($staff)->post(route('staff.tickets.resolve'), ['ticket' => $tampered])->assertNotFound();
@@ -99,10 +97,9 @@ final class TicketOperationsR3Test extends PaymentTestCase
         }
         $this->actingAs($staff)->post(route('staff.tickets.resolve'), ['ticket' => 'malformed'])->assertTooManyRequests();
         $this->assertDatabaseCount('booking_ticket_print_events', 0);
-        $this->assertDatabaseCount('ticket_checkin_events', 0);
     }
 
-    public function test_initial_print_is_idempotent_and_success_does_not_check_in(): void
+    public function test_initial_print_is_idempotent_and_does_not_change_booking_state(): void
     {
         $booking = $this->verifiedBooking();
         $staff = $this->userWithRole('staff');
@@ -119,7 +116,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->get(route('staff.tickets.print.show', $booking))
             ->assertOk()->assertSee($booking->booking_code)->assertSee('data-staff-print-trigger', false)
             ->assertSee('MOVIEMATE')->assertSee('VÉ XEM PHIM')->assertSee('width:80mm', false)
-            ->assertSee('data-qr-value="'.app(TicketQrPayload::class)->url($booking).'"', false)
+            ->assertSee('data-qr-value="'.$booking->admissionTickets()->sole()->ticket_code.'"', false)
             ->assertDontSee('data-qr-value="'.$booking->booking_code.'"', false)
             ->assertDontSee('provider')->assertDontSee('ticket_email_token');
         $this->get(route('staff.tickets.print.show', $booking))->assertOk();
@@ -135,8 +132,6 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $this->post(route('staff.tickets.print.succeed', $booking))->assertRedirect(route('staff.tickets.operations', $booking));
         $this->assertSame(1, BookingTicketPrintEvent::query()->where('event_type', 'print_succeeded')->count());
         $this->assertSame('paid', $booking->fresh()->booking_status);
-        $this->assertNull($booking->fresh()->used_at);
-        $this->assertDatabaseCount('ticket_checkin_events', 0);
         $this->post(route('staff.tickets.print.start', $booking))->assertStatus(409);
     }
 
@@ -309,7 +304,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
             ->assertDontSee('Phê duyệt in lại');
     }
 
-    public function test_ineligible_bookings_cannot_print_but_used_ticket_can_be_reprinted_without_resetting_use(): void
+    public function test_ineligible_bookings_cannot_print(): void
     {
         $staff = $this->userWithRole('staff');
         $bookings = [
@@ -323,13 +318,6 @@ final class TicketOperationsR3Test extends PaymentTestCase
         }
         $this->assertDatabaseCount('booking_ticket_prints', 0);
 
-        $used = $this->verifiedBooking(['booking_status' => 'used', 'used_at' => now()]);
-        $ticket = $used->admissionTickets()->sole();
-        $usedAt = $used->getRawOriginal('used_at');
-        $this->actingAs($staff)->post(route('staff.tickets.print.start', $used))->assertRedirect();
-        $this->post(route('staff.tickets.print.succeed', $used))->assertRedirect();
-        $this->assertSame($usedAt, $used->fresh()->getRawOriginal('used_at'));
-        $this->assertNull($ticket->fresh()->used_at);
     }
 
     public function test_print_events_are_append_only_and_contain_no_capability_columns(): void
@@ -361,7 +349,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
         $booking = $booking->fresh();
         $staff = $this->userWithRole('staff');
         $manager = $this->userWithRole('manager');
-        $capability = app(TicketQrPayload::class)->url($booking);
+        $capability = app(BookingQrPayload::class)->value($booking);
 
         $counts = [
             'customer_ticket' => $this->queryCount(fn () => $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))->assertOk()),

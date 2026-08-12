@@ -28,10 +28,9 @@
             <p class="px-3 pb-2 pt-5 text-[10px] font-black uppercase tracking-[.18em] app-muted">Bán vé tại quầy</p>
             @can('counter_sales.view')<x-admin.nav-link route-name="staff.counter.index" active-pattern="staff.counter.*" label="Bán vé" icon="ph-storefront" />@endcan
             @can('counter_sales.view')<x-admin.nav-link route-name="staff.sales.index" active-pattern="staff.sales.*" label="Giao dịch hôm nay" icon="ph-receipt" />@endcan
-            <p class="px-3 pb-2 pt-5 text-[10px] font-black uppercase tracking-[.18em] app-muted">Vé &amp; soát vé</p>
-            @can('tickets.lookup')<x-admin.nav-link route-name="staff.tickets.index" active-pattern="staff.tickets.*" label="Quét và tra cứu vé" icon="ph-qr-code" />@endcan
+            <p class="px-3 pb-2 pt-5 text-[10px] font-black uppercase tracking-[.18em] app-muted">Tra cứu &amp; in đơn</p>
+            @can('tickets.lookup')<x-admin.nav-link route-name="staff.tickets.index" active-pattern="staff.tickets.*" label="Tra cứu & in đơn" icon="ph-qr-code" />@endcan
             @can('tickets.print')<x-admin.nav-link route-name="staff.prints.index" active-pattern="staff.prints.*" label="Vé cần in" icon="ph-printer" />@endcan
-            @can('ticket_checkins.view')<x-admin.nav-link route-name="staff.checkins.index" active-pattern="staff.checkins.*" label="Lịch sử soát vé" icon="ph-clock-counter-clockwise" />@endcan
         </nav>
         <div class="p-4 border-t app-border shrink-0">
             <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về trang chính</a>

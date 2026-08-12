@@ -124,7 +124,8 @@ class LegacyBookingStoreRetirementTest extends PaymentTestCase
             'user.bookings.history',
             'user.bookings.ticket',
             'staff.tickets.index',
-            'staff.tickets.check',
+            'staff.tickets.resolve',
+            'staff.tickets.print-all',
         ] as $routeName) {
             $this->assertTrue(Route::has($routeName), "Missing route {$routeName}");
         }

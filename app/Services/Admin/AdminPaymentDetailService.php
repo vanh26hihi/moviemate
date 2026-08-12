@@ -77,8 +77,8 @@ final class AdminPaymentDetailService
                 $verified ? 'Kết quả provider đã được chấp nhận' : 'Chưa có kết quả được chấp nhận',
             ),
             'finalization' => $this->state(
-                $verified && $booking && in_array($booking->booking_status, ['paid', 'used'], true) && $booking->payment_status === 'paid' ? 'yes' : 'unknown',
-                $verified && $booking && in_array($booking->booking_status, ['paid', 'used'], true) && $booking->payment_status === 'paid'
+                $verified && $booking && $booking->booking_status === 'paid' && $booking->payment_status === 'paid' ? 'yes' : 'unknown',
+                $verified && $booking && $booking->booking_status === 'paid' && $booking->payment_status === 'paid'
                     ? 'Đơn đã hoàn tất nhất quán' : 'Chưa có bằng chứng hoàn tất nhất quán',
             ),
         ];

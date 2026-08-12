@@ -10,40 +10,18 @@ use App\Services\CinemaAccessService;
 final class TicketResolutionService
 {
     public function __construct(
-        private readonly TicketCheckinCapability $capabilities,
+        private readonly BookingLookupCapability $capabilities,
         private readonly CinemaAccessService $cinemaAccess,
     ) {}
 
     public function resolve(string $capability, User $actor): Booking
     {
-        return $this->resolveTicket($capability, $actor)->booking;
-    }
+        $bookingId = $this->capabilities->bookingId($capability);
+        abort_if($bookingId === null, 404, 'Mã đơn không hợp lệ.');
+        $booking = Booking::query()->find($bookingId);
+        abort_unless($booking && $this->capabilities->isValid($booking, $capability), 404, 'Mã đơn không hợp lệ.');
 
-    public function resolvePublic(string $capability): Booking
-    {
-        return $this->resolvePublicTicket($capability)->booking;
-    }
-
-    public function resolveTicket(string $capability, User $actor): AdmissionTicket
-    {
-        $ticket = $this->findValidTicket($capability);
-        $this->cinemaAccess->authorizeCinema($actor, (int) $ticket->booking->cinema_id);
-
-        return $ticket;
-    }
-
-    public function resolvePublicTicket(string $capability): AdmissionTicket
-    {
-        return $this->findValidTicket($capability);
-    }
-
-    public function resolveTicketCode(string $ticketCode, User $actor): AdmissionTicket
-    {
-        abort_unless(preg_match('/^AT-[A-Z0-9]{26}$/D', $ticketCode) === 1, 404, 'Mã vé không hợp lệ.');
-        $ticket = AdmissionTicket::query()->where('ticket_code', $ticketCode)->first();
-        abort_unless($ticket, 404, 'Mã vé không hợp lệ.');
-
-        return $this->authorizedTicket($ticket, $actor);
+        return $this->authorizedBooking($booking, $actor);
     }
 
     public function authorizedBooking(Booking $booking, User $actor): Booking
@@ -79,23 +57,11 @@ final class TicketResolutionService
 
     public function resolveBookingCode(string $bookingCode, User $actor): Booking
     {
-        abort_unless(preg_match('/^MMT-[0-9]{4}-[A-F0-9]{16}$/D', $bookingCode) === 1, 404, 'Không tìm thấy mã vé.');
+        abort_unless(preg_match('/^MMT-[0-9]{4}-[A-F0-9]{16}$/D', $bookingCode) === 1, 404, 'Không tìm thấy mã đơn.');
         $booking = Booking::query()->where('booking_code', $bookingCode)->first();
-        abort_unless($booking, 404, 'Không tìm thấy mã vé.');
+        abort_unless($booking, 404, 'Không tìm thấy mã đơn.');
 
         return $this->authorizedBooking($booking, $actor);
-    }
-
-    private function findValidTicket(string $capability): AdmissionTicket
-    {
-        $ticketId = $this->capabilities->ticketId($capability);
-        abort_if($ticketId === null, 404, 'Mã vé không hợp lệ.');
-
-        $ticket = AdmissionTicket::query()->with('booking')->find($ticketId);
-        abort_unless($ticket && $this->capabilities->isValid($ticket, $capability), 404, 'Mã vé không hợp lệ.');
-        abort_unless($ticket->booking->cinema_id, 404);
-
-        return $this->loadTicket($ticket);
     }
 
     private function loadBooking(Booking $booking): Booking
@@ -110,7 +76,6 @@ final class TicketResolutionService
             'admissionTickets.bookingSeat.seat',
             'admissionTickets.printState.printedBy:id,name',
             'admissionTickets.printState.events.actor:id,name',
-            'admissionTickets.acceptedCheckin.actor:id,name',
             'ticketDelivery',
             'foodOrder.items',
             'foodPickupVoucher.printEvents.actor:id,name',
@@ -130,7 +95,6 @@ final class TicketResolutionService
             'booking.foodPickupVoucher',
             'bookingSeat.seat',
             'printState.printedBy:id,name',
-            'acceptedCheckin.actor:id,name',
         ]);
     }
 }

@@ -25,7 +25,6 @@ use App\Http\Controllers\Admin\RoomTypeController as AdminRoomTypeController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
-use App\Http\Controllers\Admin\TicketCheckinController as AdminTicketCheckinController;
 use App\Http\Controllers\Admin\UserCinemaAssignmentController as AdminUserCinemaAssignmentController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -44,11 +43,10 @@ use App\Http\Controllers\Payments\ZaloPayReturnController;
 use App\Http\Controllers\Staff\CounterPaymentController as StaffCounterPaymentController;
 use App\Http\Controllers\Staff\CounterSaleController as StaffCounterSaleController;
 use App\Http\Controllers\Staff\FoodPickupVoucherPrintController as StaffFoodPickupVoucherPrintController;
-use App\Http\Controllers\Staff\TicketCheckinController as StaffTicketCheckinController;
+use App\Http\Controllers\Staff\PrintAllController as StaffPrintAllController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
 use App\Http\Controllers\Staff\WorkspaceController as StaffWorkspaceController;
-use App\Http\Controllers\TicketVerificationController;
 use App\Http\Controllers\User\AiController;
 use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
@@ -81,11 +79,6 @@ Route::get('/cinemas', [UserCinemaController::class, 'index'])->middleware('thro
 Route::get('/cinemas/{cinema:code}', [UserCinemaController::class, 'show'])
     ->where('cinema', '[A-Za-z0-9-]+')->name('cinemas.show');
 Route::get('/showtimes/filter', ShowtimeFilterController::class)->middleware('throttle:60,1')->name('showtimes.filter');
-Route::get('/tickets/verify/{capability}', TicketVerificationController::class)
-    ->middleware('throttle:60,1')
-    ->where('capability', 'v2\\.[1-9][0-9]{0,18}\\.[A-Za-z0-9_-]{43}')
-    ->name('tickets.verify');
-
 Route::post('/payments/zalopay/callback', ZaloPayCallbackController::class)
     ->middleware('throttle:120,1')
     ->name('payments.zalopay.callback');
@@ -468,12 +461,6 @@ Route::prefix('admin')->name('admin.')
             ->middleware(['permission:payments.reconcile', 'throttle:6,1'])
             ->name('payment-reviews.resolve');
 
-        Route::get('/ticket-checkins', [AdminTicketCheckinController::class, 'index'])
-            ->middleware('permission:ticket_checkins.view')->name('ticket-checkins.index');
-        Route::get('/ticket-checkins/{ticketCheckinEvent}', [AdminTicketCheckinController::class, 'show'])
-            ->whereNumber('ticketCheckinEvent')
-            ->middleware('permission:ticket_checkins.view')->name('ticket-checkins.show');
-
         Route::get('/users', [AdminUserController::class, 'index'])
             ->middleware('permission:users.view')->name('users.index');
         Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])
@@ -511,14 +498,14 @@ Route::prefix('staff')->name('staff.')
             ->middleware('permission:counter_sales.view')->name('sales.index');
         Route::get('/print-queue', [StaffWorkspaceController::class, 'prints'])
             ->middleware('permission:tickets.print')->name('prints.index');
-        Route::get('/check-in-history', [StaffWorkspaceController::class, 'checkins'])
-            ->middleware('permission:ticket_checkins.view')->name('checkins.index');
         Route::get('/tickets', [StaffTicketWorkspaceController::class, 'index'])
             ->middleware('permission:tickets.lookup')->name('tickets.index');
         Route::post('/tickets/resolve', [StaffTicketWorkspaceController::class, 'resolve'])
             ->middleware(['permission:tickets.lookup', 'throttle:30,1'])->name('tickets.resolve');
         Route::get('/tickets/{booking}/operations', [StaffTicketWorkspaceController::class, 'operations'])
             ->whereNumber('booking')->middleware('permission:tickets.lookup')->name('tickets.operations');
+        Route::post('/tickets/{booking}/print-all', StaffPrintAllController::class)
+            ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:6,1'])->name('tickets.print-all');
         Route::post('/tickets/{booking}/print', [StaffTicketPrintController::class, 'start'])
             ->whereNumber('booking')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('tickets.print.start');
         Route::post('/tickets/{booking}/reprint', [StaffTicketPrintController::class, 'reprint'])
@@ -545,14 +532,6 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('admissionTicket')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('admission-tickets.print.recover-expired');
         Route::post('/food-pickup-vouchers/{foodPickupVoucher}/print', StaffFoodPickupVoucherPrintController::class)
             ->whereNumber('foodPickupVoucher')->middleware(['permission:tickets.print', 'throttle:12,1'])->name('food-pickup-vouchers.print');
-        Route::get('/tickets/check', [StaffTicketCheckinController::class, 'show'])
-            ->middleware('permission:tickets.checkin')->name('tickets.check');
-        Route::post('/tickets/check', [StaffTicketCheckinController::class, 'store'])
-            ->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume');
-        Route::post('/admission-tickets/{admissionTicket}/admit', [StaffTicketCheckinController::class, 'confirm'])
-            ->whereNumber('admissionTicket')->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('admission-tickets.admit');
-        Route::post('/tickets/{booking}/check-in', [StaffTicketCheckinController::class, 'storeBooking'])
-            ->whereNumber('booking')->middleware(['permission:tickets.checkin', 'throttle:30,1'])->name('tickets.consume-booking');
         Route::get('/counter', [StaffCounterSaleController::class, 'index'])
             ->middleware('permission:counter_sales.view')->name('counter.index');
         Route::post('/counter/cinema', [StaffCounterSaleController::class, 'selectCinema'])

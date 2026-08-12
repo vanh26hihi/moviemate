@@ -1,24 +1,25 @@
 @extends('layouts.staff')
 
-@section('title', 'Vận hành đơn '.$booking->booking_code.' - MovieMate')
-@section('page-title', 'Vận hành vé')
+@section('title', 'Tra cứu & in đơn '.$booking->booking_code.' - MovieMate')
+@section('page-title', 'Tra cứu & in đơn')
 
 @section('content')
 <div class="space-y-6">
-    @if(session('checkin_result'))
-        @php($result = session('checkin_result'))
-        <section class="rounded-2xl border p-5 {{ $result['result'] === 'accepted' ? 'border-success/40 bg-success/10' : 'border-error/40 bg-error/10' }}" role="alert">
-            <h2 class="text-xl font-extrabold">{{ $result['result'] === 'accepted' ? 'Đã xác nhận cho vào' : 'Không thể xác nhận' }}</h2>
-            <p>{{ $result['message'] }}</p>
-        </section>
-    @endif
-
     <header>
         <a href="{{ route('staff.tickets.index') }}" class="text-sm font-bold text-brand-start">← Tra cứu đơn khác</a>
         <p class="mt-4 text-sm font-bold uppercase tracking-widest app-muted">Đơn đặt vé</p>
         <h1 class="text-3xl font-extrabold app-heading">{{ $booking->booking_code }}</h1>
         <p class="mt-2 app-muted">{{ $booking->showtime?->movie?->title }} · {{ $booking->showtime_label }} · {{ $booking->showtime?->cinema?->name }} · {{ $booking->showtime?->room?->name }}</p>
     </header>
+
+    @can('tickets.print')
+        @if($booking->admissionTickets->isNotEmpty() && $booking->admissionTickets->every(fn($ticket) => $ticket->printState === null) && (!$booking->foodPickupVoucher || $booking->foodPickupVoucher->print_count === 0))
+            <form method="POST" action="{{ route('staff.tickets.print-all', $booking) }}" target="_blank" data-submit-once>
+                @csrf
+                <button class="btn-primary" type="submit"><i class="ph ph-printer"></i>In toàn bộ</button>
+            </form>
+        @endif
+    @endcan
 
     <section aria-labelledby="physical-tickets-title">
         <h2 id="physical-tickets-title" class="text-2xl font-extrabold app-heading">Vé xem phim theo ghế</h2>
@@ -28,11 +29,10 @@
                 <article class="cinema-card p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div><p class="text-sm app-muted">Ghế hành khách</p><h3 class="text-3xl font-extrabold text-brand-start">{{ $ticket->seat_code }}</h3><p class="mt-1 break-all font-mono text-xs app-muted">{{ $ticket->ticket_code }}</p></div>
-                        <span class="status-badge {{ $ticket->used_at ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success' }}">{{ $ticket->used_at ? 'Đã sử dụng' : 'Chưa sử dụng' }}</span>
+                        <span class="status-badge bg-brand-start/10 text-brand-start">Vé vật lý</span>
                     </div>
-                    <dl class="mt-5 grid grid-cols-2 gap-3 text-sm">
+                    <dl class="mt-5 grid gap-3 text-sm">
                         <div><dt class="app-muted">Số bản đã in</dt><dd class="font-bold">{{ $ticket->print_count }}</dd></div>
-                        <div><dt class="app-muted">Sử dụng lúc</dt><dd class="font-bold">{{ $ticket->used_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
                     </dl>
 
                     @can('tickets.print')
@@ -85,8 +85,5 @@
         </section>
     @endif
 
-    @can('tickets.checkin')
-        <a href="{{ route('staff.tickets.check') }}" class="btn-primary inline-flex">Mở màn hình soát vé</a>
-    @endcan
 </div>
 @endsection

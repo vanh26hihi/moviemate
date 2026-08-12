@@ -9,8 +9,7 @@ final class StatusLabel
         'booking' => [
             'pending' => 'Chờ xử lý',
             'pending_payment' => 'Chờ thanh toán',
-            'paid' => 'Chưa sử dụng',
-            'used' => 'Đã sử dụng',
+            'paid' => 'Đã thanh toán',
             'cancelled' => 'Đã hủy',
             'expired' => 'Đã hết hạn',
             'review' => 'Cần kiểm tra',
@@ -19,7 +18,6 @@ final class StatusLabel
             'pending' => 'Chờ xử lý',
             'pending_payment' => 'Chờ thanh toán',
             'paid' => 'Đã thanh toán',
-            'used' => 'Đã sử dụng',
             'cancelled' => 'Đã hủy',
             'expired' => 'Đã hết hạn',
             'review' => 'Chờ đối soát',
@@ -49,15 +47,6 @@ final class StatusLabel
             'failed' => 'Gửi thất bại',
             'sent' => 'Đã gửi',
             'missing' => 'Thiếu thông tin',
-        ],
-        'ticket_checkin' => [
-            'accepted' => 'Chấp nhận',
-            'already_used' => 'Quét trùng',
-            'unpaid' => 'Chưa thanh toán',
-            'cancelled' => 'Đơn đã hủy',
-            'expired' => 'Đã hết hạn',
-            'invalid_token' => 'Mã vé không hợp lệ',
-            'rejected' => 'Bị từ chối',
         ],
         'ticket_print' => [
             'unprinted' => 'Chưa in',

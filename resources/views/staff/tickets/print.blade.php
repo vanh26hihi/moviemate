@@ -39,7 +39,7 @@
             <div class="fact"><dt>Thời gian in</dt><dd>{{ now($booking->showtime?->cinema?->timezone)->format('d/m/Y H:i') }}</dd></div>
         </dl>
         <hr class="rule">
-        <div class="qr"><canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="256" width="256" height="256" aria-label="QR bảo mật xác minh vé"></canvas><p class="code">{{ $ticket->ticket_code }}</p><p class="qr-note">QR xác minh riêng cho ghế {{ $ticket->seat_code }}. Việc in không đồng nghĩa vé đã được sử dụng.</p></div>
+        <div class="qr"><canvas data-qr-value="{{ $ticketQrPayload }}" data-qr-size="256" width="256" height="256" aria-label="QR mã vé"></canvas><p class="code">{{ $ticket->ticket_code }}</p><p class="qr-note">Mã nhận diện nội bộ cho vé ghế {{ $ticket->seat_code }}.</p></div>
         <hr class="rule">
         <footer class="footer">Vui lòng đến trước giờ chiếu 15 phút.<br>Giữ vé trong suốt thời gian xem phim.</footer>
     </article>

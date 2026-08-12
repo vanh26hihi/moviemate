@@ -3,9 +3,8 @@
 namespace Tests\Feature\Bookings;
 
 use App\Mail\BookingTicketMail;
-use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\TicketQrCode;
-use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Support\Facades\Route;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -23,9 +22,10 @@ class PrintableTicketTest extends PaymentTestCase
         [$owner, $booking] = $this->paidOwnerBooking();
         $response = $this->actingAs($owner)->get(route('user.bookings.ticket', $booking));
 
-        $response->assertOk()->assertSee('VÉ XEM PHIM')->assertSee('Chưa sử dụng')
+        $payload = app(BookingQrPayload::class)->value($booking);
+        $response->assertOk()->assertSee('ĐƠN ĐẶT VÉ')->assertSee('QR ĐƠN ĐẶT VÉ')
             ->assertSee($booking->booking_code)->assertSee('Booking Foundation Movie')
-            ->assertSee('data-qr-value="'.route('tickets.verify', ['capability' => app(TicketCheckinCapability::class)->issue($booking)]).'"', false)
+            ->assertSee('data-qr-value="'.$payload.'"', false)
             ->assertDontSee('data-qr-value="'.$booking->booking_code.'"', false)
             ->assertDontSee('In vé')->assertDontSee('Lưu PDF')->assertDontSee('Lưu ảnh')
             ->assertDontSee('data-print-ticket', false)->assertDontSee('api.qrserver.com', false);
@@ -42,21 +42,6 @@ class PrintableTicketTest extends PaymentTestCase
         $this->actingAs($other)->post(route('staff.tickets.print.start', $booking))->assertForbidden();
     }
 
-    public function test_used_ticket_remains_readable_with_first_checkin_time_and_stable_qr(): void
-    {
-        [$owner, $booking] = $this->paidOwnerBooking();
-        $ticket = $booking->admissionTickets()->sole();
-        $capability = app(TicketQrPayload::class)->url($ticket);
-        $usedAt = now()->subMinute();
-        $ticket->forceFill(['used_at' => $usedAt])->save();
-        $booking->forceFill(['booking_status' => 'used', 'used_at' => $usedAt])->save();
-
-        $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
-            ->assertOk()->assertSee('Đã sử dụng')
-            ->assertSee('data-qr-value="'.$capability.'"', false)
-            ->assertSee($usedAt->format('d/m/Y H:i:s'));
-    }
-
     public function test_cancelled_refunded_expired_and_unpaid_tickets_have_no_qr(): void
     {
         foreach ([
@@ -68,7 +53,7 @@ class PrintableTicketTest extends PaymentTestCase
             $booking->forceFill($state)->save();
             $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
                 ->assertOk()
-                ->assertSee('Đơn chưa có vé xem phim hợp lệ để sử dụng.')
+                ->assertSee('Đơn chưa đủ điều kiện phát hành QR nhận vé.')
                 ->assertDontSee('data-qr-value', false);
         }
     }
@@ -90,7 +75,7 @@ class PrintableTicketTest extends PaymentTestCase
             ->assertDontSee('window.print')->assertDontSee('Lưu PDF');
     }
 
-    public function test_couple_pair_has_two_physical_tickets_on_page_and_email(): void
+    public function test_couple_pair_is_presented_as_one_booking_qr_on_page_and_email(): void
     {
         $owner = $this->userWithRole('user');
         $scenario = $this->bookingScenario(true);
@@ -104,18 +89,19 @@ class PrintableTicketTest extends PaymentTestCase
         ]);
 
         $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
-            ->assertOk()->assertSee('Ghế B1')->assertSee('Ghế B2')
-            ->assertSee('QR riêng cho ghế B1')->assertSee('QR riêng cho ghế B2');
+            ->assertOk()->assertSee('B1')->assertSee('B2')
+            ->assertSee('QR ĐƠN ĐẶT VÉ')->assertDontSee('QR riêng cho ghế');
 
-        $capability = app(TicketQrPayload::class)->url($booking);
+        $capability = app(BookingQrPayload::class)->value($booking);
         $email = (new BookingTicketMail(
             $booking,
             'https://example.test/ticket',
             app(TicketQrCode::class)->png($capability),
         ))->render();
-        $this->assertStringContainsString('Ghế B1', $email);
-        $this->assertStringContainsString('Ghế B2', $email);
-        $this->assertStringContainsString('Mã QR xác minh vé MovieMate', $email);
+        $this->assertStringContainsString('B1', $email);
+        $this->assertStringContainsString('B2', $email);
+        $this->assertStringContainsString('QR ĐƠN ĐẶT VÉ', $email);
+        $this->assertSame(1, substr_count($email, 'alt="QR đơn đặt vé MovieMate"'));
     }
 
     private function paidOwnerBooking(): array

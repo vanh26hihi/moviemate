@@ -23,7 +23,6 @@ final class BookingHistoryController extends Controller
         $statusFilters = [
             'pending' => 'pending_payment',
             'paid' => 'paid',
-            'used' => 'used',
             'cancelled' => 'cancelled',
             'expired' => 'expired',
         ];

@@ -17,8 +17,8 @@ use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\Payments\BookingPaymentActionPolicy;
 use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\BookingTicketEligibility;
-use App\Services\Tickets\TicketQrPayload;
 use App\Support\SeatPresentation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +33,7 @@ class BookingController extends Controller
         private readonly BookingCheckoutDraftService $drafts,
         private readonly BookingCheckoutPreviewService $previews,
         private readonly BookingTicketEligibility $ticketEligibility,
-        private readonly TicketQrPayload $ticketQrPayloads,
+        private readonly BookingQrPayload $bookingQrPayloads,
         private readonly TicketMailConfigurationInspector $mailConfiguration,
         private readonly PublicShowtimeCatalog $showtimeCatalog,
         private readonly BookingExpirationService $expiration,
@@ -189,10 +189,8 @@ class BookingController extends Controller
             'showtime.room',
             'bookingSeats.seat',
             'admissionTickets.bookingSeat.seat',
-            'admissionTickets.acceptedCheckin',
             'foodOrder.items',
             'foodPickupVoucher',
-            'acceptedTicketCheckin',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
@@ -223,29 +221,24 @@ class BookingController extends Controller
             'showtime.room',
             'bookingSeats.seat',
             'admissionTickets.bookingSeat.seat',
-            'admissionTickets.acceptedCheckin',
             'foodOrder.items',
             'foodPickupVoucher',
-            'acceptedTicketCheckin',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $isDeliverable = $this->ticketEligibility->isDeliverable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
-        $ticketQrPayloads = $isDeliverable
-            ? $booking->admissionTickets->mapWithKeys(fn ($ticket) => [$ticket->id => $this->ticketQrPayloads->url($ticket)])
-            : collect();
+        $bookingQrPayload = $isDeliverable ? $this->bookingQrPayloads->value($booking) : null;
         $ticketState = match (true) {
             $booking->payment_status === 'refunded' => 'refunded',
             $booking->booking_status === 'cancelled' => 'cancelled',
             $booking->booking_status === 'expired' => 'expired',
-            $booking->booking_status === 'used' => 'used',
             $isUsable => 'valid',
             default => 'invalid',
         };
 
         return response()->view('user.bookings.ticket', compact(
-            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'ticketQrPayloads', 'ticketState'
+            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'bookingQrPayload', 'ticketState'
         ))->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache');
     }

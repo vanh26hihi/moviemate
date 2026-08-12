@@ -76,13 +76,6 @@
             'colour' => 'text-error',
             'badge' => 'Đã hủy',
         ],
-        'used' => [
-            'title' => 'Vé đã được sử dụng',
-            'message' => 'Vé đã được soát tại rạp và chỉ còn giá trị tra cứu lịch sử. Mã QR không còn khả dụng.',
-            'icon' => 'ph-checks',
-            'colour' => 'text-ai-start',
-            'badge' => 'Đã sử dụng',
-        ],
     ];
     $state = $states[$stateKey];
     $currency = ($booking?->currency ?: 'VND') === 'VND' ? 'VNĐ' : ($booking?->currency ?: 'VND');

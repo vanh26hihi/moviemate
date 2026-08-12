@@ -46,7 +46,6 @@
                     ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],
                     ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
                     ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Mã giảm giá', 'icon' => 'ph-ticket-percent'],
-                    ['route' => 'admin.ticket-checkins.index', 'active' => 'admin.ticket-checkins.*', 'permission' => 'ticket_checkins.view', 'label' => 'Lịch sử soát vé', 'icon' => 'ph-qr-code'],
                 ]],
                 ['label' => 'Dịch vụ', 'items' => [
                     ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],

@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\CinemaAccessService;
-use App\Services\Tickets\TicketCheckinCapability;
-use App\Services\Tickets\TicketQrPayload;
+use App\Services\Tickets\BookingLookupCapability;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\TicketResolutionService;
 use App\Support\PrivacyMask;
 use Illuminate\Http\Request;
@@ -22,8 +22,8 @@ final class TicketWorkspaceController extends Controller
 
     public function resolve(
         Request $request,
-        TicketCheckinCapability $capabilities,
-        TicketQrPayload $payloads,
+        BookingLookupCapability $capabilities,
+        BookingQrPayload $payloads,
         TicketResolutionService $tickets,
     ): View {
         $validated = $request->validate(['ticket' => ['required', 'string', 'max:512']]);
@@ -55,7 +55,6 @@ final class TicketWorkspaceController extends Controller
             $booking->payment_status === 'refunded' => 'Vé đã được hoàn tiền và không còn hiệu lực.',
             $booking->booking_status === 'cancelled' => 'Đơn đã hủy.',
             $booking->booking_status === 'expired' => 'Đơn đã hết hạn.',
-            $booking->booking_status === 'used' => 'Vé đã được sử dụng.',
             $booking->payment_status !== 'paid' || ! $verified => 'Vé chưa có thanh toán được xác minh.',
             default => 'Vé hợp lệ và đã thanh toán.',
         };

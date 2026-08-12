@@ -13,8 +13,8 @@
     @if(!$cinema)
         <x-empty-state title="Bạn chưa được phân công chi nhánh" description="Liên hệ quản lý để được phân công chi nhánh trước khi thực hiện nghiệp vụ." icon="ph-map-pin" />
     @else
-        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Tình hình vận hành hôm nay">
-            @foreach([['Vé bán hôm nay',$stats['sold'],'ph-ticket'],['Đã soát vé',$stats['checked_in'],'ph-check-circle'],['Chờ in',$stats['waiting_print'],'ph-printer'],['In cần chú ý',$stats['print_attention'],'ph-warning'],['Đơn quầy đang giữ',$stats['pending_counter'],'ph-hourglass']] as [$label,$value,$icon])
+        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tình hình vận hành hôm nay">
+            @foreach([['Vé bán hôm nay',$stats['sold'],'ph-ticket'],['Chờ in',$stats['waiting_print'],'ph-printer'],['In cần chú ý',$stats['print_attention'],'ph-warning'],['Đơn quầy đang giữ',$stats['pending_counter'],'ph-hourglass']] as [$label,$value,$icon])
                 <article class="cinema-card p-5"><i class="ph {{ $icon }} text-2xl text-brand-start"></i><p class="mt-3 text-3xl font-black app-heading">{{ $value }}</p><p class="mt-1 text-sm app-muted">{{ $label }}</p></article>
             @endforeach
         </section>

@@ -12,7 +12,7 @@
     $isVerifiedPaid = $payment->status === \App\Models\Payment::STATUS_SUCCESS
         && $payment->verified_at !== null
         && $booking->payment_status === 'paid'
-        && in_array($booking->booking_status, ['paid', 'used'], true);
+        && $booking->booking_status === 'paid';
     $stateStatus = $payment->status === \App\Models\Payment::STATUS_SUCCESS && ! $isVerifiedPaid
         ? \App\Models\Payment::STATUS_REVIEW
         : $payment->status;

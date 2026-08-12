@@ -15,7 +15,7 @@ final class StaffWorkspaceCompletionTest extends PaymentTestCase
         $this->seedRbac();
     }
 
-    public function test_staff_workspace_navigation_and_operational_histories_are_available_without_admin_access(): void
+    public function test_staff_print_workspace_is_available_without_admin_or_checkin_access(): void
     {
         $staff = $this->userWithRole('staff');
 
@@ -23,10 +23,11 @@ final class StaffWorkspaceCompletionTest extends PaymentTestCase
             ->assertOk()->assertSee('Bàn làm việc hôm nay')->assertSee('Giao dịch hôm nay');
         $this->get(route('staff.sales.index'))->assertOk()->assertSee('Giao dịch tại chi nhánh');
         $this->get(route('staff.prints.index'))->assertOk()->assertSee('Vé cần in');
-        $this->get(route('staff.checkins.index'))->assertOk()->assertSee('Lịch sử soát vé');
+        $this->get(route('staff.tickets.index'))->assertOk()->assertSee('Tra cứu & in đơn');
         $this->actingAs($this->userWithRole('user'))->get(route('staff.sales.index'))->assertForbidden();
 
         $this->assertFalse($staff->hasPermission('admin.access'));
+        $this->assertFalse(app('router')->has('staff.checkins.index'));
     }
 
     public function test_unassigned_staff_receives_safe_empty_workspace_without_branch_data(): void
@@ -51,7 +52,7 @@ final class StaffWorkspaceCompletionTest extends PaymentTestCase
             'counter' => route('staff.counter.index'),
             'sales' => route('staff.sales.index'),
             'print_queue' => route('staff.prints.index'),
-            'checkin_history' => route('staff.checkins.index'),
+            'ticket_lookup' => route('staff.tickets.index'),
         ] as $surface => $url) {
             $count = $this->queryCount(fn () => $this->actingAs($staff)->get($url)->assertOk());
             $this->assertLessThanOrEqual(30, $count, $surface.' has an unexpected query count.');
