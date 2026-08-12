@@ -323,6 +323,75 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         $this->assertSame('active', $bulk->status);
     }
 
+    public function test_preview_and_publish_share_authority_for_every_representative_failure_code(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $movie = $this->movie(90);
+
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 20:00:00', 'Asia/Ho_Chi_Minh'));
+        $this->assertPreviewPublishParity(
+            $admin,
+            [$this->row('past', $movie, $this->rooms['P01'], time: '20:00')],
+            'PAST_START',
+        );
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2029-06-10 20:00:00', 'Asia/Ho_Chi_Minh'));
+
+        $existing = $this->existing($movie, $this->rooms['P01']);
+        $this->assertPreviewPublishParity(
+            $admin,
+            [$this->row('persisted', $movie, $this->rooms['P01'], time: '18:30')],
+            'ROOM_CONFLICT',
+        );
+        $existing->delete();
+
+        $this->assertPreviewPublishParity($admin, [
+            $this->row('internal-a', $movie, $this->rooms['P01'], time: '18:00'),
+            $this->row('internal-b', $movie, $this->rooms['P01'], time: '18:30'),
+        ], 'BATCH_ROOM_CONFLICT');
+
+        $hours = $this->cinema->operatingHours()->create([
+            'day_of_week' => 1,
+            'opens_at' => '09:00',
+            'latest_show_start_at' => '23:00',
+            'is_closed' => true,
+        ]);
+        $this->assertPreviewPublishParity(
+            $admin,
+            [$this->row('closed', $movie, $this->rooms['P01'])],
+            'CINEMA_CLOSED',
+        );
+        $hours->update(['is_closed' => false, 'opens_at' => '19:00']);
+        $this->assertPreviewPublishParity(
+            $admin,
+            [$this->row('outside', $movie, $this->rooms['P01'])],
+            'OUTSIDE_START_WINDOW',
+        );
+        $hours->delete();
+
+        $this->rooms['P01']->layouts()->update(['status' => 'retired']);
+        $this->assertPreviewPublishParity(
+            $admin,
+            [$this->row('layout', $movie, $this->rooms['P01'])],
+            'LAYOUT_UNAVAILABLE',
+        );
+        $this->rooms['P01']->layouts()->update(['status' => 'published']);
+
+        $this->rooms['P01']->update(['status' => 'maintenance']);
+        $this->assertPreviewPublishParity(
+            $admin,
+            [$this->row('inactive', $movie, $this->rooms['P01'])],
+            'ROOM_UNAVAILABLE',
+        );
+        $this->rooms['P01']->update(['status' => 'active']);
+
+        $movie->update(['duration' => 0]);
+        $this->assertPreviewPublishParity(
+            $admin,
+            [$this->row('runtime', $movie, $this->rooms['P01'])],
+            'INVALID_RUNTIME',
+        );
+    }
+
     public function test_stale_preview_and_time_passage_fail_whole_publish(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 17:00:00', 'Asia/Ho_Chi_Minh'));
@@ -466,6 +535,17 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
     {
         $this->actingAs($user)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => [$row]])
             ->assertOk()->assertJson(['valid' => false])->assertJsonPath('rows.0.code', $code);
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private function assertPreviewPublishParity($user, array $rows, string $code): void
+    {
+        $before = Showtime::query()->count();
+        $this->actingAs($user)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
+            ->assertOk()->assertJson(['valid' => false])->assertJsonPath('rows.0.code', $code);
+        $this->actingAs($user)->postJson(route('admin.showtimes.bulk.store'), ['rows' => $rows])
+            ->assertUnprocessable()->assertJson(['valid' => false])->assertJsonPath('rows.0.code', $code);
+        $this->assertSame($before, Showtime::query()->count());
     }
 
     private function serviceUser()
