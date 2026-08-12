@@ -276,6 +276,35 @@ final class SeatIncidentFoundationTest extends TestCase
         $this->assertSame('ACTIVE', $booking->bookingSeats()->firstOrFail()->active_lock_key);
     }
 
+    public function test_incident_detail_reads_never_printed_printed_and_reprinted_ticket_states(): void
+    {
+        [$room, $layout, $seats] = $this->roomWithSeats('PRINT-STATE');
+        foreach ([0, 1, 2] as $index => $printCount) {
+            $showtime = $this->showtime($room, $layout, now()->addDays($index + 1)->toDateString(), '20:00:00');
+            $booking = $this->booking($showtime, 'PRINT-'.$printCount, 'paid', 'paid');
+            $bookingSeat = $this->bookingSeat($booking, $seats[0]);
+            Payment::createForProvider('vnpay', [
+                'booking_id' => $booking->id, 'payment_method' => 'vnpay', 'amount' => 50000,
+                'status' => 'success', 'verified_at' => now(), 'paid_at' => now(),
+            ]);
+            $bookingSeat->admissionTicket->forceFill([
+                'print_count' => $printCount,
+                'last_printed_at' => $printCount > 0 ? now() : null,
+            ])->save();
+        }
+        $manager = $this->userWithRole('manager');
+        $this->actingAs($manager)->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]), [
+            'status' => 'maintenance', 'reason' => 'seat_broken',
+        ])->assertRedirect();
+
+        $html = $this->actingAs($manager)->get(route('admin.rooms.seat-incidents.show', [$room, SeatIncident::query()->firstOrFail()]))
+            ->assertOk()->getContent();
+        $this->assertSame(1, substr_count($html, '>Chưa in<'));
+        $this->assertSame(1, substr_count($html, '>Đã in<'));
+        $this->assertSame(1, substr_count($html, '>Đã in lại (2)<'));
+        $this->assertDatabaseCount('booking_ticket_print_events', 0);
+    }
+
     public function test_old_layout_and_cross_midnight_upcoming_are_detected_but_playing_is_not(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-08-11 18:00:00', 'Asia/Ho_Chi_Minh'));
