@@ -13,6 +13,7 @@
         </div>
         @can('showtimes.create')
             <div class="flex flex-wrap gap-3">
+                <a href="{{ route('admin.showtimes.copy.index') }}" class="btn-secondary"><i class="ph-bold ph-copy"></i> Sao chép lịch</a>
                 <a href="{{ route('admin.showtimes.bulk.index') }}" class="btn-secondary"><i class="ph-bold ph-list-plus"></i> Tạo nhiều suất</a>
                 <a href="{{ route('admin.showtimes.create') }}" class="btn-primary"><i class="ph-bold ph-plus"></i> Thêm suất chiếu</a>
             </div>

@@ -9,7 +9,9 @@
     data-bulk-showtime-workspace
     data-preview-endpoint="{{ route('admin.showtimes.bulk.preview') }}"
     data-publish-endpoint="{{ route('admin.showtimes.bulk.store') }}"
+    data-initial-message="{{ $copyMessage }}"
 >
+    <script type="application/json" data-bulk-initial-rows>@json($initialRows, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)</script>
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
         <div>
             <p class="text-brand-start text-sm font-extrabold uppercase tracking-[0.22em] mb-2">Lịch chiếu</p>
@@ -73,7 +75,7 @@
                 <select class="cinema-input min-w-[220px]" data-row-movie required>
                     <option value="">Chọn phim</option>
                     @foreach($movies as $movie)
-                        <option value="{{ $movie->id }}">{{ $movie->title }} — {{ $movie->duration }} phút</option>
+                        <option value="{{ $movie->id }}">{{ $movie->title }} — {{ $movie->duration }} phút{{ in_array($movie->status, \App\Models\Movie::SCHEDULABLE_STATUSES, true) ? '' : ' · không còn khả dụng' }}</option>
                     @endforeach
                 </select>
             </td>
@@ -81,7 +83,7 @@
                 <select class="cinema-input min-w-[220px]" data-row-room required>
                     <option value="">Chọn phòng</option>
                     @foreach($rooms as $room)
-                        <option value="{{ $room->id }}">{{ $room->cinema->code }} · {{ $room->code }} · {{ $room->name }}</option>
+                        <option value="{{ $room->id }}">{{ $room->cinema->code }} · {{ $room->code }} · {{ $room->name }}{{ $room->status === 'active' && $room->latestPublishedLayout ? '' : ' · không còn khả dụng' }}</option>
                     @endforeach
                 </select>
             </td>
