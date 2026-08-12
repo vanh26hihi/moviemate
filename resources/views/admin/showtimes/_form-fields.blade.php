@@ -61,59 +61,40 @@
     @error('status')<p class="text-sm text-error md:col-span-2">{{ $message }}</p>@enderror
 </div>
 
-<section id="schedule-preview" class="rounded-2xl border app-border p-5 bg-white/5" data-cleaning-buffer="{{ $cleaningBufferMinutes }}" data-timezone="{{ $cinemaTimezone }}">
+<section
+    id="schedule-preview"
+    class="rounded-2xl border app-border p-5 bg-white/5"
+    data-showtime-schedule-preview
+    data-endpoint="{{ route('admin.showtimes.preview') }}"
+    data-showtime-id="{{ $editing ? $showtime->id : '' }}"
+    data-timezone="{{ $cinemaTimezone }}"
+>
     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h2 class="font-extrabold app-text">Xem trước thời gian vận hành phòng</h2>
-        <span class="text-xs app-muted">Múi giờ: <span id="schedule-timezone-label">{{ $cinemaTimezone }}</span></span>
+        <h2 class="font-extrabold app-text">Kiểm tra khung giờ vận hành</h2>
+        <span class="text-xs app-muted">Múi giờ chi nhánh: <span data-schedule-timezone>{{ $cinemaTimezone }}</span></span>
     </div>
+    <p class="mb-4 text-sm app-muted" data-schedule-preview-state aria-live="polite">Chọn đủ phim, phòng, ngày và giờ bắt đầu để kiểm tra khung giờ.</p>
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-        <div><span class="app-muted block">Thời lượng phim</span><strong id="preview-runtime" class="app-text">-- phút</strong></div>
-        <div><span class="app-muted block">Phim kết thúc</span><strong id="preview-movie-end" class="app-text">--</strong></div>
-        <div><span class="app-muted block">Vệ sinh phòng</span><strong id="preview-cleaning-buffer" class="app-text">{{ $cleaningBufferMinutes }} phút</strong></div>
-        <div><span class="app-muted block">Phòng sẵn sàng</span><strong id="preview-room-ready" class="text-brand-start">--</strong></div>
+        <div><span class="app-muted block">Bắt đầu</span><strong data-schedule-start class="app-text">--</strong></div>
+        <div><span class="app-muted block">Kết thúc phim</span><strong data-schedule-end class="app-text">--</strong></div>
+        <div><span class="app-muted block">Vệ sinh</span><strong data-schedule-cleaning class="app-text">--</strong></div>
+        <div><span class="app-muted block">Phòng sẵn sàng</span><strong data-schedule-ready class="text-brand-start">--</strong></div>
     </div>
-    <p class="text-xs app-muted mt-4">Thời gian kết thúc được máy chủ tính lại từ thời lượng phim và cấu hình vệ sinh; dữ liệu từ trình duyệt không được dùng để xếp lịch.</p>
+    <div data-schedule-conflict hidden class="mt-4 rounded-xl border border-error/30 bg-error/10 p-4 text-sm">
+        <p class="font-bold text-error">Suất đang chiếm phòng</p>
+        <p data-conflict-movie class="mt-1 app-text"></p>
+        <p data-conflict-window class="mt-1 app-muted"></p>
+        <p data-conflict-ready class="mt-1 app-muted"></p>
+    </div>
+    <p class="text-xs app-muted mt-4">Kết quả do máy chủ tính theo múi giờ chi nhánh và chỉ có giá trị tại thời điểm kiểm tra. Hệ thống sẽ kiểm tra lại khi lưu.</p>
 </section>
 
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const movie = document.getElementById('movie_id');
     const room = document.getElementById('room_id');
     const date = document.getElementById('show_date');
     const time = document.getElementById('show_time');
-    const preview = document.getElementById('schedule-preview');
-    const runtimeOutput = document.getElementById('preview-runtime');
-    const movieEndOutput = document.getElementById('preview-movie-end');
-    const roomReadyOutput = document.getElementById('preview-room-ready');
-    const cleaningOutput = document.getElementById('preview-cleaning-buffer');
-    const timezoneLabel = document.getElementById('schedule-timezone-label');
-
-    const pad = value => String(value).padStart(2, '0');
-    const formatWallClock = value => `${pad(value.getUTCDate())}/${pad(value.getUTCMonth() + 1)}/${value.getUTCFullYear()} ${pad(value.getUTCHours())}:${pad(value.getUTCMinutes())}`;
-
-    function refreshSchedulePreview() {
-        timezoneLabel.textContent = room.selectedOptions[0]?.dataset.timezone ?? preview.dataset.timezone;
-        const runtime = Number(movie.selectedOptions[0]?.dataset.runtime);
-        const buffer = Number(room.selectedOptions[0]?.dataset.cleaningBuffer ?? preview.dataset.cleaningBuffer);
-        cleaningOutput.textContent = Number.isInteger(buffer) ? `${buffer} phút` : '-- phút';
-        runtimeOutput.textContent = Number.isInteger(runtime) && runtime > 0 ? `${runtime} phút` : '-- phút';
-
-        if (!date.value || !time.value || !Number.isInteger(runtime) || runtime <= 0 || !Number.isInteger(buffer)) {
-            movieEndOutput.textContent = '--';
-            roomReadyOutput.textContent = '--';
-            return;
-        }
-
-        const start = new Date(`${date.value}T${time.value}:00Z`);
-        const movieEnd = new Date(start.getTime() + runtime * 60000);
-        const roomReady = new Date(movieEnd.getTime() + buffer * 60000);
-        const movieNextDay = movieEnd.toISOString().slice(0, 10) !== date.value ? ' (+1 ngày)' : '';
-        const readyNextDay = roomReady.toISOString().slice(0, 10) !== date.value ? ' (+1 ngày)' : '';
-
-        movieEndOutput.textContent = formatWallClock(movieEnd) + movieNextDay;
-        roomReadyOutput.textContent = formatWallClock(roomReady) + readyNextDay;
-    }
 
     let pricingRequest = 0;
     async function refreshPricePreview() {
@@ -139,8 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
         output.textContent = prices.join(' · ');
     }
 
-    [movie, room, date, time].forEach(input => input.addEventListener('change', () => { refreshSchedulePreview(); refreshPricePreview(); }));
-    refreshSchedulePreview();
+    [room, date, time].forEach(input => input.addEventListener('change', refreshPricePreview));
     refreshPricePreview();
 });
 </script>

@@ -138,9 +138,9 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
         $this->actingAs($admin)->get(route('admin.showtimes.create'))
             ->assertOk()
             ->assertSee('Phim UI — 120 phút')
-            ->assertSee('Thời lượng phim')
-            ->assertSee('Vệ sinh phòng')
-            ->assertSee('15 phút')
+            ->assertSee('Kiểm tra khung giờ vận hành')
+            ->assertSee('Bắt đầu')
+            ->assertSee('Vệ sinh')
             ->assertSee('Phòng sẵn sàng')
             ->assertSee('Asia/Ho_Chi_Minh')
             ->assertSee('sơ đồ phiên bản 1');
@@ -149,7 +149,7 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
             ->assertOk()
             ->assertSee('value="23:30"', false)
             ->assertSee('Sơ đồ hiện tại: phiên bản 1')
-            ->assertSee('Phim kết thúc');
+            ->assertSee('Kết thúc phim');
 
         $this->actingAs($admin)->get(route('admin.showtimes.index'))
             ->assertOk()
