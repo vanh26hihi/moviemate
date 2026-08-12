@@ -19,7 +19,7 @@ class Booking extends Model
 
     public const SALES_CHANNELS = [self::SALES_CHANNEL_ONLINE, self::SALES_CHANNEL_COUNTER];
 
-    public const STATUSES = ['pending_payment', 'paid', 'used', 'cancelled', 'expired'];
+    public const STATUSES = ['pending_payment', 'paid', 'cancelled', 'expired'];
 
     public const PAYMENT_STATUSES = ['unpaid', 'paid', 'failed', 'refunded'];
 
@@ -45,11 +45,9 @@ class Booking extends Model
         'booking_status',
         'expires_at',
         'paid_at',
-        'used_at',
     ];
 
     protected $casts = [
-        'used_at' => 'datetime',
         'expires_at' => 'datetime',
         'guest_access_expires_at' => 'datetime',
         'ticket_email_token_expires_at' => 'datetime',
@@ -165,18 +163,6 @@ class Booking extends Model
     public function ticketPrint(): HasOne
     {
         return $this->hasOne(BookingTicketPrint::class);
-    }
-
-    public function ticketCheckinEvents(): HasMany
-    {
-        return $this->hasMany(TicketCheckinEvent::class);
-    }
-
-    public function acceptedTicketCheckin(): HasOne
-    {
-        return $this->hasOne(TicketCheckinEvent::class)
-            ->where('result', TicketCheckinEvent::RESULT_ACCEPTED)
-            ->oldestOfMany('id');
     }
 
     public function foodOrder(): HasOne

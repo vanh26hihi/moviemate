@@ -48,15 +48,6 @@ class BookingExpirationServiceTest extends TestCase
         ]);
     }
 
-    public function test_used_booking_is_never_expired(): void
-    {
-        [$booking] = $this->overdueBooking();
-        $booking->update(['booking_status' => 'used']);
-
-        $this->assertFalse(app(BookingExpirationService::class)->expire($booking->id));
-        $this->assertSame('used', $booking->fresh()->booking_status);
-    }
-
     public function test_cancelled_booking_is_not_expired_again(): void
     {
         [$booking] = $this->overdueBooking();

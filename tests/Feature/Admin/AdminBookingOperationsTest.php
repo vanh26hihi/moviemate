@@ -103,7 +103,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
         $this->assertLessThanOrEqual(20, $queryCount, 'Danh sách booking có dấu hiệu N+1.');
     }
 
-    public function test_index_only_shows_authoritatively_paid_or_used_bookings_and_summary_is_exact(): void
+    public function test_index_only_shows_authoritatively_paid_bookings_and_summary_is_exact(): void
     {
         $scenario = $this->bookingScenario(false);
         $draft = $this->bookingForScenario($scenario, ['booking_code' => 'VIS-DRAFT']);
@@ -122,9 +122,9 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'booking_status' => 'paid',
             'payment_status' => 'paid',
         ]);
-        $used = $this->bookingForScenario($scenario, [
-            'booking_code' => 'VIS-USED',
-            'booking_status' => 'used',
+        $secondPaid = $this->bookingForScenario($scenario, [
+            'booking_code' => 'VIS-PAID-SECOND',
+            'booking_status' => 'paid',
             'payment_status' => 'paid',
         ]);
         $refunded = $this->bookingForScenario($scenario, [
@@ -138,7 +138,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'payment_status' => 'paid',
         ]);
         $this->recordSuccessfulPayment($paid, 50_000);
-        $this->recordSuccessfulPayment($used, 50_000);
+        $this->recordSuccessfulPayment($secondPaid, 50_000);
         $this->pendingPayment($unverifiedSuccess, ['status' => Payment::STATUS_SUCCESS, 'verified_at' => null]);
         $refundedPayment = $this->recordSuccessfulPayment($refunded, 50_000);
         $refundedPayment->booking->forceFill(['booking_status' => 'cancelled', 'payment_status' => 'refunded'])->save();
@@ -146,8 +146,8 @@ class AdminBookingOperationsTest extends PaymentTestCase
         $response = $this->actingAs($this->userWithRole('manager'))
             ->get(route('admin.bookings.index'))
             ->assertOk()
-            ->assertSee('Đơn thành công')->assertSee('Doanh thu')->assertSee('Chỗ đã bán')->assertSee('Đã soát vé')
-            ->assertSee($paid->booking_code)->assertSee($used->booking_code)
+            ->assertSee('Đơn thành công')->assertSee('Doanh thu')->assertSee('Chỗ đã bán')->assertDontSee('Đã soát vé')
+            ->assertSee($paid->booking_code)->assertSee($secondPaid->booking_code)
             ->assertSee('100.000 VNĐ');
 
         foreach ([$draft, $expired, $paidWithoutEvidence, $refunded, $unverifiedSuccess] as $hidden) {
@@ -164,8 +164,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
             'amount' => 85000,
         ]);
         $booking->forceFill([
-            'used_at' => now(),
-            'booking_status' => 'used',
+            'booking_status' => 'paid',
             'food_subtotal' => 35000,
             'total_amount' => 85000,
             'guest_access_token_hash' => hash('sha256', 'guest-secret-value'),
@@ -214,7 +213,7 @@ class AdminBookingOperationsTest extends PaymentTestCase
             ->assertSee('Giao dịch xác thực')
             ->assertSee('Bắp rang snapshot')
             ->assertSee($failedPayment->status_label)
-            ->assertSee('Đã soát vé')
+            ->assertDontSee('Soát vé')
             ->assertSee('Gửi lỗi')->assertSee('Không thể kết nối máy chủ email')->assertSee('Gửi lại vé')
             ->assertSee(number_format((int) $payment->amount, 0, ',', '.').' VNĐ')
             ->assertDontSee('Lịch sử hoạt động')

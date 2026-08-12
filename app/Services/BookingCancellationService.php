@@ -164,7 +164,7 @@ final class BookingCancellationService
                 || $payment->amount !== $amount
                 || $payments->contains(fn (Payment $candidate): bool => $candidate->hasAuthoritativeSuccessEvidence())
                 || $booking->payment_status === 'paid'
-                || in_array($booking->booking_status, ['paid', 'used'], true)) {
+                || $booking->booking_status === 'paid') {
                 return BookingCancellationResult::notCancellable();
             }
 

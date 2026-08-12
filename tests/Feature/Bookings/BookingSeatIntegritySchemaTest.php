@@ -292,7 +292,7 @@ class BookingSeatIntegritySchemaTest extends TestCase
 
     private function migration(): Migration
     {
-        foreach (['ticket_checkin_events', 'booking_ticket_print_events', 'booking_ticket_prints', 'admission_tickets'] as $table) {
+        foreach (['booking_ticket_print_events', 'booking_ticket_prints', 'admission_tickets'] as $table) {
             Schema::dropIfExists($table);
         }
 

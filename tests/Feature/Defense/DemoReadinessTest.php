@@ -39,7 +39,7 @@ final class DemoReadinessTest extends TestCase
 
         $customer = User::query()->where('email', 'customer@moviemate.test')->sole();
         $this->assertSame(0, $customer->cinemaAssignments()->count());
-        foreach (['admin.access', 'counter_sales.view', 'counter_sales.create', 'tickets.lookup', 'tickets.print', 'tickets.checkin'] as $permission) {
+        foreach (['admin.access', 'counter_sales.view', 'counter_sales.create', 'tickets.lookup', 'tickets.print'] as $permission) {
             $this->assertFalse($customer->hasPermission($permission));
         }
 

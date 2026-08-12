@@ -61,7 +61,7 @@ class AdminDashboardTest extends TestCase
             ->assertSee('Thể loại được quan tâm')
             ->assertSee('Kênh bán')
             ->assertSee('Phương thức thanh toán')
-            ->assertSee('Vận hành in vé & soát vé', false)
+            ->assertSee('Vận hành in vé', false)
             ->assertSee('Chưa có dữ liệu trong khoảng thời gian đã chọn.')
             ->assertDontSee('customer_email')
             ->assertDontSee('transaction_code')

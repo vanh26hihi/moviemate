@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class AdmissionTicket extends Model
@@ -16,7 +15,6 @@ final class AdmissionTicket extends Model
         return [
             'print_count' => 'integer',
             'last_printed_at' => 'datetime',
-            'used_at' => 'datetime',
         ];
     }
 
@@ -35,24 +33,9 @@ final class AdmissionTicket extends Model
         return $this->hasOne(BookingTicketPrint::class);
     }
 
-    public function checkinEvents(): HasMany
-    {
-        return $this->hasMany(TicketCheckinEvent::class);
-    }
-
-    public function acceptedCheckin(): HasOne
-    {
-        return $this->hasOne(TicketCheckinEvent::class, 'accepted_ticket_id')->oldestOfMany('id');
-    }
-
     public function lastPrintedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'last_printed_by_user_id');
-    }
-
-    public function usedBy(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'used_by_user_id');
     }
 
     public function getSeatCodeAttribute(): string

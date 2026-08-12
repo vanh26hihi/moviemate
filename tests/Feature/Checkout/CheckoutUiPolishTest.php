@@ -7,7 +7,7 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\RoomLayoutCell;
 use App\Models\Seat;
-use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\BookingQrPayload;
 use Tests\Feature\Payments\PaymentTestCase;
 
 class CheckoutUiPolishTest extends PaymentTestCase
@@ -93,7 +93,6 @@ class CheckoutUiPolishTest extends PaymentTestCase
             ['pending', Payment::STATUS_FAILED, 'pending_payment', 'unpaid', 'Đang xác minh kết quả thanh toán', 'user.bookings.failed'],
             ['expired', Payment::STATUS_EXPIRED, 'expired', 'unpaid', 'Đơn đặt vé đã hết hạn', 'user.bookings.expired'],
             ['cancelled', Payment::STATUS_PENDING, 'cancelled', 'unpaid', 'Thanh toán đã được hủy', 'user.bookings.success'],
-            ['used', Payment::STATUS_SUCCESS, 'used', 'paid', 'Vé đã được sử dụng', 'user.bookings.success'],
         ];
 
         foreach ($cases as [$state, $paymentState, $bookingState, $bookingPaymentState, $message, $routeName]) {
@@ -170,8 +169,8 @@ class CheckoutUiPolishTest extends PaymentTestCase
         $this->actingAs($user)->get(route('user.bookings.ticket', $booking))
             ->assertOk()
             ->assertSee('data-ticket-state="valid"', false)
-            ->assertSee('data-admission-ticket="'.$booking->fresh()->admissionTickets()->firstOrFail()->id.'"', false)
-            ->assertSee('data-qr-value="'.route('tickets.verify', ['capability' => app(TicketCheckinCapability::class)->issue($booking->fresh()->admissionTickets()->firstOrFail())]).'"', false)
+            ->assertSee('data-booking-ticket', false)
+            ->assertSee('data-qr-value="'.app(BookingQrPayload::class)->value($booking->fresh()).'"', false)
             ->assertDontSee('data-print-ticket', false)
             ->assertSee('A1')
             ->assertSee('Bắp rang caramel')

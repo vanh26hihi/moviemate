@@ -17,14 +17,12 @@ use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Models\Showtime;
-use App\Models\TicketCheckinEvent;
 use App\Models\User;
 use App\Services\Admin\AdminPaymentQuery;
 use App\Services\BookingTokenService;
 use App\Services\Payments\PayOsPaymentStateService;
 use App\Services\Payments\VerifiedPaymentService;
 use App\Services\Payments\VnpayExplicitCancellationService;
-use App\Services\Tickets\TicketCheckinCapability;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
@@ -253,25 +251,20 @@ final class CounterSalesR8Test extends TestCase
         ]);
     }
 
-    public function test_creator_settler_printer_and_checkin_actor_remain_distinct(): void
+    public function test_creator_settler_and_printer_actors_remain_distinct(): void
     {
         [$booking, , $creator] = $this->counterHold();
         $settler = $this->userWithRole('staff');
         $printer = $this->userWithRole('staff');
-        $checker = $this->userWithRole('staff');
 
         $this->actingAs($settler)->post(route('staff.counter.cash', $booking))->assertRedirect();
         $this->actingAs($printer)->post(route('staff.tickets.print.start', $booking))->assertRedirect();
         $this->post(route('staff.tickets.print.succeed', $booking))->assertRedirect();
-        $capability = app(TicketCheckinCapability::class)->issue($booking->fresh());
-        $this->actingAs($checker)->post(route('staff.tickets.consume'), ['ticket' => $capability])->assertRedirect();
-        $this->post(route('staff.admission-tickets.admit', $booking->admissionTickets()->firstOrFail()))->assertRedirect();
 
         $this->assertSame($creator->id, $booking->fresh()->created_by_staff_id);
         $this->assertSame($settler->id, Payment::query()->sole()->settled_by_user_id);
         $this->assertSame($printer->id, BookingTicketPrint::query()->sole()->printed_by_user_id);
-        $this->assertSame($checker->id, TicketCheckinEvent::query()->where('result', 'accepted')->sole()->actor_user_id);
-        $this->assertSame('used', $booking->fresh()->booking_status);
+        $this->assertSame('paid', $booking->fresh()->booking_status);
 
         $creator->forceFill(['status' => 'inactive'])->save();
         $this->assertSame($creator->name, $booking->fresh()->createdByStaff?->name);

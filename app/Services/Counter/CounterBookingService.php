@@ -78,7 +78,7 @@ final class CounterBookingService
         return $booking->load([
             'createdByStaff:id,name,email', 'showtime.movie', 'showtime.cinema', 'showtime.room',
             'bookingSeats.seat', 'foodOrder.items', 'payments.settledBy:id,name,email',
-            'ticketPrint.printedBy:id,name', 'acceptedTicketCheckin.actor:id,name',
+            'ticketPrint.printedBy:id,name',
         ]);
     }
 

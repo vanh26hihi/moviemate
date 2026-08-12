@@ -36,14 +36,14 @@ final class TicketArtifactProvisioner
     public function provision(Booking $booking): void
     {
         if ($booking->payment_status !== 'paid'
-            || ! in_array($booking->booking_status, ['paid', 'used'], true)) {
+            || $booking->booking_status !== 'paid') {
             return;
         }
 
         DB::transaction(function () use ($booking): void {
             $booking = Booking::query()->lockForUpdate()->findOrFail($booking->getKey());
             if ($booking->payment_status !== 'paid'
-                || ! in_array($booking->booking_status, ['paid', 'used'], true)) {
+                || $booking->booking_status !== 'paid') {
                 return;
             }
 

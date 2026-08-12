@@ -118,7 +118,7 @@ class AdminNavigationFoundationTest extends TestCase
         $this->assertStringNotContainsString('badgeLabel()', $provider);
         $this->assertStringNotContainsString('admin.ticket-deliveries.index', $managerNavigation);
         $this->assertStringNotContainsString('Gửi vé điện tử', $managerNavigation);
-        $this->assertStringContainsString('admin.ticket-checkins.index', $managerNavigation);
+        $this->assertStringNotContainsString('admin.ticket-checkins.index', $managerNavigation);
         $this->assertStringContainsString('admin.reports.index', $managerNavigation);
         foreach (['Tổng quan', 'Nội dung', 'Rạp &amp; lịch chiếu', 'Kinh doanh', 'Dịch vụ', 'Hệ thống'] as $group) {
             $this->assertStringContainsString($group, $managerNavigation);
@@ -152,7 +152,7 @@ class AdminNavigationFoundationTest extends TestCase
         $admin = $this->userWithRole('admin');
         $bookings = $this->actingAs($admin)->get(route('admin.bookings.index'))->assertOk();
 
-        foreach (['search', 'cinema_id', 'sales_channel', 'date_from', 'date_to', 'ticket_status', 'checkin_status', 'sort', 'direction', 'per_page'] as $name) {
+        foreach (['search', 'cinema_id', 'sales_channel', 'date_from', 'date_to', 'ticket_status', 'sort', 'direction', 'per_page'] as $name) {
             $bookings->assertSee('name="'.$name.'"', false);
         }
         foreach (['include_drafts', 'booking_status', 'payment_status', 'provider', 'amount_min', 'amount_max', 'movie_id', 'room_id', 'customer_email', 'created_by'] as $name) {

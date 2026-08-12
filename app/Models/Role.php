@@ -29,11 +29,11 @@ class Role extends Model
         'bookings.view', 'bookings.operate',
         'counter_sales.view', 'counter_sales.create', 'counter_sales.settle', 'counter_sales.cancel',
         'payments.view', 'payments.reconcile',
-        'ticket_deliveries.view', 'ticket_deliveries.retry', 'ticket_checkins.view',
+        'ticket_deliveries.view', 'ticket_deliveries.retry',
         'seats.maintenance.view', 'seats.maintenance.update',
         'discounts.view', 'discounts.manage',
         'reviews.view', 'reviews.moderate',
-        'reports.view', 'tickets.print', 'tickets.checkin', 'tickets.lookup',
+        'reports.view', 'tickets.print', 'tickets.lookup',
         'ticket_prints.view',
     ];
 
@@ -50,9 +50,7 @@ class Role extends Model
         'counter_sales.create',
         'counter_sales.settle',
         'counter_sales.cancel',
-        'ticket_checkins.view',
         'tickets.print',
-        'tickets.checkin',
         'tickets.lookup',
     ];
 

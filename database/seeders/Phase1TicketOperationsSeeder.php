@@ -58,7 +58,7 @@ final class Phase1TicketOperationsSeeder extends Seeder
             $tokens,
             $showtimes[0],
             [$seats['A1']->id],
-            'PHASE1-STANDARD',
+            'MMT-'.now()->format('Y').'-0000000000000001',
             null,
             Booking::SALES_CHANNEL_COUNTER,
             $staff,
@@ -68,7 +68,7 @@ final class Phase1TicketOperationsSeeder extends Seeder
             $tokens,
             $showtimes[1],
             [$seats['A1']->id, $seats['A2']->id],
-            'PHASE1-MULTI',
+            'MMT-'.now()->format('Y').'-0000000000000002',
             $customer,
         );
         $this->createPaidFixture(
@@ -76,7 +76,7 @@ final class Phase1TicketOperationsSeeder extends Seeder
             $tokens,
             $showtimes[2],
             [$seats['C1']->id, $seats['C2']->id],
-            'PHASE1-COUPLE',
+            'MMT-'.now()->format('Y').'-0000000000000003',
             $customer,
         );
         $this->createPaidFixture(
@@ -84,7 +84,7 @@ final class Phase1TicketOperationsSeeder extends Seeder
             $tokens,
             $showtimes[3],
             [$seats['D1']->id],
-            'PHASE1-FOOD',
+            'MMT-'.now()->format('Y').'-0000000000000004',
             $customer,
             foodSelection: [['food_id' => $food->id, 'quantity' => 2]],
         );

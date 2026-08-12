@@ -142,7 +142,7 @@
         @foreach([
             ['ph-sparkle', 'AI gợi ý phim', 'Chọn phim theo tâm trạng, thể loại và lịch rảnh.'],
             ['ph-armchair', 'Chọn ghế trực quan', 'Sơ đồ ghế rõ ràng, phân biệt ghế thường và VIP.'],
-            ['ph-qr-code', 'Vé QR tiện lợi', 'Dùng mã QR để soát vé nhanh tại rạp.'],
+            ['ph-qr-code', 'QR đơn tiện lợi', 'Xuất trình QR hoặc mã đơn tại quầy để nhận vé.'],
             ['ph-lightning', 'Đặt vé nhanh', 'Luồng đặt vé gọn, dễ thao tác trên mọi thiết bị.'],
         ] as $feature)
             <div class="cinema-card p-5">

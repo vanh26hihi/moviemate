@@ -13,7 +13,6 @@ use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Models\Showtime;
-use App\Models\TicketCheckinEvent;
 use App\Models\UserCinemaAssignment;
 use App\Services\CinemaAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -83,7 +82,6 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             route('admin.bookings.index'),
             route('admin.payments.index'),
             route('admin.payment-reconciliation.index'),
-            route('admin.ticket-checkins.index'),
             route('admin.food-orders.index'),
         ];
 
@@ -291,15 +289,8 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'pricing_unit_key' => 'seat:'.$seat->id, 'pricing_unit_label' => 'A1',
             'seat_type_snapshot' => 'normal', 'final_unit_amount' => 50000,
         ]);
-        $admissionTicket = $bookingSeat->admissionTicket()->firstOrFail();
-        $checkin = TicketCheckinEvent::query()->create([
-            'admission_ticket_id' => $admissionTicket->id,
-            'booking_id' => $booking->id,
-            'showtime_id' => $showtime->id,
-            'result' => TicketCheckinEvent::RESULT_REJECTED,
-            'scanned_at' => now(),
-        ]);
+        $bookingSeat->admissionTicket()->firstOrFail();
 
-        return compact('room', 'seat', 'layout', 'movie', 'showtime', 'booking', 'payment', 'delivery', 'checkin');
+        return compact('room', 'seat', 'layout', 'movie', 'showtime', 'booking', 'payment', 'delivery');
     }
 }

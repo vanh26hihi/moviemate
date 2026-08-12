@@ -48,8 +48,6 @@ final class ActivityLogSanitizer
         'delivery_id',
         'attempt_number',
         'error_category',
-        'checkin_event_id',
-        'checkin_result',
         'cinema_id',
         'print_state_id',
         'print_status',

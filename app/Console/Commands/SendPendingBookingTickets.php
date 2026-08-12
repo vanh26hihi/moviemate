@@ -11,9 +11,9 @@ use App\Services\Admin\AdminTicketDeliveryQuery;
 use App\Services\BookingTokenService;
 use App\Services\Mail\ProductionMailTransportGuard;
 use App\Services\Mail\TicketMailConfigurationInspector;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\TicketQrCode;
-use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -180,8 +180,8 @@ class SendPendingBookingTickets extends Command
             : route('user.bookings.access.show', $booking)
                 .'#token='.rawurlencode($ticketEmailToken).'&destination=ticket';
 
-        $ticketQrPayload = app(TicketQrPayload::class)->url($booking);
-        $ticketQrPng = app(TicketQrCode::class)->png($ticketQrPayload);
+        $bookingQrPayload = app(BookingQrPayload::class)->value($booking);
+        $ticketQrPng = app(TicketQrCode::class)->png($bookingQrPayload);
         Mail::to($recipient)->send(new BookingTicketMail($booking, $ticketAccessUrl, $ticketQrPng));
 
         DB::transaction(function () use ($delivery, $booking): void {

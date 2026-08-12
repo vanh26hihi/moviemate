@@ -238,21 +238,15 @@ final class AdminReportingService
     public function ticketOperations(ReportScope $scope): array
     {
         $eligible = $this->recognizedQuery($scope, 'operations')->select('b.id as booking_id');
-        $accepted = DB::table('ticket_checkin_events')
-            ->selectRaw('booking_id, MIN(id) as accepted_event_id')
-            ->where('result', 'accepted')->whereNotNull('booking_id')->groupBy('booking_id');
         $row = DB::query()->fromSub($eligible, 'eligible')
             ->leftJoin('booking_ticket_prints as tp', 'tp.booking_id', '=', 'eligible.booking_id')
-            ->leftJoinSub($accepted, 'accepted', 'accepted.booking_id', '=', 'eligible.booking_id')
             ->selectRaw('COUNT(*) as eligible')
             ->selectRaw('SUM(CASE WHEN tp.id IS NULL THEN 1 ELSE 0 END) as unprinted')
             ->selectRaw("SUM(CASE WHEN tp.status = 'printed' THEN 1 ELSE 0 END) as printed")
             ->selectRaw("SUM(CASE WHEN tp.status IN ('retry_allowed', 'retry_requires_authorization') THEN 1 ELSE 0 END) as print_failed")
             ->selectRaw("SUM(CASE WHEN tp.status IN ('printing', 'retry_authorized') THEN 1 ELSE 0 END) as print_waiting")
-            ->selectRaw('SUM(CASE WHEN accepted.accepted_event_id IS NOT NULL THEN 1 ELSE 0 END) as checked_in')
             ->first();
         $eligibleCount = (int) ($row->eligible ?? 0);
-        $checkedIn = (int) ($row->checked_in ?? 0);
 
         return [
             'eligible' => $eligibleCount,
@@ -260,9 +254,6 @@ final class AdminReportingService
             'printed' => (int) ($row->printed ?? 0),
             'printFailed' => (int) ($row->print_failed ?? 0),
             'printWaiting' => (int) ($row->print_waiting ?? 0),
-            'checkedIn' => $checkedIn,
-            'notCheckedIn' => max(0, $eligibleCount - $checkedIn),
-            'checkinPercent' => $eligibleCount > 0 ? (int) round($checkedIn / $eligibleCount * 100) : 0,
         ];
     }
 

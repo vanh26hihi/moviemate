@@ -10,7 +10,6 @@ use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
-use App\Models\TicketCheckinEvent;
 use App\Services\CinemaAccessService;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
@@ -44,7 +43,6 @@ final class EnsureAdminCinemaScope
             $model instanceof Booking => (int) ($model->cinema_id ?: $model->showtime?->cinema_id),
             $model instanceof Payment => (int) ($model->booking?->cinema_id ?: $model->booking?->showtime?->cinema_id),
             $model instanceof BookingTicketDelivery => (int) ($model->booking?->cinema_id ?: $model->booking?->showtime?->cinema_id),
-            $model instanceof TicketCheckinEvent => (int) ($model->booking?->cinema_id ?: $model->showtime?->cinema_id),
             $model instanceof Order => (int) ($model->booking?->cinema_id ?: $model->pickup_cinema_id),
             $model instanceof Seat => (int) $model->room?->cinema_id,
             default => null,

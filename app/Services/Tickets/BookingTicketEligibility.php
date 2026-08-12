@@ -17,7 +17,7 @@ final class BookingTicketEligibility
     public function isDeliverable(Booking $booking): bool
     {
         return $booking->payment_status === 'paid'
-            && in_array($booking->booking_status, ['paid', 'used'], true)
+            && $booking->booking_status === 'paid'
             && $this->verifiedPayment($booking) !== null;
     }
 

@@ -41,11 +41,10 @@
         </div>
     </header>
 
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Tóm tắt đơn">
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Tóm tắt đơn">
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái đặt vé</p><p class="mt-2 font-extrabold app-text">{{ \App\Support\StatusLabel::for('booking_admin', $booking->booking_status) }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái thanh toán</p><p class="mt-2 font-extrabold app-text">{{ $booking->payment_status_label }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái in vé</p><p class="mt-2 font-extrabold app-text">{{ $printState?->status_label ?? 'Chưa có dữ liệu in' }}</p></div>
-        <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái soát vé</p><p class="mt-2 font-extrabold app-text">{{ $acceptedCheckin ? 'Đã soát vé' : 'Chưa soát vé' }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Tạo lúc</p><p class="mt-2 font-extrabold app-text">{{ $booking->created_at?->format('d/m/Y H:i:s') ?? '—' }}</p></div>
     </section>
 
@@ -62,8 +61,6 @@
                 <div><dt class="text-sm app-muted">Thời gian thu tiền</dt><dd class="font-bold app-text">{{ $authoritativePayment?->settled_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
                 <div><dt class="text-sm app-muted">Người in vé</dt><dd class="font-bold app-text">{{ $printState?->printedBy?->name ?? '—' }}</dd></div>
                 <div><dt class="text-sm app-muted">Thời gian in</dt><dd class="font-bold app-text">{{ $printState?->printed_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Người soát vé</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->actor?->name ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Thời gian soát</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->scanned_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
             </dl>
         </section>
 
@@ -92,7 +89,6 @@
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Hết hạn thanh toán</dt><dd class="font-bold app-text">{{ $booking->expires_at?->format('d/m/Y H:i:s') ?? 'Không áp dụng' }}</dd></div>
                 <div><dt class="text-sm app-muted">Thanh toán xác minh</dt><dd class="font-bold app-text">{{ $booking->paid_at?->format('d/m/Y H:i:s') ?? 'Chưa thanh toán' }}</dd></div>
-                <div><dt class="text-sm app-muted">Soát vé</dt><dd class="font-bold app-text">{{ $booking->used_at?->format('d/m/Y H:i:s') ?? 'Chưa soát vé' }}</dd></div>
                 <div><dt class="text-sm app-muted">Cập nhật cuối</dt><dd class="font-bold app-text">{{ $booking->updated_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
             </dl>
         </section>
@@ -191,18 +187,6 @@
             @endcan
         </section>
 
-        <section class="cinema-card p-6">
-            <h2 class="text-xl font-extrabold app-heading">Soát vé</h2>
-            <dl class="mt-4 grid gap-4 sm:grid-cols-2">
-                <div><dt class="text-sm app-muted">Kết quả</dt><dd class="font-bold app-text">{{ $booking->booking_status === 'used' ? 'Đã soát vé' : 'Chưa soát vé' }}</dd></div>
-                <div><dt class="text-sm app-muted">Thời gian chấp nhận</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->scanned_at?->format('d/m/Y H:i:s') ?? $booking->used_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Nhân viên chấp nhận</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->actor?->name ?? ($booking->booking_status === 'used' ? 'Không có dữ liệu lịch sử' : '—') }}</dd></div>
-                <div><dt class="text-sm app-muted">Lần quét trùng</dt><dd class="font-bold app-text">{{ $duplicateCheckinCount }}</dd></div>
-                <div><dt class="text-sm app-muted">Lần bị từ chối</dt><dd class="font-bold app-text">{{ $rejectedCheckinCount }}</dd></div>
-            </dl>
-            @can('ticket_checkins.view')<a class="mt-4 inline-flex font-bold text-brand-start" href="{{ route('admin.ticket-checkins.index', ['booking_code' => $booking->booking_code]) }}">Xem toàn bộ lịch sử soát vé</a>@endcan
-            @if($checkins->isNotEmpty())<div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Kết quả</th><th>Nhân viên</th></tr></thead><tbody>@foreach($checkins as $checkin)<tr><td>{{ $checkin->scanned_at?->format('d/m/Y H:i:s') }}</td><td>{{ \App\Support\StatusLabel::for('ticket_checkin', $checkin->result) }}</td><td>{{ $checkin->actor?->name ?? 'Tài khoản không còn khả dụng' }}</td></tr>@endforeach</tbody></table></div>@endif
-        </section>
     </div>
 
     @if($includeActivity)

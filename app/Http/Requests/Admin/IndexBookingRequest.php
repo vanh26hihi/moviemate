@@ -27,7 +27,6 @@ class IndexBookingRequest extends FormRequest
             'cinema_id' => ['nullable', 'integer', 'min:1'],
             'sales_channel' => ['nullable', Rule::in(['online', 'counter'])],
             'ticket_status' => ['nullable', Rule::in([...BookingTicketDelivery::STATUSES, 'none'])],
-            'checkin_status' => ['nullable', Rule::in(['used', 'not_used'])],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'sort' => ['nullable', Rule::in(['paid_at', 'booking_code', 'total_amount', 'show_date'])],

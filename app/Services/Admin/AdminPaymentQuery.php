@@ -105,7 +105,7 @@ final class AdminPaymentQuery
             )
             ->where('payments.status', Payment::STATUS_SUCCESS)
             ->whereHas('booking', function (Builder $booking): void {
-                $booking->whereIn('booking_status', ['paid', 'used'])->where('payment_status', 'paid');
+                $booking->where('booking_status', 'paid')->where('payment_status', 'paid');
                 $this->cinemaAccess->scope($booking, auth()->user(), 'bookings.cinema_id');
             });
 
