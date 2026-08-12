@@ -55,6 +55,11 @@ class Showtime extends Model
         return $this->hasMany(Booking::class);
     }
 
+    public function bookingSeats(): HasMany
+    {
+        return $this->hasMany(BookingSeat::class);
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return StatusLabel::for('showtime', $this->status);

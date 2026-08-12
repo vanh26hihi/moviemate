@@ -2,17 +2,21 @@
 
 namespace App\Services;
 
+use App\Domain\Showtimes\ShowtimeScheduleValidationResult;
 use App\Domain\Showtimes\ShowtimeWindow;
 use App\Exceptions\InvalidMovieRuntimeException;
 use App\Exceptions\ShowtimeConflictException;
 use App\Exceptions\ShowtimeScheduleConfigurationException;
 use App\Exceptions\ShowtimeScheduleException;
+use App\Models\Booking;
+use App\Models\BookingSeat;
 use App\Models\Movie;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Showtime;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
+use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -24,6 +28,15 @@ class ShowtimeScheduleService
 
     /** @var list<string> */
     public const NON_OCCUPYING_STATUSES = ['cancelled'];
+
+    /** @var list<string> */
+    public const PROTECTED_STRUCTURAL_FIELDS = [
+        'movie_id',
+        'show_date',
+        'show_time',
+        'room_id',
+        'room_layout_id',
+    ];
 
     private readonly TicketPricingService $pricing;
 
@@ -124,6 +137,55 @@ class ShowtimeScheduleService
         );
     }
 
+    public function validateCandidate(
+        Movie $movie,
+        Room $room,
+        string $showDate,
+        string $showTime,
+        ?Showtime $existingShowtime = null,
+    ): ShowtimeScheduleValidationResult {
+        $timezone = null;
+        $window = null;
+        $layout = null;
+        $isFuture = null;
+        $isWithinOperatingHours = null;
+        $isConflictFree = null;
+
+        try {
+            $this->assertRoomIsOperational($room);
+            $this->assertMovieIsSchedulable($movie);
+            $timezone = $this->timezone($room);
+            $window = $this->window($movie, $showDate, $showTime, $room);
+            $this->assertFutureStart($window);
+            $isFuture = true;
+            $layout = $this->candidateLayout($room, $existingShowtime);
+            $this->assertWithinOperatingHours($room, $window);
+            $isWithinOperatingHours = true;
+            $this->assertNoConflict($room, $window, 'active', $existingShowtime?->id);
+            $isConflictFree = true;
+
+            return ShowtimeScheduleValidationResult::valid($timezone, $window, $layout);
+        } catch (ShowtimeScheduleException $exception) {
+            if ($exception->failureCode === 'PAST_START') {
+                $isFuture = false;
+            } elseif (in_array($exception->failureCode, ['CINEMA_CLOSED', 'OUTSIDE_START_WINDOW'], true)) {
+                $isWithinOperatingHours = false;
+            } elseif ($exception->failureCode === 'ROOM_CONFLICT') {
+                $isConflictFree = false;
+            }
+
+            return ShowtimeScheduleValidationResult::invalid(
+                $exception,
+                $timezone,
+                $window,
+                $layout,
+                $isFuture,
+                $isWithinOperatingHours,
+                $isConflictFree,
+            );
+        }
+    }
+
     /** @return Collection<int, array{showtime: Showtime, window: ShowtimeWindow}> */
     public function findConflicts(
         int $roomId,
@@ -188,26 +250,35 @@ class ShowtimeScheduleService
         }
     }
 
-    public function schedule(array $data): Showtime
+    public function schedule(array $data, ?Closure $afterPersist = null): Showtime
     {
-        $movie = $this->resolveSchedulableMovie((int) $data['movie_id']);
-
-        return DB::transaction(function () use ($data, $movie): Showtime {
+        return DB::transaction(function () use ($data, $afterPersist): Showtime {
+            $this->assertNormalMutationStatus($data);
             $room = $this->lockAndValidateRoom((int) $data['room_id']);
-            $window = $this->window($movie, $data['show_date'], $data['show_time'], $room);
-            $layout = $this->latestPublishedLayout($room);
-            $this->assertWithinOperatingHours($room, $window);
-            $this->assertNoConflict($room, $window, $data['status']);
+            $movie = $this->resolveSchedulableMovie((int) $data['movie_id']);
+            $candidate = $this->validateCandidate(
+                $movie,
+                $room,
+                $data['show_date'],
+                $data['show_time'],
+            )->requireValid();
 
-            return Showtime::query()->create($this->persistenceData($data, $movie, $room, $layout, $window));
+            $showtime = Showtime::query()->create($this->persistenceData(
+                $movie,
+                $room,
+                $candidate->layout,
+                $candidate->window,
+            ));
+            $afterPersist?->__invoke($showtime);
+
+            return $showtime;
         }, 3);
     }
 
-    public function reschedule(Showtime $showtime, array $data): Showtime
+    public function reschedule(Showtime $showtime, array $data, ?Closure $afterPersist = null): Showtime
     {
-        $movie = $this->resolveSchedulableMovie((int) $data['movie_id']);
-
-        return DB::transaction(function () use ($showtime, $data, $movie): Showtime {
+        return DB::transaction(function () use ($showtime, $data, $afterPersist): Showtime {
+            $this->assertNormalMutationStatus($data);
             $roomIds = collect([(int) $showtime->room_id, (int) $data['room_id']])->unique()->sort()->values();
             $lockedRooms = Room::query()->whereIn('id', $roomIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             if ($lockedRooms->count() !== $roomIds->count()) {
@@ -215,45 +286,69 @@ class ShowtimeScheduleService
             }
 
             $lockedShowtime = Showtime::query()->whereKey($showtime->id)->lockForUpdate()->firstOrFail();
-            $targetRoom = $lockedRooms->get((int) $data['room_id']);
-            $this->assertRoomIsOperational($targetRoom);
-            $window = $this->window($movie, $data['show_date'], $data['show_time'], $targetRoom);
-
-            if ((int) $targetRoom->id === (int) $lockedShowtime->room_id) {
-                $layout = RoomLayout::query()->published()
-                    ->whereKey($lockedShowtime->room_layout_id)
-                    ->where('room_id', $targetRoom->id)->first();
-                if (! $layout) {
-                    throw new ShowtimeScheduleException('Suất chiếu hiện tại không có layout published hợp lệ.', 'room_id');
-                }
-            } else {
-                $layout = $this->latestPublishedLayout($targetRoom);
+            if (! $lockedRooms->has((int) $lockedShowtime->room_id)) {
+                throw new ShowtimeScheduleException(
+                    'Suất chiếu vừa được thay đổi. Vui lòng tải lại trước khi cập nhật.',
+                    'showtime',
+                    'CONCURRENT_SHOWTIME_CHANGE',
+                );
             }
 
-            $this->assertWithinOperatingHours($targetRoom, $window);
-            $this->assertNoConflict($targetRoom, $window, $data['status'], $lockedShowtime->id);
-            $lockedShowtime->update($this->persistenceData($data, $movie, $targetRoom, $layout, $window));
+            $this->assertSourceCanBeRescheduled($lockedShowtime);
+            $targetRoom = $lockedRooms->get((int) $data['room_id']);
+            $movie = $this->resolveSchedulableMovie((int) $data['movie_id']);
+            $candidate = $this->validateCandidate(
+                $movie,
+                $targetRoom,
+                $data['show_date'],
+                $data['show_time'],
+                $lockedShowtime,
+            )->requireValid();
 
-            return $lockedShowtime->fresh(['movie', 'room', 'roomLayout']);
+            if ($this->hasStructuralChanges($lockedShowtime, $movie, $targetRoom, $candidate->layout, $candidate->window)
+                && $this->hasBookingHistory($lockedShowtime)) {
+                throw new ShowtimeScheduleException(
+                    'Suất chiếu đã phát sinh đơn đặt vé nên không thể thay đổi phim, phòng, ngày hoặc giờ chiếu.',
+                    'showtime',
+                    'SHOWTIME_HAS_BOOKING_HISTORY',
+                );
+            }
+
+            $before = clone $lockedShowtime;
+            $lockedShowtime->update($this->persistenceData(
+                $movie,
+                $targetRoom,
+                $candidate->layout,
+                $candidate->window,
+            ));
+            $updated = $lockedShowtime->fresh(['movie', 'room.cinema', 'cinema', 'roomLayout']);
+            $afterPersist?->__invoke($updated, $before);
+
+            return $updated;
         }, 3);
     }
 
     private function resolveSchedulableMovie(int $movieId): Movie
     {
         $movie = Movie::query()->findOrFail($movieId);
-        $this->validateRuntime($movie);
-        if (! in_array($movie->status, Movie::SCHEDULABLE_STATUSES, true)) {
-            throw new ShowtimeScheduleException('Phim đã ngừng chiếu không thể xếp lịch.', 'movie_id');
-        }
+        $this->assertMovieIsSchedulable($movie);
 
         return $movie;
+    }
+
+    private function assertMovieIsSchedulable(Movie $movie): void
+    {
+        $this->validateRuntime($movie);
+        if (! in_array($movie->status, Movie::SCHEDULABLE_STATUSES, true)) {
+            throw new ShowtimeScheduleException('Phim đã ngừng chiếu không thể xếp lịch.', 'movie_id', 'MOVIE_UNAVAILABLE');
+        }
     }
 
     private function lockAndValidateRoom(int $roomId): Room
     {
         $room = Room::query()->whereKey($roomId)->lockForUpdate()->first();
         if (! $room) {
-            throw new ShowtimeScheduleException('Phòng chiếu không tồn tại.', 'room_id');
+            throw new ShowtimeScheduleException('Phòng chiếu không tồn tại.', 'room_id', 'ROOM_UNAVAILABLE');
         }
         $this->assertRoomIsOperational($room);
 
@@ -264,7 +359,7 @@ class ShowtimeScheduleService
     {
         $room->loadMissing('cinema');
         if ($room->status !== 'active' || ! $room->cinema || $room->cinema->status !== 'active' || $room->cinema->archived_at !== null) {
-            throw new ShowtimeScheduleException('Phòng chiếu và chi nhánh phải đang hoạt động.', 'room_id');
+            throw new ShowtimeScheduleException('Phòng chiếu và chi nhánh phải đang hoạt động.', 'room_id', 'ROOM_UNAVAILABLE');
         }
     }
 
@@ -272,7 +367,7 @@ class ShowtimeScheduleService
     {
         $layout = RoomLayout::query()->published()->where('room_id', $room->id)->orderByDesc('version')->first();
         if (! $layout) {
-            throw new ShowtimeScheduleException('Phòng phải có layout published trước khi xếp lịch.', 'room_id');
+            throw new ShowtimeScheduleException('Phòng phải có layout published trước khi xếp lịch.', 'room_id', 'LAYOUT_UNAVAILABLE');
         }
 
         return $layout;
@@ -286,15 +381,113 @@ class ShowtimeScheduleService
             return;
         }
         if ($hours->is_closed) {
-            throw new ShowtimeScheduleException('Chi nhánh đóng cửa cả ngày này.', 'show_date');
+            throw new ShowtimeScheduleException('Chi nhánh đóng cửa cả ngày này.', 'show_date', 'CINEMA_CLOSED');
         }
 
         $time = $window->start->format('H:i:s');
         $opensAt = $this->normalizeTime($hours->opens_at);
         $latestStart = $this->normalizeTime($hours->latest_show_start_at);
         if (! $opensAt || ! $latestStart || $time < $opensAt || $time > $latestStart) {
-            throw new ShowtimeScheduleException('Chi nhánh không nhận suất chiếu mới vào khung giờ này.', 'show_time');
+            throw new ShowtimeScheduleException('Chi nhánh không nhận suất chiếu mới vào khung giờ này.', 'show_time', 'OUTSIDE_START_WINDOW');
         }
+    }
+
+    public function hasBookingHistory(Showtime $showtime): bool
+    {
+        return Booking::query()->where('showtime_id', $showtime->id)->exists()
+            || BookingSeat::query()->where('showtime_id', $showtime->id)->exists();
+    }
+
+    private function assertFutureStart(ShowtimeWindow $window): void
+    {
+        $now = CarbonImmutable::now($window->start->getTimezone());
+        if ($window->start->lte($now)) {
+            throw new ShowtimeScheduleException(
+                sprintf(
+                    'Giờ bắt đầu phải nằm trong tương lai theo múi giờ của chi nhánh (hiện tại %s).',
+                    $now->format('d/m/Y H:i:s'),
+                ),
+                'show_time',
+                'PAST_START',
+            );
+        }
+    }
+
+    private function assertNormalMutationStatus(array $data): void
+    {
+        if (array_key_exists('status', $data) && $data['status'] !== 'active') {
+            throw new ShowtimeScheduleException(
+                'Tạo và cập nhật lịch thông thường chỉ chấp nhận trạng thái đang hoạt động.',
+                'status',
+                'INVALID_STATUS',
+            );
+        }
+    }
+
+    private function assertSourceCanBeRescheduled(Showtime $showtime): void
+    {
+        if ($showtime->status !== 'active') {
+            throw new ShowtimeScheduleException(
+                'Chỉ suất chiếu đang hoạt động và sắp diễn ra mới có thể chỉnh sửa.',
+                'showtime',
+                'SHOWTIME_NOT_MUTABLE',
+            );
+        }
+
+        $window = $this->windowFor($showtime);
+        if (! CarbonImmutable::now($window->start->getTimezone())->lt($window->start)) {
+            throw new ShowtimeScheduleException(
+                'Chỉ suất chiếu đang hoạt động và sắp diễn ra mới có thể chỉnh sửa.',
+                'showtime',
+                'SHOWTIME_NOT_MUTABLE',
+            );
+        }
+    }
+
+    private function candidateLayout(Room $room, ?Showtime $existingShowtime): RoomLayout
+    {
+        if ($existingShowtime && (int) $room->id === (int) $existingShowtime->room_id) {
+            $layout = RoomLayout::query()->published()
+                ->whereKey($existingShowtime->room_layout_id)
+                ->where('room_id', $room->id)
+                ->first();
+            if (! $layout) {
+                throw new ShowtimeScheduleException(
+                    'Suất chiếu hiện tại không có layout published hợp lệ.',
+                    'room_id',
+                    'LAYOUT_UNAVAILABLE',
+                );
+            }
+
+            return $layout;
+        }
+
+        return $this->latestPublishedLayout($room);
+    }
+
+    private function hasStructuralChanges(
+        Showtime $showtime,
+        Movie $movie,
+        Room $room,
+        RoomLayout $layout,
+        ShowtimeWindow $window,
+    ): bool {
+        $current = [
+            'movie_id' => (int) $showtime->movie_id,
+            'show_date' => $showtime->show_date->format('Y-m-d'),
+            'show_time' => substr((string) $showtime->show_time, 0, 8),
+            'room_id' => (int) $showtime->room_id,
+            'room_layout_id' => (int) $showtime->room_layout_id,
+        ];
+        $candidate = [
+            'movie_id' => (int) $movie->id,
+            'show_date' => $window->start->toDateString(),
+            'show_time' => $window->start->format('H:i:s'),
+            'room_id' => (int) $room->id,
+            'room_layout_id' => (int) $layout->id,
+        ];
+
+        return $current !== $candidate;
     }
 
     private function normalizeTime(?string $time): ?string
@@ -307,7 +500,6 @@ class ShowtimeScheduleService
     }
 
     private function persistenceData(
-        array $data,
         Movie $movie,
         Room $room,
         RoomLayout $layout,
@@ -335,7 +527,7 @@ class ShowtimeScheduleService
             'price' => $normal->finalAmount,
             'vip_price' => $vip->finalAmount,
             'pricing_version' => 'cinema-pricing-v1',
-            'status' => $data['status'],
+            'status' => 'active',
         ];
     }
 }

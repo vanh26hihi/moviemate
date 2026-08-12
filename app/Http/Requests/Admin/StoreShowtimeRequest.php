@@ -20,7 +20,7 @@ class StoreShowtimeRequest extends FormRequest
             'room_id' => ['required', 'integer', 'exists:rooms,id'],
             'show_date' => ['required', 'date_format:Y-m-d'],
             'show_time' => ['required', 'date_format:H:i'],
-            'status' => ['required', Rule::in(['active', 'cancelled', 'finished'])],
+            'status' => ['sometimes', Rule::in(['active'])],
         ];
     }
 
@@ -37,7 +37,6 @@ class StoreShowtimeRequest extends FormRequest
             'show_date.date_format' => 'Ngày chiếu phải đúng định dạng năm-tháng-ngày.',
             'show_time.required' => 'Vui lòng chọn giờ bắt đầu.',
             'show_time.date_format' => 'Giờ bắt đầu phải đúng định dạng giờ:phút.',
-            'status.required' => 'Vui lòng chọn trạng thái suất chiếu.',
             'status.in' => 'Trạng thái suất chiếu không hợp lệ.',
         ];
     }

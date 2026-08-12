@@ -97,8 +97,10 @@
                             <td>
                                 <div class="flex items-center justify-end gap-2">
                                     @can('showtimes.update')
-                                        @if(($lifecycle['state'] ?? null) === 'upcoming')
+                                        @if($showtime->status === 'active' && ($lifecycle['state'] ?? null) === 'upcoming' && ! $showtime->bookings_exists && ! $showtime->booking_seats_exists)
                                         <a href="{{ route('admin.showtimes.edit', $showtime) }}" data-showtime-edit-action class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa"><i class="ph-bold ph-pencil-simple text-xs"></i></a>
+                                        @elseif($showtime->bookings_exists || $showtime->booking_seats_exists)
+                                        <span class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted" title="Suất chiếu đã có lịch sử đặt vé"><i class="ph-bold ph-lock-key text-xs"></i></span>
                                         @endif
                                     @endcan
                                     @can('showtimes.delete')
