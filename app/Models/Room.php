@@ -55,6 +55,11 @@ class Room extends Model
         return $this->hasMany(Showtime::class);
     }
 
+    public function seatIncidents(): HasMany
+    {
+        return $this->hasMany(SeatIncident::class);
+    }
+
     public function pricingRules(): HasMany
     {
         return $this->hasMany(CinemaPricingRule::class);

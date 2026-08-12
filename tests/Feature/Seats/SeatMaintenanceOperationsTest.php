@@ -226,7 +226,7 @@ class SeatMaintenanceOperationsTest extends TestCase
         $this->assertSame('active', $left->fresh()->status);
     }
 
-    public function test_active_hold_and_paid_future_booking_block_unsafe_transition(): void
+    public function test_active_hold_is_cancelled_and_paid_future_booking_is_preserved_by_incident(): void
     {
         [$room, $layout, $seats] = $this->roomWithSeats('PROTECT');
         $admin = $this->userWithRole('admin');
@@ -250,11 +250,13 @@ class SeatMaintenanceOperationsTest extends TestCase
 
         $this->actingAs($admin)
             ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]), ['status' => 'maintenance'])
-            ->assertSessionHasErrors('status');
-        $this->assertSame('active', $seats[0]->fresh()->status);
+            ->assertRedirect();
+        $this->assertSame('maintenance', $seats[0]->fresh()->status);
+        $this->assertSame('cancelled', $hold->fresh()->booking_status);
+        $this->assertNull($holdSeat->fresh()->active_lock_key);
+        $this->assertDatabaseCount('seat_incidents', 1);
 
-        $hold->update(['booking_status' => 'expired']);
-        $holdSeat->update(['active_lock_key' => null]);
+        Seat::query()->whereKey($seats[0]->id)->update(['status' => 'active']);
         $paid = Booking::query()->create([
             'showtime_id' => $showtime->id,
             'booking_code' => 'PAID-PROTECT',
@@ -283,15 +285,19 @@ class SeatMaintenanceOperationsTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]), ['status' => 'inactive'])
-            ->assertSessionHasErrors('status');
-        $this->assertSame('active', $seats[0]->fresh()->status);
+            ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]), ['status' => 'maintenance'])
+            ->assertRedirect();
+        $this->assertSame('maintenance', $seats[0]->fresh()->status);
         $this->assertSame('paid', $paid->fresh()->booking_status);
         $this->assertTrue($ticketIssuedAt->equalTo($paid->fresh()->ticket_emailed_at));
         $this->assertSame($paymentBefore, $payment->fresh()->getAttributes());
         $this->assertSame($layoutSnapshotId, $showtime->fresh()->room_layout_id);
         $this->assertDatabaseHas('booking_seats', ['booking_id' => $paid->id, 'seat_id' => $seats[0]->id]);
-        $this->assertDatabaseCount('activity_logs', 0);
+        $this->assertDatabaseHas('seat_incident_impacts', [
+            'booking_seat_id' => $paid->bookingSeats()->firstOrFail()->id,
+            'detected_classification' => 'paid',
+            'resolution_status' => 'unresolved',
+        ]);
     }
 
     public function test_bulk_is_deduplicated_expands_couples_and_is_all_or_nothing(): void

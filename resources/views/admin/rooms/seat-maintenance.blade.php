@@ -35,6 +35,20 @@
         @endforeach
     </section>
 
+    @if($incidents->isNotEmpty())
+        <section class="cinema-card p-5">
+            <h2 class="text-lg font-extrabold app-text">Sự cố ghế gần đây</h2>
+            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                @foreach($incidents as $incident)
+                    <a class="rounded-xl border app-border p-4 hover:border-brand-start" href="{{ route('admin.rooms.seat-incidents.show', [$room, $incident]) }}">
+                        <div class="flex items-center justify-between gap-3"><strong>#{{ $incident->id }} · {{ $incident->incidentSeats->pluck('seat.seat_code')->filter()->join('–') }}</strong><span class="status-badge {{ $incident->status === 'open' ? 'bg-error/10 text-error' : 'bg-success/10 text-success' }}">{{ $incident->status }}</span></div>
+                        <p class="mt-2 text-sm app-muted">{{ $incident->impacts_count }} ảnh hưởng · {{ $incident->unresolved_impacts_count }} chưa xử lý</p>
+                    </a>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <form method="GET" class="cinema-card grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
         <label class="text-sm font-bold">Mã ghế<input class="cinema-input mt-1" name="seat_code" value="{{ $filters['seat_code'] ?? '' }}"></label>
         <label class="text-sm font-bold">Hàng<input class="cinema-input mt-1" name="row" value="{{ $filters['row'] ?? '' }}"></label>
@@ -57,7 +71,7 @@
     @endcan
 
     <section class="cinema-card overflow-hidden">
-        <div class="overflow-x-auto"><table class="admin-table min-w-[88rem]"><thead><tr><th class="w-12">Chọn</th><th>Mã ghế</th><th>Hàng</th><th>Loại ghế</th><th>Trạng thái</th><th>Ghế đôi</th><th>Tình trạng bảo vệ</th><th>Phiên bản sơ đồ</th><th>Cập nhật cuối</th><th>Thao tác</th></tr></thead><tbody>
+        <div class="overflow-x-auto"><table class="admin-table min-w-[104rem]"><thead><tr><th class="w-12">Chọn</th><th>Mã ghế</th><th>Hàng</th><th>Loại ghế</th><th>Trạng thái</th><th>Ghế đôi</th><th>Tình trạng bảo vệ</th><th>Ảnh hưởng sắp tới</th><th>Phiên bản sơ đồ</th><th>Cập nhật cuối</th><th>Thao tác</th></tr></thead><tbody>
             @forelse($units as $unit)<tr>
                 <td>@can('seats.maintenance.update')@if($unit['is_valid'] && $unit['status'] !== 'retired')<input form="bulk-seat-maintenance" type="checkbox" name="seat_ids[]" value="{{ $unit['unit_id'] }}" aria-label="Chọn {{ $unit['label'] }}">@endif @endcan</td>
                 <td class="font-extrabold text-brand-start">{{ $unit['label'] }}</td><td>{{ $unit['row'] }}</td>
@@ -65,12 +79,13 @@
                 <td><span class="status-badge {{ $unit['status'] === 'active' ? 'bg-success/10 text-success' : ($unit['status'] === 'maintenance' ? 'bg-warning/10 text-warning' : 'bg-error/10 text-error') }}">{{ \App\Support\StatusLabel::for('seat', $unit['status']) }}</span></td>
                 <td>{{ $unit['is_couple'] ? ($unit['is_valid'] ? 'Một đơn vị gồm hai vị trí' : 'Dữ liệu cặp không hợp lệ') : 'Không' }}</td>
                 <td>@if($unit['active_hold'])<span class="status-badge bg-warning/10 text-warning">Đang giữ chỗ</span>@endif @if($unit['future_sold'])<span class="status-badge bg-error/10 text-error">Đã bán cho suất sắp tới</span>@endif @if($unit['issued_ticket'])<span class="status-badge bg-error/10 text-error">Có vé đã phát hành</span>@endif @if(!$unit['protected'])<span class="status-badge bg-success/10 text-success">Không bị ràng buộc</span>@endif</td>
+                <td><div class="space-y-1 text-xs"><div><strong>{{ $unit['impact_total'] }}</strong> booking</div><div>Có thể hủy: {{ $unit['impact_ordinary_hold'] }}</div><div>Chờ thanh toán: {{ $unit['impact_retained_payment'] }}</div><div>Đã thanh toán: {{ $unit['impact_paid'] }}</div><div>Vé đã in: {{ $unit['has_printed_ticket'] ? 'Có' : 'Không' }}</div></div></td>
                 <td>v{{ $unit['layout_version'] }}</td><td>{{ $unit['updated_at']?->format('d/m/Y H:i:s') ?? '—' }}</td>
                 <td>@can('seats.maintenance.update')
-                    @if($unit['is_valid'] && $unit['status'] !== 'retired')<form method="POST" action="{{ route('admin.rooms.seat-maintenance.update', ['room' => $room, 'seat' => $unit['unit_id']]) }}" class="flex min-w-64 gap-2" onsubmit="return confirm('Cập nhật trạng thái vận hành của {{ $unit['label'] }}?');">@csrf @method('PATCH')<select class="cinema-input !py-2 text-xs" name="status">@foreach(\App\Models\Seat::OPERATIONAL_STATUSES as $status)<option value="{{ $status }}" @selected($unit['status'] === $status)>{{ \App\Support\StatusLabel::for('seat', $status) }}</option>@endforeach</select><button class="btn-secondary !px-3 !py-2 text-xs" type="submit">Lưu</button></form>
+                    @if($unit['is_valid'] && $unit['status'] !== 'retired')<form method="POST" action="{{ route('admin.rooms.seat-maintenance.update', ['room' => $room, 'seat' => $unit['unit_id']]) }}" class="grid min-w-72 gap-2" onsubmit="return confirm('{{ $unit['impact_total'] > 0 ? 'Tạo sự cố, ngừng bán ghế và xử lý các booking tạm đủ điều kiện?' : 'Cập nhật trạng thái vận hành của '.$unit['label'].'?' }}');">@csrf @method('PATCH')<select class="cinema-input !py-2 text-xs" name="status">@foreach(\App\Models\Seat::OPERATIONAL_STATUSES as $status)<option value="{{ $status }}" @selected($unit['status'] === $status)>{{ \App\Support\StatusLabel::for('seat', $status) }}</option>@endforeach</select><select class="cinema-input !py-2 text-xs" name="reason" aria-label="Lý do sự cố"><option value="maintenance_required">Cần bảo trì</option><option value="seat_broken">Ghế bị hỏng</option><option value="safety_issue">Vấn đề an toàn</option><option value="other">Khác</option></select><input class="cinema-input !py-2 text-xs" name="note" maxlength="500" placeholder="Ghi chú (bắt buộc nếu chọn Khác)"><button class="btn-secondary !px-3 !py-2 text-xs" type="submit">{{ $unit['impact_total'] > 0 ? 'Tạo sự cố & ngừng bán ghế' : 'Xác nhận bảo trì' }}</button></form>
                     @else<span class="text-xs text-error">Chỉ đọc · sửa cấu trúc trong trình thiết kế</span>@endif
                 @else<span class="text-xs app-muted">Chỉ xem</span>@endcan</td>
-            </tr>@empty<tr><td colspan="10" class="py-12 text-center app-muted">Không có đơn vị ghế phù hợp.</td></tr>@endforelse
+            </tr>@empty<tr><td colspan="11" class="py-12 text-center app-muted">Không có đơn vị ghế phù hợp.</td></tr>@endforelse
         </tbody></table></div>
         @if($units->hasPages())<div class="border-t app-border p-5">{{ $units->links() }}</div>@endif
     </section>
