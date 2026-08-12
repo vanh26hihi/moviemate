@@ -143,6 +143,8 @@ class ShowtimeScheduleService
         string $showDate,
         string $showTime,
         ?Showtime $existingShowtime = null,
+        ?CarbonImmutable $authoritativeNow = null,
+        ?RoomLayout $authoritativeLayout = null,
     ): ShowtimeScheduleValidationResult {
         $timezone = null;
         $window = null;
@@ -156,9 +158,9 @@ class ShowtimeScheduleService
             $this->assertMovieIsSchedulable($movie);
             $timezone = $this->timezone($room);
             $window = $this->window($movie, $showDate, $showTime, $room);
-            $this->assertFutureStart($window);
+            $this->assertFutureStart($window, $authoritativeNow);
             $isFuture = true;
-            $layout = $this->candidateLayout($room, $existingShowtime);
+            $layout = $this->candidateLayout($room, $existingShowtime, $authoritativeLayout);
             $this->assertWithinOperatingHours($room, $window);
             $isWithinOperatingHours = true;
             $this->assertNoConflict($room, $window, 'active', $existingShowtime?->id);
@@ -398,9 +400,10 @@ class ShowtimeScheduleService
             || BookingSeat::query()->where('showtime_id', $showtime->id)->exists();
     }
 
-    private function assertFutureStart(ShowtimeWindow $window): void
+    private function assertFutureStart(ShowtimeWindow $window, ?CarbonImmutable $authoritativeNow = null): void
     {
-        $now = CarbonImmutable::now($window->start->getTimezone());
+        $now = ($authoritativeNow ?? CarbonImmutable::now($window->start->getTimezone()))
+            ->setTimezone($window->start->getTimezone());
         if ($window->start->lte($now)) {
             throw new ShowtimeScheduleException(
                 sprintf(
@@ -444,8 +447,11 @@ class ShowtimeScheduleService
         }
     }
 
-    private function candidateLayout(Room $room, ?Showtime $existingShowtime): RoomLayout
-    {
+    private function candidateLayout(
+        Room $room,
+        ?Showtime $existingShowtime,
+        ?RoomLayout $authoritativeLayout = null,
+    ): RoomLayout {
         if ($existingShowtime && (int) $room->id === (int) $existingShowtime->room_id) {
             $layout = RoomLayout::query()->published()
                 ->whereKey($existingShowtime->room_layout_id)
@@ -460,6 +466,12 @@ class ShowtimeScheduleService
             }
 
             return $layout;
+        }
+
+        if ($authoritativeLayout
+            && (int) $authoritativeLayout->room_id === (int) $room->id
+            && $authoritativeLayout->status === 'published') {
+            return $authoritativeLayout;
         }
 
         return $this->latestPublishedLayout($room);
@@ -499,7 +511,7 @@ class ShowtimeScheduleService
         return strlen($time) === 5 ? $time.':00' : substr($time, 0, 8);
     }
 
-    private function persistenceData(
+    public function persistenceData(
         Movie $movie,
         Room $room,
         RoomLayout $layout,

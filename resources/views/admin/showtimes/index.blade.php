@@ -12,7 +12,10 @@
             <p class="app-muted mt-2">Lịch vận hành phòng theo múi giờ {{ $cinemaTimezone }}, gồm {{ $cleaningBufferMinutes }} phút vệ sinh.</p>
         </div>
         @can('showtimes.create')
-            <a href="{{ route('admin.showtimes.create') }}" class="btn-primary"><i class="ph-bold ph-plus"></i> Thêm suất chiếu</a>
+            <div class="flex flex-wrap gap-3">
+                <a href="{{ route('admin.showtimes.bulk.index') }}" class="btn-secondary"><i class="ph-bold ph-list-plus"></i> Tạo nhiều suất</a>
+                <a href="{{ route('admin.showtimes.create') }}" class="btn-primary"><i class="ph-bold ph-plus"></i> Thêm suất chiếu</a>
+            </div>
         @endcan
     </div>
 

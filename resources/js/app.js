@@ -5,6 +5,7 @@ import './showtime-calendar';
 import './showtime';
 import './showtime-lifecycle';
 import './showtime-schedule-preview';
+import './bulk-showtime-scheduling';
 import './seat-gap-guard';
 import './layout-template-editor';
 
