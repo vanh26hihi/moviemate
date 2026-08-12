@@ -85,6 +85,10 @@ class BookingCheckoutConfirmController extends Controller
             default => 'user.bookings.pending',
         };
 
+        if ($result->payment?->status === Payment::STATUS_SUCCESS) {
+            return redirect()->route($statusRoute, $booking);
+        }
+
         return redirect()
             ->route($statusRoute, $booking)
             ->with('warning', match ($provider) {

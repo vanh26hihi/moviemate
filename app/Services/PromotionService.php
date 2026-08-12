@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Booking;
 use App\Models\BookingDiscountCode;
 use App\Models\DiscountCode;
-use App\Models\LoyaltySetting;
 use Illuminate\Validation\ValidationException;
 
 final class PromotionService
@@ -14,7 +13,7 @@ final class PromotionService
     public function quote(int $grossAmount, array $requestedCodes, ?int $userId, int $cinemaId, bool $lock = false): PromotionQuote
     {
         $codes = collect($requestedCodes)->map(fn ($code) => mb_strtoupper(trim((string) $code)))->filter()->unique()->values();
-        $maximum = max(1, (int) LoyaltySetting::current()->max_discount_codes_per_booking);
+        $maximum = max(1, (int) config('promotions.max_discount_codes_per_booking', 3));
         if ($codes->count() > $maximum) {
             throw ValidationException::withMessages(['discount_code' => "Mỗi đơn chỉ được dùng tối đa {$maximum} mã giảm giá."]);
         }

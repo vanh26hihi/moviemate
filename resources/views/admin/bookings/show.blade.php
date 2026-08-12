@@ -150,7 +150,6 @@
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tổng trước giảm giá</dt><dd class="font-bold app-text">{{ number_format((int) $booking->gross_amount, 0, ',', '.') }} VNĐ</dd></div>
                 @if($booking->promotion_discount_amount > 0)<div class="flex justify-between gap-4 text-success"><dt>Giảm từ mã khuyến mãi</dt><dd class="font-bold">−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} VNĐ</dd></div>@endif
-                @if($booking->points_discount_amount > 0)<div class="flex justify-between gap-4 text-ai-start"><dt>Giảm từ điểm MovieMate</dt><dd class="font-bold">−{{ number_format((int) $booking->points_discount_amount, 0, ',', '.') }} VNĐ</dd></div>@endif
                 <div class="flex justify-between gap-4 border-t app-border pt-3"><dt class="font-extrabold app-text">Tổng cuối cùng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4"><dt class="app-muted">Khoản thanh toán đã xác minh</dt><dd class="font-bold app-text">{{ $authoritativePayment ? number_format((int) $authoritativePayment->amount, 0, ',', '.').' VNĐ' : 'Chưa có' }}</dd></div>
             </dl>

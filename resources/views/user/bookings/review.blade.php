@@ -46,10 +46,6 @@
                             <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-bold app-text">{{ $preview->showtime->room->name }}</dd></div>
                         </dl>
                     </section>
-                    @auth
-                    <section class="mb-5 rounded-xl border app-border p-4" aria-labelledby="loyalty-title"><h2 id="loyalty-title" class="text-sm font-bold app-text">Điểm MovieMate</h2><p class="mt-1 text-xs app-muted">Khả dụng: {{ number_format($loyalty->availablePoints, 0, ',', '.') }} điểm</p><form method="POST" action="{{ route('user.bookings.loyalty') }}" class="mt-3 flex gap-2">@csrf<label class="sr-only" for="loyalty-points">Số điểm sử dụng</label><input id="loyalty-points" type="number" min="0" max="{{ $loyalty->availablePoints }}" name="points" value="{{ $draft['points_to_use'] ?? 0 }}" class="user-form-control"><button type="submit" class="btn-secondary">Cập nhật</button></form>@error('points')<p class="mt-2 text-sm text-error">{{ $message }}</p>@enderror</section>
-                    @endauth
-
                     <section class="rounded-2xl border app-border p-5" aria-labelledby="seat-summary-title">
                         <div class="flex items-center justify-between gap-3">
                             <h2 id="seat-summary-title" class="flex items-center gap-2 font-bold app-text"><i class="ph-fill ph-armchair text-brand-start" aria-hidden="true"></i>Ghế đã chọn</h2>
@@ -100,8 +96,7 @@
                         <div class="flex justify-between gap-3"><dt class="app-muted">Tiền ghế</dt><dd class="font-bold app-text">{{ number_format($preview->prices->seatSubtotal, 0, ',', '.') }} VNĐ</dd></div>
                         <div class="flex justify-between gap-3"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format($preview->prices->foodSubtotal, 0, ',', '.') }} VNĐ</dd></div>
                         @if($promotion->discountAmount > 0)<div class="flex justify-between gap-3 text-success"><dt>Giảm giá</dt><dd class="font-bold">−{{ number_format($promotion->discountAmount, 0, ',', '.') }} VNĐ</dd></div>@endif
-                        @if($loyalty->discountAmount > 0)<div class="flex justify-between gap-3 text-ai-start"><dt>Đổi điểm</dt><dd class="font-bold">−{{ number_format($loyalty->discountAmount, 0, ',', '.') }} VNĐ</dd></div>@endif
-                        <div class="flex justify-between gap-3 border-t pt-4 app-border"><dt class="font-bold app-text">Tổng thanh toán</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format($loyalty->finalAmount, 0, ',', '.') }} VNĐ</dd></div>
+                        <div class="flex justify-between gap-3 border-t pt-4 app-border"><dt class="font-bold app-text">Tổng thanh toán</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format($promotion->finalAmount, 0, ',', '.') }} VNĐ</dd></div>
                     </dl>
 
                     <div class="mt-5 rounded-xl border app-border px-4 py-3">

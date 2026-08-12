@@ -16,12 +16,12 @@ class UnifiedBookingCheckoutService
     public function __construct(
         private readonly BookingCheckoutService $bookings,
         private readonly PaymentInitiationService $payments,
+        private readonly ZeroPayableBookingSettlement $zeroPayable,
     ) {}
 
     public function confirm(array $draft, ?int $userId, ?string $provider = null, string $clientIp = '127.0.0.1'): UnifiedBookingCheckoutResult
     {
         $provider ??= (string) config('payment.driver', 'vnpay');
-        $this->payments->assertAvailable($provider);
         // BookingCheckoutService commits the entire booking/seat/food aggregate before
         // this service performs any network I/O through PaymentInitiationService.
         $checkout = $this->bookings->createPendingBooking(
@@ -32,8 +32,15 @@ class UnifiedBookingCheckoutService
             $draft['checkout_token'],
             $draft['food_items'],
             discountCodes: $draft['discount_codes'] ?? [],
-            pointsToUse: (int) ($draft['points_to_use'] ?? 0),
         );
+
+        if ((int) $checkout->booking->total_amount === 0) {
+            $payment = $this->zeroPayable->settle($checkout->booking);
+
+            return new UnifiedBookingCheckoutResult($checkout, $payment, null);
+        }
+
+        $this->payments->assertAvailable($provider);
 
         try {
             $payment = $this->payments->initiate($checkout->booking, $provider, $clientIp);

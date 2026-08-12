@@ -11,11 +11,8 @@ use App\Models\BookingTicketDelivery;
 use App\Models\CinemaPricingRule;
 use App\Models\DiscountCode;
 use App\Models\FoodItem;
-use App\Models\LoyaltyAccount;
-use App\Models\LoyaltySetting;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\User;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use App\Services\Payments\PaymentInitiationService;
@@ -74,59 +71,6 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->assertSame(['FINAL10K'], $booking->discountCodeRedemptions->pluck('code_snapshot')->all());
     }
 
-    public function test_promotion_then_loyalty_points_produce_one_authoritative_provider_amount(): void
-    {
-        $scenario = $this->bookingScenario(false);
-        CinemaPricingRule::query()
-            ->where('cinema_id', $scenario['cinema']->id)
-            ->where('name', 'Booking fixture base')
-            ->update(['amount_vnd' => 80_000]);
-        $food = FoodItem::query()->create([
-            'name' => 'Promotion and loyalty combo',
-            'price' => 55_000,
-            'active' => true,
-        ]);
-        DiscountCode::query()->create([
-            'code' => 'STACK20K',
-            'name' => 'Promotion before points',
-            'discount_type' => 'fixed',
-            'discount_value' => 20_000,
-        ]);
-        $user = User::factory()->create();
-        LoyaltyAccount::query()->create([
-            'user_id' => $user->id,
-            'points_balance' => 100,
-            'lifetime_earned' => 100,
-        ]);
-        LoyaltySetting::current()->update([
-            'point_value_vnd' => 100,
-            'max_points_discount_percent' => 100,
-            'minimum_points_redemption' => 1,
-        ]);
-        $checkout = app(BookingCheckoutService::class)->createPendingBooking(
-            $scenario['showtime']->id,
-            [$scenario['seats'][0]->id],
-            $user->id,
-            $user->email,
-            app(BookingTokenService::class)->issueCheckoutToken(),
-            [['food_id' => $food->id, 'quantity' => 1]],
-            discountCodes: ['STACK20K'],
-            pointsToUse: 100,
-        );
-
-        $result = app(PaymentInitiationService::class)->initiate($checkout->booking, 'vnpay');
-        parse_str((string) parse_url($result->orderUrl, PHP_URL_QUERY), $parameters);
-
-        $this->assertSame(135_000, $checkout->booking->gross_amount);
-        $this->assertSame(20_000, $checkout->booking->promotion_discount_amount);
-        $this->assertSame(10_000, $checkout->booking->points_discount_amount);
-        $this->assertSame(105_000, (int) $checkout->booking->total_amount);
-        $this->assertSame(105_000, $result->payment->amount);
-        $this->assertSame('10500000', $parameters['vnp_Amount']);
-        $this->assertSame('reserved', $checkout->booking->discountCodeRedemptions()->sole()->status);
-        $this->assertSame('reserved', $checkout->booking->pointRedemption()->sole()->status);
-    }
-
     public function test_discounted_review_confirms_with_the_net_amount_and_redirects_to_vnpay(): void
     {
         $scenario = $this->bookingScenario(false);
@@ -177,7 +121,6 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->assertSame(55_000, $booking->food_subtotal);
         $this->assertSame(135_000, $booking->gross_amount);
         $this->assertSame(20_000, $booking->promotion_discount_amount);
-        $this->assertSame(0, $booking->points_discount_amount);
         $this->assertSame(115_000, (int) $booking->total_amount);
         $this->assertSame(115_000, $payment->amount);
         $this->assertSame('11500000', $parameters['vnp_Amount']);

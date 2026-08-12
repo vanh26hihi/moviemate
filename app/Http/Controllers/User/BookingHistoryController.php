@@ -36,7 +36,6 @@ final class BookingHistoryController extends Controller
                 'bookingSeats.seat',
                 'payments',
                 'discountCodeRedemptions',
-                'pointRedemption',
             ])
             ->when(
                 isset($statusFilters[$status]),

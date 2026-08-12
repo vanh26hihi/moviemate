@@ -11,8 +11,6 @@ use App\Http\Controllers\Admin\DiscountController as AdminDiscountController;
 use App\Http\Controllers\Admin\FoodController as AdminFoodController;
 use App\Http\Controllers\Admin\FoodOrderController as AdminFoodOrderController;
 use App\Http\Controllers\Admin\GenreController as AdminGenreController;
-use App\Http\Controllers\Admin\LoyaltyController as AdminLoyaltyController;
-use App\Http\Controllers\Admin\LoyaltySettingController as AdminLoyaltySettingController;
 use App\Http\Controllers\Admin\MovieController as AdminMovieController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentReconciliationController;
@@ -57,14 +55,12 @@ use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
 use App\Http\Controllers\User\BookingFoodSelectionController;
 use App\Http\Controllers\User\BookingHistoryController;
-use App\Http\Controllers\User\BookingLoyaltyController;
 use App\Http\Controllers\User\BookingPromotionController;
 use App\Http\Controllers\User\BookingReviewController;
 use App\Http\Controllers\User\CinemaController as UserCinemaController;
 use App\Http\Controllers\User\FoodController as UserFoodController;
 use App\Http\Controllers\User\GuestBookingAccessController;
 use App\Http\Controllers\User\HomeController;
-use App\Http\Controllers\User\LoyaltyController as UserLoyaltyController;
 use App\Http\Controllers\User\MovieController;
 use App\Http\Controllers\User\OrderController as UserOrderController;
 use App\Http\Controllers\User\RetiredBookingStoreController;
@@ -213,10 +209,6 @@ Route::post('/booking/promotions', BookingPromotionController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
     ->name('user.bookings.promotions');
 
-Route::post('/booking/loyalty', BookingLoyaltyController::class)
-    ->middleware([ProtectBookingResponses::class, 'throttle:20,1'])
-    ->name('user.bookings.loyalty');
-
 Route::post('/booking/confirm', BookingCheckoutConfirmController::class)
     ->middleware([ProtectBookingResponses::class, 'throttle:booking-hold-creation'])
     ->name('user.bookings.confirm');
@@ -278,7 +270,6 @@ Route::middleware(['auth', 'active'])->group(function () {
     })->name('user.profile');
     Route::get('/my-reviews', [UserReviewController::class, 'index'])->name('user.reviews.index');
     Route::post('/movies/{movie}/reviews', [UserReviewController::class, 'store'])->middleware('throttle:10,1')->name('user.reviews.store');
-    Route::get('/loyalty/history', UserLoyaltyController::class)->name('user.loyalty.history');
 });
 
 Route::get('/ai/recommend', [AiController::class, 'recommend'])->name('user.ai.recommend');
@@ -343,10 +334,6 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:discounts.manage')->name('discounts.archive');
         Route::get('/reviews', [AdminReviewController::class, 'index'])->middleware('permission:reviews.view')->name('reviews.index');
         Route::patch('/reviews/{review}', [AdminReviewController::class, 'moderate'])->middleware('permission:reviews.moderate')->name('reviews.moderate');
-        Route::get('/loyalty-settings', [AdminLoyaltySettingController::class, 'edit'])->middleware('permission:reviews.view')->name('loyalty-settings.edit');
-        Route::put('/loyalty-settings', [AdminLoyaltySettingController::class, 'update'])->middleware('permission:reviews.moderate')->name('loyalty-settings.update');
-        Route::get('/loyalty', AdminLoyaltyController::class)->middleware(['role:admin', 'permission:activity_logs.view'])->name('loyalty.index');
-
         Route::resource('movies', AdminMovieController::class)->except(['destroy'])
             ->middlewareFor(['index', 'show'], 'permission:movies.view')
             ->middlewareFor(['create', 'store'], 'permission:movies.create')

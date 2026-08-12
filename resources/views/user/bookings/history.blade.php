@@ -14,12 +14,6 @@
                 <h2 class="font-bold app-text mb-1">{{ Auth::user()->name }}</h2>
                 <p class="text-xs text-ai-start font-bold mb-5">Hạng {{ Auth::user()->role?->display_name ?? 'Khách hàng' }}</p>
 
-                <div class="w-full rounded-2xl border border-ai-start/30 bg-ai-start/10 px-4 py-3 mb-4 text-left">
-                    <p class="text-xs app-muted">Thành viên {{ Auth::user()->membership_tier }}</p>
-                    <p class="text-2xl font-extrabold text-ai-start">{{ number_format(Auth::user()->loyalty_points, 0, ',', '.') }}</p>
-                    <p class="text-xs app-muted">điểm khả dụng</p>
-                </div>
-
                 <div class="w-full space-y-1 text-left">
                     <a href="{{ route('user.profile') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
                         <i class="ph ph-user text-lg"></i> Thông tin cá nhân
@@ -27,11 +21,6 @@
                     <a href="{{ route('user.bookings.history') }}" class="flex items-center gap-3 px-4 py-2.5 bg-brand-start/10 text-brand-start rounded-xl font-bold border border-brand-start/20 text-sm">
                         <i class="ph-fill ph-ticket text-lg"></i> Lịch sử đặt vé
                     </a>
-                    @if(Route::has('user.loyalty.history'))
-                        <a href="{{ route('user.loyalty.history') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
-                            <i class="ph ph-coins text-lg"></i> Lịch sử điểm
-                        </a>
-                    @endif
                     <a href="{{ route('user.reviews.index') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
                         <i class="ph ph-star text-lg"></i> Đánh giá của tôi
                     </a>
@@ -105,12 +94,6 @@
                                         <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
                                         @if($booking->promotion_discount_amount > 0)
                                             <p class="text-xs text-success">Mã {{ $booking->discountCodeRedemptions->pluck('code_snapshot')->join(', ') }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
-                                        @endif
-                                        @if($booking->pointRedemption)
-                                            <p class="text-xs text-ai-start">Đã dùng {{ number_format($booking->pointRedemption->points,0,',','.') }} điểm: −{{ number_format((int)$booking->points_discount_amount,0,',','.') }} VNĐ</p>
-                                        @endif
-                                        @if($booking->loyalty_points_earned > 0)
-                                            <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
                                         @endif
                                     </div>
                                     <div class="flex flex-wrap gap-2">
