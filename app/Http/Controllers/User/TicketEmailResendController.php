@@ -33,6 +33,6 @@ final class TicketEmailResendController extends Controller
         $deliveries->requestResend($booking, Auth::id());
         $deliveryQuery->forgetBadge();
 
-        return back()->with('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
+        return back()->with('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
     }
 }

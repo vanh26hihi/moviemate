@@ -32,7 +32,7 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                     <h1 class="text-3xl font-bold app-text">Lịch sử đặt vé</h1>
-                    <p class="app-muted mt-1">Theo dõi vé đã đặt và mã QR của bạn.</p>
+                    <p class="app-muted mt-1">Theo dõi đơn đặt vé và QR đơn đặt vé của bạn.</p>
                 </div>
 
                 <form method="GET" action="{{ route('user.bookings.history') }}" class="flex gap-2">
@@ -78,7 +78,7 @@
 
                             <div class="flex-grow min-w-0">
                                 <h2 class="text-xl font-bold app-text mb-1 pr-20">{{ $booking->showtime->movie->title }}</h2>
-                                <p class="app-muted text-xs mb-4">Mã vé: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
+                                <p class="app-muted text-xs mb-4">Mã đơn: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
 
                                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mb-4">
                                     <div><p class="app-muted mb-0.5">Thời gian</p><p class="app-text font-semibold">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }} - {{ $booking->showtime?->show_date ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y') : 'Đang cập nhật' }}</p></div>
@@ -107,12 +107,12 @@
 
                                         @if($canUseTicket)
                                             <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
-                                                Xem vé QR
+                                                Xem đơn đặt vé
                                             </a>
                                             <form method="POST" action="{{ route('user.bookings.ticket-email.resend', $booking) }}" class="inline" data-submit-once>
                                                 @csrf
                                                 <button type="submit" data-loading-label="Đang gửi…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors">
-                                                    Gửi lại email vé
+                                                    Gửi lại tài liệu nhận vé
                                                 </button>
                                             </form>
                                         @endif
@@ -152,7 +152,7 @@
                         <div class="w-16 h-16 rounded-2xl bg-brand-start/10 text-brand-start flex items-center justify-center mx-auto mb-4">
                             <i class="ph ph-ticket text-3xl"></i>
                         </div>
-                        <p class="app-muted">Bạn chưa có vé nào.</p>
+                        <p class="app-muted">Bạn chưa có đơn đặt vé nào.</p>
                     </div>
                 @endforelse
 

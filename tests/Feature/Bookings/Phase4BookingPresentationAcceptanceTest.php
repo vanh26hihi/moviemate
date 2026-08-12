@@ -62,9 +62,9 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
     public static function nonUsableBookingStates(): array
     {
         return [
-            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'Đơn chưa đủ điều kiện phát hành QR nhận vé.'],
-            'expired' => ['expired', Payment::STATUS_EXPIRED, 'Đơn chưa đủ điều kiện phát hành QR nhận vé.'],
-            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'Đơn chưa đủ điều kiện phát hành QR nhận vé.'],
+            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.'],
+            'expired' => ['expired', Payment::STATUS_EXPIRED, 'Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.'],
+            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.'],
         ];
     }
 }

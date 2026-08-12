@@ -125,7 +125,7 @@ final class ActivityLogger
     {
         return match (true) {
             $subject instanceof Booking => 'Đơn đặt vé '.$subject->booking_code,
-            $subject instanceof BookingTicketDelivery => 'Gửi vé điện tử #'.$subject->getKey().' / đơn #'.$subject->booking_id,
+            $subject instanceof BookingTicketDelivery => 'Gửi tài liệu nhận vé #'.$subject->getKey().' / đơn #'.$subject->booking_id,
             $subject instanceof Payment => 'Giao dịch #'.$subject->getKey().' / '.$subject->provider,
             $subject instanceof Room => 'Phòng '.$subject->code,
             $subject instanceof RoomType => 'Loại phòng '.$subject->code,

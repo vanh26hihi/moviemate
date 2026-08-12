@@ -106,7 +106,7 @@
 
                     <div class="mt-5 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-relaxed text-warning" role="note">
                         <i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>
-                        Sau khi xác nhận, ghế chỉ được giữ tối đa {{ $pendingMinutes }} phút trong lúc chờ thanh toán. Chỉ giao dịch được MovieMate xác minh mới phát hành vé.
+                        Sau khi xác nhận, ghế chỉ được giữ tối đa {{ $pendingMinutes }} phút trong lúc chờ thanh toán. Chỉ giao dịch được MovieMate xác minh mới xác nhận đơn đặt vé.
                     </div>
 
                     <div class="mt-6 flex flex-col gap-3">

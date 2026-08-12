@@ -35,7 +35,7 @@ final class BookingQrPrintFlowTest extends PaymentTestCase
 
         $response->assertSee('data-qr-value="'.$payload.'"', false)
             ->assertSee('QR ĐƠN ĐẶT VÉ')
-            ->assertSee('Vui lòng xuất trình mã đơn hoặc QR tại quầy để nhận vé.')
+            ->assertSee('Vui lòng xuất trình mã đơn hoặc QR đơn đặt vé tại quầy để nhận vé.')
             ->assertDontSee('QR riêng cho ghế');
         $this->assertSame(1, substr_count($response->getContent(), 'data-qr-value='));
         $this->assertSame(2, $booking->admissionTickets()->count());

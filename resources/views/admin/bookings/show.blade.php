@@ -18,7 +18,7 @@
         <div>
             <a href="{{ route('admin.bookings.index') }}" class="mb-3 inline-flex items-center gap-2 text-sm font-bold text-brand-start"><i class="ph ph-arrow-left" aria-hidden="true"></i>Về danh sách đơn</a>
             <h1 class="text-3xl font-extrabold app-heading">{{ $booking->booking_code }}</h1>
-            <p class="mt-2 app-muted">Thông tin vận hành lấy trực tiếp từ booking, giao dịch, vé điện tử và dữ liệu suất chiếu.</p>
+            <p class="mt-2 app-muted">Thông tin vận hành lấy trực tiếp từ đơn đặt vé, giao dịch, tài liệu nhận vé và dữ liệu suất chiếu.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             @can('tickets.print')
@@ -169,7 +169,7 @@
 
     <div class="grid gap-6 xl:grid-cols-2">
         <section class="cinema-card p-6">
-            <h2 class="text-xl font-extrabold app-heading">Vé điện tử</h2>
+            <h2 class="text-xl font-extrabold app-heading">Tài liệu nhận vé</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Người nhận</dt><dd class="font-bold app-text">{{ $customer['email'] }}</dd></div>
                 <div><dt class="text-sm app-muted">Trạng thái gửi email</dt><dd class="font-bold app-text">{{ match($booking->ticketDelivery?->status) { 'sent' => 'Đã gửi', 'pending' => 'Đang chờ gửi', 'processing' => 'Đang gửi', 'failed' => 'Gửi lỗi', default => $booking->recipient_email ? 'Chưa có yêu cầu gửi' : 'Không có email' } }}</dd></div>
@@ -180,8 +180,8 @@
             </dl>
             @can('ticket_deliveries.retry')
                 @if($deliveryRetryAllowed)
-                    <form method="POST" action="{{ route('admin.bookings.ticket-email.resend', $booking) }}" class="mt-5" onsubmit="return confirm('Gửi lại vé tới email đã lưu của đơn này?');">@csrf
-                        <button class="btn-primary" type="submit"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Gửi lại vé</button>
+                    <form method="POST" action="{{ route('admin.bookings.ticket-email.resend', $booking) }}" class="mt-5" onsubmit="return confirm('Gửi lại tài liệu nhận vé tới email đã lưu của đơn này?');">@csrf
+                        <button class="btn-primary" type="submit"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Gửi lại tài liệu nhận vé</button>
                     </form>
                 @endif
             @endcan
@@ -193,7 +193,7 @@
         <section class="cinema-card overflow-hidden">
             <div class="border-b app-border p-6"><h2 class="text-xl font-extrabold app-heading">Lịch sử hoạt động</h2></div>
             <div class="overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Mã yêu cầu</th></tr></thead><tbody>
-                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', 'ticket.reprint_requested' => 'Ghi nhận lý do in lại', 'ticket.print_started' => 'Bắt đầu in vé cứng', 'ticket.print_succeeded' => 'Xác nhận in thành công', 'ticket.print_failed' => 'Ghi nhận in lỗi', 'ticket.print_retry_authorized' => 'Lịch sử cấp quyền in cũ', 'ticket.print_stale_released' => 'Giải phóng lần in hết hạn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
+                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại tài liệu nhận vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', 'ticket.reprint_requested' => 'Ghi nhận lý do in lại', 'ticket.print_started' => 'Bắt đầu in vé cứng', 'ticket.print_succeeded' => 'Xác nhận in thành công', 'ticket.print_failed' => 'Ghi nhận in lỗi', 'ticket.print_retry_authorized' => 'Lịch sử cấp quyền in cũ', 'ticket.print_stale_released' => 'Giải phóng lần in hết hạn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
                 @empty<tr><td colspan="4" class="py-8 text-center app-muted">Chưa có hoạt động quản trị liên quan.</td></tr>@endforelse
             </tbody></table></div>
         </section>

@@ -117,7 +117,7 @@ class AdminNavigationFoundationTest extends TestCase
         $this->assertStringNotContainsString('paymentReconciliationBadge', $provider);
         $this->assertStringNotContainsString('badgeLabel()', $provider);
         $this->assertStringNotContainsString('admin.ticket-deliveries.index', $managerNavigation);
-        $this->assertStringNotContainsString('Gửi vé điện tử', $managerNavigation);
+        $this->assertStringNotContainsString('Gửi tài liệu nhận vé', $managerNavigation);
         $this->assertStringNotContainsString('admin.ticket-checkins.index', $managerNavigation);
         $this->assertStringContainsString('admin.reports.index', $managerNavigation);
         foreach (['Tổng quan', 'Nội dung', 'Rạp &amp; lịch chiếu', 'Kinh doanh', 'Dịch vụ', 'Hệ thống'] as $group) {

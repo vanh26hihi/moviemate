@@ -53,7 +53,7 @@ class PrintableTicketTest extends PaymentTestCase
             $booking->forceFill($state)->save();
             $this->actingAs($owner)->get(route('user.bookings.ticket', $booking))
                 ->assertOk()
-                ->assertSee('Đơn chưa đủ điều kiện phát hành QR nhận vé.')
+                ->assertSee('Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.')
                 ->assertDontSee('data-qr-value', false);
         }
     }

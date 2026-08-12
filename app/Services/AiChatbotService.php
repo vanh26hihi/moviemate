@@ -187,7 +187,7 @@ class AiChatbotService
         $normalized = Str::lower($message);
 
         if ($this->containsAny($normalized, ['đặt vé', 'dat ve', 'booking', 'chọn ghế', 'chon ghe', 'thanh toán', 'thanh toan'])) {
-            return "Cách đặt vé trên MovieMate:\n1. Vào trang Phim và chọn phim muốn xem.\n2. Mở phần Lịch chiếu, chọn suất chiếu còn hiệu lực.\n3. Chọn ghế, kiểm tra tổng tiền rồi xác nhận thanh toán.\n4. Sau khi đặt thành công, vé sẽ nằm trong mục Vé của tôi.";
+            return "Cách đặt vé trên MovieMate:\n1. Vào trang Phim và chọn phim muốn xem.\n2. Mở phần Lịch chiếu, chọn suất chiếu còn hiệu lực.\n3. Chọn ghế, kiểm tra tổng tiền rồi xác nhận thanh toán.\n4. Sau khi đặt thành công, đơn sẽ nằm trong mục Đơn đặt vé của tôi.";
         }
 
         if ($this->containsAny($normalized, ['rạp', 'rap', 'cinema', 'địa chỉ', 'dia chi', 'ở đâu', 'o dau'])) {

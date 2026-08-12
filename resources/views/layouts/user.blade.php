@@ -31,7 +31,7 @@
                     <a href="{{ route('user.ai.recommend') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.ai.*')]) @if(request()->routeIs('user.ai.*')) aria-current="page" @endif>
                         <i class="ph-fill ph-sparkle text-ai-start"></i> AI Gợi ý
                     </a>
-                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Vé của tôi</a>
+                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Đơn đặt vé của tôi</a>
                 </nav>
 
                 <details id="customer-cinema-selector" class="relative ml-auto md:ml-0">
@@ -97,7 +97,7 @@
                 <a href="{{ route('user.ai.recommend') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-ai-start hover:bg-ai-start/10 transition-colors">
                     <i class="ph-fill ph-sparkle"></i> AI Gợi ý
                 </a>
-                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')])>Vé của tôi</a>
+                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')])>Đơn đặt vé của tôi</a>
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
                         <a href="{{ route('user.profile') }}" class="user-mobile-link"><i class="ph ph-user mr-2"></i>Hồ sơ</a>
@@ -139,12 +139,12 @@
 
                 <div>
                     <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Hỗ trợ</h3>
-                    <ul class="space-y-2.5"><li><a href="{{ route('user.ai.recommend') }}" class="app-muted hover:text-ai-start transition-colors text-sm">AI gợi ý phim</a></li><li><a href="{{ route('user.bookings.history') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Vé của tôi</a></li><li><a href="{{ route('user.profile') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Tài khoản</a></li></ul>
+                    <ul class="space-y-2.5"><li><a href="{{ route('user.ai.recommend') }}" class="app-muted hover:text-ai-start transition-colors text-sm">AI gợi ý phim</a></li><li><a href="{{ route('user.bookings.history') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Đơn đặt vé của tôi</a></li><li><a href="{{ route('user.profile') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Tài khoản</a></li></ul>
                 </div>
 
                 <div>
                     <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Trải nghiệm</h3>
-                    <p class="app-muted text-sm mb-4">Tìm phim, chọn suất chiếu, đặt ghế và nhận vé điện tử trong một luồng thống nhất.</p>
+                    <p class="app-muted text-sm mb-4">Tìm phim, chọn suất chiếu, đặt ghế và nhận vé tại quầy trong một luồng thống nhất.</p>
                     <a href="{{ route('user.movies.index', ['status' => 'now_showing']) }}" class="btn-primary text-sm"><i class="ph-fill ph-ticket"></i>Đặt vé ngay</a>
                 </div>
             </div>
