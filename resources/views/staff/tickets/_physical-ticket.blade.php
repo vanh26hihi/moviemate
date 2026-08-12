@@ -2,7 +2,7 @@
     $cinema = $booking->showtime?->cinema;
     $movie = $booking->showtime?->movie;
     $showtime = $booking->showtime;
-    $seatType = $ticket->bookingSeat?->seat_type_snapshot ?: $ticket->bookingSeat?->seat?->type;
+    $seatType = $ticket->bookingSeat?->seat?->type ?: $ticket->bookingSeat?->seat_type_snapshot;
     $seatTypeLabel = \App\Support\StatusLabel::for('seat_type', (string) $seatType);
     $printTimestamp = $printedAt ?? now($cinema?->timezone ?: config('app.timezone'));
 @endphp
