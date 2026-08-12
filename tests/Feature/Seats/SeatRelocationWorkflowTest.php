@@ -15,6 +15,7 @@ use App\Models\RoomLayout;
 use App\Models\RoomLayoutCell;
 use App\Models\Seat;
 use App\Models\SeatIncident;
+use App\Models\SeatIncidentImpact;
 use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
 use App\Models\UserCinemaAssignment;
@@ -22,6 +23,7 @@ use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
 use App\Services\Seats\SeatRelocationCandidateService;
+use App\Services\Tickets\BookingQrPayload;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -86,6 +88,12 @@ final class SeatRelocationWorkflowTest extends TestCase
             && $mail->relocations[0]['original'] === 'A1'
             && $mail->relocations[0]['replacement'] === 'A2'
         );
+        $mailHtml = Mail::sent(SeatRelocationMail::class)->first()->render();
+        $this->assertStringContainsString($scenario['booking']->booking_code, $mailHtml);
+        $this->assertStringContainsString('Relocation Movie', $mailHtml);
+        $this->assertStringContainsString('A1', $mailHtml);
+        $this->assertStringContainsString('A2', $mailHtml);
+        $this->assertStringContainsString('không phải thanh toán thêm', $mailHtml);
     }
 
     public function test_upgrade_is_allowed_only_after_equivalents_are_exhausted_and_never_reprices(): void
@@ -129,6 +137,11 @@ final class SeatRelocationWorkflowTest extends TestCase
         $this->assertDatabaseCount('seat_incident_resolutions', 0);
 
         $scenario['booking']->forceFill(['booking_status' => 'paid', 'payment_status' => 'paid'])->save();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['A2']->id,
+        ])->assertSessionHasErrors('impact');
+        $this->assertDatabaseCount('seat_incident_resolutions', 0);
+
         $scenario['payment']->forceFill(['status' => 'success', 'verified_at' => now(), 'paid_at' => now()])->save();
         $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
             'replacement_seat_id' => $scenario['seats']['A2']->id,
@@ -374,12 +387,67 @@ final class SeatRelocationWorkflowTest extends TestCase
         $this->assertDatabaseMissing('booking_ticket_print_events', ['event_type' => 'reprint_requested']);
     }
 
+    public function test_upgrade_replacement_ticket_keeps_promotion_allocated_paid_amount(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario();
+        $scenario['booking']->forceFill(['promotion_discount_amount' => 10000, 'total_amount' => 40000])->save();
+        $scenario['payment']->forceFill(['amount' => 40000])->save();
+        $ticket = $scenario['bookingSeat']->admissionTicket;
+        $this->markPrinted($ticket);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->firstOrFail();
+        Seat::query()->whereIn('id', [$scenario['seats']['A2']->id, $scenario['seats']['A3']->id])->update(['status' => 'maintenance']);
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['B1']->id,
+        ])->assertSessionHas('success');
+        $resolution = SeatIncidentResolution::query()->firstOrFail();
+
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.admission-tickets.print.incident-reprint', [$ticket, $resolution]));
+        $this->get(route('staff.admission-tickets.print.show', $ticket))
+            ->assertOk()->assertSee('B1')->assertSee('Ghế VIP')->assertSee('40.000 VNĐ')->assertDontSee('70.000 VNĐ');
+        $this->assertSame(40000, (int) $scenario['booking']->fresh()->total_amount);
+        $this->assertSame(40000, (int) $scenario['payment']->fresh()->amount);
+        $this->assertSame(50000, (int) $scenario['bookingSeat']->fresh()->price);
+    }
+
+    public function test_couple_relocation_waits_only_for_members_whose_paper_was_printed(): void
+    {
+        Mail::fake();
+        $scenario = $this->scenario('C1');
+        $second = $this->bookingSeat($scenario['booking'], $scenario['seats']['C2'], 50000, 'couple:C', 100000);
+        $scenario['booking']->forceFill(['seat_subtotal' => 100000, 'gross_amount' => 100000, 'total_amount' => 100000])->save();
+        $scenario['payment']->forceFill(['amount' => 100000])->save();
+        $printedTicket = $scenario['bookingSeat']->admissionTicket;
+        $this->markPrinted($printedTicket);
+        $incident = $this->incident($scenario);
+        $impact = $incident->impacts()->oldest('id')->firstOrFail();
+        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
+            'replacement_seat_id' => $scenario['seats']['D1']->id,
+        ])->assertSessionHas('success');
+
+        $this->assertSame(1, SeatIncidentResolution::query()->where('reprint_required', true)->count());
+        $this->assertSame(1, SeatIncidentResolution::query()->where('reprint_required', false)->count());
+        $this->assertSame(1, SeatIncidentImpact::query()->where('resolution_status', 'unresolved')->count());
+        $this->assertSame(1, SeatIncidentImpact::query()->where('resolution_status', 'resolved')->count());
+        $this->assertSame(0, $second->admissionTicket->fresh()->print_count);
+        $this->assertSame('open', $incident->fresh()->status);
+
+        $resolution = SeatIncidentResolution::query()->where('reprint_required', true)->firstOrFail();
+        $staff = $this->userWithRole('staff');
+        $this->actingAs($staff)->post(route('staff.admission-tickets.print.incident-reprint', [$printedTicket, $resolution]));
+        $this->post(route('staff.admission-tickets.print.succeed', $printedTicket));
+        $this->assertSame('resolved', $incident->fresh()->status);
+    }
+
     public function test_customer_sees_current_seat_history_and_one_unchanged_booking_qr(): void
     {
         Mail::fake();
         $scenario = $this->scenario();
         $owner = $this->userWithRole('user');
         $scenario['booking']->forceFill(['user_id' => $owner->id])->save();
+        $qrBefore = app(BookingQrPayload::class)->value($scenario['booking']);
         $incident = $this->incident($scenario);
         $impact = $incident->impacts()->firstOrFail();
         $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
@@ -390,6 +458,7 @@ final class SeatRelocationWorkflowTest extends TestCase
             ->assertOk()->assertSee('Ghế A1 đã được đổi sang')->assertSee('A2')->assertSee('Bạn không phải thanh toán thêm.')
             ->getContent();
         $this->assertSame(1, substr_count($html, 'QR ĐƠN ĐẶT VÉ'));
+        $this->assertSame($qrBefore, app(BookingQrPayload::class)->value($scenario['booking']->fresh()));
         $this->assertSame($scenario['seats']['A2']->id, $scenario['bookingSeat']->fresh()->seat_id);
     }
 
