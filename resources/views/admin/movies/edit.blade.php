@@ -124,6 +124,8 @@
                 </select>
                 <p class="admin-help">Giữ Ctrl (Windows) hoặc Cmd (Mac) để chọn nhiều thể loại.</p>
             </div>
+
+            @include('admin.movies._presentation-formats')
         </div>
     </div>
 

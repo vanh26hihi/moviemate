@@ -4,6 +4,7 @@ namespace Tests\Feature\Operations;
 
 use App\Models\Cinema;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayoutTemplate;
 use App\Models\RoomType;
@@ -201,6 +202,9 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
     public function test_movie_lifecycle_is_authoritative_terminal_and_non_destructive(): void
     {
         $movie = Movie::query()->create(['title' => 'Lifecycle', 'slug' => 'lifecycle', 'duration' => 90, 'status' => Movie::STATUS_DRAFT]);
+        $movie->supportedPresentationFormats()->attach(PresentationFormat::query()->create([
+            'code' => '2D', 'name' => '2D', 'is_active' => true, 'sort_order' => 10,
+        ]));
         $service = app(MovieLifecycleService::class);
         $service->transition($movie, Movie::STATUS_COMING_SOON, $this->admin);
         $service->transition($movie->fresh(), Movie::STATUS_NOW_SHOWING, $this->admin);

@@ -50,6 +50,8 @@
     </div>
 </div>
 
+@include('admin.rooms._presentation-capabilities')
+
 <div class="rounded-2xl border border-info/20 bg-info/5 p-4 text-sm app-muted">
     <p class="font-bold app-text">{{ __('rooms.fields.layout') }} và sức chứa</p>
     <p class="mt-1">Sức chứa được tính tự động từ sơ đồ ghế đã phát hành. Dữ liệu gửi từ trình duyệt không thể thay đổi tổng số ghế.</p>

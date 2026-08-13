@@ -34,6 +34,12 @@ class MovieLifecycleService
             if (! in_array($status, self::TRANSITIONS[$locked->status] ?? [], true)) {
                 throw ValidationException::withMessages(['status' => 'Trạng thái phim vừa thay đổi. Hãy tải lại trang.']);
             }
+            if (in_array($status, Movie::SCHEDULABLE_STATUSES, true)
+                && ! $locked->supportedPresentationFormats()->active()->exists()) {
+                throw ValidationException::withMessages([
+                    'status' => 'Phim phải hỗ trợ ít nhất một định dạng đang sử dụng trước khi chuyển sang trạng thái có thể xếp lịch.',
+                ]);
+            }
             $before = $locked->status;
             $locked->update(['status' => $status]);
             $this->activityLogger->log(
