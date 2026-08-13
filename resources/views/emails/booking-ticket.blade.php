@@ -45,6 +45,7 @@
                     'Rạp' => $booking->cinema_label,
                     'Địa chỉ' => $booking->showtime?->cinema?->address,
                     'Phòng' => $booking->room_label,
+                    'Định dạng' => $booking->showtime?->presentationFormat?->name ?? 'Không xác định',
                     'Suất chiếu' => $booking->showtime_label,
                     'Ghế' => $booking->seat_codes,
                     'Thanh toán' => $provider.' · '.($verifiedPayment?->provider === 'counter_cash' ? 'Đã thu tại quầy' : 'Đã xác minh'),

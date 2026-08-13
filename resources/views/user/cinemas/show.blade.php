@@ -6,7 +6,7 @@
 <section class="cinema-surface py-10 md:py-14">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <a href="{{ route('cinemas.index') }}" class="text-sm font-bold text-brand-start"><i class="ph ph-arrow-left" aria-hidden="true"></i> Tất cả rạp</a>
-        <div class="mt-5 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"><div><p class="text-sm font-extrabold uppercase tracking-wider text-brand-start">{{ $cinema->district }}, {{ $cinema->city }}</p><h1 class="hero-title mt-2 text-4xl font-extrabold app-text md:text-5xl">Lịch chiếu tại {{ $cinema->name }}</h1><p class="mt-3 app-muted">{{ $cinema->address }}@if($cinema->phone) · {{ $cinema->phone }}@endif</p><p class="mt-2 text-sm app-muted">Định dạng: {{ $formats->join(', ') ?: 'Đang cập nhật' }}</p></div>
+        <div class="mt-5 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"><div><p class="text-sm font-extrabold uppercase tracking-wider text-brand-start">{{ $cinema->district }}, {{ $cinema->city }}</p><h1 class="hero-title mt-2 text-4xl font-extrabold app-text md:text-5xl">Lịch chiếu tại {{ $cinema->name }}</h1><p class="mt-3 app-muted">{{ $cinema->address }}@if($cinema->phone) · {{ $cinema->phone }}@endif</p></div>
             @unless($preferredCinema?->is($cinema))<form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="{{ $cinema->code }}"><button class="btn-secondary" type="submit"><i class="ph ph-push-pin" aria-hidden="true"></i>Chọn làm rạp ưu tiên</button></form>@endunless
         </div>
     </div>

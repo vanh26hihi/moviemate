@@ -24,6 +24,7 @@ class BookingTicketMail extends Mailable
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
+            'showtime.presentationFormat',
             'bookingSeats.seat',
             'admissionTickets.bookingSeat.seat',
             'payments',

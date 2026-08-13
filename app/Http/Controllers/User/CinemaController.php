@@ -70,7 +70,7 @@ final class CinemaController extends Controller
     public function show(Request $request, Cinema $cinema): View
     {
         abort_unless($cinema->status === 'active' && $cinema->archived_at === null, 404);
-        $cinema->load(['operatingHours', 'rooms' => fn ($query) => $query->where('status', 'active')->orderBy('code')]);
+        $cinema->load('operatingHours');
         $date = $this->catalog->date($request->query('date'), $cinema);
         $showtimes = $this->customerCatalog->forDate($date, $cinema);
 
@@ -80,7 +80,6 @@ final class CinemaController extends Controller
             'dates' => $this->catalog->dates($cinema),
             'showtimes' => $showtimes,
             'showtimesByMovie' => $showtimes->groupBy('movie_id'),
-            'formats' => $cinema->rooms->pluck('room_type')->filter()->unique()->sort()->values(),
             'preferredCinema' => $this->context->preference(),
         ]);
     }

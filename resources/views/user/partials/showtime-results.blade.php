@@ -1,4 +1,12 @@
-@php($showtimes = collect($showtimes ?? []))
+@php
+    $showtimes = collect($showtimes ?? []);
+    $availableFormats = $showtimes
+        ->pluck('presentation_format')
+        ->filter()
+        ->unique('code')
+        ->sortBy(fn (array $format): array => [$format['sort_order'], $format['code']])
+        ->values();
+@endphp
 
 @if($showtimes->isEmpty())
     <div class="cinema-card rounded-3xl p-8 text-center" data-showtime-empty>
@@ -7,6 +15,10 @@
         <p class="mt-2 app-muted">Hãy chọn ngày hoặc chi nhánh khác trong lịch đang mở bán.</p>
     </div>
 @elseif($context === 'cinema')
+    <p class="mb-4 text-sm app-muted" data-sellable-presentation-formats>
+        Định dạng suất chiếu:
+        <strong class="app-text">{{ $availableFormats->pluck('name')->join(', ') }}</strong>
+    </p>
     <div class="space-y-5">@foreach($showtimes->groupBy(fn ($item) => $item['movie']->id) as $entries)<x-customer.showtimes.movie-card :entries="$entries" />@endforeach</div>
 @else
     <div class="space-y-6">

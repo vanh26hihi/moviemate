@@ -24,6 +24,7 @@
         <div class="paper-fact"><dt>Ngày</dt><dd>{{ $showtime?->show_date?->format('d/m/Y') }}</dd></div>
         <div class="paper-fact"><dt>Giờ</dt><dd>{{ \Carbon\CarbonImmutable::parse($showtime?->show_time)->format('H:i') }}</dd></div>
         <div class="paper-fact"><dt>Phòng</dt><dd>{{ $showtime?->room?->name }}</dd></div>
+        <div class="paper-fact"><dt>Định dạng</dt><dd>{{ $showtime?->presentationFormat?->name ?? 'Không xác định' }}</dd></div>
     </dl>
     <hr class="paper-rule">
     <div class="paper-seat">

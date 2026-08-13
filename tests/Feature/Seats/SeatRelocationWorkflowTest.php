@@ -421,6 +421,10 @@ final class SeatRelocationWorkflowTest extends TestCase
             ->assertOk()->assertSee('Cần in lại do đổi ghế');
         $this->post(route('staff.admission-tickets.print.incident-reprint', [$ticket, $resolution]))
             ->assertRedirect(route('staff.admission-tickets.print.show', $ticket));
+        $this->get(route('staff.admission-tickets.print.show', $ticket))
+            ->assertOk()
+            ->assertSee('Định dạng')
+            ->assertSee($scenario['booking']->showtime->presentationFormat->name);
         $state = BookingTicketPrint::query()->where('admission_ticket_id', $ticket->id)->firstOrFail();
         $this->assertSame($resolution->id, $state->active_seat_incident_resolution_id);
         $this->assertDatabaseHas('booking_ticket_print_events', [

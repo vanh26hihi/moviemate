@@ -32,6 +32,7 @@ final class BookingHistoryController extends Controller
                 'showtime.movie',
                 'showtime.cinema',
                 'showtime.room',
+                'showtime.presentationFormat',
                 'bookingSeats.seat',
                 'payments',
                 'discountCodeRedemptions',

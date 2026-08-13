@@ -71,12 +71,13 @@ class CustomerCinemaDiscoveryTest extends TestCase
 
     public function test_cinema_detail_is_branch_specific_date_scoped_and_priced_by_r4_service(): void
     {
-        $branch = $this->publicScenario('PUB-DETAIL', 'Detail Cinema', '2030-06-02', ['room_type' => '3D']);
+        $branch = $this->publicScenario('PUB-DETAIL', 'Detail Cinema', '2030-06-02', ['room_type' => 'IMAX']);
         $other = $this->publicScenario('PUB-OTHER', 'Other Branch Movie', '2030-06-02');
 
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-02']))
             ->assertOk()->assertSee('Lịch chiếu tại '.$branch['cinema']->name)
-            ->assertSee($branch['movie']->title)->assertSee('80.000 ₫')->assertSee('3D')
+            ->assertSee($branch['movie']->title)->assertSee('80.000 ₫')
+            ->assertSee('Định dạng: Test 2D')->assertSee('Loại phòng: IMAX')
             ->assertDontSee($other['movie']->title);
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-03']))
             ->assertOk()->assertSee('Chưa có suất chiếu');

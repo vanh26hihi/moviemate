@@ -135,7 +135,12 @@ final class TicketPrintController extends Controller
             return $this->recoverNavigation($ticket);
         }
         $booking = $ticket->booking;
-        $booking->loadMissing(['payments.settledBy:id,name', 'createdByStaff:id,name', 'foodOrder.items']);
+        $booking->loadMissing([
+            'payments.settledBy:id,name',
+            'createdByStaff:id,name',
+            'foodOrder.items',
+            'showtime.presentationFormat',
+        ]);
         $printAmounts = $amounts->allocate($booking);
 
         return response()->view('staff.tickets.print', [

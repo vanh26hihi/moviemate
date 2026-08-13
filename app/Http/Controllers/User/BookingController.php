@@ -46,7 +46,7 @@ class BookingController extends Controller
      */
     public function selectSeat(Request $request, Showtime $showtime)
     {
-        $showtime->load(['movie', 'cinema', 'room', 'roomLayout.cells.seat']);
+        $showtime->load(['movie', 'cinema', 'room', 'presentationFormat', 'roomLayout.cells.seat']);
         $this->assertExpectedCinema($request, $showtime);
 
         if (! $this->isShowtimeAvailable($showtime)) {
@@ -188,6 +188,7 @@ class BookingController extends Controller
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
+            'showtime.presentationFormat',
             'bookingSeats.seat',
             'admissionTickets.bookingSeat.seat',
             'foodOrder.items',
@@ -220,6 +221,7 @@ class BookingController extends Controller
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
+            'showtime.presentationFormat',
             'bookingSeats.seat',
             'admissionTickets.bookingSeat.seat',
             'foodOrder.items',
