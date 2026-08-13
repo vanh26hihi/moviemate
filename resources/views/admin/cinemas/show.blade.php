@@ -4,7 +4,49 @@
 @section('page-title', 'Chi tiết chi nhánh')
 
 @section('content')
-<div class="admin-page-header"><div><p class="text-xs font-bold uppercase tracking-wider text-brand-start">{{ $cinema->code }}</p><h1 class="admin-page-title">{{ $cinema->name }}</h1><p class="admin-page-subtitle">{{ $cinema->address }}</p></div>@can('cinemas.manage')<a href="{{ route('admin.cinemas.edit', $cinema) }}" class="admin-btn-primary">Chỉnh sửa</a>@endcan</div>
+@php($header = $branch360['header'])
+@php($queue = $branch360['actionQueue'])
+<div class="admin-page-header">
+    <div>
+        <p class="text-xs font-bold uppercase tracking-wider text-brand-start">Branch 360 · {{ $header['code'] }}</p>
+        <h1 class="admin-page-title">{{ $header['name'] }}</h1>
+        <p class="admin-page-subtitle">{{ $header['shortAddress'] }}</p>
+        <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm app-muted">
+            <span><span class="font-semibold app-text">Giờ chi nhánh:</span> {{ $header['localTime']->format('H:i, d/m/Y') }}</span>
+            <span><span class="font-semibold app-text">Trạng thái:</span> {{ $header['branchStatus']['label'] }}</span>
+            <span><span class="font-semibold app-text">Hôm nay:</span> {{ $header['operatingHours']['label'] }}@if($header['operatingHours']['detail']) · {{ $header['operatingHours']['detail'] }}@endif</span>
+        </div>
+        <p class="mt-2 text-xs app-muted">Cập nhật lúc {{ $header['generatedAt']->format('H:i:s, d/m/Y') }} · {{ $header['timezone'] }}</p>
+    </div>
+    @can('cinemas.manage')<a href="{{ route('admin.cinemas.edit', $cinema) }}" class="admin-btn-primary">Chỉnh sửa</a>@endcan
+</div>
+
+<section class="app-card mb-6 rounded-2xl border app-border p-6" aria-labelledby="branch-action-queue-title">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 id="branch-action-queue-title" class="text-lg font-bold app-text">Cần xử lý</h2>
+            <p class="mt-1 text-sm app-muted">{{ $queue['total'] }} việc ưu tiên tại chi nhánh</p>
+        </div>
+        @if($queue['remaining'] > 0)<span class="text-sm font-semibold app-muted">Còn {{ $queue['remaining'] }} việc chưa hiển thị</span>@endif
+    </div>
+    @if($queue['total'] === 0)
+        <p class="mt-5 rounded-xl border app-border p-4 app-muted">Hiện không có việc khẩn cấp cần xử lý.</p>
+    @else
+        <div class="mt-5 divide-y app-border">
+            @foreach($queue['items'] as $task)
+                <article class="grid gap-3 py-4 md:grid-cols-[8rem_1fr_auto] md:items-center">
+                    <div>
+                        <div class="text-xs font-bold uppercase tracking-wide text-brand-start">{{ $task['priority'] }}</div>
+                        <div class="mt-1 text-xs app-muted">{{ $task['relevantAt']->format('H:i d/m/Y') }}</div>
+                    </div>
+                    <p class="text-sm font-medium app-text">{{ $task['message'] }}</p>
+                    <a href="{{ $task['actionUrl'] }}" class="admin-btn-secondary">{{ $task['actionLabel'] }}</a>
+                </article>
+            @endforeach
+        </div>
+    @endif
+</section>
+
 <div class="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
     <section class="app-card rounded-2xl border app-border p-6 space-y-4">
         <div class="border-b app-border pb-3"><div class="text-xs uppercase app-muted">Quận / huyện</div><div class="mt-1 font-semibold app-text">{{ $cinema->district ?: '—' }}</div></div>
