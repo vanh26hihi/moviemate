@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Cinema;
 use App\Services\ActivityLogger;
+use App\Services\Admin\Branch360ReadModel;
 use App\Services\CinemaAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ final class CinemaController extends Controller
     public function __construct(
         private readonly CinemaAccessService $access,
         private readonly ActivityLogger $activity,
+        private readonly Branch360ReadModel $branch360,
     ) {}
 
     public function index(Request $request): View
@@ -50,8 +52,10 @@ final class CinemaController extends Controller
         return redirect()->route('admin.cinemas.show', $cinema)->with('success', 'Đã tạo chi nhánh.');
     }
 
-    public function show(Cinema $cinema): View
+    public function show(Request $request, Cinema $cinema): View
     {
+        $branch360 = $this->branch360->snapshot($cinema, $request->user());
+
         $cinema->load([
             'rooms' => fn ($query) => $query->withCount('showtimes')->orderBy('code'),
             'activeAssignments.user.role',
@@ -64,7 +68,7 @@ final class CinemaController extends Controller
             'bookings',
         ]);
 
-        return view('admin.cinemas.show', compact('cinema'));
+        return view('admin.cinemas.show', compact('cinema', 'branch360'));
     }
 
     public function edit(Cinema $cinema): View
@@ -90,7 +94,7 @@ final class CinemaController extends Controller
     {
         $cinema = $this->access->currentCinema($request->user());
 
-        return $cinema ? $this->show($cinema) : $this->index($request);
+        return $cinema ? $this->show($request, $cinema) : $this->index($request);
     }
 
     public function legacyUpdate(Request $request): RedirectResponse
