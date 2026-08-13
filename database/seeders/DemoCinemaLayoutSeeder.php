@@ -31,7 +31,7 @@ final class DemoCinemaLayoutSeeder extends Seeder
             }
             $isDefenseRoom = app()->environment(['local', 'testing']) && $room->code === 'DEMO';
             $rows = $isDefenseRoom ? 4 : 3;
-            $columns = $isDefenseRoom ? 8 : 4;
+            $columns = $isDefenseRoom ? 9 : 4;
             $draft = $layouts->createBlankDraft($room, rows: $rows, columns: $columns);
             $cells = [];
             foreach (range(1, $rows) as $row) {
@@ -42,12 +42,12 @@ final class DemoCinemaLayoutSeeder extends Seeder
 
                         continue;
                     }
-                    if ($isDefenseRoom && $row === 2 && $column === 7) {
+                    if ($isDefenseRoom && $row === 2 && $column === 9) {
                         $cells[] = ['kind' => 'blocked', 'x' => $column, 'y' => $row];
 
                         continue;
                     }
-                    if ($isDefenseRoom && $row === 2 && $column === 8) {
+                    if ($isDefenseRoom && $column === 9) {
                         continue;
                     }
                     $isCouple = $isDefenseRoom && $row === 3 && in_array($column, [1, 2], true);

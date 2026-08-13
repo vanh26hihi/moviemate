@@ -48,7 +48,29 @@ final class DemoReadinessTest extends TestCase
         $room = Room::query()->where('code', 'DEMO')->firstOrFail();
         $layout = $room->latestPublishedLayout()->firstOrFail();
         $this->assertSame(4, $layout->rows);
-        $this->assertSame(8, $layout->columns);
+        $this->assertSame(9, $layout->columns);
+        $this->assertSame([6_500, 9_000, 58_500_000, '58,50'], [
+            $room->width_mm,
+            $room->length_mm,
+            $room->areaMm2(),
+            $room->formattedAreaM2(),
+        ]);
+        $this->assertSame(28, $layout->cells()->where('cell_type', 'seat')->count());
+        $this->assertSame(27, $room->seats()->where('status', 'active')->count());
+        $this->assertSame(27, $room->seats()->where('type', '!=', 'couple')->count()
+            + $room->seats()->where('type', 'couple')->distinct()->count('pair_code'));
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $layout->id,
+            'x_position' => 9,
+            'y_position' => 2,
+            'cell_type' => 'blocked',
+            'seat_id' => null,
+        ]);
+        $this->assertDatabaseMissing('room_layout_cells', [
+            'room_layout_id' => $layout->id,
+            'x_position' => 9,
+            'y_position' => 3,
+        ]);
         $defenseSeats = $room->seats()->whereIn('seat_code', ['D6', 'D7', 'D8'])
             ->orderBy('x_position')->get();
         $this->assertSame(['D6', 'D7', 'D8'], $defenseSeats->pluck('seat_code')->all());
@@ -65,8 +87,14 @@ final class DemoReadinessTest extends TestCase
         $this->assertTrue($policy->violates($layout, [], [$defenseSeats[0]->id, $defenseSeats[2]->id], $cells));
         $this->assertFalse($policy->violates($layout, [], $defenseSeats->pluck('id'), $cells));
 
-        $showtime = Showtime::query()->where('room_id', $room->id)->where('status', 'active')
-            ->where('show_date', '>=', now($room->cinema->timezone)->toDateString())->firstOrFail();
+        $demoShowtimes = Showtime::query()->where('room_id', $room->id)->with('roomLayout')->get();
+        $this->assertNotEmpty($demoShowtimes);
+        $this->assertTrue($demoShowtimes->every(fn (Showtime $showtime) => $showtime->room_layout_id === $layout->id));
+        $this->assertTrue($demoShowtimes->every(fn (Showtime $showtime) => $showtime->roomLayout?->room_id === $room->id));
+
+        $showtime = $demoShowtimes->first(fn (Showtime $showtime) => $showtime->status === 'active'
+            && $showtime->show_date->toDateString() >= now($room->cinema->timezone)->toDateString());
+        $this->assertNotNull($showtime);
         $this->assertSame($layout->id, $showtime->room_layout_id);
         $this->assertTrue(app(PublicShowtimeCatalog::class)->isSellable($showtime));
 

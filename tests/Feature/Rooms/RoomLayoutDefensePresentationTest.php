@@ -128,7 +128,7 @@ final class RoomLayoutDefensePresentationTest extends TestCase
             ->assertDontSee('length_mm');
     }
 
-    public function test_dedicated_demo_layout_is_coherent_without_replacing_a_seat_with_blocked(): void
+    public function test_dedicated_demo_layout_preserves_physical_capacity_while_showing_structural_cells(): void
     {
         $room = Room::factory()->create([
             'code' => 'DEMO',
@@ -142,27 +142,60 @@ final class RoomLayoutDefensePresentationTest extends TestCase
 
         $layout = $room->fresh()->latestPublishedLayout;
         $this->assertNotNull($layout);
-        $this->assertSame([1, 4, 8, 'published'], [$layout->version, $layout->rows, $layout->columns, $layout->status]);
-        $this->assertSame([6_500, 9_000], [$room->fresh()->width_mm, $room->fresh()->length_mm]);
-        $this->assertSame(26, $layout->cells()->where('cell_type', RoomLayoutCell::TYPE_SEAT)->count());
+        $room->refresh();
+        $this->assertSame([1, 4, 9, 'published'], [$layout->version, $layout->rows, $layout->columns, $layout->status]);
+        $this->assertSame([6_500, 9_000, 58_500_000, '58,50'], [
+            $room->width_mm,
+            $room->length_mm,
+            $room->areaMm2(),
+            $room->formattedAreaM2(),
+        ]);
+        $this->assertSame(28, $layout->cells()->where('cell_type', RoomLayoutCell::TYPE_SEAT)->count());
         $this->assertSame(4, $layout->cells()->where('cell_type', RoomLayoutCell::TYPE_AISLE)->count());
+        foreach (range(1, 4) as $row) {
+            $this->assertDatabaseHas('room_layout_cells', [
+                'room_layout_id' => $layout->id,
+                'x_position' => 5,
+                'y_position' => $row,
+                'cell_type' => RoomLayoutCell::TYPE_AISLE,
+                'seat_id' => null,
+            ]);
+        }
         $this->assertDatabaseHas('room_layout_cells', [
             'room_layout_id' => $layout->id,
-            'x_position' => 7,
+            'x_position' => 9,
             'y_position' => 2,
             'cell_type' => RoomLayoutCell::TYPE_BLOCKED,
             'seat_id' => null,
         ]);
         $this->assertDatabaseMissing('room_layout_cells', [
             'room_layout_id' => $layout->id,
-            'x_position' => 8,
-            'y_position' => 2,
+            'x_position' => 9,
+            'y_position' => 3,
         ]);
-        $this->assertSame(2, Seat::query()->where('room_id', $room->id)->where('type', 'couple')->count());
+        $expectedOriginalSeats = collect(range(1, 4))->flatMap(fn (int $row) => collect(range(1, 8))
+            ->reject(fn (int $column) => $column === 5)
+            ->map(fn (int $column) => chr(64 + $row).$column))
+            ->sort()->values()->all();
+        $this->assertSame($expectedOriginalSeats, $room->seats()->orderBy('seat_code')->pluck('seat_code')->sort()->values()->all());
+
+        $couple = $room->seats()->where('pair_code', 'DEMO-C-PAIR-1')->orderBy('seat_code')->get();
+        $this->assertSame(['C1', 'C2'], $couple->pluck('seat_code')->all());
+        $this->assertSame(['left', 'right'], $couple->pluck('pair_position')->all());
+        $this->assertSame(2, $couple->count());
         $this->assertSame(1, Seat::query()->where('room_id', $room->id)->where('type', 'vip')->count());
-        $this->assertSame(1, Seat::query()->where('room_id', $room->id)->where('status', 'maintenance')->count());
-        $this->assertSame(25, Seat::query()->where('room_id', $room->id)->where('type', '!=', 'couple')->count()
+        $maintenance = $room->seats()->where('status', 'maintenance')->sole();
+        $this->assertSame('D8', $maintenance->seat_code);
+        $this->assertSame(28, $room->seats()->count());
+        $this->assertSame(27, $room->seats()->where('status', 'active')->count());
+        $this->assertSame(27, Seat::query()->where('room_id', $room->id)->where('type', '!=', 'couple')->count()
             + Seat::query()->where('room_id', $room->id)->where('type', 'couple')->distinct()->count('pair_code'));
+
+        $admin = $this->userWithRole('admin');
+        $this->actingAs($admin)->get(route('admin.rooms.layout.preview', ['room' => $room, 'version' => 1]))
+            ->assertOk()
+            ->assertSee('Lưới logic: 4 hàng × 9 cột')
+            ->assertSee('Sức chứa vật lý: 28 vị trí');
     }
 
     private function publishedLayout(Room $room): RoomLayout
