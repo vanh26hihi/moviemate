@@ -16,6 +16,7 @@ class Showtime extends Model
         'cinema_id',
         'room_id',
         'room_layout_id',
+        'presentation_format_id',
         'show_date',
         'show_time',
         'price',

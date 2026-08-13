@@ -154,8 +154,12 @@ class SingleCinemaOperationsTest extends TestCase
         $legacy = Cinema::factory()->legacy()->create();
         $legacyRoom = Room::factory()->create(['cinema_id' => $legacy->id, 'code' => 'LEG-01']);
         $movie = Movie::query()->create(['title' => 'Test Movie', 'slug' => 'test-movie', 'status' => Movie::STATUS_NOW_SHOWING]);
+        $format = PresentationFormat::query()->create([
+            'code' => 'SHOWTIME_2D', 'name' => 'Showtime 2D', 'is_active' => true, 'sort_order' => 10,
+        ]);
         $payload = [
             'movie_id' => $movie->id,
+            'presentation_format_id' => $format->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00',
             'price' => 80000,

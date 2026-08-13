@@ -17,6 +17,8 @@ use PDOException;
 
 class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();

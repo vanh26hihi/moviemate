@@ -11,6 +11,7 @@ use App\Exceptions\ShowtimeScheduleException;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Showtime;
@@ -36,6 +37,7 @@ class ShowtimeScheduleService
         'show_time',
         'room_id',
         'room_layout_id',
+        'presentation_format_id',
     ];
 
     private readonly TicketPricingService $pricing;
@@ -145,17 +147,30 @@ class ShowtimeScheduleService
         ?Showtime $existingShowtime = null,
         ?CarbonImmutable $authoritativeNow = null,
         ?RoomLayout $authoritativeLayout = null,
+        ?int $presentationFormatId = null,
+        bool $requirePresentationFormat = false,
+        ?PresentationFormat $authoritativePresentationFormat = null,
     ): ShowtimeScheduleValidationResult {
         $timezone = null;
         $window = null;
         $layout = null;
+        $presentationFormat = null;
         $isFuture = null;
         $isWithinOperatingHours = null;
         $isConflictFree = null;
 
         try {
+            $presentationFormat = $this->resolvePresentationFormat(
+                $presentationFormatId,
+                $requirePresentationFormat,
+                $authoritativePresentationFormat,
+            );
             $this->assertRoomIsOperational($room);
             $this->assertMovieIsSchedulable($movie);
+            if ($presentationFormat) {
+                $this->assertMovieSupportsFormat($movie, $presentationFormat);
+                $this->assertRoomSupportsFormat($room, $presentationFormat);
+            }
             $timezone = $this->timezone($room);
             $window = $this->window($movie, $showDate, $showTime, $room);
             $this->assertFutureStart($window, $authoritativeNow);
@@ -166,7 +181,7 @@ class ShowtimeScheduleService
             $this->assertNoConflict($room, $window, 'active', $existingShowtime?->id);
             $isConflictFree = true;
 
-            return ShowtimeScheduleValidationResult::valid($timezone, $window, $layout);
+            return ShowtimeScheduleValidationResult::valid($timezone, $window, $layout, $presentationFormat);
         } catch (ShowtimeScheduleException $exception) {
             if ($exception->failureCode === 'PAST_START') {
                 $isFuture = false;
@@ -181,6 +196,7 @@ class ShowtimeScheduleService
                 $timezone,
                 $window,
                 $layout,
+                $presentationFormat,
                 $isFuture,
                 $isWithinOperatingHours,
                 $isConflictFree,
@@ -257,12 +273,16 @@ class ShowtimeScheduleService
         return DB::transaction(function () use ($data, $afterPersist): Showtime {
             $this->assertNormalMutationStatus($data);
             $room = $this->lockAndValidateRoom((int) $data['room_id']);
-            $movie = $this->resolveSchedulableMovie((int) $data['movie_id']);
+            $movie = $this->resolveSchedulableMovie((int) $data['movie_id'], true);
+            $presentationFormat = $this->lockPresentationFormat($data['presentation_format_id'] ?? null);
             $candidate = $this->validateCandidate(
                 $movie,
                 $room,
                 $data['show_date'],
                 $data['show_time'],
+                presentationFormatId: isset($data['presentation_format_id']) ? (int) $data['presentation_format_id'] : null,
+                requirePresentationFormat: true,
+                authoritativePresentationFormat: $presentationFormat,
             )->requireValid();
 
             $showtime = Showtime::query()->create($this->persistenceData(
@@ -270,6 +290,7 @@ class ShowtimeScheduleService
                 $room,
                 $candidate->layout,
                 $candidate->window,
+                $candidate->presentationFormat,
             ));
             $afterPersist?->__invoke($showtime);
 
@@ -287,8 +308,33 @@ class ShowtimeScheduleService
                 throw new ShowtimeScheduleException('Phòng chiếu không tồn tại.', 'room_id');
             }
 
+            $movieIds = collect([(int) $showtime->movie_id, (int) $data['movie_id']])->unique()->sort()->values();
+            $lockedMovies = Movie::query()->whereIn('id', $movieIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            if ($lockedMovies->count() !== $movieIds->count()) {
+                throw new ShowtimeScheduleException('Phim đã chọn không tồn tại.', 'movie_id', 'MOVIE_UNAVAILABLE');
+            }
+
+            $targetFormatId = isset($data['presentation_format_id']) ? (int) $data['presentation_format_id'] : null;
+            $formatIds = collect([$showtime->presentation_format_id, $targetFormatId])
+                ->filter(fn ($id): bool => $id !== null)
+                ->map(fn ($id): int => (int) $id)
+                ->unique()->sort()->values();
+            $lockedFormats = PresentationFormat::query()->whereIn('id', $formatIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            if ($lockedFormats->count() !== $formatIds->count()) {
+                throw new ShowtimeScheduleException(
+                    'Định dạng trình chiếu đã chọn hiện không còn hoạt động.',
+                    'presentation_format_id',
+                    'PRESENTATION_FORMAT_INACTIVE',
+                );
+            }
+
             $lockedShowtime = Showtime::query()->whereKey($showtime->id)->lockForUpdate()->firstOrFail();
-            if (! $lockedRooms->has((int) $lockedShowtime->room_id)) {
+            $sourceFormatWasLocked = $lockedShowtime->presentation_format_id === null
+                ? $showtime->presentation_format_id === null
+                : $lockedFormats->has((int) $lockedShowtime->presentation_format_id);
+            if (! $lockedRooms->has((int) $lockedShowtime->room_id)
+                || ! $lockedMovies->has((int) $lockedShowtime->movie_id)
+                || ! $sourceFormatWasLocked) {
                 throw new ShowtimeScheduleException(
                     'Suất chiếu vừa được thay đổi. Vui lòng tải lại trước khi cập nhật.',
                     'showtime',
@@ -298,16 +344,20 @@ class ShowtimeScheduleService
 
             $this->assertSourceCanBeRescheduled($lockedShowtime);
             $targetRoom = $lockedRooms->get((int) $data['room_id']);
-            $movie = $this->resolveSchedulableMovie((int) $data['movie_id']);
+            $movie = $lockedMovies->get((int) $data['movie_id']);
+            $presentationFormat = $targetFormatId === null ? null : $lockedFormats->get($targetFormatId);
             $candidate = $this->validateCandidate(
                 $movie,
                 $targetRoom,
                 $data['show_date'],
                 $data['show_time'],
                 $lockedShowtime,
+                presentationFormatId: $targetFormatId,
+                requirePresentationFormat: true,
+                authoritativePresentationFormat: $presentationFormat,
             )->requireValid();
 
-            if ($this->hasStructuralChanges($lockedShowtime, $movie, $targetRoom, $candidate->layout, $candidate->window)
+            if ($this->hasStructuralChanges($lockedShowtime, $movie, $targetRoom, $candidate->layout, $candidate->window, $candidate->presentationFormat)
                 && $this->hasBookingHistory($lockedShowtime)) {
                 throw new ShowtimeScheduleException(
                     'Suất chiếu đã phát sinh đơn đặt vé nên không thể thay đổi phim, phòng, ngày hoặc giờ chiếu.',
@@ -322,20 +372,94 @@ class ShowtimeScheduleService
                 $targetRoom,
                 $candidate->layout,
                 $candidate->window,
+                $candidate->presentationFormat,
             ));
-            $updated = $lockedShowtime->fresh(['movie', 'room.cinema', 'cinema', 'roomLayout']);
+            $updated = $lockedShowtime->fresh(['movie', 'room.cinema', 'cinema', 'roomLayout', 'presentationFormat']);
             $afterPersist?->__invoke($updated, $before);
 
             return $updated;
         }, 3);
     }
 
-    private function resolveSchedulableMovie(int $movieId): Movie
+    private function resolveSchedulableMovie(int $movieId, bool $lockForUpdate = false): Movie
     {
-        $movie = Movie::query()->findOrFail($movieId);
+        $query = Movie::query()->whereKey($movieId);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $movie = $query->first();
+        if (! $movie) {
+            throw new ShowtimeScheduleException('Phim đã chọn không tồn tại.', 'movie_id', 'MOVIE_UNAVAILABLE');
+        }
         $this->assertMovieIsSchedulable($movie);
 
         return $movie;
+    }
+
+    private function lockPresentationFormat(mixed $presentationFormatId): ?PresentationFormat
+    {
+        if ($presentationFormatId === null || $presentationFormatId === '') {
+            return null;
+        }
+
+        return PresentationFormat::query()
+            ->whereKey((int) $presentationFormatId)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function resolvePresentationFormat(
+        ?int $presentationFormatId,
+        bool $required,
+        ?PresentationFormat $authoritativePresentationFormat = null,
+    ): ?PresentationFormat {
+        if ($presentationFormatId === null) {
+            if ($required) {
+                throw new ShowtimeScheduleException(
+                    'Vui lòng chọn định dạng trình chiếu.',
+                    'presentation_format_id',
+                    'PRESENTATION_FORMAT_REQUIRED',
+                );
+            }
+
+            return null;
+        }
+
+        $format = $authoritativePresentationFormat;
+        if (! $format || (int) $format->id !== $presentationFormatId) {
+            $format = PresentationFormat::query()->find($presentationFormatId);
+        }
+        if (! $format || ! $format->is_active) {
+            throw new ShowtimeScheduleException(
+                'Định dạng trình chiếu đã chọn hiện không còn hoạt động.',
+                'presentation_format_id',
+                'PRESENTATION_FORMAT_INACTIVE',
+            );
+        }
+
+        return $format;
+    }
+
+    private function assertMovieSupportsFormat(Movie $movie, PresentationFormat $format): void
+    {
+        if (! $movie->supportedPresentationFormats()->whereKey($format->id)->exists()) {
+            throw new ShowtimeScheduleException(
+                'Phim không hỗ trợ định dạng trình chiếu đã chọn.',
+                'presentation_format_id',
+                'MOVIE_FORMAT_UNSUPPORTED',
+            );
+        }
+    }
+
+    private function assertRoomSupportsFormat(Room $room, PresentationFormat $format): void
+    {
+        if (! $room->presentationCapabilities()->whereKey($format->id)->exists()) {
+            throw new ShowtimeScheduleException(
+                'Phòng chiếu không hỗ trợ định dạng trình chiếu đã chọn.',
+                'presentation_format_id',
+                'ROOM_FORMAT_UNSUPPORTED',
+            );
+        }
     }
 
     private function assertMovieIsSchedulable(Movie $movie): void
@@ -483,6 +607,7 @@ class ShowtimeScheduleService
         Room $room,
         RoomLayout $layout,
         ShowtimeWindow $window,
+        ?PresentationFormat $presentationFormat,
     ): bool {
         $current = [
             'movie_id' => (int) $showtime->movie_id,
@@ -490,6 +615,7 @@ class ShowtimeScheduleService
             'show_time' => substr((string) $showtime->show_time, 0, 8),
             'room_id' => (int) $showtime->room_id,
             'room_layout_id' => (int) $showtime->room_layout_id,
+            'presentation_format_id' => $showtime->presentation_format_id === null ? null : (int) $showtime->presentation_format_id,
         ];
         $candidate = [
             'movie_id' => (int) $movie->id,
@@ -497,6 +623,7 @@ class ShowtimeScheduleService
             'show_time' => $window->start->format('H:i:s'),
             'room_id' => (int) $room->id,
             'room_layout_id' => (int) $layout->id,
+            'presentation_format_id' => $presentationFormat?->id,
         ];
 
         return $current !== $candidate;
@@ -516,6 +643,7 @@ class ShowtimeScheduleService
         Room $room,
         RoomLayout $layout,
         ShowtimeWindow $window,
+        ?PresentationFormat $presentationFormat = null,
     ): array {
         $preview = new Showtime([
             'movie_id' => $movie->id,
@@ -534,6 +662,7 @@ class ShowtimeScheduleService
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
+            'presentation_format_id' => $presentationFormat?->id,
             'show_date' => $window->start->toDateString(),
             'show_time' => $window->start->format('H:i:s'),
             'price' => $normal->finalAmount,

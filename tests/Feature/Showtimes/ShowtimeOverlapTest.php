@@ -8,6 +8,8 @@ use RuntimeException;
 
 class ShowtimeOverlapTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_exact_operational_end_boundary_and_later_time_are_allowed(): void
     {
         $existingMovie = $this->movie(120);

@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schema;
 
 class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_schedule_lookup_index_matches_candidate_query_prefix(): void
     {
         $index = collect(Schema::getIndexes('showtimes'))
@@ -65,6 +67,9 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
             'cinema_id' => $legacyCinema->id, 'code' => 'LEGACY', 'name' => 'Legacy room',
             'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
         ]);
+        foreach ([$inactive, $archive, $noLayout, $legacy] as $room) {
+            $room->presentationCapabilities()->attach($this->presentationFormat);
+        }
 
         foreach ([$inactive, $archive, $noLayout, $legacy] as $room) {
             $this->actingAs($admin)->post(route('admin.showtimes.store'), $this->payload($movie, $room))

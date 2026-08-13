@@ -5,6 +5,7 @@ namespace Tests\Feature\Showtimes;
 use App\Models\ActivityLog;
 use App\Models\Cinema;
 use App\Models\CinemaPricingRule;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Showtime;
@@ -308,7 +309,15 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
     {
         $movie = $this->movie(90);
         $admin = $this->userWithRole('admin');
-        $singlePayload = $this->payload($movie, $this->rooms['P01'], ['show_time' => '18:00']);
+        $format = PresentationFormat::query()->create([
+            'code' => '2D', 'name' => '2D', 'is_active' => true, 'sort_order' => 10,
+        ]);
+        $movie->supportedPresentationFormats()->attach($format);
+        $this->rooms['P01']->presentationCapabilities()->attach($format);
+        $singlePayload = $this->payload($movie, $this->rooms['P01'], [
+            'show_time' => '18:00',
+            'presentation_format_id' => $format->id,
+        ]);
         $this->actingAs($admin)->post(route('admin.showtimes.store'), $singlePayload)->assertRedirect(route('admin.showtimes.index'));
         $single = Showtime::query()->firstOrFail();
 

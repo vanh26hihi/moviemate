@@ -44,12 +44,12 @@ final class ShowtimeSeeder extends Seeder
                         }
                         $movie = $compatibleMovies[($cinemaOffset + $roomOffset + $dayOffset + $slotOffset) % $compatibleMovies->count()];
                         try {
-                            $showtime = $schedule->schedule([
+                            $schedule->schedule([
                                 'movie_id' => $movie->id, 'room_id' => $room->id,
+                                'presentation_format_id' => $format->id,
                                 'show_date' => $date, 'show_time' => $time,
                                 'status' => 'active',
                             ]);
-                            $showtime->forceFill(['presentation_format_id' => $format->id])->save();
                         } catch (ShowtimeScheduleException) {
                             // Existing or longer films may occupy this window; preserve them and continue.
                         }

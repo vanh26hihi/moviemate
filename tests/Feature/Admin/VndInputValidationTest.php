@@ -13,6 +13,8 @@ use Throwable;
 
 class VndInputValidationTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_showtime_ignores_browser_prices_and_stores_server_calculated_integer_previews(): void
     {
         $movie = $this->movie();

@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 class ShowtimeUpdateTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_unchanged_update_does_not_conflict_with_itself_and_keeps_layout_version(): void
     {
         $movie = $this->movie(120);

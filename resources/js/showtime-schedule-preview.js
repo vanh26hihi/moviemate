@@ -9,6 +9,7 @@ function initializeShowtimeSchedulePreview(preview) {
 
     const fields = {
         movie_id: form.querySelector('[name="movie_id"]'),
+        presentation_format_id: form.querySelector('[name="presentation_format_id"]'),
         room_id: form.querySelector('[name="room_id"]'),
         show_date: form.querySelector('[name="show_date"]'),
         show_time: form.querySelector('[name="show_time"]'),
@@ -17,6 +18,7 @@ function initializeShowtimeSchedulePreview(preview) {
 
     const state = preview.querySelector('[data-schedule-preview-state]');
     const timezone = preview.querySelector('[data-schedule-timezone]');
+    const presentationFormat = preview.querySelector('[data-schedule-format]');
     const start = preview.querySelector('[data-schedule-start]');
     const end = preview.querySelector('[data-schedule-end]');
     const cleaning = preview.querySelector('[data-schedule-cleaning]');
@@ -42,6 +44,7 @@ function initializeShowtimeSchedulePreview(preview) {
         end.textContent = '--';
         cleaning.textContent = '--';
         ready.textContent = '--';
+        if (presentationFormat) presentationFormat.textContent = '--';
         conflict.hidden = true;
     }
 
@@ -51,6 +54,9 @@ function initializeShowtimeSchedulePreview(preview) {
 
     function render(data) {
         timezone.textContent = data.timezone || fields.room_id.selectedOptions[0]?.dataset.timezone || preview.dataset.timezone;
+        if (presentationFormat && data.presentation_format) {
+            presentationFormat.textContent = `${data.presentation_format.code} — ${data.presentation_format.name}`;
+        }
         if (data.window) {
             start.textContent = data.window.start_display;
             end.textContent = data.window.end_display;
@@ -116,8 +122,8 @@ function initializeShowtimeSchedulePreview(preview) {
         timezone.textContent = fields.room_id.selectedOptions[0]?.dataset.timezone || preview.dataset.timezone;
 
         if (!isComplete()) {
-            setState('Chọn đủ phim, phòng, ngày và giờ bắt đầu để kiểm tra khung giờ.');
-            if (save) save.disabled = false;
+            setState('Chọn đủ phim, định dạng, phòng, ngày và giờ bắt đầu để kiểm tra khung giờ.');
+            if (save) save.disabled = true;
             return;
         }
 

@@ -4,6 +4,7 @@ namespace Tests\Feature\Seats;
 
 use App\Models\Cinema;
 use App\Models\CinemaPricingRule;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\CinemaContext;
@@ -21,6 +22,8 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
     private $rooms;
 
     private int $movieId;
+
+    private int $presentationFormatId;
 
     protected function setUp(): void
     {
@@ -41,6 +44,17 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
             'title' => 'Dynamic Movie', 'slug' => 'dynamic-movie', 'duration' => 100,
             'age_rating' => 'P', 'status' => 'now_showing', 'created_at' => now(), 'updated_at' => now(),
         ]);
+        $format = PresentationFormat::query()->create([
+            'code' => '2D', 'name' => '2D', 'is_active' => true, 'sort_order' => 10,
+        ]);
+        $this->presentationFormatId = $format->id;
+        DB::table('movie_presentation_formats')->insert([
+            'movie_id' => $this->movieId,
+            'presentation_format_id' => $format->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->rooms->each(fn (Room $room) => $room->presentationCapabilities()->attach($format));
     }
 
     public function test_guest_customer_and_inactive_user_cannot_enter_editor(): void
@@ -210,6 +224,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
             'cinema_id' => $this->cinema->id, 'code' => 'P04', 'name' => 'No Layout',
             'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
         ]);
+        $room->presentationCapabilities()->attach($this->presentationFormatId);
         $admin = $this->userWithRole('admin');
         $this->actingAs($admin)->get(route('admin.showtimes.create'))->assertOk()->assertDontSee('P04');
         $this->actingAs($admin)->post(route('admin.showtimes.store'), $this->showtimePayload($room))
@@ -252,7 +267,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
     private function showtimePayload(Room $room, array $overrides = []): array
     {
         return [
-            'movie_id' => $this->movieId, 'room_id' => $room->id,
+            'movie_id' => $this->movieId, 'presentation_format_id' => $this->presentationFormatId, 'room_id' => $room->id,
             'show_date' => now()->addDays(5)->toDateString(), 'show_time' => '10:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active', ...$overrides,
         ];
@@ -262,7 +277,8 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
     {
         return Showtime::query()->create([
             'movie_id' => $this->movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
-            'room_layout_id' => $layoutId, 'show_date' => now()->addDays(5)->toDateString(), 'show_time' => '10:00:00',
+            'room_layout_id' => $layoutId, 'presentation_format_id' => $this->presentationFormatId,
+            'show_date' => now()->addDays(5)->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);
     }
