@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DiscountCode;
 use App\Services\ActivityLogger;
+use App\Services\Admin\PromotionAdminAccess;
 use App\Services\CinemaAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,14 +16,27 @@ use Illuminate\View\View;
 
 final class DiscountController extends Controller
 {
-    public function __construct(private readonly CinemaAccessService $access, private readonly ActivityLogger $activity) {}
+    public function __construct(
+        private readonly CinemaAccessService $access,
+        private readonly PromotionAdminAccess $promotionAccess,
+        private readonly ActivityLogger $activity,
+    ) {}
 
     public function index(Request $request): View
     {
-        $discounts = DiscountCode::query()->with('cinemas')->withCount(['redemptions as active_usage_count' => fn ($q) => $q->whereIn('status', ['reserved', 'redeemed'])])
+        $query = $this->promotionAccess->visibleQuery(DiscountCode::query(), $request->user());
+        $discounts = $query->with('cinemas')->withCount(['redemptions as active_usage_count' => fn ($q) => $q->whereIn('status', ['reserved', 'redeemed'])])
             ->orderByDesc('priority')->orderByDesc('id')->paginate(20);
+        $discounts->getCollection()->each(fn (DiscountCode $discount) => $discount->setAttribute(
+            'admin_can_manage',
+            $this->promotionAccess->canManage($request->user(), $discount),
+        ));
 
-        return view('admin.discounts.index', compact('discounts'));
+        return view('admin.discounts.index', [
+            'discounts' => $discounts,
+            'hasGlobalPromotionAccess' => $this->access->hasGlobalAccess($request->user()),
+            'promotionAdminCinemaId' => $this->access->currentCinemaId($request->user()),
+        ]);
     }
 
     public function create(Request $request): View
@@ -33,6 +47,7 @@ final class DiscountController extends Controller
     public function edit(Request $request, DiscountCode $discount): View
     {
         $discount->load('cinemas');
+        $this->promotionAccess->authorizeManage($request->user(), $discount);
 
         return $this->form($request, $discount);
     }
@@ -55,6 +70,8 @@ final class DiscountController extends Controller
 
     public function update(Request $request, DiscountCode $discount): RedirectResponse
     {
+        $discount->load('cinemas');
+        $this->promotionAccess->authorizeManage($request->user(), $discount);
         $data = $this->validated($request, $discount);
         DB::transaction(function () use ($request, $discount, $data): void {
             $cinemas = $data['cinema_ids'] ?? [];
@@ -70,6 +87,8 @@ final class DiscountController extends Controller
 
     public function archive(Request $request, DiscountCode $discount): RedirectResponse
     {
+        $discount->load('cinemas');
+        $this->promotionAccess->authorizeManage($request->user(), $discount);
         $discount->update(['is_active' => false, 'archived_at' => now(), 'updated_by_user_id' => $request->user()->id]);
         $this->activity->log('discount.archived', $discount);
 
@@ -78,11 +97,18 @@ final class DiscountController extends Controller
 
     private function form(Request $request, DiscountCode $discount): View
     {
-        return view('admin.discounts.form', ['discount' => $discount, 'cinemas' => $this->access->accessibleCinemas($request->user())->sortBy('name')->values()]);
+        return view('admin.discounts.form', [
+            'discount' => $discount,
+            'cinemas' => $this->promotionAccess->mutationCinemas($request->user()),
+            'canCreateGlobalPromotion' => $this->access->hasGlobalAccess($request->user()),
+        ]);
     }
 
     private function validated(Request $request, ?DiscountCode $discount = null): array
     {
+        $globalAccess = $this->access->hasGlobalAccess($request->user());
+        $cinemaScopeRules = $globalAccess ? ['nullable', 'array'] : ['required', 'array', 'min:1'];
+        $allowedCinemaIds = $this->promotionAccess->mutationCinemaIds($request->user())->all();
         $request->merge(['code' => mb_strtoupper(trim((string) $request->input('code')))]);
         $data = $request->validate([
             'code' => ['required', 'string', 'max:50', 'regex:/^[A-Z0-9_-]+$/', Rule::unique('discount_codes')->ignore($discount?->id)],
@@ -92,7 +118,9 @@ final class DiscountController extends Controller
             'starts_at' => ['nullable', 'date'], 'ends_at' => ['nullable', 'date', 'after:starts_at'], 'is_active' => ['required', 'boolean'],
             'total_quota' => ['nullable', 'integer', 'min:1'], 'per_user_quota' => ['nullable', 'integer', 'min:1'],
             'registered_users_only' => ['nullable', 'boolean'], 'first_order_only' => ['nullable', 'boolean'], 'can_combine' => ['nullable', 'boolean'],
-            'priority' => ['required', 'integer', 'between:-10000,10000'], 'cinema_ids' => ['sometimes', 'array'], 'cinema_ids.*' => ['integer', Rule::in($this->access->accessibleCinemas($request->user())->pluck('id')->all())],
+            'priority' => ['required', 'integer', 'between:-10000,10000'],
+            'cinema_ids' => $cinemaScopeRules,
+            'cinema_ids.*' => ['integer', 'distinct', Rule::exists('cinemas', 'id'), Rule::in($allowedCinemaIds)],
         ]);
         if ($data['discount_type'] === 'percent' && $data['discount_value'] > 100) {
             throw ValidationException::withMessages(['discount_value' => 'Phần trăm giảm phải từ 1 đến 100.']);
