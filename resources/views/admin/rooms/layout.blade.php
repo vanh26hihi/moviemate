@@ -83,6 +83,31 @@
         <x-validation-summary id="layoutServerErrors" :errors="$errors" heading="Không thể hoàn tất thao tác với sơ đồ ghế." />
     @endif
 
+    <div class="grid gap-4 lg:grid-cols-2">
+        <section class="cinema-card p-5" aria-labelledby="layout-room-physical-title">
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thông tin vật lý</p>
+            <h2 id="layout-room-physical-title" class="mt-2 text-lg font-extrabold app-text">Không gian phòng chiếu</h2>
+            <dl class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div><dt class="text-sm app-muted">Kích thước phòng</dt><dd class="font-bold app-text">{{ $room->hasCompletePhysicalDimensions() ? $room->formattedWidthMeters().' m × '.$room->formattedLengthMeters().' m' : 'Chưa cấu hình' }}</dd></div>
+                <div><dt class="text-sm app-muted">Diện tích mặt bằng</dt><dd class="font-bold app-text">{{ $room->formattedAreaM2() !== null ? $room->formattedAreaM2().' m²' : 'Chưa cấu hình' }}</dd></div>
+            </dl>
+        </section>
+        <section class="cinema-card p-5" aria-labelledby="layout-logical-facts-title">
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Sơ đồ bố trí logic</p>
+            <h2 id="layout-logical-facts-title" class="mt-2 text-lg font-extrabold app-text">Phiên bản đang xem</h2>
+            @if($layout)
+                <dl class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div><dt class="text-sm app-muted">Phiên bản sơ đồ</dt><dd class="font-bold app-text">{{ $layout->version }}</dd></div>
+                    <div><dt class="text-sm app-muted">Trạng thái sơ đồ</dt><dd class="font-bold app-text">{{ $layout->status_label }}</dd></div>
+                    <div><dt class="text-sm app-muted">Lưới logic</dt><dd class="font-bold app-text">{{ $layoutRows }} hàng × {{ $layoutColumns }} cột</dd></div>
+                    <div><dt class="text-sm app-muted">Vị trí màn hình</dt><dd class="font-bold app-text">{{ $layoutScreenPosition === 'top' ? 'Phía trên' : 'Phía dưới' }}</dd></div>
+                </dl>
+            @else
+                <p class="mt-3 text-sm app-muted">Chưa có phiên bản sơ đồ. Lưới logic không biểu thị kích thước theo mét.</p>
+            @endif
+        </section>
+    </div>
+
     @if(!$layout || !$isDraft)
         <div class="cinema-card p-6">
             <h2 class="text-xl font-bold app-text">{{ $layout ? $layout->display_name : 'Phòng chưa có sơ đồ ghế' }}</h2>
@@ -102,6 +127,10 @@
 
     @if($layout)
         <div class="cinema-card p-5 sm:p-6">
+            <div class="mb-5">
+                <x-admin.layout-template-legend />
+                <p class="mt-3 rounded-xl border border-warning/25 bg-warning/5 px-4 py-3 text-sm app-muted"><strong class="app-text">Trạng thái vận hành:</strong> Ghế bảo trì vẫn là một Seat vật lý tạm thời không khả dụng; không phải Vật cản cố định và không làm thay đổi cấu trúc sơ đồ.</p>
+            </div>
             <div class="grid gap-4 md:grid-cols-4">
                 <label class="cinema-label">Tên sơ đồ<input id="layoutName" class="cinema-input mt-1" value="{{ $layoutName }}" @disabled(!$isDraft)></label>
                 <label class="cinema-label">Số hàng ghế<input id="layoutRows" type="number" min="1" max="30" class="cinema-input mt-1" value="{{ $layoutRows }}" @disabled(!$isDraft)></label>
@@ -189,7 +218,7 @@
             </div>
             @if($layoutSummary)
                 <div class="mt-5 grid grid-cols-2 gap-3 border-t app-border pt-5 text-sm sm:grid-cols-4 lg:grid-cols-6" aria-label="Tóm tắt sơ đồ do máy chủ tính toán">
-                    @foreach(['rows' => 'Số hàng logic', 'columns' => 'Số cột logic', 'used' => 'Vị trí đã dùng', 'empty' => 'Vị trí trống', 'physical_seats' => 'Vị trí ghế vật lý', 'normal' => 'Ghế thường', 'vip' => 'Ghế VIP', 'couple_pairs' => 'Cặp ghế đôi', 'aisles' => 'Ô lối đi', 'blocked' => 'Vật cản cố định', 'maintenance' => 'Bảo trì', 'inactive' => 'Không sử dụng', 'operational_available' => 'Ghế đang hoạt động'] as $key => $label)
+                    @foreach(['rows' => 'Số hàng logic', 'columns' => 'Số cột logic', 'used' => 'Vị trí đã dùng', 'empty' => 'Ô trống', 'physical_seats' => 'Sức chứa vật lý', 'normal' => 'Ghế thường', 'vip' => 'Ghế VIP', 'couple_pairs' => 'Cặp ghế đôi', 'aisles' => 'Ô lối đi', 'blocked' => 'Vật cản cố định', 'maintenance' => 'Ghế bảo trì', 'inactive' => 'Ghế không sử dụng', 'operational_available' => 'Ghế khả dụng vận hành'] as $key => $label)
                         <div><p class="app-muted">{{ $label }}</p><p class="font-extrabold app-text">{{ $layoutSummary[$key] }}</p></div>
                     @endforeach
                 </div>

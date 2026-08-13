@@ -71,9 +71,9 @@
 
     <section class="app-card overflow-hidden rounded-3xl border app-border" aria-labelledby="seat-layout-editor-title">
         <div class="border-b app-border p-5 sm:p-6">
-            <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thiết kế sơ đồ ghế</p>
-            <h2 id="seat-layout-editor-title" class="mt-2 text-xl font-extrabold app-text">Bố trí từng vị trí trong phòng chiếu</h2>
-            <p id="seat-layout-editor-help" class="mt-2 max-w-3xl text-sm leading-relaxed app-muted">Chọn một công cụ rồi nhấn vào ô trên sơ đồ để bố trí ghế. Ghế đôi sử dụng hai ô liền kề và mã ghế được tạo tự động theo hàng.</p>
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thiết kế mẫu lưới logic</p>
+            <h2 id="seat-layout-editor-title" class="mt-2 text-xl font-extrabold app-text">Bố trí từng vị trí logic trong mẫu</h2>
+            <p id="seat-layout-editor-help" class="mt-2 max-w-3xl text-sm leading-relaxed app-muted">Hàng × cột là lưới logic, không phải kích thước phòng theo mét. Chọn công cụ rồi nhấn vào ô để bố trí; ghế đôi sử dụng hai ô liền kề.</p>
         </div>
 
         <div class="layout-template-toolbar border-b app-border p-5 sm:p-6 lg:sticky lg:top-0 lg:z-20">
@@ -138,11 +138,11 @@
     <section class="app-card rounded-3xl border app-border p-5 sm:p-6" aria-labelledby="layout-statistics-title">
         <div class="mb-5">
             <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thống kê</p>
-            <h2 id="layout-statistics-title" class="mt-2 text-xl font-extrabold app-text">Cấu trúc vật lý và đơn vị tính giá của mẫu</h2>
+            <h2 id="layout-statistics-title" class="mt-2 text-xl font-extrabold app-text">Cấu trúc lưới và đơn vị tính giá của mẫu</h2>
         </div>
         <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                'physical_seats' => ['Vị trí ghế vật lý', 'ph-users-three'],
+                'physical_seats' => ['Vị trí SEAT trong mẫu', 'ph-users-three'],
                 'pricing_units' => ['Đơn vị tính giá', 'ph-ticket'],
                 'normal' => ['Ghế thường', 'ph-armchair'],
                 'vip' => ['VIP', 'ph-star'],

@@ -35,7 +35,8 @@
 
 <div class="rounded-2xl border app-border app-card-soft p-4">
     <div>
-        <p class="font-bold app-text">Kích thước phòng</p>
+        <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thông tin vật lý</p>
+        <p class="mt-2 font-bold app-text">Kích thước phòng</p>
         <p class="mt-1 text-sm app-muted">Kích thước mặt bằng chữ nhật phục vụ quản lý hành chính; không quy đổi sang tỷ lệ ô của lưới ghế.</p>
     </div>
     <div class="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -74,13 +75,14 @@
 @include('admin.rooms._presentation-capabilities')
 
 <div class="rounded-2xl border border-info/20 bg-info/5 p-4 text-sm app-muted">
-    <p class="font-bold app-text">{{ __('rooms.fields.layout') }} và sức chứa vật lý</p>
-    <p class="mt-1">Sức chứa vật lý là số ô ghế trong sơ đồ đã phát hành. Ghế bảo trì vẫn là một vị trí vật lý; lưới logic không có đơn vị mét.</p>
+    <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Sơ đồ bố trí logic</p>
+    <p class="mt-2 font-bold app-text">Lưới logic và sức chứa vật lý</p>
+    <p class="mt-1">Sức chứa vật lý là số vị trí SEAT trong sơ đồ đã phát hành. Ghế bảo trì vẫn là một vị trí vật lý; số hàng × số cột chỉ là lưới bố trí logic và không có đơn vị mét.</p>
 </div>
 
 @if(! $editing && isset($templates) && $templates->isNotEmpty() && auth()->user()->hasPermission('room_layouts.apply_template'))
 <div class="rounded-2xl border app-border app-card-soft p-4 space-y-4">
-    <div><p class="font-bold app-text">Khởi tạo từ mẫu sơ đồ</p><p class="text-sm app-muted">Tùy chọn. Hệ thống sao chép mẫu thành ghế và sơ đồ riêng của phòng rồi phát hành ngay.</p></div>
+    <div><p class="font-bold app-text">Khởi tạo từ mẫu lưới bố trí</p><p class="text-sm app-muted">Tùy chọn. Áp dụng mẫu sẽ tạo ghế và một sơ đồ phòng độc lập rồi phát hành ngay. Thay đổi mẫu sau này không làm thay đổi sơ đồ đã áp dụng.</p></div>
     <label class="cinema-label">Mẫu<select name="template_id" class="cinema-input"><option value="">Thiết kế sau</option>@foreach($templates as $template)<option value="{{ $template->id }}" @selected(old('template_id')==$template->id)>{{ $template->name }} · lưới {{ $template->rows }} hàng × {{ $template->columns }} cột logic{{ $template->room_type ? ' · '.($roomTypes->firstWhere('code', $template->room_type)?->name ?? $template->room_type) : '' }}</option>@endforeach</select></label>
     <label class="cinema-label">Tên sơ đồ<input name="layout_name" class="cinema-input" value="{{ old('layout_name') }}" placeholder="Ví dụ: Tiêu chuẩn 100 ghế – khai trương"></label>
     <label class="cinema-label">Ghi chú thay đổi<textarea name="change_note" class="cinema-input" rows="2">{{ old('change_note') }}</textarea></label>
