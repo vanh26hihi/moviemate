@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreShowtimeRequest;
 use App\Http\Requests\Admin\UpdateShowtimeRequest;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\ActivityLogger;
@@ -103,7 +104,7 @@ class ShowtimeController extends Controller
     public function edit(Showtime $showtime)
     {
         $this->assertOperationalShowtime($showtime);
-        $showtime->loadMissing(['movie', 'roomLayout', 'cinema']);
+        $showtime->loadMissing(['movie', 'roomLayout', 'cinema', 'presentationFormat']);
         $this->assertUpcomingForMutation($showtime);
 
         return view('admin.showtimes.edit', [
@@ -181,7 +182,11 @@ class ShowtimeController extends Controller
         $cinema = $this->cinemaAccess->currentCinema(auth()->user());
 
         return [
-            'movies' => Movie::query()->whereIn('status', Movie::SCHEDULABLE_STATUSES)->orderBy('title')->get(),
+            'movies' => Movie::query()
+                ->whereIn('status', Movie::SCHEDULABLE_STATUSES)
+                ->with(['supportedPresentationFormats' => fn ($query) => $query->active()->orderBy('sort_order')->orderBy('id')])
+                ->orderBy('title')->get(),
+            'presentationFormats' => PresentationFormat::query()->active()->orderBy('sort_order')->orderBy('id')->get(),
             'rooms' => $this->operationalRooms(),
             'cinema' => $cinema,
             'cleaningBufferMinutes' => $this->schedule->cleaningBufferMinutes(),
@@ -192,7 +197,11 @@ class ShowtimeController extends Controller
     private function operationalRooms()
     {
         $query = Room::query()->operational()->whereHas('latestPublishedLayout')
-            ->with(['latestPublishedLayout', 'cinema']);
+            ->with([
+                'latestPublishedLayout',
+                'cinema',
+                'presentationCapabilities' => fn ($query) => $query->active()->orderBy('sort_order')->orderBy('id'),
+            ]);
         $this->cinemaAccess->scope($query, auth()->user(), 'rooms.cinema_id');
 
         return $query
@@ -226,6 +235,7 @@ class ShowtimeController extends Controller
             'movie_id' => $showtime->movie_id,
             'room_id' => $showtime->room_id,
             'room_layout_id' => $showtime->room_layout_id,
+            'presentation_format_id' => $showtime->presentation_format_id,
             'show_date' => $showtime->show_date?->format('Y-m-d'),
             'show_time' => (string) $showtime->show_time,
             'movie_end_at' => $window->movieEnd->toIso8601String(),

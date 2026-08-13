@@ -50,6 +50,8 @@ final class ShowtimePreviewController extends Controller
             $data['show_date'],
             $data['show_time'],
             $showtime,
+            presentationFormatId: (int) $data['presentation_format_id'],
+            requirePresentationFormat: true,
         );
 
         return response()->json($this->payload($result, $room));
@@ -95,6 +97,11 @@ final class ShowtimePreviewController extends Controller
             'code' => $result->failureCode(),
             'message' => $result->message(),
             'timezone' => $result->timezone,
+            'presentation_format' => $result->presentationFormat ? [
+                'id' => $result->presentationFormat->id,
+                'code' => $result->presentationFormat->code,
+                'name' => $result->presentationFormat->name,
+            ] : null,
             'window' => $window ? [
                 'start_at' => $window->start->toIso8601String(),
                 'end_at' => $window->movieEnd->toIso8601String(),
@@ -124,6 +131,7 @@ final class ShowtimePreviewController extends Controller
             'code' => $code,
             'message' => $message,
             'timezone' => null,
+            'presentation_format' => null,
             'window' => null,
             'operating_window' => null,
             'conflict' => null,

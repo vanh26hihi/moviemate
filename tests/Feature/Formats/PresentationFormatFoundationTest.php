@@ -106,20 +106,16 @@ final class PresentationFormatFoundationTest extends ShowtimeTestCase
         $format->delete();
     }
 
-    public function test_existing_single_showtime_create_contract_still_accepts_no_format(): void
+    public function test_single_showtime_create_requires_format_while_database_column_remains_nullable(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 12:00:00', 'Asia/Ho_Chi_Minh'));
         $movie = $this->movie();
 
         $this->actingAs($this->userWithRole('admin'))
             ->post(route('admin.showtimes.store'), $this->payload($movie, $this->rooms->get('P01')))
-            ->assertRedirect(route('admin.showtimes.index'))
-            ->assertSessionHasNoErrors();
+            ->assertSessionHasErrors('presentation_format_id');
 
-        $this->assertDatabaseHas('showtimes', [
-            'movie_id' => $movie->id,
-            'presentation_format_id' => null,
-        ]);
+        $this->assertDatabaseCount('showtimes', 0);
     }
 
     private function format(string $code): PresentationFormat

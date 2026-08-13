@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\DB;
 
 class ShowtimePreviewTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
@@ -151,6 +153,7 @@ class ShowtimePreviewTest extends ShowtimeTestCase
             'total_seats' => 0,
             'status' => 'active',
         ]);
+        $noLayout->presentationCapabilities()->attach($this->presentationFormat);
         $hours->update(['is_closed' => false]);
         $this->actingAs($admin)->postJson(route('admin.showtimes.preview'), $this->payload($movie, $noLayout))
             ->assertOk()->assertJson(['valid' => false, 'code' => 'LAYOUT_UNAVAILABLE']);
@@ -221,6 +224,7 @@ class ShowtimePreviewTest extends ShowtimeTestCase
             'total_seats' => 0,
             'status' => 'active',
         ]);
+        $otherRoom->presentationCapabilities()->attach($this->presentationFormat);
         $movie = $this->movie(90);
 
         $this->actingAs($this->userWithRole('manager'))->postJson(
@@ -293,7 +297,7 @@ class ShowtimePreviewTest extends ShowtimeTestCase
             ->assertSee('data-showtime-schedule-preview', false)
             ->assertSee('data-endpoint="'.route('admin.showtimes.preview').'"', false)
             ->assertSee('data-showtime-save', false)
-            ->assertSee('Chọn đủ phim, phòng, ngày và giờ bắt đầu để kiểm tra khung giờ.');
+            ->assertSee('Chọn đủ phim, định dạng, phòng, ngày và giờ bắt đầu để kiểm tra khung giờ.');
         $this->actingAs($admin)->get(route('admin.showtimes.edit', $showtime))
             ->assertOk()
             ->assertSee('data-showtime-id="'.$showtime->id.'"', false);

@@ -17,6 +17,7 @@ class PreviewShowtimeRequest extends FormRequest
     {
         return [
             'movie_id' => ['required', 'integer', Rule::exists('movies', 'id')->whereIn('status', Movie::SCHEDULABLE_STATUSES)],
+            'presentation_format_id' => ['required', 'integer', 'exists:presentation_formats,id'],
             'room_id' => ['required', 'integer', 'exists:rooms,id'],
             'show_date' => ['required', 'date_format:Y-m-d'],
             'show_time' => ['required', 'date_format:H:i'],
@@ -29,6 +30,9 @@ class PreviewShowtimeRequest extends FormRequest
         return [
             'movie_id.required' => 'Vui lòng chọn phim.',
             'movie_id.exists' => 'Phim đã chọn không tồn tại hoặc không thể xếp lịch.',
+            'presentation_format_id.required' => 'Vui lòng chọn định dạng trình chiếu.',
+            'presentation_format_id.integer' => 'Định dạng trình chiếu đã chọn không hợp lệ.',
+            'presentation_format_id.exists' => 'Định dạng trình chiếu đã chọn không tồn tại.',
             'room_id.required' => 'Vui lòng chọn phòng chiếu.',
             'room_id.exists' => 'Phòng chiếu đã chọn không tồn tại.',
             'show_date.required' => 'Vui lòng chọn ngày chiếu.',

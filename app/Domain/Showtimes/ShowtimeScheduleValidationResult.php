@@ -3,6 +3,7 @@
 namespace App\Domain\Showtimes;
 
 use App\Exceptions\ShowtimeScheduleException;
+use App\Models\PresentationFormat;
 use App\Models\RoomLayout;
 
 final readonly class ShowtimeScheduleValidationResult
@@ -11,15 +12,20 @@ final readonly class ShowtimeScheduleValidationResult
         public ?string $timezone,
         public ?ShowtimeWindow $window,
         public ?RoomLayout $layout,
+        public ?PresentationFormat $presentationFormat,
         public ?bool $isFuture,
         public ?bool $isWithinOperatingHours,
         public ?bool $isConflictFree,
         public ?ShowtimeScheduleException $failure,
     ) {}
 
-    public static function valid(string $timezone, ShowtimeWindow $window, RoomLayout $layout): self
-    {
-        return new self($timezone, $window, $layout, true, true, true, null);
+    public static function valid(
+        string $timezone,
+        ShowtimeWindow $window,
+        RoomLayout $layout,
+        ?PresentationFormat $presentationFormat = null,
+    ): self {
+        return new self($timezone, $window, $layout, $presentationFormat, true, true, true, null);
     }
 
     public static function invalid(
@@ -27,6 +33,7 @@ final readonly class ShowtimeScheduleValidationResult
         ?string $timezone = null,
         ?ShowtimeWindow $window = null,
         ?RoomLayout $layout = null,
+        ?PresentationFormat $presentationFormat = null,
         ?bool $isFuture = null,
         ?bool $isWithinOperatingHours = null,
         ?bool $isConflictFree = null,
@@ -35,6 +42,7 @@ final readonly class ShowtimeScheduleValidationResult
             $timezone,
             $window,
             $layout,
+            $presentationFormat,
             $isFuture,
             $isWithinOperatingHours,
             $isConflictFree,
