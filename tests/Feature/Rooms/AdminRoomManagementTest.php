@@ -3,6 +3,7 @@
 namespace Tests\Feature\Rooms;
 
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
@@ -14,11 +15,16 @@ class AdminRoomManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    private PresentationFormat $presentationFormat;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seedRbac();
         app()->setLocale('vi');
+        $this->presentationFormat = PresentationFormat::query()->create([
+            'code' => '2D_FORMAT', 'name' => '2D Format', 'is_active' => true, 'sort_order' => 10,
+        ]);
     }
 
     public function test_room_routes_follow_current_authorization_matrix(): void
@@ -80,6 +86,7 @@ class AdminRoomManagementTest extends TestCase
             'name' => 'Phòng đang nhập',
             'room_type' => 'không hợp lệ',
             'status' => 'active',
+            'presentation_format_ids' => [$this->presentationFormat->id],
         ]);
         $response->assertRedirect(route('admin.rooms.create'))
             ->assertSessionHasErrors(['code', 'room_type'])
@@ -95,6 +102,7 @@ class AdminRoomManagementTest extends TestCase
         $response = $this->actingAs($manager)->post(route('admin.rooms.store'), [
             'code' => 'p20', 'name' => 'Phòng Hai Mươi', 'room_type' => '2d',
             'status' => 'active', 'total_seats' => 999,
+            'presentation_format_ids' => [$this->presentationFormat->id],
         ]);
         $room = Room::query()->where('code', 'P20')->sole();
         $response->assertRedirect(route('admin.rooms.layout.show', $room));
@@ -107,6 +115,7 @@ class AdminRoomManagementTest extends TestCase
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), [
             'code' => 'P20', 'name' => 'Phòng 20', 'room_type' => '3D', 'status' => 'active',
             'total_seats' => 500, 'layout_id' => 999999,
+            'presentation_format_ids' => [$this->presentationFormat->id],
         ])->assertRedirect(route('admin.rooms.show', $room));
 
         $this->assertDatabaseHas('seats', ['id' => $seat->id, 'room_id' => $room->id]);
@@ -160,9 +169,12 @@ class AdminRoomManagementTest extends TestCase
     /** @param array<string, mixed> $attributes */
     private function room(array $attributes = []): Room
     {
-        return Room::factory()->create([
+        $room = Room::factory()->create([
             'cinema_id' => app(CinemaContext::class)->id(),
             ...$attributes,
         ]);
+        $room->presentationCapabilities()->attach($this->presentationFormat);
+
+        return $room;
     }
 }

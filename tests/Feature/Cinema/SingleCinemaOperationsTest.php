@@ -5,6 +5,7 @@ namespace Tests\Feature\Cinema;
 use App\Models\Cinema;
 use App\Models\FoodItem;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
@@ -96,6 +97,9 @@ class SingleCinemaOperationsTest extends TestCase
         $manager = $this->userWithRole('manager');
         $canonical = app(CinemaContext::class)->current();
         $legacy = Cinema::factory()->legacy()->create();
+        $format = PresentationFormat::query()->create([
+            'code' => '2D_FORMAT', 'name' => '2D Format', 'is_active' => true, 'sort_order' => 10,
+        ]);
 
         $response = $this->actingAs($manager)->post(route('admin.rooms.store'), [
             'cinema_id' => $legacy->id,
@@ -104,6 +108,7 @@ class SingleCinemaOperationsTest extends TestCase
             'room_type' => '2D',
             'total_seats' => 20,
             'status' => 'active',
+            'presentation_format_ids' => [$format->id],
         ]);
 
         $room = Room::query()->where('code', 'P99')->sole();
@@ -118,6 +123,7 @@ class SingleCinemaOperationsTest extends TestCase
             'room_type' => '3D',
             'total_seats' => 24,
             'status' => 'active',
+            'presentation_format_ids' => [$format->id],
         ])->assertRedirect(route('admin.rooms.show', $room));
 
         $room->refresh();
@@ -130,6 +136,7 @@ class SingleCinemaOperationsTest extends TestCase
             'room_type' => '2D',
             'total_seats' => 0,
             'status' => 'active',
+            'presentation_format_ids' => [$format->id],
         ])->assertSessionHasErrors('name');
     }
 

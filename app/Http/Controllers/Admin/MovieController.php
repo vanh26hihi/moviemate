@@ -7,12 +7,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveMovieRequest;
 use App\Models\Genre;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Services\MovieImageService;
 use App\Services\MovieLifecycleService;
+use App\Services\MoviePresentationFormatService;
 use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -61,18 +62,20 @@ class MovieController extends Controller
     public function create()
     {
         $genres = Genre::all();
+        $presentationFormats = PresentationFormat::query()->active()->orderBy('sort_order')->orderBy('name')->get();
 
-        return view('admin.movies.create', compact('genres'));
+        return view('admin.movies.create', compact('genres', 'presentationFormats'));
     }
 
     /**
      * Store a newly created movie in storage.
      */
-    public function store(SaveMovieRequest $request, MovieImageService $images): RedirectResponse
+    public function store(SaveMovieRequest $request, MovieImageService $images, MoviePresentationFormatService $formats): RedirectResponse
     {
         $validated = $request->validated();
         $genres = $validated['genres'] ?? [];
-        unset($validated['genres'], $validated['poster'], $validated['cover_image']);
+        $formatIds = $validated['presentation_format_ids'] ?? [];
+        unset($validated['genres'], $validated['presentation_format_ids'], $validated['poster'], $validated['cover_image']);
         $validated['status'] = Movie::STATUS_DRAFT;
         $validated['slug'] = $this->uniqueSlug($validated['slug'] ?? null, $validated['title']);
         $stored = [];
@@ -85,10 +88,7 @@ class MovieController extends Controller
                 $validated['cover_image'] = $stored[] = $images->store($request->file('cover_image'), MovieImageService::BANNER);
             }
 
-            DB::transaction(function () use ($validated, $genres): void {
-                $movie = Movie::create($validated);
-                $movie->genres()->sync($genres);
-            });
+            $formats->create($validated, $genres, $formatIds);
         } catch (Throwable $exception) {
             $images->deleteStored($stored);
             throw $exception;
@@ -118,20 +118,23 @@ class MovieController extends Controller
     {
         abort_if($movie->status === Movie::STATUS_ARCHIVED, 409, 'Phim đã lưu trữ chỉ có thể xem.');
         $genres = Genre::all();
-        $movie->load('genres');
+        $movie->load(['genres', 'supportedPresentationFormats']);
+        $presentationFormats = PresentationFormat::query()->active()->orderBy('sort_order')->orderBy('name')->get();
+        $archivedPresentationFormats = $movie->supportedPresentationFormats->where('is_active', false)->sortBy('sort_order')->values();
 
-        return view('admin.movies.edit', compact('movie', 'genres'));
+        return view('admin.movies.edit', compact('movie', 'genres', 'presentationFormats', 'archivedPresentationFormats'));
     }
 
     /**
      * Update the specified movie in storage.
      */
-    public function update(SaveMovieRequest $request, Movie $movie, MovieImageService $images, ShowtimeScheduleService $schedule): RedirectResponse
+    public function update(SaveMovieRequest $request, Movie $movie, MovieImageService $images, ShowtimeScheduleService $schedule, MoviePresentationFormatService $formats): RedirectResponse
     {
         abort_if($movie->status === Movie::STATUS_ARCHIVED, 409, 'Phim đã lưu trữ chỉ có thể xem.');
         $validated = $request->validated();
         $genres = $validated['genres'] ?? [];
-        unset($validated['genres'], $validated['poster'], $validated['cover_image']);
+        $formatIds = $validated['presentation_format_ids'] ?? [];
+        unset($validated['genres'], $validated['presentation_format_ids'], $validated['poster'], $validated['cover_image']);
         unset($validated['status']);
         $validated['slug'] = $this->uniqueSlug($validated['slug'] ?? null, $validated['title'], $movie->id);
         $oldPoster = $movie->poster;
@@ -154,10 +157,7 @@ class MovieController extends Controller
                 $validated['cover_image'] = $stored[] = $images->store($request->file('cover_image'), MovieImageService::BANNER);
             }
 
-            DB::transaction(function () use ($movie, $validated, $genres): void {
-                $movie->update($validated);
-                $movie->genres()->sync($genres);
-            });
+            $formats->update($movie, $validated, $genres, $formatIds);
         } catch (Throwable $exception) {
             $images->deleteStored($stored);
             throw $exception;

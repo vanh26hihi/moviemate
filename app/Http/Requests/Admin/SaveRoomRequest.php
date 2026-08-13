@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Services\CinemaAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SaveRoomRequest extends FormRequest
 {
@@ -62,7 +64,36 @@ class SaveRoomRequest extends FormRequest
             'template_id' => [$room instanceof Room ? 'prohibited' : 'nullable', 'integer', Rule::exists('room_layout_templates', 'id')->where('status', 'active')],
             'layout_name' => ['nullable', 'required_with:template_id', 'string', 'min:5', 'max:255'],
             'change_note' => ['nullable', 'string', 'max:2000'],
+            'presentation_format_ids' => ['nullable', 'required_if:status,active', 'array', 'min:1'],
+            'presentation_format_ids.*' => ['integer', 'distinct', 'exists:presentation_formats,id'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->has('presentation_format_ids')
+                || $validator->errors()->has('presentation_format_ids.*')) {
+                return;
+            }
+
+            $ids = collect($this->input('presentation_format_ids', []))
+                ->map(fn ($id): int => (int) $id)->unique()->values();
+            $room = $this->route('room');
+            $currentIds = $room instanceof Room
+                ? $room->presentationCapabilities()->pluck('presentation_formats.id')->map(fn ($id): int => (int) $id)
+                : collect();
+            $newIds = $ids->diff($currentIds);
+
+            if ($newIds->isNotEmpty() && PresentationFormat::query()->whereIn('id', $newIds)->where('is_active', false)->exists()) {
+                $validator->errors()->add('presentation_format_ids', 'Không thể thêm khả năng trình chiếu đã lưu trữ.');
+            }
+
+            if ($this->input('status') === 'active'
+                && ! PresentationFormat::query()->active()->whereIn('id', $ids)->exists()) {
+                $validator->errors()->add('presentation_format_ids', 'Phòng đang hoạt động phải có ít nhất một khả năng trình chiếu đang sử dụng.');
+            }
+        });
     }
 
     /** @return array<string, string> */
@@ -76,6 +107,8 @@ class SaveRoomRequest extends FormRequest
             'cleaning_buffer_minutes' => 'thời gian vệ sinh phòng',
             'template_id' => 'mẫu sơ đồ phòng',
             'layout_name' => 'tên phiên bản sơ đồ',
+            'presentation_format_ids' => 'khả năng trình chiếu',
+            'presentation_format_ids.*' => 'khả năng trình chiếu',
         ];
     }
 }

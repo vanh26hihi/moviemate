@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveRoomRequest;
 use App\Models\Cinema;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayoutTemplate;
 use App\Models\RoomType;
 use App\Services\ActivityLogger;
 use App\Services\ApplyRoomLayoutTemplateService;
 use App\Services\CinemaAccessService;
+use App\Services\RoomPresentationCapabilityService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +27,7 @@ class RoomController extends Controller
         private readonly CinemaAccessService $cinemaAccess,
         private readonly ActivityLogger $activityLogger,
         private readonly ApplyRoomLayoutTemplateService $templateApplicator,
+        private readonly RoomPresentationCapabilityService $capabilities,
     ) {}
 
     public function index(Request $request): View
@@ -62,8 +65,9 @@ class RoomController extends Controller
         $cinemas = $this->cinemaAccess->accessibleCinemas(auth()->user());
         $templates = RoomLayoutTemplate::query()->active()->orderBy('name')->get();
         $roomTypes = RoomType::options();
+        $presentationFormats = PresentationFormat::query()->active()->orderBy('sort_order')->orderBy('name')->get();
 
-        return view('admin.rooms.create', compact('cinema', 'cinemas', 'templates', 'roomTypes'));
+        return view('admin.rooms.create', compact('cinema', 'cinemas', 'templates', 'roomTypes', 'presentationFormats'));
     }
 
     public function store(SaveRoomRequest $request): RedirectResponse
@@ -73,12 +77,14 @@ class RoomController extends Controller
         $this->ensureOperationalNameIsUnique($validated, cinemaId: $cinemaId);
 
         $templateId = $validated['template_id'] ?? null;
+        $capabilityIds = $validated['presentation_format_ids'] ?? [];
         $layoutName = $validated['layout_name'] ?? null;
         $changeNote = $validated['change_note'] ?? null;
-        unset($validated['template_id'], $validated['layout_name'], $validated['change_note']);
+        unset($validated['template_id'], $validated['layout_name'], $validated['change_note'], $validated['presentation_format_ids']);
         $validated['room_type_id'] = RoomType::query()->where('code', $validated['room_type'])->value('id');
-        $room = DB::transaction(function () use ($validated, $cinemaId, $templateId, $layoutName, $changeNote, $request): Room {
+        $room = DB::transaction(function () use ($validated, $cinemaId, $templateId, $capabilityIds, $layoutName, $changeNote, $request): Room {
             $room = Room::query()->create([...$validated, 'total_seats' => 0, 'cinema_id' => $cinemaId]);
+            $this->capabilities->syncNew($room, $capabilityIds);
             if ($templateId) {
                 $template = RoomLayoutTemplate::query()->findOrFail($templateId);
                 $this->templateApplicator->apply($room, $template, (string) $layoutName, $changeNote, $request->user(), true);
@@ -137,30 +143,38 @@ class RoomController extends Controller
         $cinema = $room->cinema;
         $cinemas = collect([$cinema]);
         $roomTypes = RoomType::options($room->room_type);
+        $room->load('presentationCapabilities');
+        $presentationFormats = PresentationFormat::query()->active()->orderBy('sort_order')->orderBy('name')->get();
+        $archivedPresentationFormats = $room->presentationCapabilities->where('is_active', false)->sortBy('sort_order')->values();
 
-        return view('admin.rooms.edit', compact('room', 'cinema', 'cinemas', 'roomTypes'));
+        return view('admin.rooms.edit', compact('room', 'cinema', 'cinemas', 'roomTypes', 'presentationFormats', 'archivedPresentationFormats'));
     }
 
     public function update(SaveRoomRequest $request, Room $room): RedirectResponse
     {
         $this->assertManagedRoom($room);
         $validated = $request->validated();
+        $capabilityIds = $validated['presentation_format_ids'] ?? [];
+        unset($validated['presentation_format_ids']);
         $validated['room_type_id'] = RoomType::query()->where('code', $validated['room_type'])->value('id');
-        $this->ensureStatusTransitionIsSafe($room, $validated['status']);
-        $this->ensureOperationalNameIsUnique($validated, $room->id, (int) $room->cinema_id);
 
-        $beforeStatus = $room->status;
-        $beforeBuffer = $room->cleaning_buffer_minutes;
-        DB::transaction(function () use ($room, $validated, $beforeStatus, $beforeBuffer): void {
+        DB::transaction(function () use ($room, $validated, $capabilityIds): void {
+            $locked = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
+            $this->ensureStatusTransitionIsSafe($locked, $validated['status']);
+            $this->ensureOperationalNameIsUnique($validated, $locked->id, (int) $locked->cinema_id);
+            $beforeStatus = $locked->status;
+            $beforeBuffer = $locked->cleaning_buffer_minutes;
+            $locked->status = $validated['status'];
+            $this->capabilities->syncLocked($locked, $capabilityIds);
             unset($validated['cinema_id']);
-            $room->update($validated);
-            if ($beforeStatus !== $room->status) {
-                $this->logStatusChange($room, $beforeStatus);
+            $locked->update($validated);
+            if ($beforeStatus !== $locked->status) {
+                $this->logStatusChange($locked, $beforeStatus);
             }
-            if ($beforeBuffer !== $room->cleaning_buffer_minutes) {
-                $this->activityLogger->log('room.cleaning_buffer_updated', $room,
-                    ['room_id' => $room->id, 'cleaning_buffer' => $beforeBuffer],
-                    ['room_id' => $room->id, 'cleaning_buffer' => $room->cleaning_buffer_minutes]);
+            if ($beforeBuffer !== $locked->cleaning_buffer_minutes) {
+                $this->activityLogger->log('room.cleaning_buffer_updated', $locked,
+                    ['room_id' => $locked->id, 'cleaning_buffer' => $beforeBuffer],
+                    ['room_id' => $locked->id, 'cleaning_buffer' => $locked->cleaning_buffer_minutes]);
             }
         });
 
@@ -174,17 +188,20 @@ class RoomController extends Controller
         $validated = $request->validate([
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
-        $this->ensureStatusTransitionIsSafe($room, $validated['status']);
-        $this->ensureOperationalNameIsUnique([
-            'name' => $room->name,
-            'status' => $validated['status'],
-        ], $room->id, (int) $room->cinema_id);
-
-        $beforeStatus = $room->status;
-        DB::transaction(function () use ($room, $validated, $beforeStatus): void {
-            $room->update(['status' => $validated['status']]);
-            if ($beforeStatus !== $room->status) {
-                $this->logStatusChange($room, $beforeStatus);
+        DB::transaction(function () use ($room, $validated): void {
+            $locked = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
+            $this->ensureStatusTransitionIsSafe($locked, $validated['status']);
+            $this->ensureOperationalNameIsUnique([
+                'name' => $locked->name,
+                'status' => $validated['status'],
+            ], $locked->id, (int) $locked->cinema_id);
+            if ($validated['status'] === 'active') {
+                $this->capabilities->assertCanActivateLocked($locked);
+            }
+            $beforeStatus = $locked->status;
+            $locked->update(['status' => $validated['status']]);
+            if ($beforeStatus !== $locked->status) {
+                $this->logStatusChange($locked, $beforeStatus);
             }
         });
 
