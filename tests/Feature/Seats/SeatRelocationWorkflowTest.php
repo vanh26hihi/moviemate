@@ -231,15 +231,8 @@ final class SeatRelocationWorkflowTest extends TestCase
 
     public function test_candidate_inventory_excludes_held_booked_maintenance_and_active_incident_seats(): void
     {
-        $scenario = $this->scenario();
-        $incidentSeat = Seat::query()->create([
-            'room_id' => $scenario['room']->id, 'row' => 'E', 'number' => 1, 'seat_code' => 'E1',
-            'type' => 'normal', 'status' => 'active',
-        ]);
-        RoomLayoutCell::query()->create([
-            'room_layout_id' => $scenario['layout']->id, 'x_position' => 5, 'y_position' => 4,
-            'cell_type' => 'seat', 'seat_id' => $incidentSeat->id,
-        ]);
+        $scenario = $this->scenario(includeIncidentSeat: true);
+        $incidentSeat = $scenario['seats']['E1'];
         $held = $this->booking($scenario['showtime'], 'HELD', 'pending_payment', 'unpaid');
         $this->bookingSeat($held, $scenario['seats']['A2'], 50000);
         $booked = $this->booking($scenario['showtime'], 'BOOKED', 'paid', 'paid');
@@ -274,7 +267,7 @@ final class SeatRelocationWorkflowTest extends TestCase
         ]);
         $otherLayout = RoomLayout::query()->create([
             'room_id' => $scenario['room']->id, 'version' => 2, 'name' => 'Other showtime layout',
-            'rows' => 5, 'columns' => 8, 'status' => 'archived',
+            'rows' => 5, 'columns' => 8, 'status' => 'draft',
         ]);
         $otherLayoutSeat = Seat::query()->create([
             'room_id' => $scenario['room']->id, 'row' => 'E', 'number' => 2, 'seat_code' => 'E2',
@@ -284,6 +277,7 @@ final class SeatRelocationWorkflowTest extends TestCase
             'room_layout_id' => $otherLayout->id, 'x_position' => 2, 'y_position' => 5,
             'cell_type' => 'seat', 'seat_id' => $otherLayoutSeat->id,
         ]);
+        $otherLayout->update(['status' => 'retired', 'published_at' => now()]);
         Showtime::query()->create([
             'movie_id' => $scenario['showtime']->movie_id, 'cinema_id' => $scenario['cinema']->id,
             'room_id' => $scenario['room']->id, 'room_layout_id' => $otherLayout->id,
@@ -685,16 +679,22 @@ final class SeatRelocationWorkflowTest extends TestCase
         $this->assertLessThanOrEqual(30, $staffQueries, "Staff replacement-print detail issued {$staffQueries} queries.");
     }
 
-    private function scenario(string $originalCode = 'A1', string $paymentStatus = 'success'): array
-    {
+    private function scenario(
+        string $originalCode = 'A1',
+        string $paymentStatus = 'success',
+        bool $includeIncidentSeat = false,
+    ): array {
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
         $room = Room::factory()->create(['cinema_id' => $cinema->id, 'code' => 'R'.str()->random(6)]);
-        $layout = RoomLayout::query()->create(['room_id' => $room->id, 'version' => 1, 'name' => 'Relocation', 'rows' => 4, 'columns' => 8, 'status' => 'published', 'published_at' => now()]);
+        $layout = RoomLayout::query()->create(['room_id' => $room->id, 'version' => 1, 'name' => 'Relocation', 'rows' => $includeIncidentSeat ? 5 : 4, 'columns' => 8, 'status' => 'draft']);
         $definitions = [
             ['A1', 'normal', null, null], ['A2', 'normal', null, null], ['A3', 'normal', null, null], ['B1', 'vip', null, null],
             ['C1', 'couple', 'C', 'left'], ['C2', 'couple', 'C', 'right'],
             ['D1', 'couple', 'D', 'left'], ['D2', 'couple', 'D', 'right'],
         ];
+        if ($includeIncidentSeat) {
+            $definitions[] = ['E1', 'normal', null, null];
+        }
         $seats = collect();
         foreach ($definitions as [$code, $type, $pair, $position]) {
             $seat = Seat::query()->create([
@@ -709,6 +709,7 @@ final class SeatRelocationWorkflowTest extends TestCase
             ]);
             $seats->put($code, $seat);
         }
+        $layout->update(['status' => 'published', 'published_at' => now()]);
         CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation base', 'rule_type' => 'base', 'amount_vnd' => 50000, 'priority' => 500, 'status' => 'active']);
         CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000, 'priority' => 500, 'status' => 'active']);
         CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000, 'priority' => 500, 'status' => 'active']);

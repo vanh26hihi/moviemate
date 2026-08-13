@@ -392,6 +392,10 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
             $this->assertDatabaseCount('showtimes', 1);
         } finally {
             DB::table('showtimes')->delete();
+            $integrityMigration = require database_path('migrations/2026_08_14_200000_harden_room_layout_history_integrity.php');
+            foreach (['room_layout_cells_prevent_immutable_insert', 'room_layout_cells_prevent_immutable_update', 'room_layout_cells_prevent_immutable_delete'] as $trigger) {
+                DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
+            }
             DB::table('room_layout_cells')->delete();
             DB::table('room_layouts')->delete();
             DB::table('seats')->delete();
@@ -399,6 +403,7 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
             DB::table('rooms')->delete();
             DB::table('movies')->delete();
             DB::table('presentation_formats')->delete();
+            $integrityMigration->up();
             DB::beginTransaction();
         }
     }

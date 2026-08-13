@@ -73,9 +73,9 @@ class RoomLayoutService
                 $name ?? "Điều chỉnh từ {$published->display_name}",
             );
 
-            $published->loadMissing('cells');
+            $published->loadMissing('cells.seat');
             foreach ($published->cells as $cell) {
-                $draft->cells()->create($cell->only(['x_position', 'y_position', 'cell_type', 'seat_id']));
+                $this->createCell($draft, $cell->only(['x_position', 'y_position', 'cell_type', 'seat_id']), $cell->seat);
             }
 
             return $draft->load('cells.seat');
@@ -116,7 +116,7 @@ class RoomLayoutService
 
             foreach ($normalized['cells'] as $cell) {
                 if ($cell['cell_type'] !== RoomLayoutCell::TYPE_SEAT) {
-                    $locked->cells()->create([
+                    $this->createCell($locked, [
                         'x_position' => $cell['x_position'],
                         'y_position' => $cell['y_position'],
                         'cell_type' => $cell['cell_type'],
@@ -167,12 +167,12 @@ class RoomLayoutService
                     ]);
                 }
 
-                $locked->cells()->create([
+                $this->createCell($locked, [
                     'x_position' => $cell['x_position'],
                     'y_position' => $cell['y_position'],
                     'cell_type' => 'seat',
                     'seat_id' => $seat->id,
-                ]);
+                ], $seat);
             }
 
             Seat::query()->where('room_id', $locked->room_id)
@@ -562,6 +562,20 @@ class RoomLayoutService
         return $index <= 26
             ? chr(64 + $index)
             : 'A'.chr(64 + $index - 26);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function createCell(RoomLayout $layout, array $attributes, ?Seat $seat = null): RoomLayoutCell
+    {
+        $cell = new RoomLayoutCell($attributes);
+        $cell->room_layout_id = $layout->id;
+        $cell->setRelation('layout', $layout);
+        if ($seat) {
+            $cell->setRelation('seat', $seat);
+        }
+        $cell->save();
+
+        return $cell;
     }
 
     private function payloadFromLayout(RoomLayout $layout): array

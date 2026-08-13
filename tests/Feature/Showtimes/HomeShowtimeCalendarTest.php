@@ -176,6 +176,7 @@ class HomeShowtimeCalendarTest extends TestCase
         $activeRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'active']);
         $layout = $this->publishRoomForDiscovery($activeRoom);
         $inactiveRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'inactive']);
+        $inactiveLayout = $this->publishedRoomLayoutFixture($inactiveRoom);
         $publicMovie = Movie::query()->create([
             'title' => 'Public calendar movie',
             'slug' => 'public-calendar-movie',
@@ -201,7 +202,7 @@ class HomeShowtimeCalendarTest extends TestCase
                 'movie_id' => $movie->id,
                 'cinema_id' => $cinema->id,
                 'room_id' => $room->id,
-                'room_layout_id' => $room->is($activeRoom) ? $layout->id : null,
+                'room_layout_id' => $room->is($activeRoom) ? $layout->id : $inactiveLayout->id,
                 'presentation_format_id' => $format->id,
                 'show_date' => '2026-08-07',
                 'show_time' => sprintf('%02d:30:00', 16 + $index),

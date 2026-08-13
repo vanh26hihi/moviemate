@@ -4,8 +4,6 @@ namespace Tests\Feature\Checkout;
 
 use App\Models\Booking;
 use App\Models\BookingSeat;
-use App\Models\RoomLayoutCell;
-use App\Models\Seat;
 use App\Services\BookingCheckoutPreviewService;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingExpirationService;
@@ -202,26 +200,10 @@ final class SeatGapCheckoutTest extends TestCase
 
     private function threeSeatScenario(): array
     {
-        $scenario = $this->bookingScenario(false);
+        $scenario = $this->bookingScenario(false, [], 2, 4, [[
+            'row' => 'A', 'number' => 3, 'seat_code' => 'A3', 'type' => 'normal', 'status' => 'active',
+        ]]);
         $scenario['seats'][1]->forceFill(['status' => 'active'])->save();
-        $third = Seat::query()->create([
-            'room_id' => $scenario['room']->id,
-            'row' => 'A',
-            'number' => 3,
-            'seat_code' => 'A3',
-            'type' => 'normal',
-            'status' => 'active',
-            'x_position' => 3,
-            'y_position' => 1,
-        ]);
-        RoomLayoutCell::query()->create([
-            'room_layout_id' => $scenario['layout']->id,
-            'x_position' => 3,
-            'y_position' => 1,
-            'cell_type' => 'seat',
-            'seat_id' => $third->id,
-        ]);
-        $scenario['seats'] = $scenario['seats']->push($third)->values();
 
         return $scenario;
     }

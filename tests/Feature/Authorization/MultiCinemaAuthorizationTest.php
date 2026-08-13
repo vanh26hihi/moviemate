@@ -157,9 +157,10 @@ final class MultiCinemaAuthorizationTest extends TestCase
         ]);
         $layout = RoomLayout::query()->create([
             'room_id' => $room->id, 'version' => 1, 'name' => 'Test',
-            'rows' => 1, 'columns' => 1, 'status' => 'published', 'published_at' => now(),
+            'rows' => 1, 'columns' => 1, 'status' => 'draft',
         ]);
         $layout->cells()->create(['x_position' => 1, 'y_position' => 1, 'cell_type' => 'seat', 'seat_id' => $seat->id]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
         $movie = Movie::query()->create([
             'title' => 'Branch Movie '.$cinema->code, 'slug' => 'branch-'.str()->lower(str()->random(8)),
             'duration' => 90, 'status' => 'now_showing',

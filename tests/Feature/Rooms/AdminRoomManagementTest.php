@@ -129,10 +129,12 @@ class AdminRoomManagementTest extends TestCase
         $admin = $this->userWithRole('admin');
         $room = $this->room();
         $movie = Movie::query()->create(['title' => 'Phim thử nghiệm', 'slug' => 'phim-thu-nghiem']);
+        $layout = $this->publishedRoomLayoutFixture($room);
         Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
             'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00:00',
@@ -159,8 +161,10 @@ class AdminRoomManagementTest extends TestCase
         $admin = $this->userWithRole('admin');
         $room = $this->room();
         $movie = Movie::query()->create(['title' => 'Phim lịch sử', 'slug' => 'phim-lich-su']);
+        $layout = $this->publishedRoomLayoutFixture($room);
         Showtime::query()->create([
             'movie_id' => $movie->id, 'cinema_id' => $room->cinema_id, 'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
             'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->subDay()->toDateString(), 'show_time' => '10:00:00',
             'price' => 70000, 'status' => 'finished',

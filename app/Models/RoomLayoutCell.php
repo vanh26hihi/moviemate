@@ -36,9 +36,20 @@ class RoomLayoutCell extends Model
     protected static function booted(): void
     {
         static::saving(function (RoomLayoutCell $cell): void {
-            $layout = $cell->layout()->first();
+            $layout = $cell->relationLoaded('layout') && $cell->getRelation('layout')?->id === $cell->room_layout_id
+                ? $cell->getRelation('layout')
+                : $cell->layout()->first();
             if (! $layout) {
                 throw new LogicException('Ô sơ đồ phải thuộc một sơ đồ ghế.');
+            }
+            if ($layout->status !== RoomLayout::STATUS_DRAFT) {
+                throw new LogicException('Chỉ ô thuộc bản nháp sơ đồ ghế mới được chỉnh sửa.');
+            }
+            if ($cell->exists && $cell->isDirty('room_layout_id')) {
+                $originalLayout = RoomLayout::query()->find($cell->getOriginal('room_layout_id'));
+                if ($originalLayout?->status !== RoomLayout::STATUS_DRAFT) {
+                    throw new LogicException('Chỉ ô thuộc bản nháp sơ đồ ghế mới được chỉnh sửa.');
+                }
             }
             if ($cell->x_position < 1 || $cell->x_position > $layout->columns
                 || $cell->y_position < 1 || $cell->y_position > $layout->rows) {
@@ -51,7 +62,9 @@ class RoomLayoutCell extends Model
                 throw new LogicException('Ô cấu trúc không thể tham chiếu đến ghế.');
             }
             if ($cell->cell_type === self::TYPE_SEAT) {
-                $seat = $cell->seat()->first();
+                $seat = $cell->relationLoaded('seat') && $cell->getRelation('seat')?->id === $cell->seat_id
+                    ? $cell->getRelation('seat')
+                    : $cell->seat()->first();
                 if (! $seat || $seat->room_id !== $layout->room_id) {
                     throw new LogicException('Ô ghế phải tham chiếu đến một ghế trong đúng phòng.');
                 }
@@ -59,13 +72,12 @@ class RoomLayoutCell extends Model
         });
 
         $assertMutable = function (RoomLayoutCell $cell): void {
-            $layout = $cell->layout()->first();
-            if ($layout?->status === 'published') {
-                throw new LogicException('Không thể chỉnh sửa ô thuộc sơ đồ ghế đã phát hành.');
+            $layout = $cell->relationLoaded('layout') ? $cell->getRelation('layout') : $cell->layout()->first();
+            if ($layout?->status !== RoomLayout::STATUS_DRAFT) {
+                throw new LogicException('Chỉ ô thuộc bản nháp sơ đồ ghế mới được chỉnh sửa.');
             }
         };
 
-        static::updating($assertMutable);
         static::deleting($assertMutable);
     }
 
