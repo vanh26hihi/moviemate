@@ -163,6 +163,29 @@
     </div>
 </section>
 
+@isset($branch360['finance'])
+@php($finance = $branch360['finance'])
+<section class="app-card mb-6 rounded-2xl border app-border p-6" aria-labelledby="branch-finance-title">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 id="branch-finance-title" class="text-lg font-bold app-text">Tài chính hôm nay</h2>
+            <p class="mt-1 text-sm app-muted">Theo ngày xác minh/thu tại chi nhánh {{ $finance['generatedAt']->format('d/m/Y') }}</p>
+        </div>
+        <a href="{{ $finance['reportUrl'] }}" class="admin-btn-secondary">Xem báo cáo chi nhánh</a>
+    </div>
+    <dl class="mt-5 grid gap-3 sm:grid-cols-2">
+        <div class="rounded-xl border app-border p-4">
+            <dt class="text-sm app-muted">Tiền đã xác minh/thu hôm nay</dt>
+            <dd class="mt-2 text-3xl font-extrabold text-brand-start">{{ number_format($finance['collectedAmount'], 0, ',', '.') }} ₫</dd>
+        </div>
+        <div class="rounded-xl border app-border p-4">
+            <dt class="text-sm app-muted">Đơn thanh toán hợp lệ hôm nay</dt>
+            <dd class="mt-2 text-3xl font-extrabold app-text">{{ number_format($finance['paidBookingCount'], 0, ',', '.') }} đơn</dd>
+        </div>
+    </dl>
+</section>
+@endisset
+
 <div class="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
     <section class="app-card rounded-2xl border app-border p-6 space-y-4">
         <div class="border-b app-border pb-3"><div class="text-xs uppercase app-muted">Quận / huyện</div><div class="mt-1 font-semibold app-text">{{ $cinema->district ?: '—' }}</div></div>

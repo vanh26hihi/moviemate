@@ -13,12 +13,14 @@ use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
 use App\Models\User;
 use App\Services\CinemaAccessService;
+use App\Services\Reports\AuthoritativePaymentQuery;
 use App\Services\Seats\SeatIncidentImpactClassifier;
 use App\Services\ShowtimeLifecycleService;
 use App\Services\ShowtimeScheduleService;
 use App\Services\Tickets\BookingTicketEligibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 final class Branch360ReadModel
 {
@@ -61,6 +63,7 @@ final class Branch360ReadModel
         private readonly ShowtimeScheduleService $schedule,
         private readonly SeatIncidentImpactClassifier $incidentClassifier,
         private readonly BookingTicketEligibility $ticketEligibility,
+        private readonly AuthoritativePaymentQuery $authoritativePayments,
     ) {}
 
     /**
@@ -79,7 +82,8 @@ final class Branch360ReadModel
      *     replacementPrintActionUrl:?string,
      *     overflowCount:int,
      *     limit:int
-     *   }
+     *   },
+     *   finance?: array{localDate:string,collectedAmount:int,paidBookingCount:int,reportUrl:string,generatedAt:CarbonImmutable}
      * }
      */
     public function snapshot(Cinema $cinema, User $actor): array
@@ -104,6 +108,9 @@ final class Branch360ReadModel
 
         $total = count($tasks);
         $items = array_slice($tasks, 0, self::PRESENTATION_LIMIT);
+        $finance = $actor->hasPermission('reports.view')
+            ? ['finance' => $this->financeContext($cinema, $localNow)]
+            : [];
 
         return [
             'header' => [
@@ -124,6 +131,36 @@ final class Branch360ReadModel
             ],
             ...$operations,
             'counterOperations' => $this->counterOperations($cinema, $actor, $localNow, $tasks),
+            ...$finance,
+        ];
+    }
+
+    /** @return array{localDate:string,collectedAmount:int,paidBookingCount:int,reportUrl:string,generatedAt:CarbonImmutable} */
+    private function financeContext(Cinema $cinema, CarbonImmutable $localNow): array
+    {
+        $localDate = $localNow->toDateString();
+        $start = $localNow->startOfDay()->utc();
+        $nextStart = $localNow->addDay()->startOfDay()->utc();
+        $aggregate = DB::query()
+            ->fromSub($this->authoritativePayments->authoritative(), 'authoritative_payments')
+            ->join('bookings as finance_bookings', 'finance_bookings.id', '=', 'authoritative_payments.booking_id')
+            ->where('finance_bookings.cinema_id', $cinema->id)
+            ->where('authoritative_payments.finance_paid_at', '>=', $start->toDateTimeString())
+            ->where('authoritative_payments.finance_paid_at', '<', $nextStart->toDateTimeString())
+            ->selectRaw('COUNT(*) as paid_booking_count')
+            ->selectRaw('COALESCE(SUM(authoritative_payments.amount), 0) as collected_amount')
+            ->first();
+
+        return [
+            'localDate' => $localDate,
+            'collectedAmount' => (int) ($aggregate?->collected_amount ?? 0),
+            'paidBookingCount' => (int) ($aggregate?->paid_booking_count ?? 0),
+            'reportUrl' => route('admin.reports.index', [
+                'from' => $localDate,
+                'to' => $localDate,
+                'cinema' => $cinema->id,
+            ]),
+            'generatedAt' => $localNow,
         ];
     }
 
