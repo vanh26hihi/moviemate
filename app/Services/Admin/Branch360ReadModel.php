@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Cinema;
 use App\Models\CinemaOperatingHour;
 use App\Models\Payment;
+use App\Models\Room;
 use App\Models\SeatIncidentImpact;
 use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
@@ -36,6 +37,23 @@ final class Branch360ReadModel
 
     private const PRIORITY_CLOSED_DAY = 70;
 
+    private const UPCOMING_SOON_MINUTES = 120;
+
+    private const ROOM_STATE_INACTIVE = 'INACTIVE';
+
+    private const ROOM_STATE_SHOWING = 'SHOWING';
+
+    private const ROOM_STATE_CLEANING = 'CLEANING';
+
+    private const ROOM_STATE_READY = 'READY';
+
+    private const ROOM_STATE_LABELS = [
+        self::ROOM_STATE_INACTIVE => 'Ngừng hoạt động',
+        self::ROOM_STATE_SHOWING => 'Đang chiếu',
+        self::ROOM_STATE_CLEANING => 'Đang vệ sinh',
+        self::ROOM_STATE_READY => 'Sẵn sàng theo lịch',
+    ];
+
     public function __construct(
         private readonly CinemaAccessService $cinemaAccess,
         private readonly ShowtimeLifecycleService $lifecycle,
@@ -46,7 +64,11 @@ final class Branch360ReadModel
     /**
      * @return array{
      *   header: array<string, mixed>,
-     *   actionQueue: array{items:list<array<string, mixed>>,total:int,remaining:int,limit:int}
+     *   actionQueue: array{items:list<array<string, mixed>>,total:int,remaining:int,limit:int},
+     *   todayOperations: array<string, mixed>,
+     *   playingNow: array{items:list<array<string, mixed>>,total:int},
+     *   upcomingSoon: array{items:list<array<string, mixed>>,untilAt:CarbonImmutable,horizonMinutes:int},
+     *   roomOperations: list<array<string, mixed>>
      * }
      */
     public function snapshot(Cinema $cinema, User $actor): array
@@ -60,6 +82,7 @@ final class Branch360ReadModel
             ->where('day_of_week', $localNow->dayOfWeekIso)
             ->first();
         $upcoming = $this->upcomingShowtimes($cinema);
+        $operations = $this->operationalSnapshot($cinema, $actor, $localNow);
         $tasks = [
             ...$this->incidentTasks($cinema, $actor, $upcoming, $timezone),
             ...$this->paymentTasks($cinema, $actor, $timezone),
@@ -88,6 +111,189 @@ final class Branch360ReadModel
                 'remaining' => max(0, $total - count($items)),
                 'limit' => self::PRESENTATION_LIMIT,
             ],
+            ...$operations,
+        ];
+    }
+
+    /**
+     * @return array{
+     *   todayOperations: array<string, mixed>,
+     *   playingNow: array{items:list<array<string, mixed>>,total:int},
+     *   upcomingSoon: array{items:list<array<string, mixed>>,untilAt:CarbonImmutable,horizonMinutes:int},
+     *   roomOperations: list<array<string, mixed>>
+     * }
+     */
+    private function operationalSnapshot(Cinema $cinema, User $actor, CarbonImmutable $localNow): array
+    {
+        $rooms = Room::query()
+            ->where('cinema_id', $cinema->id)
+            ->with([
+                'roomType:id,code,name',
+                'latestPublishedLayout' => fn ($query) => $query->select([
+                    'room_layouts.id',
+                    'room_layouts.room_id',
+                    'room_layouts.status',
+                    'room_layouts.version',
+                ]),
+            ])
+            ->withCount(['seatIncidents as open_incident_count' => fn ($query) => $query->where('status', 'open')])
+            ->orderBy('code')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($rooms as $room) {
+            $room->setRelation('cinema', $cinema);
+        }
+
+        $showtimes = $this->operationalShowtimeCandidates($cinema, $rooms, $localNow);
+        $snapshots = $showtimes->mapWithKeys(fn (Showtime $showtime): array => [
+            $showtime->id => $this->lifecycle->snapshot($showtime, $localNow),
+        ]);
+        $businessDate = $localNow->toDateString();
+        $today = $showtimes->filter(fn (Showtime $showtime): bool => $showtime->show_date->toDateString() === $businessDate);
+        $playing = $showtimes->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::PLAYING)
+            ->sort(fn (Showtime $left, Showtime $right): int => $this->compareShowtimes($left, $right, $snapshots));
+        $untilAt = $localNow->addMinutes(self::UPCOMING_SOON_MINUTES);
+        $upcomingSoon = $showtimes
+            ->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::UPCOMING
+                && $snapshots[$showtime->id]['starts_at']->gt($localNow)
+                && $snapshots[$showtime->id]['starts_at']->lte($untilAt))
+            ->sort(fn (Showtime $left, Showtime $right): int => $this->compareShowtimes($left, $right, $snapshots));
+
+        return [
+            'todayOperations' => [
+                'businessDate' => $businessDate,
+                'counts' => [
+                    'upcoming' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::UPCOMING)->count(),
+                    'playing' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::PLAYING)->count(),
+                    'completed' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::COMPLETED)->count(),
+                    'cancelled' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::CANCELLED)->count(),
+                ],
+            ],
+            'playingNow' => [
+                'items' => $playing->map(fn (Showtime $showtime): array => $this->showtimeProjection($showtime, $snapshots[$showtime->id], true))->values()->all(),
+                'total' => $playing->count(),
+            ],
+            'upcomingSoon' => [
+                'items' => $upcomingSoon->map(fn (Showtime $showtime): array => $this->showtimeProjection($showtime, $snapshots[$showtime->id]))->values()->all(),
+                'untilAt' => $untilAt,
+                'horizonMinutes' => self::UPCOMING_SOON_MINUTES,
+            ],
+            'roomOperations' => $this->roomOperations($rooms, $showtimes, $snapshots, $actor),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Room>  $rooms
+     * @return Collection<int, Showtime>
+     */
+    private function operationalShowtimeCandidates(Cinema $cinema, Collection $rooms, CarbonImmutable $localNow): Collection
+    {
+        if ($rooms->isEmpty()) {
+            return collect();
+        }
+
+        $lookbackMinutes = ShowtimeScheduleService::MAX_RUNTIME_MINUTES
+            + ShowtimeScheduleService::MAX_CLEANING_BUFFER_MINUTES;
+
+        $showtimes = Showtime::query()
+            ->where('cinema_id', $cinema->id)
+            ->whereIn('room_id', $rooms->pluck('id'))
+            ->whereDate('show_date', '>=', $localNow->subMinutes($lookbackMinutes)->toDateString())
+            ->with(['movie:id,title,duration', 'presentationFormat:id,code,name'])
+            ->orderBy('show_date')
+            ->orderBy('show_time')
+            ->orderBy('room_id')
+            ->orderBy('id')
+            ->get();
+        $roomsById = $rooms->keyBy('id');
+
+        foreach ($showtimes as $showtime) {
+            $showtime->setRelation('room', $roomsById->get($showtime->room_id));
+            $showtime->setRelation('cinema', $cinema);
+        }
+
+        return $showtimes;
+    }
+
+    /**
+     * @param  Collection<int, Room>  $rooms
+     * @param  Collection<int, Showtime>  $showtimes
+     * @param  Collection<int, array<string, mixed>>  $snapshots
+     * @return list<array<string, mixed>>
+     */
+    private function roomOperations(Collection $rooms, Collection $showtimes, Collection $snapshots, User $actor): array
+    {
+        $byRoom = $showtimes->groupBy('room_id');
+
+        return $rooms->map(function (Room $room) use ($byRoom, $snapshots, $actor): array {
+            $roomShowtimes = $byRoom->get($room->id, collect());
+            $active = $roomShowtimes->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] !== ShowtimeLifecycleService::CANCELLED);
+            $current = $active->first(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::PLAYING);
+            $cleaning = $active->first(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::COMPLETED
+                && $snapshots[$showtime->id]['now']->gte($snapshots[$showtime->id]['ends_at'])
+                && $snapshots[$showtime->id]['now']->lt($snapshots[$showtime->id]['room_ready_at']));
+            $next = $active->first(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::UPCOMING);
+            $state = match (true) {
+                $room->status === 'inactive' => self::ROOM_STATE_INACTIVE,
+                $current !== null => self::ROOM_STATE_SHOWING,
+                $cleaning !== null => self::ROOM_STATE_CLEANING,
+                default => self::ROOM_STATE_READY,
+            };
+            $layoutWarning = $room->status === 'active' && $room->latestPublishedLayout === null;
+
+            return [
+                'roomId' => (int) $room->id,
+                'code' => (string) $room->code,
+                'name' => (string) $room->name,
+                'roomType' => (string) ($room->roomType?->name ?: $room->room_type),
+                'persistedStatus' => (string) $room->status,
+                'operationalState' => $state,
+                'operationalStateLabel' => self::ROOM_STATE_LABELS[$state],
+                'currentShowtime' => $current ? $this->showtimeProjection($current, $snapshots[$current->id], true) : null,
+                'cleaningReadyAt' => $state === self::ROOM_STATE_CLEANING ? $snapshots[$cleaning->id]['room_ready_at'] : null,
+                'nextShowtime' => $next ? $this->showtimeProjection($next, $snapshots[$next->id]) : null,
+                'openIncidentCount' => (int) $room->open_incident_count,
+                'layoutWarning' => $layoutWarning,
+                'futureShowDrift' => $room->status === 'inactive' && $next !== null,
+                'roomUrl' => $actor->hasPermission('rooms.view') ? route('admin.rooms.show', $room) : null,
+                'incidentUrl' => (int) $room->open_incident_count > 0 && $actor->hasPermission('seats.maintenance.view')
+                    ? route('admin.rooms.seat-maintenance.index', $room)
+                    : null,
+                'layoutUrl' => $layoutWarning && $actor->hasPermission('seats.view')
+                    ? route('admin.rooms.layout.show', $room)
+                    : null,
+            ];
+        })->values()->all();
+    }
+
+    /** @param array<string, mixed> $snapshot @return array<string, mixed> */
+    private function showtimeProjection(Showtime $showtime, array $snapshot, bool $includeEnd = false): array
+    {
+        return [
+            'showtimeId' => (int) $showtime->id,
+            'movieTitle' => (string) $showtime->movie?->title,
+            'formatName' => (string) $showtime->presentationFormat?->name,
+            'roomId' => (int) $showtime->room_id,
+            'roomCode' => (string) $showtime->room?->code,
+            'roomName' => (string) $showtime->room?->name,
+            'startsAt' => $snapshot['starts_at'],
+            'endsAt' => $includeEnd ? $snapshot['ends_at'] : null,
+        ];
+    }
+
+    /** @param Collection<int, array<string, mixed>> $snapshots */
+    private function compareShowtimes(Showtime $left, Showtime $right, Collection $snapshots): int
+    {
+        return [
+            $snapshots[$left->id]['starts_at']->getTimestamp(),
+            (int) $left->room_id,
+            (int) $left->id,
+        ] <=> [
+            $snapshots[$right->id]['starts_at']->getTimestamp(),
+            (int) $right->room_id,
+            (int) $right->id,
         ];
     }
 

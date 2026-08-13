@@ -47,6 +47,90 @@
     @endif
 </section>
 
+@php($today = $branch360['todayOperations'])
+@php($playingNow = $branch360['playingNow'])
+@php($upcomingSoon = $branch360['upcomingSoon'])
+@php($roomOperations = $branch360['roomOperations'])
+<section class="app-card mb-6 rounded-2xl border app-border p-6" aria-labelledby="today-operations-title">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="today-operations-title" class="text-lg font-bold app-text">Vận hành hôm nay</h2>
+        <p class="text-sm app-muted">Ngày vận hành: {{ Carbon\CarbonImmutable::parse($today['businessDate'])->format('d/m/Y') }}</p>
+    </div>
+    @if(array_sum($today['counts']) === 0)
+        <p class="mt-4 app-muted">Hôm nay chưa có lịch chiếu.</p>
+    @else
+        <dl class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            @foreach(['playing' => 'Đang chiếu', 'upcoming' => 'Sắp chiếu', 'completed' => 'Đã hoàn tất', 'cancelled' => 'Đã hủy'] as $key => $label)
+                <div class="rounded-xl border app-border p-3"><dt class="text-xs uppercase app-muted">{{ $label }}</dt><dd class="mt-1 text-xl font-bold app-text">{{ $today['counts'][$key] }}</dd></div>
+            @endforeach
+        </dl>
+    @endif
+</section>
+
+<div class="mb-6 grid gap-6 lg:grid-cols-2">
+    <section class="app-card rounded-2xl border app-border p-6" aria-labelledby="playing-now-title">
+        <div class="flex items-center justify-between gap-3"><h2 id="playing-now-title" class="text-lg font-bold app-text">Đang diễn ra</h2><span class="text-sm app-muted">{{ $playingNow['total'] }} suất</span></div>
+        <p class="mt-1 text-xs app-muted">Trạng thái vật lý tại thời điểm hiện tại, có thể gồm suất bắt đầu từ ngày vận hành trước.</p>
+        <div class="mt-4 divide-y app-border">
+            @forelse($playingNow['items'] as $showtime)
+                <article class="py-3">
+                    <div class="flex flex-wrap items-start justify-between gap-2"><h3 class="font-semibold app-text">{{ $showtime['movieTitle'] }}</h3><span class="text-sm font-semibold text-brand-start">{{ $showtime['formatName'] }}</span></div>
+                    <p class="mt-1 text-sm app-muted">Phòng {{ $showtime['roomCode'] }} · {{ $showtime['roomName'] }} · {{ $showtime['startsAt']->format('H:i') }}–{{ $showtime['endsAt']->format('H:i') }}</p>
+                </article>
+            @empty
+                <p class="py-3 app-muted">Hiện không có suất đang chiếu.</p>
+            @endforelse
+        </div>
+    </section>
+
+    <section class="app-card rounded-2xl border app-border p-6" aria-labelledby="upcoming-soon-title">
+        <div class="flex items-center justify-between gap-3"><h2 id="upcoming-soon-title" class="text-lg font-bold app-text">Sắp tới 120 phút</h2><span class="text-sm app-muted">Đến {{ $upcomingSoon['untilAt']->format('H:i') }}</span></div>
+        <div class="mt-4 divide-y app-border">
+            @forelse($upcomingSoon['items'] as $showtime)
+                <article class="flex flex-wrap items-start justify-between gap-3 py-3">
+                    <div><h3 class="font-semibold app-text">{{ $showtime['movieTitle'] }}</h3><p class="mt-1 text-sm app-muted">{{ $showtime['formatName'] }} · Phòng {{ $showtime['roomCode'] }} · {{ $showtime['roomName'] }}</p></div>
+                    <time class="font-semibold text-brand-start">{{ $showtime['startsAt']->format('H:i') }}</time>
+                </article>
+            @empty
+                <p class="py-3 app-muted">Không có suất bắt đầu trong 120 phút tới.</p>
+            @endforelse
+        </div>
+    </section>
+</div>
+
+<section class="app-card mb-6 rounded-2xl border app-border p-6" aria-labelledby="room-operations-title">
+    <div class="flex flex-wrap items-center justify-between gap-3"><h2 id="room-operations-title" class="text-lg font-bold app-text">Vận hành phòng</h2>@can('rooms.create')<a href="{{ route('admin.rooms.create') }}" class="admin-btn-secondary">Thêm phòng</a>@endcan</div>
+    <div class="mt-4 grid gap-3 lg:grid-cols-2">
+        @forelse($roomOperations as $room)
+            <article class="rounded-xl border app-border p-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>@if($room['roomUrl'])<a href="{{ $room['roomUrl'] }}" class="font-bold app-text hover:text-brand-start">{{ $room['code'] }} · {{ $room['name'] }}</a>@else<span class="font-bold app-text">{{ $room['code'] }} · {{ $room['name'] }}</span>@endif<p class="mt-1 text-xs app-muted">Loại phòng: {{ $room['roomType'] }}</p></div>
+                    <span class="text-xs font-bold uppercase tracking-wide text-brand-start">{{ $room['operationalStateLabel'] }}</span>
+                </div>
+                @if($room['currentShowtime'])
+                    <p class="mt-3 text-sm app-text"><span class="font-semibold">Hiện tại:</span> {{ $room['currentShowtime']['formatName'] }} · {{ $room['currentShowtime']['movieTitle'] }} · {{ $room['currentShowtime']['startsAt']->format('H:i') }}–{{ $room['currentShowtime']['endsAt']->format('H:i') }}</p>
+                @elseif($room['cleaningReadyAt'])
+                    <p class="mt-3 text-sm app-text">Đang vệ sinh · Sẵn sàng lúc {{ $room['cleaningReadyAt']->format('H:i') }}</p>
+                @endif
+                @if($room['nextShowtime'])
+                    <p class="mt-2 text-sm app-muted"><span class="font-semibold app-text">Tiếp theo:</span> {{ $room['nextShowtime']['formatName'] }} · {{ $room['nextShowtime']['movieTitle'] }} · {{ $room['nextShowtime']['startsAt']->format($room['nextShowtime']['startsAt']->toDateString() === $today['businessDate'] ? 'H:i' : 'd/m/Y H:i') }}</p>
+                @elseif($room['persistedStatus'] === 'active')
+                    <p class="mt-2 text-sm app-muted">Chưa có suất tiếp theo.</p>
+                @endif
+                @if($room['openIncidentCount'] || $room['layoutWarning'] || $room['futureShowDrift'])
+                    <div class="mt-3 flex flex-wrap gap-2 text-xs">
+                        @if($room['openIncidentCount'])@if($room['incidentUrl'])<a href="{{ $room['incidentUrl'] }}" class="rounded-full border app-border px-2.5 py-1 text-warning">⚠ {{ $room['openIncidentCount'] }} sự cố đang mở</a>@else<span class="rounded-full border app-border px-2.5 py-1 text-warning">⚠ {{ $room['openIncidentCount'] }} sự cố đang mở</span>@endif @endif
+                        @if($room['layoutWarning'])@if($room['layoutUrl'])<a href="{{ $room['layoutUrl'] }}" class="rounded-full border app-border px-2.5 py-1 text-warning">⚠ Chưa có layout đã xuất bản</a>@else<span class="rounded-full border app-border px-2.5 py-1 text-warning">⚠ Chưa có layout đã xuất bản</span>@endif @endif
+                        @if($room['futureShowDrift'])<span class="rounded-full border app-border px-2.5 py-1 text-warning">⚠ Phòng ngừng hoạt động còn suất tương lai</span>@endif
+                    </div>
+                @endif
+            </article>
+        @empty
+            <p class="app-muted">Chi nhánh chưa có phòng chiếu.</p>
+        @endforelse
+    </div>
+</section>
+
 <div class="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
     <section class="app-card rounded-2xl border app-border p-6 space-y-4">
         <div class="border-b app-border pb-3"><div class="text-xs uppercase app-muted">Quận / huyện</div><div class="mt-1 font-semibold app-text">{{ $cinema->district ?: '—' }}</div></div>
