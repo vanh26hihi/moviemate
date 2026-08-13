@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\MovieController as AdminMovieController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentReconciliationController;
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
+use App\Http\Controllers\Admin\PresentationFormatController as AdminPresentationFormatController;
 use App\Http\Controllers\Admin\PricingRuleController as AdminPricingRuleController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
@@ -393,6 +394,19 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('roomType')->middleware('permission:room_types.manage')->name('room-types.update');
         Route::patch('/room-types/{roomType}/status', [AdminRoomTypeController::class, 'status'])
             ->whereNumber('roomType')->middleware('permission:room_types.manage')->name('room-types.status');
+
+        Route::get('/presentation-formats', [AdminPresentationFormatController::class, 'index'])
+            ->middleware('permission:presentation_formats.view')->name('presentation-formats.index');
+        Route::get('/presentation-formats/create', [AdminPresentationFormatController::class, 'create'])
+            ->middleware('permission:presentation_formats.manage')->name('presentation-formats.create');
+        Route::post('/presentation-formats', [AdminPresentationFormatController::class, 'store'])
+            ->middleware('permission:presentation_formats.manage')->name('presentation-formats.store');
+        Route::get('/presentation-formats/{presentationFormat}/edit', [AdminPresentationFormatController::class, 'edit'])
+            ->whereNumber('presentationFormat')->middleware('permission:presentation_formats.manage')->name('presentation-formats.edit');
+        Route::put('/presentation-formats/{presentationFormat}', [AdminPresentationFormatController::class, 'update'])
+            ->whereNumber('presentationFormat')->middleware('permission:presentation_formats.manage')->name('presentation-formats.update');
+        Route::patch('/presentation-formats/{presentationFormat}/archive', [AdminPresentationFormatController::class, 'archive'])
+            ->whereNumber('presentationFormat')->middleware('permission:presentation_formats.manage')->name('presentation-formats.archive');
 
         Route::patch('/rooms/{room}/status', [AdminRoomController::class, 'updateStatus'])
             ->middleware('permission:rooms.update')->name('rooms.status.update');
