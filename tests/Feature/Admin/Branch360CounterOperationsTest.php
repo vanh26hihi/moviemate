@@ -241,7 +241,7 @@ final class Branch360CounterOperationsTest extends TestCase
         $this->assertSame(0, collect($snapshot['actionQueue']['items'])->where('type', 'incident_replacement_print')->count());
     }
 
-    public function test_ui_is_compact_has_no_digital_fulfilment_or_finance_and_preserves_access_boundaries(): void
+    public function test_ui_is_compact_has_no_digital_fulfilment_and_preserves_access_boundaries(): void
     {
         $manager = $this->userWithRole('manager');
         $booking = $this->booking($this->showtime('2026-08-13', '11:00:00'), 'vnpay', evidence: 'online', ticketPrintCounts: [1, 0], couple: true);
