@@ -16,6 +16,7 @@ use App\Services\CinemaAccessService;
 use App\Services\Seats\SeatIncidentImpactClassifier;
 use App\Services\ShowtimeLifecycleService;
 use App\Services\ShowtimeScheduleService;
+use App\Services\Tickets\BookingTicketEligibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
@@ -59,6 +60,7 @@ final class Branch360ReadModel
         private readonly ShowtimeLifecycleService $lifecycle,
         private readonly ShowtimeScheduleService $schedule,
         private readonly SeatIncidentImpactClassifier $incidentClassifier,
+        private readonly BookingTicketEligibility $ticketEligibility,
     ) {}
 
     /**
@@ -68,7 +70,16 @@ final class Branch360ReadModel
      *   todayOperations: array<string, mixed>,
      *   playingNow: array{items:list<array<string, mixed>>,total:int},
      *   upcomingSoon: array{items:list<array<string, mixed>>,untilAt:CarbonImmutable,horizonMinutes:int},
-     *   roomOperations: list<array<string, mixed>>
+     *   roomOperations: list<array<string, mixed>>,
+     *   counterOperations: array{
+     *     firstPrintBookingCount:int,
+     *     unprintedTicketCount:int,
+     *     items:list<array<string, mixed>>,
+     *     replacementPrintPendingCount:int,
+     *     replacementPrintActionUrl:?string,
+     *     overflowCount:int,
+     *     limit:int
+     *   }
      * }
      */
     public function snapshot(Cinema $cinema, User $actor): array
@@ -112,6 +123,96 @@ final class Branch360ReadModel
                 'limit' => self::PRESENTATION_LIMIT,
             ],
             ...$operations,
+            'counterOperations' => $this->counterOperations($cinema, $actor, $localNow, $tasks),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $actionTasks
+     * @return array<string, mixed>
+     */
+    private function counterOperations(Cinema $cinema, User $actor, CarbonImmutable $localNow, array $actionTasks): array
+    {
+        $query = Booking::query()
+            ->where('bookings.cinema_id', $cinema->id)
+            ->whereHas('showtime', fn ($showtimes) => $showtimes
+                ->whereDate('show_date', '>=', $localNow->toDateString())
+                ->where('status', '!=', ShowtimeLifecycleService::CANCELLED))
+            ->whereHas('admissionTickets', fn ($tickets) => $tickets->where('print_count', 0))
+            ->with([
+                'showtime.movie:id,title,duration',
+                'showtime.room:id,cinema_id,code,name,cleaning_buffer_minutes',
+                'showtime.presentationFormat:id,code,name',
+            ])
+            ->withCount([
+                'admissionTickets as total_ticket_count',
+                'admissionTickets as printed_ticket_count' => fn ($tickets) => $tickets->where('print_count', '>', 0),
+                'admissionTickets as unprinted_ticket_count' => fn ($tickets) => $tickets->where('print_count', 0),
+            ])
+            ->orderBy('bookings.id');
+        $this->ticketEligibility->applyPrintableBookingFilter($query);
+
+        $bookings = $query->get()
+            ->filter(function (Booking $booking) use ($cinema, $localNow): bool {
+                $showtime = $booking->showtime;
+                if (! $showtime || ! $showtime->room || ! $showtime->movie) {
+                    return false;
+                }
+                $showtime->setRelation('cinema', $cinema);
+                $showtime->room->setRelation('cinema', $cinema);
+
+                return $this->lifecycle->state($showtime, $localNow) === ShowtimeLifecycleService::UPCOMING;
+            })
+            ->sort(function (Booking $left, Booking $right): int {
+                $leftStart = $this->schedule->windowFor($left->showtime)->start;
+                $rightStart = $this->schedule->windowFor($right->showtime)->start;
+
+                return [$leftStart->getTimestamp(), (int) $left->id]
+                    <=> [$rightStart->getTimestamp(), (int) $right->id];
+            })
+            ->values();
+
+        $total = $bookings->count();
+        $unprinted = $bookings->sum(fn (Booking $booking): int => (int) $booking->unprinted_ticket_count);
+        $replacementTasks = collect($actionTasks)->where('type', 'incident_replacement_print');
+        $replacementTask = $replacementTasks->first();
+        $canOpenTicketOperations = $actor->hasPermission('tickets.lookup');
+        $items = $bookings->take(self::PRESENTATION_LIMIT)->map(function (Booking $booking) use ($canOpenTicketOperations): array {
+            $showtime = $booking->showtime;
+            $startsAt = $this->schedule->windowFor($showtime)->start;
+            $totalTickets = (int) $booking->total_ticket_count;
+            $printedTickets = (int) $booking->printed_ticket_count;
+            $unprintedTickets = (int) $booking->unprinted_ticket_count;
+
+            return [
+                'bookingId' => (int) $booking->id,
+                'bookingCode' => (string) $booking->booking_code,
+                'showtimeId' => (int) $showtime->id,
+                'movieTitle' => (string) $showtime->movie?->title,
+                'presentationFormat' => (string) $showtime->presentationFormat?->name,
+                'roomId' => (int) $showtime->room_id,
+                'roomCode' => (string) $showtime->room?->code,
+                'roomName' => (string) $showtime->room?->name,
+                'startsAt' => $startsAt,
+                'totalTicketCount' => $totalTickets,
+                'printedTicketCount' => $printedTickets,
+                'unprintedTicketCount' => $unprintedTickets,
+                'taskType' => 'first_print_pending',
+                'taskMessage' => "Đơn {$booking->booking_code} còn {$unprintedTickets}/{$totalTickets} vé chưa in.",
+                'actionLabel' => $canOpenTicketOperations ? 'Xử lý vé' : null,
+                'actionUrl' => $canOpenTicketOperations ? route('staff.tickets.operations', $booking) : null,
+                'sortKey' => $startsAt->format('Y-m-d H:i:s').':'.str_pad((string) $booking->id, 20, '0', STR_PAD_LEFT),
+            ];
+        })->all();
+
+        return [
+            'firstPrintBookingCount' => $total,
+            'unprintedTicketCount' => $unprinted,
+            'items' => $items,
+            'replacementPrintPendingCount' => $replacementTasks->count(),
+            'replacementPrintActionUrl' => $replacementTask['actionUrl'] ?? null,
+            'overflowCount' => max(0, $total - count($items)),
+            'limit' => self::PRESENTATION_LIMIT,
         ];
     }
 
