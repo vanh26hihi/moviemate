@@ -7,6 +7,7 @@ use App\Models\BookingSeat;
 use App\Models\Cinema;
 use App\Models\CinemaPricingRule;
 use App\Models\Room;
+use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingTokenService;
@@ -272,7 +273,7 @@ class DynamicSeatBookingTest extends TestCase
 
     public function test_showtime_without_published_layout_cannot_open_seat_map(): void
     {
-        $this->showtime->update(['room_layout_id' => null]);
+        $this->showtime->roomLayout()->update(['status' => RoomLayout::STATUS_RETIRED]);
         $this->get(route('user.bookings.selectSeat', $this->showtime))
             ->assertRedirect(route('user.movies.show', 'booking-movie'));
     }

@@ -319,8 +319,7 @@ final class Branch360ReadModelTest extends TestCase
             'name' => 'Branch 360 Layout '.$this->sequence,
             'rows' => 1,
             'columns' => 1,
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
         $layout->cells()->create([
             'x_position' => 1,
@@ -328,6 +327,7 @@ final class Branch360ReadModelTest extends TestCase
             'cell_type' => 'seat',
             'seat_id' => $seat->id,
         ]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
         $movie = Movie::query()->create([
             'title' => 'Branch 360 Movie '.$this->sequence,
             'slug' => 'branch-360-movie-'.$this->sequence,

@@ -19,8 +19,13 @@ use App\Services\CinemaContext;
 
 trait CreatesBookingFixtures
 {
-    protected function bookingScenario(bool $withCouple = true): array
-    {
+    protected function bookingScenario(
+        bool $withCouple = true,
+        array $extraLayoutCells = [],
+        int $layoutRows = 2,
+        int $layoutColumns = 4,
+        array $extraSeats = [],
+    ): array {
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
         $room = Room::query()->create([
             'cinema_id' => $cinema->id,
@@ -69,13 +74,25 @@ trait CreatesBookingFixtures
                 ]),
             );
         }
+        foreach ($extraSeats as $attributes) {
+            $seats->push(Seat::query()->create([
+                'room_id' => $room->id,
+                'row' => $attributes['row'],
+                'number' => $attributes['number'],
+                'seat_code' => $attributes['seat_code'],
+                'type' => $attributes['type'] ?? 'normal',
+                'status' => $attributes['status'] ?? 'active',
+                'pair_code' => $attributes['pair_code'] ?? null,
+                'pair_position' => $attributes['pair_position'] ?? null,
+            ]));
+        }
 
         $layout = RoomLayout::query()->create([
             'room_id' => $room->id,
             'version' => 1,
             'name' => 'Test layout',
-            'rows' => 2,
-            'columns' => 4,
+            'rows' => $layoutRows,
+            'columns' => $layoutColumns,
             'status' => 'draft',
         ]);
         foreach ($seats as $index => $seat) {
@@ -85,6 +102,15 @@ trait CreatesBookingFixtures
                 'y_position' => 1,
                 'cell_type' => 'seat',
                 'seat_id' => $seat->id,
+            ]);
+        }
+        foreach ($extraLayoutCells as $cell) {
+            RoomLayoutCell::query()->create([
+                'room_layout_id' => $layout->id,
+                'x_position' => $cell['x_position'],
+                'y_position' => $cell['y_position'],
+                'cell_type' => $cell['cell_type'],
+                'seat_id' => $cell['seat_id'] ?? null,
             ]);
         }
         $layout->update(['status' => 'published', 'published_at' => now()]);

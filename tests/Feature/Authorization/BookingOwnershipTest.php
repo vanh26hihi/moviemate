@@ -56,10 +56,12 @@ class BookingOwnershipTest extends TestCase
         $movie = Movie::query()->create(['title' => 'Test Movie', 'slug' => 'test-movie-'.uniqid()]);
         $cinema = Cinema::query()->create(['name' => 'Test Cinema', 'address' => '1 Test St', 'city' => 'Test']);
         $room = Room::query()->create(['cinema_id' => $cinema->id, 'name' => 'Room 1']);
+        $layout = $this->publishedRoomLayoutFixture($room);
         $showtime = Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
             'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '19:00:00',

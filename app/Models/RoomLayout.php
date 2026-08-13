@@ -11,6 +11,14 @@ use LogicException;
 
 class RoomLayout extends Model
 {
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_PUBLISHED = 'published';
+
+    public const STATUS_RETIRED = 'retired';
+
+    public const STRUCTURAL_FIELDS = ['room_id', 'version', 'rows', 'columns', 'screen_position'];
+
     protected $fillable = [
         'room_id',
         'version',
@@ -40,7 +48,18 @@ class RoomLayout extends Model
     protected static function booted(): void
     {
         static::updating(function (RoomLayout $layout): void {
-            if ($layout->getOriginal('status') === 'published') {
+            $originalStatus = $layout->getOriginal('status');
+            $isRetirement = $originalStatus === self::STATUS_PUBLISHED
+                && $layout->status === self::STATUS_RETIRED
+                && ! $layout->isDirty(self::STRUCTURAL_FIELDS);
+
+            if ($originalStatus === self::STATUS_DRAFT) {
+                return;
+            }
+
+            if ($layout->isDirty(self::STRUCTURAL_FIELDS)
+                || ($layout->isDirty('status') && ! $isRetirement)
+                || ($originalStatus === self::STATUS_PUBLISHED && ! $isRetirement)) {
                 throw new LogicException('Không thể chỉnh sửa sơ đồ ghế đã phát hành.');
             }
         });

@@ -246,8 +246,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'name' => 'Test',
             'rows' => 1,
             'columns' => 1,
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
         $layout->cells()->create([
             'x_position' => 1,
@@ -255,6 +254,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'cell_type' => 'seat',
             'seat_id' => $seat->id,
         ]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
         $movie = Movie::query()->create([
             'title' => 'Branch Movie '.$cinema->code,
             'slug' => 'branch-'.str()->lower(str()->random(8)),

@@ -78,12 +78,8 @@ class SeatMaintenanceOperationsTest extends TestCase
 
     public function test_room_pages_link_to_maintenance_and_index_filters_and_paginates_units(): void
     {
-        [$room, $layout, $seats] = $this->roomWithSeats('FILTER');
+        [$room, $layout, $seats] = $this->roomWithSeats('FILTER', normalCount: 18);
         $seats[1]->update(['status' => 'maintenance']);
-        foreach (range(3, 18) as $number) {
-            $seat = $this->seat($room, 'A', $number);
-            $this->cell($layout, $seat, $number, 1);
-        }
         $manager = $this->userWithRole('manager');
         $url = route('admin.rooms.seat-maintenance.index', $room);
 
@@ -301,8 +297,7 @@ class SeatMaintenanceOperationsTest extends TestCase
 
     public function test_bulk_is_deduplicated_expands_couples_and_is_all_or_nothing(): void
     {
-        [$room, $layout, $normal] = $this->roomWithSeats('BULK');
-        $pair = $this->addCouple($room, $layout, 'B', 1, 'B-PAIR');
+        [$room, $layout, $normal, $pair] = $this->roomWithSeats('BULK', withAdditionalCouple: true);
         $admin = $this->userWithRole('admin');
 
         $this->actingAs($admin)
@@ -351,9 +346,11 @@ class SeatMaintenanceOperationsTest extends TestCase
         $oldLayout = $this->layout($room, 1, 'Sơ đồ cũ');
         $oldSeat = $this->seat($room, 'Z', 1, 'retired');
         $this->cell($oldLayout, $oldSeat, 1, 1);
+        $oldLayout->update(['status' => 'published', 'published_at' => now()]);
         $currentLayout = $this->layout($room, 2, 'Sơ đồ hiện hành');
         $currentSeat = $this->seat($room, 'A', 1);
         $this->cell($currentLayout, $currentSeat, 1, 1);
+        $currentLayout->update(['status' => 'published', 'published_at' => now()]);
         $admin = $this->userWithRole('admin');
 
         $this->actingAs($admin)
@@ -371,8 +368,7 @@ class SeatMaintenanceOperationsTest extends TestCase
 
     public function test_query_counts_remain_bounded_for_index_and_mutations(): void
     {
-        [$room, $layout, $seats] = $this->roomWithSeats('QUERIES');
-        $pair = $this->addCouple($room, $layout, 'B', 1, 'QUERY-PAIR');
+        [$room, $layout, $seats, $pair] = $this->roomWithSeats('QUERIES', withAdditionalCouple: true);
         $admin = $this->userWithRole('admin');
         $queries = 0;
         DB::listen(function () use (&$queries): void {
@@ -429,23 +425,33 @@ class SeatMaintenanceOperationsTest extends TestCase
     }
 
     /** @return array{Room, RoomLayout, array<int, Seat>} */
-    private function roomWithSeats(string $code = 'MAINT', bool $couple = false): array
-    {
+    private function roomWithSeats(
+        string $code = 'MAINT',
+        bool $couple = false,
+        int $normalCount = 2,
+        bool $withAdditionalCouple = false,
+    ): array {
         $room = Room::factory()->create([
             'cinema_id' => app(CinemaContext::class)->id(),
             'code' => $code,
         ]);
         $layout = $this->layout($room, 1, 'Sơ đồ hiện hành');
         if ($couple) {
-            return [$room, $layout, $this->addCouple($room, $layout, 'A', 1, 'A-PAIR')];
+            $seats = $this->addCouple($room, $layout, 'A', 1, 'A-PAIR');
+            $layout->update(['status' => 'published', 'published_at' => now()]);
+
+            return [$room, $layout, $seats];
         }
 
-        $seats = [$this->seat($room, 'A', 1), $this->seat($room, 'A', 2)];
+        $seats = collect(range(1, $normalCount))->map(fn (int $number): Seat => $this->seat($room, 'A', $number))->all();
         foreach ($seats as $index => $seat) {
             $this->cell($layout, $seat, $index + 1, 1);
         }
 
-        return [$room, $layout, $seats];
+        $pair = $withAdditionalCouple ? $this->addCouple($room, $layout, 'B', 1, 'B-PAIR') : [];
+        $layout->update(['status' => 'published', 'published_at' => now()]);
+
+        return [$room, $layout, $seats, $pair];
     }
 
     private function layout(Room $room, int $version, string $name): RoomLayout
@@ -457,8 +463,7 @@ class SeatMaintenanceOperationsTest extends TestCase
             'rows' => 5,
             'columns' => 20,
             'screen_position' => 'top',
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
     }
 

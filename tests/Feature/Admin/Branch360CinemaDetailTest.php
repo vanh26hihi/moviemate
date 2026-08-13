@@ -172,8 +172,7 @@ final class Branch360CinemaDetailTest extends TestCase
             'name' => 'UI Layout '.$this->sequence,
             'rows' => 1,
             'columns' => 1,
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
         $layout->cells()->create([
             'x_position' => 1,
@@ -181,6 +180,7 @@ final class Branch360CinemaDetailTest extends TestCase
             'cell_type' => 'seat',
             'seat_id' => $seat->id,
         ]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
         $movie = Movie::query()->create([
             'title' => 'UI Movie '.$this->sequence,
             'slug' => 'ui-movie-'.$this->sequence,

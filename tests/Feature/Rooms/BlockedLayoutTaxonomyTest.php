@@ -23,15 +23,12 @@ final class BlockedLayoutTaxonomyTest extends TestCase
 
     public function test_customer_admin_and_staff_maps_render_blocked_as_a_non_seat(): void
     {
-        $scenario = $this->bookingScenario(false);
-        $layout = $scenario['layout'];
-        RoomLayoutCell::query()->create([
-            'room_layout_id' => $layout->id,
+        $scenario = $this->bookingScenario(false, [[
             'x_position' => 1,
             'y_position' => 2,
             'cell_type' => RoomLayoutCell::TYPE_BLOCKED,
             'seat_id' => null,
-        ]);
+        ]]);
 
         $customer = $this->get(route('user.bookings.selectSeat', $scenario['showtime']))->assertOk();
         $this->assertStructuralBlockedNode($customer->getContent(), 1);
@@ -49,16 +46,12 @@ final class BlockedLayoutTaxonomyTest extends TestCase
 
     public function test_one_and_one_hundred_blocked_cells_have_constant_map_query_counts(): void
     {
-        $scenario = $this->bookingScenario(false);
-        $layout = $scenario['layout'];
-        DB::table('room_layouts')->where('id', $layout->id)->update(['rows' => 10, 'columns' => 12]);
-        RoomLayoutCell::query()->create([
-            'room_layout_id' => $layout->id,
+        $scenario = $this->bookingScenario(false, [[
             'x_position' => 3,
             'y_position' => 1,
             'cell_type' => RoomLayoutCell::TYPE_BLOCKED,
             'seat_id' => null,
-        ]);
+        ]], 10, 12);
 
         DB::enableQueryLog();
         DB::flushQueryLog();
@@ -72,30 +65,28 @@ final class BlockedLayoutTaxonomyTest extends TestCase
 
         $coordinates = collect(range(1, 10))->flatMap(fn (int $y) => collect(range(1, 12))
             ->map(fn (int $x): array => ['x' => $x, 'y' => $y]))
-            ->reject(fn (array $coordinate): bool => $coordinate['y'] === 1 && in_array($coordinate['x'], [1, 2, 3], true))
-            ->take(99);
-        $now = now();
-        DB::table('room_layout_cells')->insert($coordinates->map(fn (array $coordinate): array => [
-            'room_layout_id' => $layout->id,
-            'x_position' => $coordinate['x'],
-            'y_position' => $coordinate['y'],
-            'cell_type' => RoomLayoutCell::TYPE_BLOCKED,
-            'seat_id' => null,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ])->all());
+            ->reject(fn (array $coordinate): bool => $coordinate['y'] === 1 && in_array($coordinate['x'], [1, 2], true))
+            ->take(100)
+            ->map(fn (array $coordinate): array => [
+                'x_position' => $coordinate['x'],
+                'y_position' => $coordinate['y'],
+                'cell_type' => RoomLayoutCell::TYPE_BLOCKED,
+                'seat_id' => null,
+            ])->all();
+        $manyScenario = $this->bookingScenario(false, $coordinates, 10, 12);
+        $layout = $manyScenario['layout'];
 
         DB::flushQueryLog();
-        $manyResponse = $this->get(route('user.bookings.selectSeat', $scenario['showtime']))->assertOk();
+        $manyResponse = $this->get(route('user.bookings.selectSeat', $manyScenario['showtime']))->assertOk();
         $customerMany = count(DB::getQueryLog());
 
         DB::flushQueryLog();
-        $this->get(route('admin.rooms.layout.show', $scenario['room']))->assertOk();
+        $this->get(route('admin.rooms.layout.show', $manyScenario['room']))->assertOk();
         $editorMany = count(DB::getQueryLog());
 
         $staff = $this->userWithRole('staff');
         DB::flushQueryLog();
-        $this->actingAs($staff)->get(route('staff.counter.seats', $scenario['showtime']))->assertOk();
+        $this->actingAs($staff)->get(route('staff.counter.seats', $manyScenario['showtime']))->assertOk();
         $counterMany = count(DB::getQueryLog());
         DB::disableQueryLog();
 

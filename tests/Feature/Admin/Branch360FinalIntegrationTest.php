@@ -123,11 +123,13 @@ final class Branch360FinalIntegrationTest extends TestCase
             'duration' => 90,
             'status' => 'now_showing',
         ]);
+        $layout = $this->publishedRoomLayoutFixture($room);
 
         return Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $this->cinema->id,
             'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
             'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => '2026-08-13',
             'show_time' => '10:30:00',

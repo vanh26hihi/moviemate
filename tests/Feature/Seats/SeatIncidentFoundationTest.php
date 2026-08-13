@@ -195,8 +195,7 @@ final class SeatIncidentFoundationTest extends TestCase
 
     public function test_couple_records_both_positions_but_cancels_shared_booking_once(): void
     {
-        [$room, $layout] = $this->roomWithSeats('COUPLE', 0);
-        $seats = $this->couple($room, $layout);
+        [$room, $layout, $seats] = $this->roomWithSeats('COUPLE', 0, true);
         $showtime = $this->showtime($room, $layout, now()->addDay()->toDateString(), '20:00:00');
         $booking = $this->booking($showtime, 'COUPLE-HOLD');
         foreach ($seats as $seat) {
@@ -316,6 +315,7 @@ final class SeatIncidentFoundationTest extends TestCase
         foreach ($seats as $index => $seat) {
             $this->cell($newLayout, $seat, $index + 1, 1);
         }
+        $newLayout->update(['status' => 'published', 'published_at' => now()]);
 
         $this->actingAs($this->userWithRole('manager'))->patch(
             route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]),
@@ -424,7 +424,7 @@ final class SeatIncidentFoundationTest extends TestCase
     }
 
     /** @return array{Room, RoomLayout, array<int, Seat>} */
-    private function roomWithSeats(string $code = 'INC', int $count = 2): array
+    private function roomWithSeats(string $code = 'INC', int $count = 2, bool $withCouple = false): array
     {
         $room = Room::factory()->create(['cinema_id' => app(CinemaContext::class)->id(), 'code' => $code]);
         $layout = $this->layout($room, 1);
@@ -434,13 +434,17 @@ final class SeatIncidentFoundationTest extends TestCase
             $this->cell($layout, $seat, $number, 1);
             $seats[] = $seat;
         }
+        if ($withCouple) {
+            $seats = $this->couple($room, $layout);
+        }
+        $layout->update(['status' => 'published', 'published_at' => now()]);
 
         return [$room, $layout, $seats];
     }
 
     private function layout(Room $room, int $version): RoomLayout
     {
-        return RoomLayout::query()->create(['room_id' => $room->id, 'version' => $version, 'name' => 'Layout '.$version, 'rows' => 5, 'columns' => 20, 'screen_position' => 'top', 'status' => 'published', 'published_at' => now()]);
+        return RoomLayout::query()->create(['room_id' => $room->id, 'version' => $version, 'name' => 'Layout '.$version, 'rows' => 5, 'columns' => 20, 'screen_position' => 'top', 'status' => 'draft']);
     }
 
     private function cell(RoomLayout $layout, Seat $seat, int $x, int $y): void

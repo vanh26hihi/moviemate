@@ -65,8 +65,7 @@ class AdminNavigationFoundationTest extends TestCase
             'rows' => 1,
             'columns' => 1,
             'screen_position' => 'top',
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
         $seat = Seat::query()->create([
             'room_id' => $room->id,
@@ -83,6 +82,7 @@ class AdminNavigationFoundationTest extends TestCase
             'cell_type' => 'seat',
             'seat_id' => $seat->id,
         ]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
 
         $navigation = $this->navigationHtml(
             $this->actingAs($this->userWithRole('admin'))

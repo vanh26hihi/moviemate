@@ -33,12 +33,13 @@ trait CreatesPublicDiscoveryFixtures
         ]);
         $layout = RoomLayout::query()->create([
             'room_id' => $room->id, 'version' => 1, 'name' => 'Public test layout',
-            'rows' => 1, 'columns' => 1, 'status' => 'published', 'published_at' => now(),
+            'rows' => 1, 'columns' => 1, 'status' => 'draft',
         ]);
         RoomLayoutCell::query()->create([
             'room_layout_id' => $layout->id, 'x_position' => 1, 'y_position' => 1,
             'cell_type' => 'seat', 'seat_id' => $seat->id,
         ]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
         foreach (range(1, 7) as $day) {
             CinemaOperatingHour::query()->updateOrCreate(
                 ['cinema_id' => $cinema->id, 'day_of_week' => $day],
@@ -81,12 +82,15 @@ trait CreatesPublicDiscoveryFixtures
         ]);
         $layout = RoomLayout::query()->create([
             'room_id' => $room->id, 'version' => 1, 'name' => 'Public layout',
-            'rows' => 1, 'columns' => 1, 'status' => $attributes['layout_status'] ?? 'published',
-            'published_at' => ($attributes['layout_status'] ?? 'published') === 'published' ? now() : null,
+            'rows' => 1, 'columns' => 1, 'status' => 'draft',
         ]);
         RoomLayoutCell::query()->create([
             'room_layout_id' => $layout->id, 'x_position' => 1, 'y_position' => 1,
             'cell_type' => 'seat', 'seat_id' => $seat->id,
+        ]);
+        $layout->update([
+            'status' => $attributes['layout_status'] ?? 'published',
+            'published_at' => ($attributes['layout_status'] ?? 'published') === 'published' ? now() : null,
         ]);
         foreach (range(1, 7) as $day) {
             CinemaOperatingHour::query()->create([

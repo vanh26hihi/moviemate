@@ -5,8 +5,6 @@ namespace Tests\Feature\Checkout;
 use App\Models\FoodItem;
 use App\Models\Order;
 use App\Models\Payment;
-use App\Models\RoomLayoutCell;
-use App\Models\Seat;
 use App\Services\Tickets\BookingQrPayload;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -14,22 +12,9 @@ class CheckoutUiPolishTest extends PaymentTestCase
 {
     public function test_seat_food_and_review_views_share_mobile_safe_four_step_progress(): void
     {
-        $scenario = $this->bookingScenario();
-        $vip = Seat::query()->create([
-            'room_id' => $scenario['room']->id,
-            'row' => 'C',
-            'number' => 1,
-            'seat_code' => 'C1',
-            'type' => 'vip',
-            'status' => 'active',
-        ]);
-        RoomLayoutCell::query()->create([
-            'room_layout_id' => $scenario['layout']->id,
-            'x_position' => 1,
-            'y_position' => 2,
-            'cell_type' => 'seat',
-            'seat_id' => $vip->id,
-        ]);
+        $scenario = $this->bookingScenario(true, [], 2, 5, [[
+            'row' => 'C', 'number' => 1, 'seat_code' => 'C1', 'type' => 'vip', 'status' => 'active',
+        ]]);
 
         $this->get(route('user.bookings.selectSeat', $scenario['showtime']))
             ->assertOk()

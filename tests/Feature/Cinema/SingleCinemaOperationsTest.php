@@ -184,11 +184,13 @@ class SingleCinemaOperationsTest extends TestCase
 
         $this->assertDatabaseCount('showtimes', 0);
 
+        $archivedLayout = $this->publishedRoomLayoutFixture($archived);
         $archivedShowtime = Showtime::query()->create([
             ...$payload,
             'show_time' => '20:00:00',
             'cinema_id' => $canonical->id,
             'room_id' => $archived->id,
+            'room_layout_id' => $archivedLayout->id,
         ]);
         $seat = Seat::query()->create([
             'room_id' => $archived->id,

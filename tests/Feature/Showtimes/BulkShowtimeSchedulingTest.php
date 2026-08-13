@@ -221,7 +221,10 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         $room->update(['status' => 'active']);
         $room->layouts()->update(['status' => 'retired']);
         $this->assertPreviewCode($admin, $this->row('layout', $movie, $room, time: '21:00'), 'LAYOUT_UNAVAILABLE');
-        $room->layouts()->update(['status' => 'published']);
+        RoomLayout::query()->create([
+            'room_id' => $room->id, 'version' => 2, 'rows' => 1, 'columns' => 1,
+            'screen_position' => 'top', 'status' => 'published', 'published_at' => now(),
+        ]);
         $movie->update(['duration' => 0]);
         $this->assertPreviewCode($admin, $this->row('runtime', $movie, $room, time: '21:00'), 'INVALID_RUNTIME');
     }
@@ -426,7 +429,10 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             [$this->row('layout', $movie, $this->rooms['P01'])],
             'LAYOUT_UNAVAILABLE',
         );
-        $this->rooms['P01']->layouts()->update(['status' => 'published']);
+        RoomLayout::query()->create([
+            'room_id' => $this->rooms['P01']->id, 'version' => 2, 'rows' => 1, 'columns' => 1,
+            'screen_position' => 'top', 'status' => 'published', 'published_at' => now(),
+        ]);
 
         $this->rooms['P01']->update(['status' => 'maintenance']);
         $this->assertPreviewPublishParity(
@@ -599,6 +605,10 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             $this->assertDatabaseCount('showtimes', 2);
         } finally {
             DB::table('showtimes')->delete();
+            $integrityMigration = require database_path('migrations/2026_08_14_200000_harden_room_layout_history_integrity.php');
+            foreach (['room_layout_cells_prevent_immutable_insert', 'room_layout_cells_prevent_immutable_update', 'room_layout_cells_prevent_immutable_delete'] as $trigger) {
+                DB::unprepared("DROP TRIGGER IF EXISTS {$trigger}");
+            }
             DB::table('room_layout_cells')->delete();
             DB::table('room_layouts')->delete();
             DB::table('seats')->delete();
@@ -607,6 +617,7 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             DB::table('movies')->delete();
             DB::table('presentation_formats')->delete();
             DB::table('users')->delete();
+            $integrityMigration->up();
             DB::beginTransaction();
         }
     }
