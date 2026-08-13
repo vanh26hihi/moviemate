@@ -71,7 +71,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $room = $this->rooms['P01'];
         $staff = $this->userWithRole('staff');
         $this->actingAs($staff)->get(route('staff.rooms.layout.preview', $room))
-            ->assertOk()->assertSee('P01')->assertSee('phiên bản 1');
+            ->assertOk()->assertSee('P01')->assertSee('Phiên bản sơ đồ 1');
         $this->actingAs($staff)->post(route('admin.rooms.layout.draft', $room))->assertForbidden();
         $this->actingAs($staff)->post(route('admin.rooms.layout.publish', $room))->assertForbidden();
     }

@@ -30,7 +30,7 @@ return [
         'name' => 'Tên phòng',
         'cinema' => 'Rạp/cơ sở',
         'type' => 'Loại phòng',
-        'layout' => 'Sơ đồ ghế',
+        'layout' => 'Sơ đồ bố trí',
         'physical_seat_count' => 'Sức chứa vật lý',
         'normal_seats' => 'Ghế thường',
         'vip_seats' => 'Ghế VIP',

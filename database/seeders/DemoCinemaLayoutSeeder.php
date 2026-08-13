@@ -42,11 +42,20 @@ final class DemoCinemaLayoutSeeder extends Seeder
 
                         continue;
                     }
+                    if ($isDefenseRoom && $row === 2 && $column === 7) {
+                        $cells[] = ['kind' => 'blocked', 'x' => $column, 'y' => $row];
+
+                        continue;
+                    }
+                    if ($isDefenseRoom && $row === 2 && $column === 8) {
+                        continue;
+                    }
                     $isCouple = $isDefenseRoom && $row === 3 && in_array($column, [1, 2], true);
+                    $isVip = $isDefenseRoom && $row === 1 && $column === 6;
                     $cells[] = [
-                        'kind' => $isCouple ? 'couple' : 'normal', 'x' => $column, 'y' => $row,
+                        'kind' => $isCouple ? 'couple' : ($isVip ? 'vip' : 'normal'), 'x' => $column, 'y' => $row,
                         'row' => $label, 'number' => $column,
-                        'seat_code' => $label.$column, 'status' => 'active',
+                        'seat_code' => $label.$column, 'status' => $isDefenseRoom && $row === 4 && $column === 8 ? 'maintenance' : 'active',
                         'pair_code' => $isCouple ? 'DEMO-C-PAIR-1' : null,
                         'pair_position' => $isCouple ? ($column === 1 ? 'left' : 'right') : null,
                     ];
