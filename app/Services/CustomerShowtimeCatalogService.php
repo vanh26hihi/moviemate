@@ -47,6 +47,11 @@ final class CustomerShowtimeCatalogService
                 'genres' => $showtime->movie->genres,
                 'duration' => $showtime->movie->duration,
                 'age_rating' => $showtime->movie->age_rating,
+                'presentation_format' => $showtime->presentationFormat ? [
+                    'code' => $showtime->presentationFormat->code,
+                    'name' => $showtime->presentationFormat->name,
+                    'sort_order' => (int) $showtime->presentationFormat->sort_order,
+                ] : null,
                 'room_type' => $showtime->room->room_type_label,
                 'starts_at' => $lifecycle['starts_at'],
                 'customer_visible_ends_at' => $lifecycle['ends_at'],

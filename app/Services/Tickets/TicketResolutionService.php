@@ -46,7 +46,7 @@ final class TicketResolutionService
         abort_unless($booking->cinema_id, 404);
         $this->cinemaAccess->authorizeCinema($actor, (int) $booking->cinema_id);
         $ticket = AdmissionTicket::query()
-            ->with('printState')
+            ->with(['printState', 'booking.showtime.presentationFormat'])
             ->where('booking_id', $booking->id)
             ->oldest('id')
             ->first();
@@ -90,6 +90,7 @@ final class TicketResolutionService
             'booking.showtime.movie',
             'booking.showtime.cinema',
             'booking.showtime.room',
+            'booking.showtime.presentationFormat',
             'booking.bookingSeats.seat',
             'booking.foodOrder.items',
             'booking.foodPickupVoucher',

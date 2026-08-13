@@ -137,7 +137,7 @@ final class PublicShowtimeCatalog
     private function structuralQuery(?Cinema $cinema, ?Movie $movie): Builder
     {
         return Showtime::query()->with([
-            'movie.genres', 'cinema.operatingHours', 'room.roomType', 'room.cinema.operatingHours',
+            'movie.genres', 'cinema.operatingHours', 'presentationFormat', 'room.roomType',
             'roomLayout.cells' => fn ($query) => $query->where('cell_type', 'seat'),
         ])->where('status', 'active')
             ->when($cinema, fn (Builder $query) => $query->where('cinema_id', $cinema->id))

@@ -166,6 +166,7 @@ class SendPendingBookingTickets extends Command
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
+            'showtime.presentationFormat',
             'bookingSeats.seat',
             'payment',
         ]);

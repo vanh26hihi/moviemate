@@ -85,6 +85,7 @@
                                     <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->seat_codes }}</p></div>
                                     <div><p class="app-muted mb-0.5">Rạp</p><p class="app-text font-semibold">{{ $booking->showtime->cinema->name }}</p></div>
                                     <div><p class="app-muted mb-0.5">Phòng</p><p class="app-text font-semibold">{{ $booking->showtime->room->name }}</p></div>
+                                    <div><p class="app-muted mb-0.5">Định dạng</p><p class="app-text font-semibold">{{ $booking->showtime?->presentationFormat?->name ?? 'Không xác định' }}</p></div>
                                 </div>
 
                                 <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">

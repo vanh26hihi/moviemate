@@ -39,6 +39,7 @@
                     <p class="text-sm app-muted">
                         {{ $showtime->cinema->name }} · {{ $showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}
                     </p>
+                    <p class="mt-1 text-sm app-muted">Định dạng: <strong class="app-text">{{ $showtime->presentationFormat?->name ?? 'Không xác định' }}</strong></p>
                     <p class="mt-1 text-sm app-muted">{{ $showtime->cinema->address }}</p>
                 </header>
 

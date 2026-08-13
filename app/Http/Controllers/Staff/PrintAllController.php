@@ -55,6 +55,7 @@ final class PrintAllController extends Controller
                 'showtime.movie',
                 'showtime.cinema',
                 'showtime.room',
+                'showtime.presentationFormat',
                 'bookingSeats.seat',
                 'admissionTickets.bookingSeat.seat',
                 'admissionTickets.lastPrintedBy:id,name',
