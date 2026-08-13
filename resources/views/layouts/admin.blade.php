@@ -39,6 +39,7 @@
                     ['route' => 'admin.cinemas.index', 'active' => ['admin.cinema.*', 'admin.cinemas.*'], 'permission' => 'cinemas.view', 'label' => 'Chi nhánh', 'icon' => 'ph-buildings'],
                     ['route' => 'admin.rooms.index', 'active' => ['admin.rooms.*', 'admin.seats.*'], 'permission' => 'rooms.view', 'label' => 'Phòng chiếu', 'icon' => 'ph-projector-screen'],
                     ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ phòng', 'icon' => 'ph-grid-four'],
+                    ['route' => 'admin.presentation-formats.index', 'active' => 'admin.presentation-formats.*', 'permission' => 'presentation_formats.view', 'label' => 'Định dạng trình chiếu', 'icon' => 'ph-cube-focus'],
                     ['route' => 'admin.showtimes.index', 'active' => 'admin.showtimes.*', 'permission' => 'showtimes.view', 'label' => 'Suất chiếu', 'icon' => 'ph-calendar-plus'],
                     ['route' => 'admin.pricing-rules.index', 'active' => 'admin.pricing-rules.*', 'permission' => 'pricing.view', 'label' => 'Bảng giá vé', 'icon' => 'ph-ticket'],
                 ]],

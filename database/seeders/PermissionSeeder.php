@@ -24,6 +24,8 @@ class PermissionSeeder extends Seeder
         'rooms.update' => 'Sửa phòng',
         'room_types.view' => 'Xem danh mục loại phòng',
         'room_types.manage' => 'Quản lý danh mục loại phòng',
+        'presentation_formats.view' => 'Xem danh mục định dạng trình chiếu',
+        'presentation_formats.manage' => 'Quản lý danh mục định dạng trình chiếu',
         'seats.view' => 'Xem ghế',
         'seats.manage' => 'Quản lý sơ đồ ghế',
         'layout_templates.view' => 'Xem mẫu sơ đồ phòng',

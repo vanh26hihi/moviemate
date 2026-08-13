@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 final class PresentationFormat extends Model
 {
@@ -51,5 +52,17 @@ final class PresentationFormat extends Model
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by_user_id');
+    }
+
+    public static function normalizeCode(string $value): string
+    {
+        $code = preg_replace('/[^A-Z0-9]+/', '_', strtoupper(Str::ascii(trim($value)))) ?? '';
+
+        return Str::limit(trim($code, '_'), 40, '');
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        return $this->is_active ? 'Đang sử dụng' : 'Đã lưu trữ';
     }
 }
