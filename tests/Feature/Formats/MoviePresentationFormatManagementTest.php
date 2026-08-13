@@ -7,7 +7,6 @@ use App\Models\Movie;
 use App\Models\PresentationFormat;
 use App\Services\MovieLifecycleService;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\Feature\Showtimes\ShowtimeTestCase;
 
@@ -80,8 +79,7 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
         $oldGenre = Genre::query()->create(['name' => 'Cũ', 'slug' => 'cu']);
         $newGenre = Genre::query()->create(['name' => 'Mới', 'slug' => 'moi']);
         $movie->genres()->attach($oldGenre);
-        $showtime = $this->existing($movie, $this->rooms->get('P01'));
-        DB::table('showtimes')->where('id', $showtime->id)->update(['presentation_format_id' => $threeD->id]);
+        $showtime = $this->existing($movie, $this->rooms->get('P01'), ['presentation_format_id' => $threeD->id]);
 
         $this->actingAs($manager)->put(route('admin.movies.update', $movie), [
             'title' => 'Tên không được lưu',
@@ -106,8 +104,10 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
         $threeD = $this->format('3D');
         $movie = $this->movie();
         $movie->supportedPresentationFormats()->attach([$twoD->id, $threeD->id]);
-        $showtime = $this->existing($movie, $this->rooms->get('P01'), ['show_date' => '2030-06-09']);
-        DB::table('showtimes')->where('id', $showtime->id)->update(['presentation_format_id' => $threeD->id]);
+        $showtime = $this->existing($movie, $this->rooms->get('P01'), [
+            'show_date' => '2030-06-09',
+            'presentation_format_id' => $threeD->id,
+        ]);
 
         $this->actingAs($manager)->put(route('admin.movies.update', $movie), [
             'title' => $movie->title,
@@ -127,8 +127,10 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
         $threeD = $this->format('3D');
         $movie = $this->movie();
         $movie->supportedPresentationFormats()->attach([$twoD->id, $threeD->id]);
-        $showtime = $this->existing($movie, $this->rooms->get('P01'), ['status' => 'cancelled']);
-        DB::table('showtimes')->where('id', $showtime->id)->update(['presentation_format_id' => $threeD->id]);
+        $showtime = $this->existing($movie, $this->rooms->get('P01'), [
+            'status' => 'cancelled',
+            'presentation_format_id' => $threeD->id,
+        ]);
 
         $this->actingAs($manager)->put(route('admin.movies.update', $movie), [
             'title' => $movie->title,

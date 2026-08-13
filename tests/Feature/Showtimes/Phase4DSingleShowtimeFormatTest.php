@@ -123,22 +123,20 @@ final class Phase4DSingleShowtimeFormatTest extends ShowtimeTestCase
         $this->assertSame($threeD->id, $showtime->fresh()->presentation_format_id);
     }
 
-    public function test_legacy_null_requires_a_valid_format_for_single_structural_update(): void
+    public function test_authoritative_candidate_validation_no_longer_accepts_a_missing_format(): void
     {
         $movie = $this->movie(90);
         $room = $this->rooms['P01'];
-        $showtime = $this->existing($movie, $room, ['presentation_format_id' => null]);
-        $payload = $this->payload($movie, $room, ['show_time' => '19:00']);
-        unset($payload['presentation_format_id']);
+        $result = app(ShowtimeScheduleService::class)->validateCandidate(
+            $movie,
+            $room,
+            '2030-06-10',
+            '19:00',
+        );
 
-        $this->assertRescheduleFailure('PRESENTATION_FORMAT_REQUIRED', $showtime, $payload);
-        $this->assertNull($showtime->fresh()->presentation_format_id);
-
-        app(ShowtimeScheduleService::class)->reschedule($showtime, [
-            ...$payload,
-            'presentation_format_id' => $this->presentationFormat->id,
-        ]);
-        $this->assertSame($this->presentationFormat->id, $showtime->fresh()->presentation_format_id);
+        $this->assertFalse($result->isValid());
+        $this->assertSame('PRESENTATION_FORMAT_REQUIRED', $result->failureCode());
+        $this->assertDatabaseCount('showtimes', 0);
     }
 
     public function test_preview_returns_format_metadata_and_compatibility_precedes_window_failures(): void

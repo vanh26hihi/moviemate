@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Cinema;
 use App\Models\CinemaPricingRule;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\RoomLayoutCell;
@@ -35,6 +36,13 @@ trait CreatesBookingFixtures
             'duration' => 100,
             'status' => 'now_showing',
         ]);
+        $format = PresentationFormat::query()->firstOrCreate(['code' => 'TEST_2D'], [
+            'name' => 'Test 2D',
+            'is_active' => true,
+            'sort_order' => 10,
+        ]);
+        $movie->supportedPresentationFormats()->attach($format);
+        $room->presentationCapabilities()->attach($format);
         $seats = collect([
             Seat::query()->create([
                 'room_id' => $room->id, 'row' => 'A', 'number' => 1,
@@ -103,6 +111,7 @@ trait CreatesBookingFixtures
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
+            'presentation_format_id' => $format->id,
             'show_date' => now()->addDays(5)->toDateString(),
             'show_time' => '19:00:00',
             'price' => 50000,

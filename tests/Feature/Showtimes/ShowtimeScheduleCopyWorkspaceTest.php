@@ -7,6 +7,8 @@ use App\Models\Room;
 
 class ShowtimeScheduleCopyWorkspaceTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_workspace_rbac_and_branch_scoping_expose_both_copy_modes_without_a_publish_action(): void
     {
         $otherCinema = Cinema::factory()->create([
@@ -70,6 +72,7 @@ class ShowtimeScheduleCopyWorkspaceTest extends ShowtimeTestCase
         $response->assertSessionHas('bulk_showtime_rows', [[
             'row_key' => 'copy-1',
             'movie_id' => $movie->id,
+            'presentation_format_id' => $this->presentationFormat->id,
             'room_id' => $room->id,
             'show_date' => '2030-08-19',
             'show_time' => '09:30',
@@ -90,11 +93,13 @@ class ShowtimeScheduleCopyWorkspaceTest extends ShowtimeTestCase
         $room = $this->rooms['P01'];
         $movie->update(['status' => 'ended']);
         $room->update(['status' => 'maintenance']);
+        $this->presentationFormat->update(['is_active' => false]);
 
         $this->actingAs($this->userWithRole('manager'))
             ->withSession(['bulk_showtime_rows' => [[
                 'row_key' => 'copy-1',
                 'movie_id' => $movie->id,
+                'presentation_format_id' => $this->presentationFormat->id,
                 'room_id' => $room->id,
                 'show_date' => '2030-08-19',
                 'show_time' => '09:30',
@@ -102,6 +107,7 @@ class ShowtimeScheduleCopyWorkspaceTest extends ShowtimeTestCase
             ->get(route('admin.showtimes.bulk.index'))
             ->assertOk()
             ->assertSee('value="'.$movie->id.'"', false)
+            ->assertSee('value="'.$this->presentationFormat->id.'"', false)
             ->assertSee('value="'.$room->id.'"', false)
             ->assertSee('không còn khả dụng');
     }

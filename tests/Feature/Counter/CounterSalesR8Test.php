@@ -655,6 +655,7 @@ final class CounterSalesR8Test extends TestCase
         ]);
         $showtime = Showtime::query()->create([
             'movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'room_layout_id' => $layout->id, 'show_date' => now()->addDays(3)->toDateString(),
             'show_time' => '19:00:00', 'price' => 60000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active',
         ]);

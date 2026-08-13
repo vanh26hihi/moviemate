@@ -148,7 +148,6 @@ class ShowtimeScheduleService
         ?CarbonImmutable $authoritativeNow = null,
         ?RoomLayout $authoritativeLayout = null,
         ?int $presentationFormatId = null,
-        bool $requirePresentationFormat = false,
         ?PresentationFormat $authoritativePresentationFormat = null,
     ): ShowtimeScheduleValidationResult {
         $timezone = null;
@@ -162,7 +161,6 @@ class ShowtimeScheduleService
         try {
             $presentationFormat = $this->resolvePresentationFormat(
                 $presentationFormatId,
-                $requirePresentationFormat,
                 $authoritativePresentationFormat,
             );
             $this->assertRoomIsOperational($room);
@@ -281,7 +279,6 @@ class ShowtimeScheduleService
                 $data['show_date'],
                 $data['show_time'],
                 presentationFormatId: isset($data['presentation_format_id']) ? (int) $data['presentation_format_id'] : null,
-                requirePresentationFormat: true,
                 authoritativePresentationFormat: $presentationFormat,
             )->requireValid();
 
@@ -353,7 +350,6 @@ class ShowtimeScheduleService
                 $data['show_time'],
                 $lockedShowtime,
                 presentationFormatId: $targetFormatId,
-                requirePresentationFormat: true,
                 authoritativePresentationFormat: $presentationFormat,
             )->requireValid();
 
@@ -410,19 +406,14 @@ class ShowtimeScheduleService
 
     private function resolvePresentationFormat(
         ?int $presentationFormatId,
-        bool $required,
         ?PresentationFormat $authoritativePresentationFormat = null,
     ): ?PresentationFormat {
         if ($presentationFormatId === null) {
-            if ($required) {
-                throw new ShowtimeScheduleException(
-                    'Vui lòng chọn định dạng trình chiếu.',
-                    'presentation_format_id',
-                    'PRESENTATION_FORMAT_REQUIRED',
-                );
-            }
-
-            return null;
+            throw new ShowtimeScheduleException(
+                'Vui lòng chọn định dạng trình chiếu.',
+                'presentation_format_id',
+                'PRESENTATION_FORMAT_REQUIRED',
+            );
         }
 
         $format = $authoritativePresentationFormat;
@@ -442,7 +433,10 @@ class ShowtimeScheduleService
 
     private function assertMovieSupportsFormat(Movie $movie, PresentationFormat $format): void
     {
-        if (! $movie->supportedPresentationFormats()->whereKey($format->id)->exists()) {
+        $supportsFormat = $movie->relationLoaded('supportedPresentationFormats')
+            ? $movie->supportedPresentationFormats->contains('id', $format->id)
+            : $movie->supportedPresentationFormats()->whereKey($format->id)->exists();
+        if (! $supportsFormat) {
             throw new ShowtimeScheduleException(
                 'Phim không hỗ trợ định dạng trình chiếu đã chọn.',
                 'presentation_format_id',
@@ -453,7 +447,10 @@ class ShowtimeScheduleService
 
     private function assertRoomSupportsFormat(Room $room, PresentationFormat $format): void
     {
-        if (! $room->presentationCapabilities()->whereKey($format->id)->exists()) {
+        $supportsFormat = $room->relationLoaded('presentationCapabilities')
+            ? $room->presentationCapabilities->contains('id', $format->id)
+            : $room->presentationCapabilities()->whereKey($format->id)->exists();
+        if (! $supportsFormat) {
             throw new ShowtimeScheduleException(
                 'Phòng chiếu không hỗ trợ định dạng trình chiếu đã chọn.',
                 'presentation_format_id',
@@ -643,7 +640,7 @@ class ShowtimeScheduleService
         Room $room,
         RoomLayout $layout,
         ShowtimeWindow $window,
-        ?PresentationFormat $presentationFormat = null,
+        PresentationFormat $presentationFormat,
     ): array {
         $preview = new Showtime([
             'movie_id' => $movie->id,
@@ -662,7 +659,7 @@ class ShowtimeScheduleService
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
-            'presentation_format_id' => $presentationFormat?->id,
+            'presentation_format_id' => $presentationFormat->id,
             'show_date' => $window->start->toDateString(),
             'show_time' => $window->start->format('H:i:s'),
             'price' => $normal->finalAmount,

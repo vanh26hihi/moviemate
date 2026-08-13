@@ -8,6 +8,7 @@ use App\Domain\Showtimes\ShowtimeScheduleValidationResult;
 use App\Exceptions\BulkShowtimeValidationException;
 use App\Exceptions\ShowtimeScheduleException;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Models\User;
@@ -25,7 +26,7 @@ final class BulkShowtimeScheduleService
     ) {}
 
     /**
-     * @param  list<array{row_key: string, movie_id: int, room_id: int, show_date: string, show_time: string}>  $rows
+     * @param  list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}>  $rows
      */
     public function preview(array $rows, User $user): BulkShowtimeValidationResult
     {
@@ -33,7 +34,7 @@ final class BulkShowtimeScheduleService
     }
 
     /**
-     * @param  list<array{row_key: string, movie_id: int, room_id: int, show_date: string, show_time: string}>  $rows
+     * @param  list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}>  $rows
      * @return list<Showtime>
      */
     public function publish(array $rows, User $user, ?Closure $afterPersist = null): array
@@ -48,9 +49,24 @@ final class BulkShowtimeScheduleService
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
-            $lockedRooms->load(['cinema.operatingHours', 'latestPublishedLayout']);
+            $lockedRooms->load(['cinema.operatingHours', 'latestPublishedLayout', 'presentationCapabilities']);
 
-            $result = $this->validateRows($rows, $user, $lockedRooms);
+            $lockedMovies = Movie::query()
+                ->whereIn('id', $this->movieIds($rows))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $lockedMovies->load('supportedPresentationFormats');
+
+            $lockedFormats = PresentationFormat::query()
+                ->whereIn('id', $this->formatIds($rows))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $result = $this->validateRows($rows, $user, $lockedRooms, $lockedMovies, $lockedFormats);
             if (! $result->isValid()) {
                 throw new BulkShowtimeValidationException($result);
             }
@@ -63,7 +79,10 @@ final class BulkShowtimeScheduleService
                     $row->room,
                     $candidate->layout,
                     $candidate->window,
+                    $row->presentationFormat,
                 ));
+                $showtime->setRelation('movie', $row->movie);
+                $showtime->setRelation('room', $row->room);
                 $afterPersist?->__invoke($showtime, $row->rowKey);
                 $created[] = $showtime;
             }
@@ -73,20 +92,32 @@ final class BulkShowtimeScheduleService
     }
 
     /**
-     * @param  list<array{row_key: string, movie_id: int, room_id: int, show_date: string, show_time: string}>  $rows
+     * @param  list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}>  $rows
      * @param  Collection<int, Room>|null  $resolvedRooms
+     * @param  Collection<int, Movie>|null  $resolvedMovies
+     * @param  Collection<int, PresentationFormat>|null  $resolvedFormats
      */
-    private function validateRows(array $rows, User $user, ?Collection $resolvedRooms = null): BulkShowtimeValidationResult
-    {
+    private function validateRows(
+        array $rows,
+        User $user,
+        ?Collection $resolvedRooms = null,
+        ?Collection $resolvedMovies = null,
+        ?Collection $resolvedFormats = null,
+    ): BulkShowtimeValidationResult {
         $rooms = $resolvedRooms ?? Room::query()
             ->whereIn('id', $this->roomIds($rows))
-            ->with(['cinema.operatingHours', 'latestPublishedLayout'])
+            ->with(['cinema.operatingHours', 'latestPublishedLayout', 'presentationCapabilities'])
             ->get()
             ->keyBy('id');
         $this->assertAuthorizedSingleCinema($rooms, $user);
 
-        $movies = Movie::query()
-            ->whereIn('id', collect($rows)->pluck('movie_id')->unique()->all())
+        $movies = $resolvedMovies ?? Movie::query()
+            ->whereIn('id', $this->movieIds($rows))
+            ->with('supportedPresentationFormats')
+            ->get()
+            ->keyBy('id');
+        $formats = $resolvedFormats ?? PresentationFormat::query()
+            ->whereIn('id', $this->formatIds($rows))
             ->get()
             ->keyBy('id');
         $cinemaId = $rooms->pluck('cinema_id')->unique()->map(fn ($id): int => (int) $id)->first();
@@ -98,6 +129,7 @@ final class BulkShowtimeScheduleService
         $baseRows = [];
         foreach ($rows as $row) {
             $movie = $movies->get((int) $row['movie_id']);
+            $presentationFormat = $formats->get((int) $row['presentation_format_id']);
             $room = $rooms->get((int) $row['room_id']);
             $candidate = match (true) {
                 ! $room => ShowtimeScheduleValidationResult::invalid(new ShowtimeScheduleException(
@@ -110,6 +142,11 @@ final class BulkShowtimeScheduleService
                     'movie_id',
                     'MOVIE_UNAVAILABLE',
                 ), $timezone),
+                ! $presentationFormat => ShowtimeScheduleValidationResult::invalid(new ShowtimeScheduleException(
+                    'Định dạng trình chiếu đã chọn hiện không còn hoạt động.',
+                    'presentation_format_id',
+                    'PRESENTATION_FORMAT_INACTIVE',
+                ), $timezone),
                 default => $this->schedule->validateCandidate(
                     $movie,
                     $room,
@@ -117,11 +154,14 @@ final class BulkShowtimeScheduleService
                     $row['show_time'],
                     authoritativeNow: $authoritativeNow,
                     authoritativeLayout: $room->latestPublishedLayout,
+                    presentationFormatId: (int) $row['presentation_format_id'],
+                    authoritativePresentationFormat: $presentationFormat,
                 ),
             };
             $baseRows[] = [
                 'intent' => $row,
                 'movie' => $movie,
+                'presentation_format' => $presentationFormat,
                 'room' => $room,
                 'candidate' => $candidate,
             ];
@@ -132,6 +172,7 @@ final class BulkShowtimeScheduleService
             fn (array $row): BulkShowtimeRowResult => new BulkShowtimeRowResult(
                 $row['intent']['row_key'],
                 $row['movie'],
+                $row['presentation_format'],
                 $row['room'],
                 $row['candidate'],
                 $internalConflicts[$row['intent']['row_key']] ?? [],
@@ -143,7 +184,7 @@ final class BulkShowtimeScheduleService
     }
 
     /**
-     * @param  list<array{intent: array<string, mixed>, movie: ?Movie, room: ?Room, candidate: ShowtimeScheduleValidationResult}>  $rows
+     * @param  list<array{intent: array<string, mixed>, movie: ?Movie, presentation_format: ?PresentationFormat, room: ?Room, candidate: ShowtimeScheduleValidationResult}>  $rows
      * @return array<string, list<array<string, mixed>>>
      */
     private function internalConflicts(array $rows): array
@@ -210,5 +251,17 @@ final class BulkShowtimeScheduleService
     private function roomIds(array $rows): array
     {
         return collect($rows)->pluck('room_id')->map(fn ($id): int => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /** @param list<array{movie_id: int}> $rows @return list<int> */
+    private function movieIds(array $rows): array
+    {
+        return collect($rows)->pluck('movie_id')->map(fn ($id): int => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /** @param list<array{presentation_format_id: int}> $rows @return list<int> */
+    private function formatIds(array $rows): array
+    {
+        return collect($rows)->pluck('presentation_format_id')->map(fn ($id): int => (int) $id)->unique()->sort()->values()->all();
     }
 }

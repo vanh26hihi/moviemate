@@ -140,6 +140,7 @@ class CustomerCinemaDiscoveryTest extends TestCase
             Showtime::query()->create([
                 'movie_id' => $movie->id, 'cinema_id' => $scenario['cinema']->id,
                 'room_id' => $room->id, 'room_layout_id' => $layout->id,
+                'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
                 'show_date' => '2030-06-03', 'show_time' => '20:00:00',
                 'price' => 1, 'vip_price' => 2, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active',
             ]);

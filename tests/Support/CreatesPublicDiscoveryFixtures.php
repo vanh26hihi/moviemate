@@ -6,6 +6,7 @@ use App\Models\Cinema;
 use App\Models\CinemaOperatingHour;
 use App\Models\CinemaPricingRule;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\RoomLayoutCell;
@@ -14,6 +15,15 @@ use App\Models\Showtime;
 
 trait CreatesPublicDiscoveryFixtures
 {
+    protected function presentationFormatForDiscovery(): PresentationFormat
+    {
+        return PresentationFormat::query()->firstOrCreate(['code' => 'TEST_2D'], [
+            'name' => 'Test 2D',
+            'is_active' => true,
+            'sort_order' => 10,
+        ]);
+    }
+
     protected function publishRoomForDiscovery(Room $room): RoomLayout
     {
         $cinema = $room->cinema()->firstOrFail();
@@ -39,6 +49,7 @@ trait CreatesPublicDiscoveryFixtures
             ['name' => 'Public test base', 'cinema_id' => $cinema->id],
             ['rule_type' => 'base', 'amount_vnd' => 90000, 'priority' => 1000, 'status' => 'active'],
         );
+        $room->presentationCapabilities()->syncWithoutDetaching($this->presentationFormatForDiscovery());
 
         return $layout;
     }
@@ -61,6 +72,9 @@ trait CreatesPublicDiscoveryFixtures
             'title' => 'Movie '.$code, 'slug' => 'movie-'.strtolower($code).'-'.str()->lower(str()->random(6)),
             'duration' => 100, 'status' => $attributes['movie_status'] ?? 'now_showing',
         ]);
+        $format = $this->presentationFormatForDiscovery();
+        $movie->supportedPresentationFormats()->syncWithoutDetaching($format);
+        $room->presentationCapabilities()->syncWithoutDetaching($format);
         $seat = Seat::query()->create([
             'room_id' => $room->id, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1',
             'type' => 'normal', 'status' => 'active',
@@ -90,7 +104,8 @@ trait CreatesPublicDiscoveryFixtures
         }
         $showtime = Showtime::query()->create([
             'movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id,
-            'room_layout_id' => $layout->id, 'show_date' => $date, 'show_time' => $attributes['show_time'] ?? '19:00:00',
+            'room_layout_id' => $layout->id, 'presentation_format_id' => $format->id,
+            'show_date' => $date, 'show_time' => $attributes['show_time'] ?? '19:00:00',
             'price' => 1, 'vip_price' => 2, 'pricing_version' => 'cinema-pricing-v1',
             'status' => $attributes['showtime_status'] ?? 'active',
         ]);

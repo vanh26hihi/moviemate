@@ -10,14 +10,20 @@ use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Showtime;
 use App\Services\BulkShowtimeScheduleService;
+use App\Services\MoviePresentationFormatService;
+use App\Services\PresentationFormatManagementService;
+use App\Services\RoomPresentationCapabilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use PDOException;
 use RuntimeException;
 
 class BulkShowtimeSchedulingTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
@@ -36,6 +42,11 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         $this->actingAs($this->userWithRole('manager'))->postJson(route('admin.showtimes.bulk.preview'), [
             'rows' => [$row, [...$row, 'movie_id' => null]],
         ])->assertUnprocessable()->assertJsonValidationErrors(['rows.1.row_key', 'rows.1.movie_id']);
+        $missingFormat = $row;
+        unset($missingFormat['presentation_format_id']);
+        $this->actingAs($this->userWithRole('manager'))->postJson(route('admin.showtimes.bulk.preview'), [
+            'rows' => [$missingFormat],
+        ])->assertUnprocessable()->assertJsonValidationErrors('rows.0.presentation_format_id');
     }
 
     public function test_preview_is_authoritative_side_effect_free_and_returns_operational_row_context(): void
@@ -114,6 +125,42 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
                 'valid' => true,
                 'summary' => ['total' => 4, 'valid_count' => 4, 'invalid_count' => 0],
             ]);
+    }
+
+    public function test_bulk_supports_multiple_formats_and_format_does_not_partition_room_conflicts_or_pricing(): void
+    {
+        $movie = $this->movie(90);
+        $threeD = PresentationFormat::query()->create([
+            'code' => '3D', 'name' => '3D', 'is_active' => true, 'sort_order' => 20,
+        ]);
+        $movie->supportedPresentationFormats()->attach($threeD);
+        $this->rooms['P01']->presentationCapabilities()->attach($threeD);
+        $this->rooms['P02']->presentationCapabilities()->attach($threeD);
+        $admin = $this->userWithRole('admin');
+        $twoDRow = $this->row('two-d', $movie, $this->rooms['P01'], time: '18:00');
+        $threeDConflict = [
+            ...$this->row('three-d-conflict', $movie, $this->rooms['P01'], time: '18:30'),
+            'presentation_format_id' => $threeD->id,
+        ];
+
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.preview'), [
+            'rows' => [$twoDRow, $threeDConflict],
+        ])->assertOk()
+            ->assertJsonPath('rows.0.code', 'BATCH_ROOM_CONFLICT')
+            ->assertJsonPath('rows.1.code', 'BATCH_ROOM_CONFLICT');
+
+        $threeDRow = [
+            ...$this->row('three-d', $movie, $this->rooms['P02'], '2030-06-11'),
+            'presentation_format_id' => $threeD->id,
+        ];
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.store'), [
+            'rows' => [$twoDRow, $threeDRow],
+        ])->assertCreated()->assertJson(['created_count' => 2]);
+
+        $showtimes = Showtime::query()->orderBy('id')->get();
+        $this->assertSame([$this->presentationFormat->id, $threeD->id], $showtimes->pluck('presentation_format_id')->all());
+        $this->assertSame((string) $showtimes[0]->price, (string) $showtimes[1]->price);
+        $this->assertSame((string) $showtimes[0]->vip_price, (string) $showtimes[1]->vip_price);
     }
 
     public function test_cross_midnight_candidates_compare_authoritative_datetimes_across_business_dates(): void
@@ -283,6 +330,7 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             $this->assertSame(110_000, (int) $showtime->vip_price);
             $this->assertSame($this->cinema->id, (int) $showtime->cinema_id);
             $this->assertNotNull($showtime->room_layout_id);
+            $this->assertSame($this->presentationFormat->id, $showtime->presentation_format_id);
         }
         $this->assertTrue(ActivityLog::query()->get()->every(fn (ActivityLog $log): bool => ($log->context['source'] ?? null) === 'bulk'));
     }
@@ -309,14 +357,9 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
     {
         $movie = $this->movie(90);
         $admin = $this->userWithRole('admin');
-        $format = PresentationFormat::query()->create([
-            'code' => '2D', 'name' => '2D', 'is_active' => true, 'sort_order' => 10,
-        ]);
-        $movie->supportedPresentationFormats()->attach($format);
-        $this->rooms['P01']->presentationCapabilities()->attach($format);
         $singlePayload = $this->payload($movie, $this->rooms['P01'], [
             'show_time' => '18:00',
-            'presentation_format_id' => $format->id,
+            'presentation_format_id' => $this->presentationFormat->id,
         ]);
         $this->actingAs($admin)->post(route('admin.showtimes.store'), $singlePayload)->assertRedirect(route('admin.showtimes.index'));
         $single = Showtime::query()->firstOrFail();
@@ -399,6 +442,84 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             [$this->row('runtime', $movie, $this->rooms['P01'])],
             'INVALID_RUNTIME',
         );
+    }
+
+    public function test_publish_revalidates_current_format_activity_movie_support_and_room_capability_atomically(): void
+    {
+        $admin = $this->userWithRole('admin');
+        $movie = $this->movie(90);
+        $rows = [
+            $this->row('one', $movie, $this->rooms['P01']),
+            $this->row('two', $movie, $this->rooms['P02'], '2030-06-11'),
+        ];
+
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
+            ->assertOk()->assertJson(['valid' => true])
+            ->assertJsonPath('rows.0.presentation_format.id', $this->presentationFormat->id)
+            ->assertJsonPath('rows.0.presentation_format.code', '2D');
+
+        $movie->supportedPresentationFormats()->detach($this->presentationFormat);
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.store'), ['rows' => $rows])
+            ->assertUnprocessable()->assertJsonPath('rows.0.code', 'MOVIE_FORMAT_UNSUPPORTED');
+        $this->assertDatabaseCount('showtimes', 0);
+
+        $movie->supportedPresentationFormats()->attach($this->presentationFormat);
+        $this->rooms['P02']->presentationCapabilities()->detach($this->presentationFormat);
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.store'), ['rows' => $rows])
+            ->assertUnprocessable()->assertJsonPath('rows.1.code', 'ROOM_FORMAT_UNSUPPORTED');
+        $this->assertDatabaseCount('showtimes', 0);
+
+        $this->rooms['P02']->presentationCapabilities()->attach($this->presentationFormat);
+        $this->presentationFormat->update(['is_active' => false]);
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.store'), ['rows' => $rows])
+            ->assertUnprocessable()->assertJsonPath('rows.0.code', 'PRESENTATION_FORMAT_INACTIVE');
+        $this->assertDatabaseCount('showtimes', 0);
+        $this->assertDatabaseCount('activity_logs', 0);
+    }
+
+    public function test_committed_bulk_showtime_blocks_official_format_dependency_removals(): void
+    {
+        $movie = $this->movie(90);
+        $room = $this->rooms['P01'];
+        $alternate = PresentationFormat::query()->create([
+            'code' => '3D', 'name' => '3D', 'is_active' => true, 'sort_order' => 20,
+        ]);
+        $movie->supportedPresentationFormats()->attach($alternate);
+        $room->presentationCapabilities()->attach($alternate);
+        $admin = $this->userWithRole('admin');
+
+        app(BulkShowtimeScheduleService::class)->publish(
+            [$this->row('one', $movie, $room)],
+            $this->serviceUser(),
+        );
+
+        try {
+            app(MoviePresentationFormatService::class)->update($movie, [], [], [$alternate->id]);
+            $this->fail('Official Movie support removal must not invalidate a committed bulk Showtime.');
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+        try {
+            DB::transaction(function () use ($room, $alternate): void {
+                $locked = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
+                app(RoomPresentationCapabilityService::class)->syncLocked($locked, [$alternate->id]);
+            });
+            $this->fail('Official Room capability removal must not invalidate a committed bulk Showtime.');
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+        try {
+            app(PresentationFormatManagementService::class)->archive($this->presentationFormat, $admin);
+            $this->fail('Official Format archive must not invalidate a committed bulk Showtime.');
+        } catch (ValidationException) {
+            $this->assertTrue(true);
+        }
+
+        $this->assertDatabaseHas('showtimes', [
+            'movie_id' => $movie->id,
+            'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormat->id,
+        ]);
     }
 
     public function test_stale_preview_and_time_passage_fail_whole_publish(): void
@@ -484,12 +605,13 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             DB::table('cinema_pricing_rules')->delete();
             DB::table('rooms')->delete();
             DB::table('movies')->delete();
+            DB::table('presentation_formats')->delete();
             DB::table('users')->delete();
             DB::beginTransaction();
         }
     }
 
-    public function test_final_room_locks_are_unique_ascending_and_validation_queries_follow_the_lock(): void
+    public function test_final_owner_locks_are_unique_ascending_and_validation_queries_follow_room_movie_format_order(): void
     {
         $movie = $this->movie(30);
         $rows = [
@@ -507,12 +629,22 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
 
         $lockIndex = collect($queries)->search(fn (array $query): bool => str_contains($query['sql'], 'from "rooms"')
             && str_contains($query['sql'], 'where "id" in') && str_contains($query['sql'], 'order by "id" asc'));
+        $movieLockIndex = collect($queries)->search(fn (array $query): bool => str_contains($query['sql'], 'from "movies"')
+            && str_contains($query['sql'], 'where "id" in') && str_contains($query['sql'], 'order by "id" asc'));
+        $formatLockIndex = collect($queries)->search(fn (array $query): bool => str_contains($query['sql'], 'from "presentation_formats"')
+            && str_contains($query['sql'], 'where "id" in') && str_contains($query['sql'], 'order by "id" asc'));
         $conflictIndex = collect($queries)->search(fn (array $query): bool => str_contains($query['sql'], 'from "showtimes"')
             && str_contains($query['sql'], '"room_id"'));
         $this->assertIsInt($lockIndex);
+        $this->assertIsInt($movieLockIndex);
+        $this->assertIsInt($formatLockIndex);
         $this->assertIsInt($conflictIndex);
+        $this->assertLessThan($movieLockIndex, $lockIndex);
+        $this->assertLessThan($formatLockIndex, $movieLockIndex);
         $this->assertLessThan($conflictIndex, $lockIndex);
         $this->assertSame($this->rooms->pluck('id')->map(fn ($id): int => (int) $id)->sort()->values()->all(), $queries[$lockIndex]['bindings']);
+        $this->assertSame([$movie->id], $queries[$movieLockIndex]['bindings']);
+        $this->assertSame([$this->presentationFormat->id], $queries[$formatLockIndex]['bindings']);
         $this->assertDatabaseCount('showtimes', 4);
     }
 
@@ -538,6 +670,27 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         DB::disableQueryLog();
 
         $this->assertLessThanOrEqual(40, $queryCount, "Ten-row bulk preview query count exceeded budget: {$queryCount}");
+    }
+
+    public function test_publish_query_count_is_bounded_for_ten_rows_without_format_compatibility_n_plus_one(): void
+    {
+        $movie = $this->movie(30);
+        $rows = collect(range(0, 9))->map(fn (int $index): array => $this->row(
+            'publish-query-'.$index,
+            $movie,
+            $this->rooms[['P01', 'P02', 'P03'][$index % 3]],
+            '2030-07-'.str_pad((string) (10 + $index), 2, '0', STR_PAD_LEFT),
+            '18:00',
+        ))->all();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->actingAs($this->userWithRole('admin'))->postJson(route('admin.showtimes.bulk.store'), ['rows' => $rows])
+            ->assertCreated()->assertJson(['created_count' => 10]);
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(70, $queryCount, "Ten-row bulk publish query count exceeded budget: {$queryCount}");
     }
 
     private function assertPreviewCode($user, array $row, string $code): void
@@ -566,12 +719,13 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         return $user;
     }
 
-    /** @return array{row_key: string, movie_id: int, room_id: int, show_date: string, show_time: string} */
+    /** @return array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string} */
     private function row(string $key, $movie, $room, string $date = '2030-06-10', string $time = '18:00'): array
     {
         return [
             'row_key' => $key,
             'movie_id' => $movie->id,
+            'presentation_format_id' => $this->presentationFormat->id,
             'room_id' => $room->id,
             'show_date' => $date,
             'show_time' => $time,

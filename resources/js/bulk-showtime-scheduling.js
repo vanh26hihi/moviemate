@@ -51,10 +51,36 @@ function initializeBulkShowtimeWorkspace(workspace) {
     function addRow(values = {}) {
         const row = template.content.firstElementChild.cloneNode(true);
         row.dataset.rowKey = values.row_key || `row-${Date.now()}-${++rowCounter}`;
-        row.querySelector('[data-row-movie]').value = values.movie_id || '';
-        row.querySelector('[data-row-room]').value = values.room_id || '';
+        const movie = row.querySelector('[data-row-movie]');
+        const format = row.querySelector('[data-row-format]');
+        const room = row.querySelector('[data-row-room]');
+        movie.value = values.movie_id || '';
+        format.value = values.presentation_format_id || '';
+        room.value = values.room_id || '';
         row.querySelector('[data-row-date]').value = values.show_date || '';
         row.querySelector('[data-row-time]').value = values.show_time || '';
+
+        const supportedIds = (option) => new Set((option?.dataset.formatIds || '').split(',').filter(Boolean));
+        const filterFormats = (preserveSelection = false) => {
+            const allowed = supportedIds(movie.selectedOptions[0]);
+            [...format.options].forEach((option) => {
+                option.hidden = option.value !== '' && !allowed.has(option.value);
+            });
+            if (!preserveSelection && format.value && !allowed.has(format.value)) format.value = '';
+        };
+        const filterRooms = (preserveSelection = false) => {
+            [...room.options].forEach((option) => {
+                option.hidden = option.value !== '' && (!format.value || !supportedIds(option).has(format.value));
+            });
+            if (!preserveSelection && room.value && !supportedIds(room.selectedOptions[0]).has(format.value)) room.value = '';
+        };
+        movie.addEventListener('change', () => {
+            filterFormats();
+            filterRooms();
+        });
+        format.addEventListener('change', () => filterRooms());
+        filterFormats(true);
+        filterRooms(true);
         row.querySelectorAll('select,input').forEach((input) => input.addEventListener('change', invalidatePreview));
         row.querySelector('[data-bulk-remove-row]').addEventListener('click', () => {
             row.remove();
@@ -69,6 +95,7 @@ function initializeBulkShowtimeWorkspace(workspace) {
             rows: [...rows.querySelectorAll('[data-bulk-row]')].map((row) => ({
                 row_key: row.dataset.rowKey,
                 movie_id: row.querySelector('[data-row-movie]').value,
+                presentation_format_id: row.querySelector('[data-row-format]').value,
                 room_id: row.querySelector('[data-row-room]').value,
                 show_date: row.querySelector('[data-row-date]').value,
                 show_time: row.querySelector('[data-row-time]').value,
@@ -86,7 +113,7 @@ function initializeBulkShowtimeWorkspace(workspace) {
             status.textContent = result.valid ? 'Hợp lệ' : 'Không hợp lệ';
             status.className = result.valid ? 'status-badge text-success bg-success/10' : 'status-badge text-error bg-error/10';
             row.querySelector('[data-row-window]').textContent = result.window
-                ? `${result.window.start_display} → ${result.window.end_display} · vệ sinh ${result.window.cleaning_display} · phòng sẵn sàng ${result.window.room_ready_display} · ${result.timezone}`
+                ? `${result.presentation_format?.code || ''} · ${result.window.start_display} → ${result.window.end_display} · vệ sinh ${result.window.cleaning_display} · phòng sẵn sàng ${result.window.room_ready_display} · ${result.timezone}`
                 : '';
             const internal = (result.internal_conflicts || []).map((item) => `dòng ${item.row_key} (${item.start_display}–${item.room_ready_display})`).join(', ');
             const persisted = result.conflict

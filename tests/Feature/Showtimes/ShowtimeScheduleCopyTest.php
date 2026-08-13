@@ -10,6 +10,7 @@ use App\Models\BookingTicketPrint;
 use App\Models\Cinema;
 use App\Models\CinemaPricingRule;
 use App\Models\Payment;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\DB;
 
 class ShowtimeScheduleCopyTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
@@ -47,8 +50,8 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
         ]);
 
         $this->assertSame([
-            ['row_key' => 'copy-1', 'movie_id' => $early->id, 'room_id' => $room->id, 'show_date' => '2030-08-19', 'show_time' => '09:00'],
-            ['row_key' => 'copy-2', 'movie_id' => $late->id, 'room_id' => $room->id, 'show_date' => '2030-08-19', 'show_time' => '12:00'],
+            ['row_key' => 'copy-1', 'movie_id' => $early->id, 'presentation_format_id' => $this->presentationFormat->id, 'room_id' => $room->id, 'show_date' => '2030-08-19', 'show_time' => '09:00'],
+            ['row_key' => 'copy-2', 'movie_id' => $late->id, 'presentation_format_id' => $this->presentationFormat->id, 'room_id' => $room->id, 'show_date' => '2030-08-19', 'show_time' => '12:00'],
         ], $response->json('rows'));
         $this->assertSame($before, $this->operationalCounts());
     }
@@ -83,6 +86,64 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
             ->assertOk()->assertJson(['generated_count' => 1]);
         $this->actingAs($manager)->postJson(route('admin.showtimes.copy.generate'), $this->copyPayload('room', '2031-01-01', '2032-01-01', $room))
             ->assertOk()->assertJson(['generated_count' => 1]);
+    }
+
+    public function test_copy_preserves_source_format_even_when_it_is_now_archived_and_target_preview_rejects_it(): void
+    {
+        $movie = $this->movie();
+        $room = $this->rooms['P01'];
+        $this->existing($movie, $room, ['show_date' => '2025-08-12']);
+        $this->presentationFormat->update(['is_active' => false]);
+        $admin = $this->userWithRole('admin');
+
+        $rows = $this->generateRows($admin, $this->copyPayload('room', '2025-08-12', '2030-08-19', $room));
+
+        $this->assertSame($this->presentationFormat->id, $rows[0]['presentation_format_id']);
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
+            ->assertOk()
+            ->assertJsonPath('rows.0.code', 'PRESENTATION_FORMAT_INACTIVE');
+        $this->assertDatabaseCount('showtimes', 1);
+    }
+
+    public function test_copied_format_is_revalidated_against_current_movie_and_room_compatibility(): void
+    {
+        $movie = $this->movie();
+        $room = $this->rooms['P01'];
+        $this->existing($movie, $room, ['show_date' => '2025-08-12']);
+        $admin = $this->userWithRole('admin');
+
+        $movie->supportedPresentationFormats()->detach($this->presentationFormat);
+        $rows = $this->generateRows($admin, $this->copyPayload('room', '2025-08-12', '2030-08-19', $room));
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
+            ->assertOk()->assertJsonPath('rows.0.code', 'MOVIE_FORMAT_UNSUPPORTED');
+
+        $movie->supportedPresentationFormats()->attach($this->presentationFormat);
+        $room->presentationCapabilities()->detach($this->presentationFormat);
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
+            ->assertOk()->assertJsonPath('rows.0.code', 'ROOM_FORMAT_UNSUPPORTED');
+        $this->assertDatabaseCount('showtimes', 1);
+    }
+
+    public function test_copied_format_can_be_edited_before_preview_without_copy_publishing(): void
+    {
+        $movie = $this->movie();
+        $room = $this->rooms['P01'];
+        $this->existing($movie, $room, ['show_date' => '2025-08-12']);
+        $threeD = PresentationFormat::query()->create([
+            'code' => '3D', 'name' => '3D', 'is_active' => true, 'sort_order' => 20,
+        ]);
+        $movie->supportedPresentationFormats()->attach($threeD);
+        $room->presentationCapabilities()->attach($threeD);
+        $admin = $this->userWithRole('admin');
+        $rows = $this->generateRows($admin, $this->copyPayload('room', '2025-08-12', '2030-08-19', $room));
+        $rows[0]['presentation_format_id'] = $threeD->id;
+
+        $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
+            ->assertOk()
+            ->assertJson(['valid' => true])
+            ->assertJsonPath('rows.0.presentation_format.id', $threeD->id);
+        $this->assertDatabaseCount('showtimes', 1);
+        $this->assertDatabaseMissing('showtimes', ['show_date' => '2030-08-19 00:00:00']);
     }
 
     public function test_same_source_target_empty_and_cancelled_finished_only_sources_are_rejected(): void
@@ -176,6 +237,7 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
             'cinema_id' => $otherCinema->id,
             'room_id' => $otherRoom->id,
             'room_layout_id' => $layout->id,
+            'presentation_format_id' => $this->presentationFormat->id,
             'show_date' => '2025-08-12',
             'show_time' => '18:00:00',
             'price' => 1,
@@ -267,7 +329,7 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
         $rows = $this->generateRows($admin, $this->copyPayload('room', '2025-08-12', '2030-08-19', $room));
 
         $this->assertSame([
-            'row_key', 'movie_id', 'room_id', 'show_date', 'show_time',
+            'row_key', 'movie_id', 'presentation_format_id', 'room_id', 'show_date', 'show_time',
         ], array_keys($rows[0]));
         $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
             ->assertOk()
@@ -403,8 +465,9 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
             'ticket_prints' => BookingTicketPrint::query()->count(),
             'incident_impacts' => DB::table('seat_incident_impacts')->count(),
         ]);
-        $this->assertSame(['row_key', 'movie_id', 'room_id', 'show_date', 'show_time'], array_keys($rows[0]));
+        $this->assertSame(['row_key', 'movie_id', 'presentation_format_id', 'room_id', 'show_date', 'show_time'], array_keys($rows[0]));
         $this->assertSame($source->movie_id, $rows[0]['movie_id']);
+        $this->assertSame($source->presentation_format_id, $rows[0]['presentation_format_id']);
     }
 
     /** @return array<string, mixed> */
@@ -419,7 +482,7 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
         ];
     }
 
-    /** @return list<array{row_key: string, movie_id: int, room_id: int, show_date: string, show_time: string}> */
+    /** @return list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}> */
     private function generateRows($user, array $payload): array
     {
         return $this->actingAs($user)->postJson(route('admin.showtimes.copy.generate'), $payload)

@@ -536,6 +536,7 @@ class SeatMaintenanceOperationsTest extends TestCase
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00:00',
             'price' => 50000,

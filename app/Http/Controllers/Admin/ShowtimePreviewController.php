@@ -51,7 +51,6 @@ final class ShowtimePreviewController extends Controller
             $data['show_time'],
             $showtime,
             presentationFormatId: (int) $data['presentation_format_id'],
-            requirePresentationFormat: true,
         );
 
         return response()->json($this->payload($result, $room));

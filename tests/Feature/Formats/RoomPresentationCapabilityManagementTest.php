@@ -8,7 +8,6 @@ use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\UserCinemaAssignment;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\DB;
 use Tests\Feature\Showtimes\ShowtimeTestCase;
 
 final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
@@ -82,8 +81,7 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
         $room = $this->rooms->get('P01');
         $room->presentationCapabilities()->attach([$twoD->id, $threeD->id]);
         $movie = $this->movie();
-        $showtime = $this->existing($movie, $room);
-        DB::table('showtimes')->where('id', $showtime->id)->update(['presentation_format_id' => $threeD->id]);
+        $showtime = $this->existing($movie, $room, ['presentation_format_id' => $threeD->id]);
 
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), [
             'code' => $room->code,
@@ -111,8 +109,10 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
         $threeD = $this->format('3D');
         $room = $this->rooms->get('P01');
         $room->presentationCapabilities()->attach([$twoD->id, $threeD->id]);
-        $showtime = $this->existing($this->movie(), $room, ['show_date' => '2030-06-09']);
-        DB::table('showtimes')->where('id', $showtime->id)->update(['presentation_format_id' => $threeD->id]);
+        $showtime = $this->existing($this->movie(), $room, [
+            'show_date' => '2030-06-09',
+            'presentation_format_id' => $threeD->id,
+        ]);
 
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), $this->updatePayload($room, [$twoD->id]))
             ->assertRedirect(route('admin.rooms.show', $room));
@@ -129,8 +129,10 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
         $threeD = $this->format('3D');
         $room = $this->rooms->get('P01');
         $room->presentationCapabilities()->attach([$twoD->id, $threeD->id]);
-        $showtime = $this->existing($this->movie(), $room, ['status' => 'cancelled']);
-        DB::table('showtimes')->where('id', $showtime->id)->update(['presentation_format_id' => $threeD->id]);
+        $showtime = $this->existing($this->movie(), $room, [
+            'status' => 'cancelled',
+            'presentation_format_id' => $threeD->id,
+        ]);
 
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), $this->updatePayload($room, [$twoD->id]))
             ->assertRedirect(route('admin.rooms.show', $room));

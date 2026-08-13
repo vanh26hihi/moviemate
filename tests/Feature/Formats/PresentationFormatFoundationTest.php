@@ -39,9 +39,7 @@ final class PresentationFormatFoundationTest extends ShowtimeTestCase
         $room = $this->rooms->get('P01');
         $movie->supportedPresentationFormats()->attach($format);
         $room->presentationCapabilities()->attach($format);
-        $showtime = $this->existing($movie, $room);
-        $showtime->presentation_format_id = $format->id;
-        $showtime->save();
+        $showtime = $this->existing($movie, $room, ['presentation_format_id' => $format->id]);
 
         $this->assertTrue($movie->fresh()->supportedPresentationFormats->contains($format));
         $this->assertTrue($room->fresh()->presentationCapabilities->contains($format));
@@ -83,11 +81,23 @@ final class PresentationFormatFoundationTest extends ShowtimeTestCase
         $room->presentationCapabilities()->attach($format);
     }
 
-    public function test_showtime_format_fk_is_nullable_but_rejects_an_invalid_reference(): void
+    public function test_showtime_format_is_not_nullable(): void
     {
         $movie = $this->movie();
-        $showtime = $this->existing($movie, $this->rooms->get('P01'));
-        $this->assertNull($showtime->presentation_format_id);
+
+        $column = collect(Schema::getColumns('showtimes'))->firstWhere('name', 'presentation_format_id');
+        $this->assertIsArray($column);
+        $this->assertFalse($column['nullable']);
+
+        $this->expectException(QueryException::class);
+        $this->existing($movie, $this->rooms->get('P01'), ['presentation_format_id' => null]);
+    }
+
+    public function test_showtime_format_fk_rejects_an_invalid_reference(): void
+    {
+        $format = $this->format('2D');
+        $movie = $this->movie();
+        $showtime = $this->existing($movie, $this->rooms->get('P01'), ['presentation_format_id' => $format->id]);
 
         $this->expectException(QueryException::class);
         DB::table('showtimes')->where('id', $showtime->id)->update([
@@ -98,15 +108,13 @@ final class PresentationFormatFoundationTest extends ShowtimeTestCase
     public function test_referenced_showtime_format_cannot_be_hard_deleted(): void
     {
         $format = $this->format('2D');
-        $showtime = $this->existing($this->movie(), $this->rooms->get('P01'));
-        $showtime->presentation_format_id = $format->id;
-        $showtime->save();
+        $showtime = $this->existing($this->movie(), $this->rooms->get('P01'), ['presentation_format_id' => $format->id]);
 
         $this->expectException(QueryException::class);
         $format->delete();
     }
 
-    public function test_single_showtime_create_requires_format_while_database_column_remains_nullable(): void
+    public function test_single_showtime_create_requires_format(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 12:00:00', 'Asia/Ho_Chi_Minh'));
         $movie = $this->movie();

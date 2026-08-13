@@ -294,7 +294,7 @@ final class ReportingR9Test extends TestCase
             RoomLayoutCell::query()->create(['room_layout_id' => $layout->id, 'x_position' => $index + 1, 'y_position' => 1, 'cell_type' => 'seat', 'seat_id' => $seat->id]);
         }
         $layout->update(['status' => 'published', 'published_at' => now()]);
-        $showtime = Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'show_date' => $date, 'show_time' => $time, 'price' => 50_000, 'vip_price' => 70_000, 'pricing_version' => 'report-v1', 'status' => 'active']);
+        $showtime = Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id, 'show_date' => $date, 'show_time' => $time, 'price' => 50_000, 'vip_price' => 70_000, 'pricing_version' => 'report-v1', 'status' => 'active']);
 
         return compact('showtime', 'seats');
     }

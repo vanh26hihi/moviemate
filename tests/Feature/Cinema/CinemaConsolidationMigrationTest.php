@@ -140,8 +140,10 @@ class CinemaConsolidationMigrationTest extends TestCase
             'duration' => 90, 'age_rating' => 'P', 'status' => 'now_showing',
             'created_at' => $now, 'updated_at' => $now,
         ]);
+        $format = $this->presentationFormatFixture(2, 9);
         DB::table('showtimes')->insert([
             'id' => 950, 'movie_id' => 2, 'cinema_id' => $canonicalId, 'room_id' => 9,
+            'presentation_format_id' => $format->id,
             'show_date' => '2026-08-20', 'show_time' => '20:00:00', 'price' => 90000,
             'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
         ]);
@@ -367,6 +369,9 @@ class CinemaConsolidationMigrationTest extends TestCase
             'duration' => 90, 'age_rating' => 'P', 'status' => 'now_showing',
             'created_at' => $now, 'updated_at' => $now,
         ]);
+        $format = $this->presentationFormatFixture(1, 9);
+        $this->presentationFormatFixture(1, 10);
+        $this->presentationFormatFixture(1, 11);
 
         $showtimes = [];
         $showtimeId = 900;
@@ -374,6 +379,7 @@ class CinemaConsolidationMigrationTest extends TestCase
             for ($index = 0; $index < $count; $index++) {
                 $showtimes[] = [
                     'id' => ++$showtimeId, 'movie_id' => 1, 'cinema_id' => $cinemaId, 'room_id' => $roomId,
+                    'presentation_format_id' => $format->id,
                     'show_date' => '2026-08-10', 'show_time' => sprintf('%02d:00:00', 8 + $index),
                     'price' => 80000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
                 ];

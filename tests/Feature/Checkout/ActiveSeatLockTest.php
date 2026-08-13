@@ -64,6 +64,7 @@ class ActiveSeatLockTest extends TestCase
             'cinema_id' => $scenario['cinema']->id,
             'room_id' => $scenario['room']->id,
             'room_layout_id' => $scenario['layout']->id,
+            'presentation_format_id' => $scenario['showtime']->presentation_format_id,
             'show_date' => now()->addDays(6)->toDateString(),
             'show_time' => '20:00:00',
             'price' => 50000,

@@ -57,6 +57,7 @@ class DynamicSeatBookingTest extends TestCase
         $room = $this->rooms['P01'];
         $this->showtime = Showtime::query()->create([
             'movie_id' => $movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movieId, $room)->id,
             'room_layout_id' => $room->latestPublishedLayout()->first()->id,
             'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
@@ -116,6 +117,7 @@ class DynamicSeatBookingTest extends TestCase
         $v2 = $service->publish($saved);
         $newShowtime = Showtime::query()->create([
             'movie_id' => $this->showtime->movie_id, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($this->showtime->movie_id, $room)->id,
             'room_layout_id' => $v2->id, 'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '13:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);
@@ -183,6 +185,7 @@ class DynamicSeatBookingTest extends TestCase
         $maintenance = Seat::query()->where('room_id', $room->id)->where('status', 'maintenance')->firstOrFail();
         $showtime = Showtime::query()->create([
             'movie_id' => $this->showtime->movie_id, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($this->showtime->movie_id, $room)->id,
             'room_layout_id' => $room->latestPublishedLayout()->first()->id,
             'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '12:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
