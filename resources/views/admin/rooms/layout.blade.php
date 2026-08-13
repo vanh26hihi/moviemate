@@ -20,6 +20,7 @@
         'vip' => ['label' => 'Ghế VIP', 'icon' => 'ph-crown'],
         'couple' => ['label' => 'Ghế đôi', 'icon' => 'ph-heart'],
         'aisle' => ['label' => 'Lối đi', 'icon' => 'ph-arrows-down-up'],
+        'blocked' => ['label' => 'Vật cản cố định', 'icon' => 'ph-bricks'],
         'empty' => ['label' => 'Ô trống', 'icon' => 'ph-eraser'],
         'maintenance' => ['label' => 'Bảo trì', 'icon' => 'ph-wrench'],
         'inactive' => ['label' => 'Không sử dụng', 'icon' => 'ph-prohibit'],
@@ -29,7 +30,8 @@
         $initialCells = collect($oldLayout['cells'])->map(fn ($cell) => [
             'x' => (int) ($cell['x'] ?? $cell['x_position'] ?? 0),
             'y' => (int) ($cell['y'] ?? $cell['y_position'] ?? 0),
-            'cell_type' => ($cell['kind'] ?? $cell['cell_type'] ?? null) === 'aisle' ? 'aisle' : 'seat',
+            'cell_type' => in_array(($cell['kind'] ?? $cell['cell_type'] ?? null), ['aisle', 'blocked'], true)
+                ? ($cell['kind'] ?? $cell['cell_type']) : 'seat',
             'seat_id' => isset($cell['seat_id']) ? (int) $cell['seat_id'] : null,
             'type' => $cell['type'] ?? $cell['kind'] ?? null,
             'status' => $cell['status'] ?? 'active',
@@ -40,8 +42,8 @@
         ])->values();
     } else {
         $initialCells = $layout?->cells->map(function ($cell) {
-            if ($cell->cell_type === 'aisle') {
-                return ['x' => $cell->x_position, 'y' => $cell->y_position, 'cell_type' => 'aisle'];
+            if ($cell->cell_type !== 'seat') {
+                return ['x' => $cell->x_position, 'y' => $cell->y_position, 'cell_type' => $cell->cell_type];
             }
 
             return [
@@ -187,7 +189,7 @@
             </div>
             @if($layoutSummary)
                 <div class="mt-5 grid grid-cols-2 gap-3 border-t app-border pt-5 text-sm sm:grid-cols-4 lg:grid-cols-6" aria-label="Tóm tắt sơ đồ do máy chủ tính toán">
-                    @foreach(['rows' => 'Số hàng logic', 'columns' => 'Số cột logic', 'used' => 'Vị trí đã dùng', 'empty' => 'Vị trí trống', 'physical_seats' => 'Vị trí ghế vật lý', 'normal' => 'Ghế thường', 'vip' => 'Ghế VIP', 'couple_pairs' => 'Cặp ghế đôi', 'aisles' => 'Ô lối đi', 'maintenance' => 'Bảo trì', 'inactive' => 'Không sử dụng', 'operational_available' => 'Ghế đang hoạt động'] as $key => $label)
+                    @foreach(['rows' => 'Số hàng logic', 'columns' => 'Số cột logic', 'used' => 'Vị trí đã dùng', 'empty' => 'Vị trí trống', 'physical_seats' => 'Vị trí ghế vật lý', 'normal' => 'Ghế thường', 'vip' => 'Ghế VIP', 'couple_pairs' => 'Cặp ghế đôi', 'aisles' => 'Ô lối đi', 'blocked' => 'Vật cản cố định', 'maintenance' => 'Bảo trì', 'inactive' => 'Không sử dụng', 'operational_available' => 'Ghế đang hoạt động'] as $key => $label)
                         <div><p class="app-muted">{{ $label }}</p><p class="font-extrabold app-text">{{ $layoutSummary[$key] }}</p></div>
                     @endforeach
                 </div>
@@ -234,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         vip: 'bg-ai-start/10 text-ai-start border-ai-start/50',
         couple: 'bg-warning/10 text-warning border-warning/50',
         aisle: 'border-dashed app-muted opacity-60',
+        blocked: 'border-slate-500 bg-slate-800 text-slate-200',
         maintenance: 'bg-gray-300 text-gray-600 border-gray-400',
         inactive: 'bg-dark-border/30 app-muted',
     };
@@ -383,6 +386,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     button.className += ` ${visualClasses.aisle}`;
                     button.innerHTML = '<i class="ph ph-arrows-down-up" aria-hidden="true"></i>';
                     button.setAttribute('aria-label', `Lối đi hàng ${rowLabel(y)}, cột ${x}`);
+                } else if (cell.cell_type === 'blocked') {
+                    button.className += ` ${visualClasses.blocked}`;
+                    button.innerHTML = '<i class="ph ph-bricks" aria-hidden="true"></i>';
+                    button.title = 'Vật cản cố định · Vị trí cấu trúc không bố trí ghế';
+                    button.setAttribute('aria-label', `Vật cản cố định hàng ${rowLabel(y)}, cột ${x}, vị trí cấu trúc không bố trí ghế`);
                 } else if (isMergedPair) {
                     const displayCode = pair.map(member => member.seat_code).join('–');
                     const consistentStatus = new Set(pair.map(member => member.status)).size === 1;
@@ -448,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         set('row', y ? rowLabel(y) : '—');
         set('coordinate', x && y ? `x=${x}, y=${y}` : '—');
-        set('kind', cell ? (cell.cell_type === 'aisle' ? 'Lối đi' : (typeLabels[cell.type] || statusLabels[cell.status] || 'Ghế')) : (x ? 'Ô trống' : '—'));
+        set('kind', cell ? (cell.cell_type === 'aisle' ? 'Lối đi' : (cell.cell_type === 'blocked' ? 'Vật cản cố định' : (typeLabels[cell.type] || statusLabels[cell.status] || 'Ghế'))) : (x ? 'Ô trống' : '—'));
         set('code', cell?.seat_code || '—');
         set('pair', cell?.pair_code || '—');
         set('history', cell?.has_bookings ? 'Đã có đặt vé' : (cell ? 'Chưa có đặt vé' : '—'));
@@ -480,8 +488,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showEditorError('Không thể di chuyển riêng một nửa ghế đôi. Hãy dùng thao tác “Tách ghế đôi” trước.', [key, rightKey]);
                 return;
             }
-            if (existing?.cell_type === 'aisle' || right?.cell_type === 'aisle') {
-                showEditorError('Ghế đôi không thể chồng lên hoặc băng qua lối đi. Hãy thay đổi lối đi bằng một thao tác cấu trúc riêng trước.', [key, rightKey]);
+            if ((existing && existing.cell_type !== 'seat') || (right && right.cell_type !== 'seat')) {
+                showEditorError('Ghế đôi không thể chồng lên lối đi hoặc vật cản cố định. Hãy thay đổi ô cấu trúc riêng trước.', [key, rightKey]);
                 return;
             }
             if (existing?.has_bookings || right?.has_bookings) {
@@ -503,11 +511,11 @@ document.addEventListener('DOMContentLoaded', () => {
             cells.set(rightKey, {...rightSeat, x: x + 1, y, pair_code: pairCode, pair_position: 'right'});
             clearCoordinateErrors([key, rightKey]);
         } else if (activeTool === 'maintenance' || activeTool === 'inactive') {
-            if (existing?.cell_type === 'aisle' && !window.confirm('Vị trí này là lối đi. Bạn có chắc muốn thay thế lối đi bằng ghế?')) return;
+            if (existing && existing.cell_type !== 'seat' && !window.confirm('Vị trí này là ô cấu trúc. Bạn có chắc muốn thay thế bằng ghế?')) return;
             remember();
             if (existingPair) existingPair.forEach(member => member.status = activeTool);
             else cells.set(key, {...(existing?.cell_type === 'seat' ? existing : createSeat(x, y)), status: activeTool});
-        } else if (activeTool === 'empty' || activeTool === 'aisle') {
+        } else if (activeTool === 'empty' || activeTool === 'aisle' || activeTool === 'blocked') {
             if (!existing && activeTool === 'empty') return;
             if (existingPair) {
                 showEditorError('Không thể thay đổi riêng một nửa ghế đôi. Hãy dùng thao tác “Tách ghế đôi” trước.', touched);
@@ -517,17 +525,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 showEditorError('Không thể xóa ghế đã có lịch sử đặt vé.', [key]);
                 return;
             }
-            if (existing && !window.confirm(`Vị trí này đang là ${existing.cell_type === 'aisle' ? 'lối đi' : existing.seat_code}. Bạn có chắc muốn thay thế?`)) return;
+            if (existing && !window.confirm(`Vị trí này đang là ${existing.cell_type === 'aisle' ? 'lối đi' : (existing.cell_type === 'blocked' ? 'vật cản cố định' : existing.seat_code)}. Bạn có chắc muốn thay thế?`)) return;
             remember();
             cells.delete(key);
             if (activeTool === 'aisle') cells.set(key, {x, y, cell_type: 'aisle'});
+            if (activeTool === 'blocked') cells.set(key, {x, y, cell_type: 'blocked'});
         } else if (existingPair) {
             showEditorError('Không thể thay đổi riêng một nửa ghế đôi. Hãy dùng thao tác “Tách ghế đôi” trước.', touched);
             return;
         } else {
-            if (existing?.cell_type === 'aisle' && !window.confirm('Không thể đặt ghế tại vị trí lối đi nếu chưa xác nhận thay thế. Bạn có chắc muốn thay lối đi?')) return;
+            if (existing && existing.cell_type !== 'seat' && !window.confirm('Không thể đặt ghế tại ô cấu trúc nếu chưa xác nhận thay thế. Bạn có chắc muốn thay ô này?')) return;
             if (existing?.cell_type === 'seat' && existing.type === activeTool && existing.status === 'active') return;
-            if (existing && !window.confirm(`Tọa độ này đã được sử dụng bởi ${existing.seat_code || 'lối đi'}. Bạn có chắc muốn thay thế?`)) return;
+            if (existing && !window.confirm(`Tọa độ này đã được sử dụng bởi ${existing.seat_code || (existing.cell_type === 'blocked' ? 'vật cản cố định' : 'lối đi')}. Bạn có chắc muốn thay thế?`)) return;
             remember();
             cells.set(key, existing?.cell_type === 'seat'
                 ? {...existing, type: activeTool, status: 'active'}
@@ -712,8 +721,8 @@ document.addEventListener('DOMContentLoaded', () => {
             rows: Number(rowsInput.value),
             columns: Number(columnsInput.value),
             screen_position: screenInput.value,
-            cells: Array.from(cells.values()).map(cell => cell.cell_type === 'aisle'
-                ? {kind: 'aisle', x: cell.x, y: cell.y}
+            cells: Array.from(cells.values()).map(cell => cell.cell_type !== 'seat'
+                ? {kind: cell.cell_type, x: cell.x, y: cell.y}
                 : {
                     kind: cell.type,
                     seat_id: cell.seat_id || null,

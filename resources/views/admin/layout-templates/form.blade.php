@@ -18,6 +18,7 @@
         'vip' => ['label' => 'VIP', 'icon' => 'ph-star'],
         'couple' => ['label' => 'Ghế đôi', 'icon' => 'ph-heart'],
         'aisle' => ['label' => 'Lối đi', 'icon' => 'ph-arrows-down-up'],
+        'blocked' => ['label' => 'Vật cản cố định', 'icon' => 'ph-bricks'],
         'empty' => ['label' => 'Xóa ô', 'icon' => 'ph-eraser'],
     ];
 @endphp
@@ -100,7 +101,7 @@
 
                 <fieldset>
                     <legend class="mb-3 text-sm font-extrabold app-text">Công cụ bố trí</legend>
-                    <div data-layout-tools class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5" role="toolbar" aria-label="Công cụ bố trí sơ đồ ghế">
+                    <div data-layout-tools class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" role="toolbar" aria-label="Công cụ bố trí sơ đồ ghế">
                         @foreach($tools as $key => $tool)
                             <button type="button" data-layout-tool="{{ $key }}" aria-pressed="{{ $key === 'normal' ? 'true' : 'false' }}" class="layout-template-tool {{ $key === 'normal' ? 'is-active' : '' }} {{ $key === 'empty' ? 'is-danger' : '' }}">
                                 <i class="ph {{ $tool['icon'] }} text-lg" aria-hidden="true"></i>
@@ -147,6 +148,7 @@
                 'vip' => ['VIP', 'ph-star'],
                 'couple' => ['Ghế đôi', 'ph-heart'],
                 'aisle' => ['Lối đi', 'ph-arrows-down-up'],
+                'blocked' => ['Vật cản cố định', 'ph-bricks'],
                 'dimensions' => ['Lưới logic', 'ph-grid-four'],
             ] as $key => [$label, $icon])
                 <div class="rounded-2xl border app-border app-bg p-4">

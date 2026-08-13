@@ -8,6 +8,14 @@ use LogicException;
 
 class RoomLayoutCell extends Model
 {
+    public const TYPE_SEAT = 'seat';
+
+    public const TYPE_AISLE = 'aisle';
+
+    public const TYPE_BLOCKED = 'blocked';
+
+    public const CELL_TYPES = [self::TYPE_SEAT, self::TYPE_AISLE, self::TYPE_BLOCKED];
+
     protected $fillable = [
         'room_layout_id',
         'x_position',
@@ -36,10 +44,13 @@ class RoomLayoutCell extends Model
                 || $cell->y_position < 1 || $cell->y_position > $layout->rows) {
                 throw new LogicException('Tọa độ ô nằm ngoài giới hạn sơ đồ ghế.');
             }
-            if ($cell->cell_type === 'aisle' && $cell->seat_id !== null) {
-                throw new LogicException('Ô lối đi không thể tham chiếu đến ghế.');
+            if (! in_array($cell->cell_type, self::CELL_TYPES, true)) {
+                throw new LogicException('Loại ô sơ đồ không hợp lệ.');
             }
-            if ($cell->cell_type === 'seat') {
+            if (in_array($cell->cell_type, [self::TYPE_AISLE, self::TYPE_BLOCKED], true) && $cell->seat_id !== null) {
+                throw new LogicException('Ô cấu trúc không thể tham chiếu đến ghế.');
+            }
+            if ($cell->cell_type === self::TYPE_SEAT) {
                 $seat = $cell->seat()->first();
                 if (! $seat || $seat->room_id !== $layout->room_id) {
                     throw new LogicException('Ô ghế phải tham chiếu đến một ghế trong đúng phòng.');

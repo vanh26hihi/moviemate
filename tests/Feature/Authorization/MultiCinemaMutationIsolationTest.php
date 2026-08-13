@@ -55,6 +55,18 @@ final class MultiCinemaMutationIsolationTest extends TestCase
         $this->assertSame('active', $foreign['room']->fresh()->status);
 
         $this->actingAs($manager)
+            ->patch(route('admin.rooms.layout.update', $foreign['room']), [
+                'layout' => json_encode([
+                    'rows' => 1, 'columns' => 1, 'screen_position' => 'top',
+                    'cells' => [['kind' => 'blocked', 'x' => 1, 'y' => 1]],
+                ]),
+            ])
+            ->assertNotFound();
+        $this->assertDatabaseMissing('room_layout_cells', [
+            'room_layout_id' => $foreign['layout']->id, 'cell_type' => 'blocked',
+        ]);
+
+        $this->actingAs($manager)
             ->patch(route('admin.rooms.seat-maintenance.update', [$foreign['room'], $foreign['seat']]), [
                 'status' => 'maintenance',
             ])

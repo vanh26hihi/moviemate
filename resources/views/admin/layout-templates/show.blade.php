@@ -71,6 +71,7 @@
                 ['VIP', $statistics['vip'], 'vị trí', 'ph-star'],
                 ['Ghế đôi', $statistics['couple_pairs'], $statistics['couple_positions'].' vị trí', 'ph-heart'],
                 ['Lối đi', $statistics['aisles'], 'ô', 'ph-arrows-down-up'],
+                ['Vật cản cố định', $statistics['blocked'], 'ô', 'ph-bricks'],
                 ['Đang áp dụng', $statistics['usages'], 'phòng/layout', 'ph-buildings'],
             ] as [$label, $value, $note, $icon])
                 <div class="rounded-2xl border app-border app-bg p-4">

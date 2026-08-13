@@ -32,7 +32,8 @@
                     $available = $seat && $consistentStatus && $groupSeats->every(fn ($member) => $member->status === 'active');
                 @endphp
                 @if(!$cell)<span class="h-9 w-9"></span>
-                @elseif($cell->cell_type === 'aisle')<span class="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed app-border text-xs app-muted" aria-label="Lối đi">│</span>
+                @elseif($cell->cell_type === 'aisle')<span class="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed app-border text-xs app-muted" aria-label="Lối đi"><i class="ph ph-arrows-down-up" aria-hidden="true"></i></span>
+                @elseif($cell->cell_type === 'blocked')<span class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-500 bg-slate-800 text-slate-200" aria-label="Vật cản cố định hàng {{ chr(64 + $y) }}, cột {{ $x }}, vị trí cấu trúc không bố trí ghế"><i class="ph ph-bricks" aria-hidden="true"></i></span>
                 @elseif($isMergedCouple && $seat->id !== $primarySeatId) @continue
                 @else
                     @php

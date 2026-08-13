@@ -21,7 +21,8 @@
                     @for($x=1;$x<=$layout->columns;$x++)
                         @php $cell=$cellMap->get($x.':'.$y); $seat=$cell?->seat; $disabled=$seat && isset($unavailable[$seat->id]); @endphp
                         @if(!$cell)<span class="h-11 w-11"></span>
-                        @elseif($cell->cell_type==='aisle')<span class="flex h-11 w-11 items-center justify-center app-muted">↕</span>
+                        @elseif($cell->cell_type==='aisle')<span class="flex h-11 w-11 items-center justify-center app-muted" aria-label="Lối đi"><i class="ph ph-arrows-down-up" aria-hidden="true"></i></span>
+                        @elseif($cell->cell_type==='blocked')<span class="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-500 bg-slate-800 text-slate-200" aria-label="Vật cản cố định hàng {{ chr(64 + $y) }}, cột {{ $x }}, vị trí cấu trúc không bố trí ghế"><i class="ph ph-bricks" aria-hidden="true"></i></span>
                         @else
                             <label class="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border app-border text-xs font-extrabold has-[:checked]:border-brand-start has-[:checked]:bg-brand-start has-[:checked]:text-white {{ $disabled ? 'cursor-not-allowed opacity-35' : '' }}" title="{{ $seat->seat_code }} · {{ number_format($seatPrices[$seat->type]->finalAmount,0,',','.') }} VNĐ">
                                 <input class="sr-only counter-seat" type="checkbox" name="seat_ids[]" value="{{ $seat->id }}" data-pair="{{ $seat->pair_code }}" @disabled($disabled)>

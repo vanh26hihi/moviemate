@@ -159,6 +159,7 @@ class SeatController extends Controller
             'vip' => $seats->where('type', 'vip')->count(),
             'couple_pairs' => $seats->where('type', 'couple')->pluck('pair_code')->filter()->unique()->count(),
             'aisles' => $layout->cells->where('cell_type', 'aisle')->count(),
+            'blocked' => $layout->cells->where('cell_type', 'blocked')->count(),
             'maintenance' => $seats->where('status', 'maintenance')->count(),
             'inactive' => $seats->whereIn('status', ['inactive', 'retired'])->count(),
             'operational_available' => $seats->where('status', 'active')->count(),
