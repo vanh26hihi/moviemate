@@ -65,7 +65,7 @@ trait CreatesPublicDiscoveryFixtures
         ]);
         $room = Room::query()->create([
             'cinema_id' => $cinema->id, 'code' => $code.'-01', 'name' => 'Phòng '.$code,
-            'room_type' => $attributes['room_type'] ?? '2D', 'total_seats' => 1,
+            'room_type' => $attributes['room_type'] ?? '2D', 'width_mm' => 8_000, 'length_mm' => 10_000,
             'status' => $attributes['room_status'] ?? 'active',
         ]);
         $movie = $attributes['movie'] ?? Movie::query()->create([

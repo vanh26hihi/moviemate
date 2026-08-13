@@ -358,11 +358,6 @@ class RoomLayoutService
                 'published_at' => now(),
                 'updated_by' => $userId,
             ]);
-            $usableCapacity = $locked->cells()
-                ->where('cell_type', 'seat')
-                ->whereHas('seat', fn ($query) => $query->where('status', 'active'))
-                ->count();
-            $locked->room()->update(['total_seats' => $usableCapacity]);
             $this->retireSeatsAbsentFromPublishedLayout($locked);
 
             return $locked->fresh(['cells.seat']);

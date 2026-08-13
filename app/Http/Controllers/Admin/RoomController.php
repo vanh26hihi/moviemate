@@ -83,7 +83,7 @@ class RoomController extends Controller
         unset($validated['template_id'], $validated['layout_name'], $validated['change_note'], $validated['presentation_format_ids']);
         $validated['room_type_id'] = RoomType::query()->where('code', $validated['room_type'])->value('id');
         $room = DB::transaction(function () use ($validated, $cinemaId, $templateId, $capabilityIds, $layoutName, $changeNote, $request): Room {
-            $room = Room::query()->create([...$validated, 'total_seats' => 0, 'cinema_id' => $cinemaId]);
+            $room = Room::query()->create([...$validated, 'cinema_id' => $cinemaId]);
             $this->capabilities->syncNew($room, $capabilityIds);
             if ($templateId) {
                 $template = RoomLayoutTemplate::query()->findOrFail($templateId);
@@ -164,6 +164,7 @@ class RoomController extends Controller
             $this->ensureOperationalNameIsUnique($validated, $locked->id, (int) $locked->cinema_id);
             $beforeStatus = $locked->status;
             $beforeBuffer = $locked->cleaning_buffer_minutes;
+            $beforeDimensions = $locked->only(['width_mm', 'length_mm']);
             $locked->status = $validated['status'];
             $this->capabilities->syncLocked($locked, $capabilityIds);
             unset($validated['cinema_id']);
@@ -175,6 +176,16 @@ class RoomController extends Controller
                 $this->activityLogger->log('room.cleaning_buffer_updated', $locked,
                     ['room_id' => $locked->id, 'cleaning_buffer' => $beforeBuffer],
                     ['room_id' => $locked->id, 'cleaning_buffer' => $locked->cleaning_buffer_minutes]);
+            }
+            $afterDimensions = $locked->only(['width_mm', 'length_mm']);
+            if ($beforeDimensions !== $afterDimensions) {
+                $this->activityLogger->log(
+                    'room.physical_dimensions_updated',
+                    $locked,
+                    $beforeDimensions,
+                    $afterDimensions,
+                    ['room_id' => $locked->id, 'room_code' => $locked->code],
+                );
             }
         });
 
@@ -236,6 +247,12 @@ class RoomController extends Controller
 
     private function ensureStatusTransitionIsSafe(Room $room, string $newStatus): void
     {
+        if ($newStatus === 'active' && ! $room->hasCompletePhysicalDimensions()) {
+            throw ValidationException::withMessages([
+                'status' => 'Không thể kích hoạt phòng khi chưa có đủ chiều rộng và chiều dài phòng hợp lệ.',
+            ]);
+        }
+
         if ($room->status !== 'active' || $newStatus !== 'inactive') {
             return;
         }

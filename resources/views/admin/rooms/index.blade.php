@@ -64,7 +64,7 @@
                         <th>{{ __('rooms.fields.cinema') }}</th>
                         <th>{{ __('rooms.fields.type') }}</th>
                         <th>{{ __('rooms.fields.layout') }}</th>
-                        <th>{{ __('rooms.fields.total_seats') }}</th>
+                        <th>{{ __('rooms.fields.physical_seat_count') }}</th>
                         <th>{{ __('rooms.fields.normal_seats') }}</th>
                         <th>{{ __('rooms.fields.vip_seats') }}</th>
                         <th>{{ __('rooms.fields.couple_seats') }}</th>
@@ -77,6 +77,7 @@
                     @forelse($rooms as $room)
                         @php
                             $published = $room->latestPublishedLayout;
+                            $physicalSeatCount = $published?->cells->where('cell_type', 'seat')->count() ?? 0;
                             $publishedSeats = $published?->cells->where('cell_type', 'seat')->pluck('seat')->filter() ?? collect();
                         @endphp
                         <tr>
@@ -89,7 +90,8 @@
                             <td>{{ $room->room_type_label }}</td>
                             <td>
                                 @if($published)
-                                    <p class="font-bold app-text">Phiên bản {{ $published->version }} · {{ $published->rows }} × {{ $published->columns }}</p>
+                                    <p class="font-bold app-text">Phiên bản {{ $published->version }}</p>
+                                    <p class="text-xs app-muted">Lưới logic: {{ $published->rows }} hàng × {{ $published->columns }} cột</p>
                                     <p class="text-xs app-muted">{{ $published->status_label }}</p>
                                 @else
                                     <span class="text-xs text-warning">{{ __('rooms.no_layout') }}</span>
@@ -98,7 +100,7 @@
                                     <span class="status-badge mt-1 inline-block bg-warning/10 text-warning">{{ __('rooms.has_draft', ['version' => $room->draftLayout->version]) }}</span>
                                 @endif
                             </td>
-                            <td>{{ $publishedSeats->count() }}</td>
+                            <td>{{ $physicalSeatCount }}</td>
                             <td>{{ $publishedSeats->where('type', 'normal')->count() }}</td>
                             <td>{{ $publishedSeats->where('type', 'vip')->count() }}</td>
                             <td>{{ $publishedSeats->where('type', 'couple')->count() }}</td>

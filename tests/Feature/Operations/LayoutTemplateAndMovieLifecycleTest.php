@@ -292,7 +292,7 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
     {
         return Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'R'.$suffix, 'name' => 'Room '.$suffix,
-            'room_type' => $roomType, 'status' => 'active', 'total_seats' => 0,
+            'room_type' => $roomType, 'status' => 'active',
         ]);
     }
 

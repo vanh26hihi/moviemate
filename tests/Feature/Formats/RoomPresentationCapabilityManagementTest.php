@@ -38,6 +38,8 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
             'name' => 'Phòng IMAX đa định dạng',
             'room_type' => 'IMAX',
             'status' => 'active',
+            'width_m' => '9',
+            'length_m' => '14',
             'presentation_format_ids' => [$twoD->id, $threeD->id],
         ])->assertSessionHasNoErrors();
 
@@ -88,6 +90,8 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
             'name' => 'Tên không được lưu',
             'room_type' => 'IMAX',
             'status' => 'active',
+            'width_m' => $room->widthMetersForInput(),
+            'length_m' => $room->lengthMetersForInput(),
             'cleaning_buffer_minutes' => 77,
             'presentation_format_ids' => [$twoD->id],
         ])->assertSessionHasErrors([
@@ -155,6 +159,11 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
         $this->assertSame(0, $room->presentationCapabilities()->count());
 
         $this->patch(route('admin.rooms.status.update', $room), ['status' => 'active'])
+            ->assertSessionHasErrors(['status' => 'Không thể kích hoạt phòng khi chưa có đủ chiều rộng và chiều dài phòng hợp lệ.']);
+        $this->assertSame('inactive', $room->fresh()->status);
+
+        $room->update(['width_mm' => 8_000, 'length_mm' => 10_000]);
+        $this->patch(route('admin.rooms.status.update', $room), ['status' => 'active'])
             ->assertSessionHasErrors(['status' => 'Phòng phải có ít nhất một khả năng trình chiếu đang sử dụng trước khi kích hoạt.']);
         $this->assertSame('inactive', $room->fresh()->status);
 
@@ -210,7 +219,8 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
     {
         return [
             'code' => $code, 'name' => "Phòng {$code}", 'room_type' => 'STANDARD',
-            'status' => 'active', 'presentation_format_ids' => $formatIds,
+            'status' => 'active', 'width_m' => '8', 'length_m' => '10',
+            'presentation_format_ids' => $formatIds,
         ];
     }
 
@@ -219,7 +229,10 @@ final class RoomPresentationCapabilityManagementTest extends ShowtimeTestCase
     {
         return [
             'code' => $room->code, 'name' => $room->name, 'room_type' => 'STANDARD',
-            'status' => $room->status, 'presentation_format_ids' => $formatIds,
+            'status' => $room->status,
+            'width_m' => $room->widthMetersForInput(),
+            'length_m' => $room->lengthMetersForInput(),
+            'presentation_format_ids' => $formatIds,
         ];
     }
 }

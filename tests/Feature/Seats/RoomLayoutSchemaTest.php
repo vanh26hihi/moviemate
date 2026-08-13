@@ -34,7 +34,7 @@ class RoomLayoutSchemaTest extends TestCase
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
         $room = Room::query()->create([
             'cinema_id' => $cinema->id, 'code' => 'S01', 'name' => 'Schema Room',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $layout = RoomLayout::query()->create([
             'room_id' => $room->id, 'version' => 1, 'rows' => 2, 'columns' => 2,

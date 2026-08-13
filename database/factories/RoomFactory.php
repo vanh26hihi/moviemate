@@ -18,8 +18,18 @@ class RoomFactory extends Factory
             'code' => fake()->unique()->bothify('T##'),
             'name' => 'Phòng '.fake()->unique()->numberBetween(10, 99),
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_mm' => 8_000,
+            'length_mm' => 12_000,
             'status' => 'active',
         ];
+    }
+
+    public function inactiveIncomplete(): static
+    {
+        return $this->state(fn (): array => [
+            'width_mm' => null,
+            'length_mm' => null,
+            'status' => 'inactive',
+        ]);
     }
 }

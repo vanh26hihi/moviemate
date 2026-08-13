@@ -301,7 +301,8 @@ final class Branch360ReadModelTest extends TestCase
             'code' => 'B'.str_pad((string) $this->sequence, 3, '0', STR_PAD_LEFT),
             'name' => 'Branch 360 Room '.$this->sequence,
             'room_type' => '2D',
-            'total_seats' => 1,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => $roomStatus,
         ]);
         $seat = Seat::query()->create([

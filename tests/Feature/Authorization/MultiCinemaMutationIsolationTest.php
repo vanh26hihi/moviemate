@@ -216,7 +216,8 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'code' => 'R'.str()->upper(str()->random(7)),
             'name' => 'Room '.$cinema->code,
             'room_type' => '2D',
-            'total_seats' => 1,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $seat = Seat::query()->create([

@@ -149,7 +149,7 @@ final class MultiCinemaAuthorizationTest extends TestCase
     {
         $room = Room::query()->create([
             'cinema_id' => $cinema->id, 'code' => 'R'.str()->upper(str()->random(7)),
-            'name' => 'Room '.$cinema->code, 'room_type' => '2D', 'total_seats' => 1, 'status' => 'active',
+            'name' => 'Room '.$cinema->code, 'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $seat = Seat::query()->create([
             'room_id' => $room->id, 'row' => 'A', 'number' => 1,

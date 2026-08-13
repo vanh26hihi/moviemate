@@ -27,7 +27,8 @@ trait CreatesBookingFixtures
             'code' => 'T'.str()->upper(str()->random(7)),
             'name' => 'Test booking room',
             'room_type' => '2D',
-            'total_seats' => $withCouple ? 4 : 2,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $movie = Movie::query()->create([

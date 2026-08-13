@@ -45,7 +45,7 @@ class DynamicSeatBookingTest extends TestCase
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([
                 'cinema_id' => $this->cinema->id, 'code' => $code, 'name' => 'Phòng '.($index + 1),
-                'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+                'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             ]);
         }
         $this->artisan('moviemate:rebuild-seat-layouts', ['--initialize-empty' => true])->assertSuccessful();

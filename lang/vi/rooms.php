@@ -31,7 +31,7 @@ return [
         'cinema' => 'Rạp/cơ sở',
         'type' => 'Loại phòng',
         'layout' => 'Sơ đồ ghế',
-        'total_seats' => 'Tổng số ghế',
+        'physical_seat_count' => 'Sức chứa vật lý',
         'normal_seats' => 'Ghế thường',
         'vip_seats' => 'Ghế VIP',
         'couple_seats' => 'Ghế đôi',

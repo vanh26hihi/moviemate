@@ -266,7 +266,7 @@ final class SeatRelocationWorkflowTest extends TestCase
     {
         $scenario = $this->scenario();
         $foreignRoom = Room::factory()->create([
-            'cinema_id' => $scenario['cinema']->id, 'code' => 'R'.str()->random(6), 'total_seats' => 1,
+            'cinema_id' => $scenario['cinema']->id, 'code' => 'R'.str()->random(6),
         ]);
         $foreignSeat = Seat::query()->create([
             'room_id' => $foreignRoom->id, 'row' => 'Z', 'number' => 1, 'seat_code' => 'Z1',
@@ -688,7 +688,7 @@ final class SeatRelocationWorkflowTest extends TestCase
     private function scenario(string $originalCode = 'A1', string $paymentStatus = 'success'): array
     {
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
-        $room = Room::factory()->create(['cinema_id' => $cinema->id, 'code' => 'R'.str()->random(6), 'total_seats' => 9]);
+        $room = Room::factory()->create(['cinema_id' => $cinema->id, 'code' => 'R'.str()->random(6)]);
         $layout = RoomLayout::query()->create(['room_id' => $room->id, 'version' => 1, 'name' => 'Relocation', 'rows' => 4, 'columns' => 8, 'status' => 'published', 'published_at' => now()]);
         $definitions = [
             ['A1', 'normal', null, null], ['A2', 'normal', null, null], ['A3', 'normal', null, null], ['B1', 'vip', null, null],

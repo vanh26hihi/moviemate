@@ -154,7 +154,8 @@ final class Branch360CinemaDetailTest extends TestCase
             'code' => 'UI'.str_pad((string) $this->sequence, 2, '0', STR_PAD_LEFT),
             'name' => 'UI Room '.$this->sequence,
             'room_type' => '2D',
-            'total_seats' => 1,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $seat = Seat::query()->create([

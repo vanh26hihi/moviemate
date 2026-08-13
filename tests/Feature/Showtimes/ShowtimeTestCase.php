@@ -60,7 +60,8 @@ abstract class ShowtimeTestCase extends TestCase
                 'code' => $code,
                 'name' => 'Phòng '.($index + 1),
                 'room_type' => '2D',
-                'total_seats' => 0,
+                'width_mm' => 8_000,
+                'length_mm' => 10_000,
                 'status' => 'active',
             ]);
         }

@@ -68,7 +68,8 @@ class RoomLayoutTemplateController extends Controller
         $couplePairs = $seatCells->where('seat_type', 'couple')->pluck('pair_key')->filter()->unique()->count();
         $aisleCells = $layoutTemplate->cells->where('cell_type', 'aisle')->count();
         $statistics = [
-            'capacity' => $normalSeats + $vipSeats + $couplePairs,
+            'physical_seats' => $seatCells->count(),
+            'pricing_units' => $normalSeats + $vipSeats + $couplePairs,
             'normal' => $normalSeats,
             'vip' => $vipSeats,
             'couple_pairs' => $couplePairs,

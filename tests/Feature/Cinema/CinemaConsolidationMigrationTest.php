@@ -103,7 +103,7 @@ class CinemaConsolidationMigrationTest extends TestCase
         $this->seedApprovedLegacyDataset(withHistory: false);
         DB::table('rooms')->insert([
             'id' => 13, 'cinema_id' => 11, 'code' => 'P02', 'name' => 'Phòng 13',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -132,7 +132,7 @@ class CinemaConsolidationMigrationTest extends TestCase
 
         DB::table('rooms')->insert([
             'id' => 20, 'cinema_id' => $canonicalId, 'code' => 'P04', 'name' => 'Phòng 4',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('movies')->insert([
@@ -339,10 +339,10 @@ class CinemaConsolidationMigrationTest extends TestCase
             ],
         ]);
         DB::table('rooms')->insert([
-            ['id' => 9, 'cinema_id' => 6, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => 10, 'cinema_id' => 6, 'code' => 'P02', 'name' => 'Phòng 2', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => 11, 'cinema_id' => 11, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => 12, 'cinema_id' => 6, 'code' => 'R0012', 'name' => self::MYSQL_ROOM_12_NAME, 'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 9, 'cinema_id' => 6, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'width_mm' => 7_500, 'length_mm' => 10_000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 10, 'cinema_id' => 6, 'code' => 'P02', 'name' => 'Phòng 2', 'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 11_000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 11, 'cinema_id' => 11, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'width_mm' => 7_500, 'length_mm' => 10_000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 12, 'cinema_id' => 6, 'code' => 'R0012', 'name' => self::MYSQL_ROOM_12_NAME, 'room_type' => '2D', 'width_mm' => null, 'length_mm' => null, 'status' => 'inactive', 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         if (! $withHistory) {

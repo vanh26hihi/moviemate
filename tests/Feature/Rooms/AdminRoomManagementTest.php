@@ -101,12 +101,13 @@ class AdminRoomManagementTest extends TestCase
         $manager = $this->userWithRole('manager');
         $response = $this->actingAs($manager)->post(route('admin.rooms.store'), [
             'code' => 'p20', 'name' => 'Phòng Hai Mươi', 'room_type' => '2d',
-            'status' => 'active', 'total_seats' => 999,
+            'status' => 'active', 'width_m' => '7.5', 'length_m' => '10',
             'presentation_format_ids' => [$this->presentationFormat->id],
         ]);
         $room = Room::query()->where('code', 'P20')->sole();
         $response->assertRedirect(route('admin.rooms.layout.show', $room));
-        $this->assertSame(0, $room->total_seats);
+        $this->assertSame(7_500, $room->width_mm);
+        $this->assertSame(10_000, $room->length_mm);
 
         $seat = Seat::query()->create([
             'room_id' => $room->id, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1',
@@ -114,12 +115,13 @@ class AdminRoomManagementTest extends TestCase
         ]);
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), [
             'code' => 'P20', 'name' => 'Phòng 20', 'room_type' => '3D', 'status' => 'active',
-            'total_seats' => 500, 'layout_id' => 999999,
+            'width_m' => '8', 'length_m' => '11', 'layout_id' => 999999,
             'presentation_format_ids' => [$this->presentationFormat->id],
         ])->assertRedirect(route('admin.rooms.show', $room));
 
         $this->assertDatabaseHas('seats', ['id' => $seat->id, 'room_id' => $room->id]);
-        $this->assertSame(0, $room->fresh()->total_seats);
+        $this->assertSame(8_000, $room->fresh()->width_mm);
+        $this->assertSame(11_000, $room->fresh()->length_mm);
     }
 
     public function test_deactivation_is_safe_and_reactivation_is_supported(): void

@@ -34,6 +34,8 @@ class SaveRoomRequest extends FormRequest
             'code' => is_string($this->input('code')) ? mb_strtoupper(trim($this->input('code'))) : $this->input('code'),
             'name' => is_string($this->input('name')) ? trim($this->input('name')) : $this->input('name'),
             'room_type' => $roomType,
+            'width_mm' => $this->metersToMillimeters($this->input('width_m')),
+            'length_mm' => $this->metersToMillimeters($this->input('length_m')),
         ]);
     }
 
@@ -60,6 +62,14 @@ class SaveRoomRequest extends FormRequest
                     ->when($currentRoomType, fn ($query, string $code) => $query->orWhere('code', $code))
             )],
             'status' => ['required', Rule::in(['active', 'inactive'])],
+            'width_mm' => [
+                Rule::requiredIf(fn (): bool => $this->input('status') === 'active' || $this->input('length_mm') !== null),
+                'nullable', 'integer', 'min:1', 'max:'.Room::MAX_DIMENSION_MM,
+            ],
+            'length_mm' => [
+                Rule::requiredIf(fn (): bool => $this->input('status') === 'active' || $this->input('width_mm') !== null),
+                'nullable', 'integer', 'min:1', 'max:'.Room::MAX_DIMENSION_MM,
+            ],
             'cleaning_buffer_minutes' => ['nullable', 'integer', 'between:0,180'],
             'template_id' => [$room instanceof Room ? 'prohibited' : 'nullable', 'integer', Rule::exists('room_layout_templates', 'id')->where('status', 'active')],
             'layout_name' => ['nullable', 'required_with:template_id', 'string', 'min:5', 'max:255'],
@@ -104,11 +114,36 @@ class SaveRoomRequest extends FormRequest
             'name' => 'tên phòng',
             'room_type' => 'loại phòng',
             'status' => 'trạng thái',
+            'width_mm' => 'chiều rộng phòng',
+            'length_mm' => 'chiều dài phòng',
             'cleaning_buffer_minutes' => 'thời gian vệ sinh phòng',
             'template_id' => 'mẫu sơ đồ phòng',
             'layout_name' => 'tên phiên bản sơ đồ',
             'presentation_format_ids' => 'khả năng trình chiếu',
             'presentation_format_ids.*' => 'khả năng trình chiếu',
         ];
+    }
+
+    /** Convert dot-decimal meters to exact millimeters without floating-point arithmetic. */
+    private function metersToMillimeters(mixed $value): int|string|null
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+
+        $value = is_string($value) || is_numeric($value) ? trim((string) $value) : '';
+        if (! preg_match('/^(?:0|[1-9][0-9]*)(?:\.([0-9]{1,3}))?$/', $value, $matches)) {
+            return 'invalid';
+        }
+
+        $wholeMeters = (int) strstr($value.'.', '.', true);
+        $fractionMm = (int) str_pad($matches[1] ?? '', 3, '0');
+        if ($wholeMeters > intdiv(Room::MAX_DIMENSION_MM, 1000)) {
+            return Room::MAX_DIMENSION_MM + 1;
+        }
+
+        $millimeters = ($wholeMeters * 1000) + $fractionMm;
+
+        return $millimeters <= Room::MAX_DIMENSION_MM ? $millimeters : Room::MAX_DIMENSION_MM + 1;
     }
 }

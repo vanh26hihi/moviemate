@@ -32,7 +32,7 @@ class RoomLayoutServiceTest extends TestCase
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
         $this->room = Room::query()->create([
             'cinema_id' => $cinema->id, 'code' => 'T01', 'name' => 'Test Room',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         foreach ([['normal', false], ['vip', false], ['couple', true]] as [$code, $pair]) {
             DB::table('seat_types')->insert([
@@ -187,7 +187,7 @@ class RoomLayoutServiceTest extends TestCase
         $published = $this->publishSingleSeatLayout();
         $this->assertSame('published', $published->status);
         $this->assertNotNull($published->published_at);
-        $this->assertSame(1, $this->room->fresh()->total_seats);
+        $this->assertSame(1, $published->cells()->where('cell_type', 'seat')->count());
 
         try {
             $published->update(['name' => 'Changed']);
@@ -230,7 +230,7 @@ class RoomLayoutServiceTest extends TestCase
         $draft = $this->service->createBlankDraft($this->room, null, 2, 2);
         $other = Room::query()->create([
             'cinema_id' => $this->room->cinema_id, 'code' => 'T02', 'name' => 'Other',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $seat = Seat::query()->create(['room_id' => $other->id, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'type' => 'normal', 'status' => 'active']);
 
@@ -320,7 +320,7 @@ class RoomLayoutServiceTest extends TestCase
         }
     }
 
-    public function test_publish_capacity_counts_only_active_usable_seat_positions(): void
+    public function test_publish_physical_count_includes_all_seat_positions_regardless_of_operational_status(): void
     {
         $draft = $this->service->createBlankDraft($this->room, null, 1, 4);
         $this->service->saveDraft($draft, [
@@ -333,9 +333,11 @@ class RoomLayoutServiceTest extends TestCase
             ],
         ]);
 
-        $this->service->publish($draft->fresh());
+        $published = $this->service->publish($draft->fresh());
 
-        $this->assertSame(1, $this->room->fresh()->total_seats);
+        $this->assertSame(3, $published->cells()->where('cell_type', 'seat')->count());
+        $this->assertSame(1, $published->cells()->where('cell_type', 'seat')
+            ->whereHas('seat', fn ($query) => $query->where('status', 'active'))->count());
     }
 
     public function test_seat_code_must_match_its_logical_row(): void
