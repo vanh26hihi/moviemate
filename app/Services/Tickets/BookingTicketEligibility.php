@@ -4,6 +4,7 @@ namespace App\Services\Tickets;
 
 use App\Models\Booking;
 use App\Models\Payment;
+use Illuminate\Database\Eloquent\Builder;
 
 final class BookingTicketEligibility
 {
@@ -26,6 +27,14 @@ final class BookingTicketEligibility
         return $this->isDeliverable($booking);
     }
 
+    public function applyPrintableBookingFilter(Builder $query): Builder
+    {
+        return $query
+            ->where('bookings.payment_status', 'paid')
+            ->where('bookings.booking_status', 'paid')
+            ->whereHas('payments', fn (Builder $payments): Builder => $this->applyAuthoritativePaymentEvidence($payments));
+    }
+
     public function verifiedPayment(Booking $booking): ?Payment
     {
         if ($booking->relationLoaded('payments')) {
@@ -35,7 +44,15 @@ final class BookingTicketEligibility
                 ->first();
         }
 
-        $query = $booking->payments()
+        $query = $this->applyAuthoritativePaymentEvidence($booking->payments()->getQuery())
+            ->latest('id');
+
+        return $query->first();
+    }
+
+    private function applyAuthoritativePaymentEvidence(Builder $query): Builder
+    {
+        return $query
             ->where('status', Payment::STATUS_SUCCESS)
             ->where(function ($query): void {
                 $query->whereNotNull('verified_at')
@@ -44,9 +61,6 @@ final class BookingTicketEligibility
                             ->whereNotNull('settled_at')
                             ->whereNotNull('settled_by_user_id');
                     });
-            })
-            ->latest('id');
-
-        return $query->first();
+            });
     }
 }

@@ -131,6 +131,38 @@
     </div>
 </section>
 
+@php($counterOperations = $branch360['counterOperations'])
+<section class="app-card mb-6 rounded-2xl border app-border p-6" aria-labelledby="counter-operations-title">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h2 id="counter-operations-title" class="text-lg font-bold app-text">Vận hành quầy</h2>
+            <p class="mt-1 text-sm app-muted">{{ $counterOperations['firstPrintBookingCount'] }} đơn sắp tới còn vé chưa in · {{ $counterOperations['unprintedTicketCount'] }} vé vật lý chưa in</p>
+        </div>
+        @if($counterOperations['overflowCount'] > 0)<span class="text-sm font-semibold app-muted">Còn {{ $counterOperations['overflowCount'] }} đơn cần xử lý</span>@endif
+    </div>
+    @if($counterOperations['replacementPrintPendingCount'] > 0)
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border app-border p-3 text-sm">
+            <span class="font-semibold text-warning">{{ $counterOperations['replacementPrintPendingCount'] }} yêu cầu in vé thay thế cần xử lý</span>
+            @if($counterOperations['replacementPrintActionUrl'])<a href="{{ $counterOperations['replacementPrintActionUrl'] }}" class="admin-btn-secondary">Xem việc cần xử lý</a>@endif
+        </div>
+    @endif
+    <div class="mt-4 divide-y app-border">
+        @forelse($counterOperations['items'] as $item)
+            <article class="grid gap-3 py-4 sm:grid-cols-[6rem_1fr_auto] sm:items-center">
+                <div><time class="font-bold text-brand-start">{{ $item['startsAt']->format('H:i') }}</time><p class="mt-1 text-xs app-muted">{{ $item['startsAt']->format('d/m/Y') }}</p></div>
+                <div>
+                    <h3 class="font-semibold app-text">{{ $item['bookingCode'] }} · {{ $item['movieTitle'] }}</h3>
+                    <p class="mt-1 text-sm app-muted">{{ $item['presentationFormat'] }} · Phòng {{ $item['roomCode'] }} · {{ $item['roomName'] }}</p>
+                    <p class="mt-1 text-sm font-medium app-text">Còn {{ $item['unprintedTicketCount'] }}/{{ $item['totalTicketCount'] }} vé chưa in</p>
+                </div>
+                @if($item['actionUrl'])<a href="{{ $item['actionUrl'] }}" class="admin-btn-secondary">{{ $item['actionLabel'] }}</a>@endif
+            </article>
+        @empty
+            <p class="py-3 app-muted">Không có đơn sắp tới cần in vé lần đầu.</p>
+        @endforelse
+    </div>
+</section>
+
 <div class="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
     <section class="app-card rounded-2xl border app-border p-6 space-y-4">
         <div class="border-b app-border pb-3"><div class="text-xs uppercase app-muted">Quận / huyện</div><div class="mt-1 font-semibold app-text">{{ $cinema->district ?: '—' }}</div></div>
