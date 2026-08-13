@@ -333,7 +333,8 @@ final class Branch360TodayRoomOperationsTest extends TestCase
             'room_type' => $roomTypeCode,
             'code' => $code,
             'name' => 'Room '.$code,
-            'total_seats' => 0,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'cleaning_buffer_minutes' => $cleaningMinutes,
             'status' => $status,
         ]);

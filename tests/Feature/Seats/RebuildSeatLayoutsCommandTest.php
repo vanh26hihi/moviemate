@@ -27,7 +27,8 @@ class RebuildSeatLayoutsCommandTest extends TestCase
                 'code' => $code,
                 'name' => 'Phòng '.($index + 1),
                 'room_type' => '2D',
-                'total_seats' => 0,
+                'width_mm' => 8_000,
+                'length_mm' => 10_000,
                 'status' => 'active',
             ]);
         }
@@ -36,7 +37,8 @@ class RebuildSeatLayoutsCommandTest extends TestCase
             'code' => 'ARCH-12',
             'name' => 'Phòng lưu trữ',
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'inactive',
         ]);
     }
@@ -121,7 +123,7 @@ class RebuildSeatLayoutsCommandTest extends TestCase
         Room::query()->where('code', 'P03')->delete();
         $this->artisan('moviemate:rebuild-seat-layouts', ['--force' => true])->assertFailed();
 
-        Room::query()->create(['cinema_id' => $this->cinema->id, 'code' => 'P03', 'name' => 'Phòng 3', 'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive']);
+        Room::query()->create(['cinema_id' => $this->cinema->id, 'code' => 'P03', 'name' => 'Phòng 3', 'room_type' => '2D', 'status' => 'inactive']);
         $this->artisan('moviemate:rebuild-seat-layouts', ['--force' => true])->assertFailed();
         $this->assertDatabaseCount('room_layouts', 0);
     }

@@ -90,7 +90,8 @@ function initializeLayoutTemplateEditor(form) {
         const couplePairs = new Set(visibleCells.filter((cell) => cell.pair_key).map((cell) => cell.pair_key)).size;
         const aisles = visibleCells.filter((cell) => cell.cell_type === 'aisle').length;
         const values = {
-            capacity: normal + vip + couplePairs,
+            physical_seats: normal + vip + couplePositions,
+            pricing_units: normal + vip + couplePairs,
             normal,
             vip,
             couple: `${couplePairs} cặp`,

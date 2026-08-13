@@ -106,7 +106,8 @@ class SingleCinemaOperationsTest extends TestCase
             'code' => 'P99',
             'name' => 'Phòng 99',
             'room_type' => '2D',
-            'total_seats' => 20,
+            'width_m' => '7.5',
+            'length_m' => '10',
             'status' => 'active',
             'presentation_format_ids' => [$format->id],
         ]);
@@ -114,14 +115,16 @@ class SingleCinemaOperationsTest extends TestCase
         $room = Room::query()->where('code', 'P99')->sole();
         $response->assertRedirect(route('admin.rooms.layout.show', $room));
         $this->assertSame($canonical->id, $room->cinema_id);
-        $this->assertSame(0, $room->total_seats);
+        $this->assertSame(7_500, $room->width_mm);
+        $this->assertSame(10_000, $room->length_mm);
 
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), [
             'cinema_id' => $legacy->id,
             'code' => 'P98',
             'name' => 'phòng 98',
             'room_type' => '3D',
-            'total_seats' => 24,
+            'width_m' => '8',
+            'length_m' => '11',
             'status' => 'active',
             'presentation_format_ids' => [$format->id],
         ])->assertRedirect(route('admin.rooms.show', $room));
@@ -134,7 +137,8 @@ class SingleCinemaOperationsTest extends TestCase
             'code' => 'P97',
             'name' => 'Phòng 98',
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_m' => '8',
+            'length_m' => '11',
             'status' => 'active',
             'presentation_format_ids' => [$format->id],
         ])->assertSessionHasErrors('name');

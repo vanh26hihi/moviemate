@@ -84,7 +84,6 @@ class SeatMaintenanceOperationsTest extends TestCase
             $seat = $this->seat($room, 'A', $number);
             $this->cell($layout, $seat, $number, 1);
         }
-        $room->update(['total_seats' => 18]);
         $manager = $this->userWithRole('manager');
         $url = route('admin.rooms.seat-maintenance.index', $room);
 
@@ -111,14 +110,14 @@ class SeatMaintenanceOperationsTest extends TestCase
 
     public function test_single_transition_changes_only_status_and_is_idempotent(): void
     {
-        [$room, , $seats] = $this->roomWithSeats();
+        [$room, $layout, $seats] = $this->roomWithSeats();
         $seat = $seats[0];
         $admin = $this->userWithRole('admin');
         $before = $seat->only([
             'id', 'room_id', 'row', 'number', 'seat_code', 'type', 'pair_code', 'pair_position',
             'x_position', 'y_position',
         ]);
-        $capacity = $room->total_seats;
+        $physicalSeatCount = $layout->cells()->where('cell_type', 'seat')->count();
         $layoutCount = RoomLayout::query()->count();
 
         $message = 'Đã cập nhật A1 sang đang bảo trì.';
@@ -132,7 +131,7 @@ class SeatMaintenanceOperationsTest extends TestCase
         $this->assertSame('maintenance', $seat->fresh()->status);
         $this->assertSame(1, substr_count(strip_tags($html), $message));
         $this->assertSame($before, $seat->fresh()->only(array_keys($before)));
-        $this->assertSame($capacity, $room->fresh()->total_seats);
+        $this->assertSame($physicalSeatCount, $layout->cells()->where('cell_type', 'seat')->count());
         $this->assertSame($layoutCount, RoomLayout::query()->count());
         $this->assertSame(1, ActivityLog::query()->where('action', 'seat.maintenance_updated')->count());
 
@@ -355,7 +354,6 @@ class SeatMaintenanceOperationsTest extends TestCase
         $currentLayout = $this->layout($room, 2, 'Sơ đồ hiện hành');
         $currentSeat = $this->seat($room, 'A', 1);
         $this->cell($currentLayout, $currentSeat, 1, 1);
-        $room->update(['total_seats' => 1]);
         $admin = $this->userWithRole('admin');
 
         $this->actingAs($admin)
@@ -436,7 +434,6 @@ class SeatMaintenanceOperationsTest extends TestCase
         $room = Room::factory()->create([
             'cinema_id' => app(CinemaContext::class)->id(),
             'code' => $code,
-            'total_seats' => 2,
         ]);
         $layout = $this->layout($room, 1, 'Sơ đồ hiện hành');
         if ($couple) {

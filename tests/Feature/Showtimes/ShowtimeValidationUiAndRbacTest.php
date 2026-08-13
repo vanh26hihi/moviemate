@@ -49,15 +49,15 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
         $admin = $this->userWithRole('admin');
         $inactive = Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'INACTIVE', 'name' => 'Inactive',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive',
+            'room_type' => '2D', 'status' => 'inactive',
         ]);
         $archive = Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'ARCH-12', 'name' => 'Archive',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive',
+            'room_type' => '2D', 'status' => 'inactive',
         ]);
         $noLayout = Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'P04', 'name' => 'No layout',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $legacyCinema = Cinema::query()->create([
             'canonical_key' => 'legacy-cinema', 'name' => 'Legacy', 'address' => 'Legacy', 'city' => 'HCM',
@@ -65,7 +65,7 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
         ]);
         $legacy = Room::query()->create([
             'cinema_id' => $legacyCinema->id, 'code' => 'LEGACY', 'name' => 'Legacy room',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         foreach ([$inactive, $archive, $noLayout, $legacy] as $room) {
             $room->presentationCapabilities()->attach($this->presentationFormat);

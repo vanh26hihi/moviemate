@@ -137,21 +137,23 @@
     <section class="app-card rounded-3xl border app-border p-5 sm:p-6" aria-labelledby="layout-statistics-title">
         <div class="mb-5">
             <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thống kê</p>
-            <h2 id="layout-statistics-title" class="mt-2 text-xl font-extrabold app-text">Sức chứa logic của mẫu</h2>
+            <h2 id="layout-statistics-title" class="mt-2 text-xl font-extrabold app-text">Cấu trúc vật lý và đơn vị tính giá của mẫu</h2>
         </div>
         <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                'capacity' => ['Sức chứa', 'ph-users-three'],
+                'physical_seats' => ['Vị trí ghế vật lý', 'ph-users-three'],
+                'pricing_units' => ['Đơn vị tính giá', 'ph-ticket'],
                 'normal' => ['Ghế thường', 'ph-armchair'],
                 'vip' => ['VIP', 'ph-star'],
                 'couple' => ['Ghế đôi', 'ph-heart'],
                 'aisle' => ['Lối đi', 'ph-arrows-down-up'],
-                'dimensions' => ['Hàng × cột', 'ph-grid-four'],
+                'dimensions' => ['Lưới logic', 'ph-grid-four'],
             ] as $key => [$label, $icon])
                 <div class="rounded-2xl border app-border app-bg p-4">
                     <div class="flex items-center gap-2 text-xs font-bold app-muted"><i class="ph {{ $icon }} text-brand-start" aria-hidden="true"></i>{{ $label }}</div>
                     <p data-layout-stat="{{ $key }}" class="mt-2 text-xl font-black app-text">0</p>
-                    @if($key === 'capacity')<p class="mt-1 text-xs app-muted">ghế logic</p>@endif
+                    @if($key === 'physical_seats')<p class="mt-1 text-xs app-muted">vị trí</p>@endif
+                    @if($key === 'pricing_units')<p class="mt-1 text-xs app-muted">đơn vị</p>@endif
                     @if($key === 'couple')<p data-layout-couple-positions class="mt-1 text-xs app-muted">0 vị trí</p>@endif
                 </div>
             @endforeach

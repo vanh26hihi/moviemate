@@ -625,7 +625,7 @@ final class CounterSalesR8Test extends TestCase
         }
         $room = Room::query()->create([
             'cinema_id' => $cinema->id, 'code' => 'R8'.str()->upper(str()->random(6)),
-            'name' => 'R8 room', 'room_type' => '2D', 'total_seats' => $seatCount, 'status' => 'active',
+            'name' => 'R8 room', 'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $seats = collect();
         for ($number = 1; $number <= $seatCount; $number++) {

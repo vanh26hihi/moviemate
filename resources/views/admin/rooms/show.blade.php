@@ -7,6 +7,7 @@
 @section('content')
 @php
     $published = $room->latestPublishedLayout;
+    $physicalSeatCount = $published?->cells->where('cell_type', 'seat')->count() ?? 0;
     $publishedSeats = $published?->cells->where('cell_type', 'seat')->pluck('seat')->filter() ?? collect();
 @endphp
 <div class="space-y-6">
@@ -43,7 +44,7 @@
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div class="cinema-card p-5"><p class="text-sm app-muted">{{ __('rooms.fields.status') }}</p><p class="mt-2"><span class="status-badge {{ $room->status === 'active' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning' }}">{{ $room->status_label }}</span></p></div>
-        <div class="cinema-card p-5"><p class="text-sm app-muted">{{ __('rooms.fields.total_seats') }}</p><p class="mt-1 text-3xl font-extrabold app-text">{{ $publishedSeats->count() }}</p></div>
+        <div class="cinema-card p-5"><p class="text-sm app-muted">{{ __('rooms.fields.physical_seat_count') }}</p><p class="mt-1 text-3xl font-extrabold app-text">{{ $physicalSeatCount }}</p><p class="mt-1 text-xs app-muted">Vị trí ghế trong sơ đồ đã phát hành</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">{{ __('rooms.fields.upcoming_showtimes') }}</p><p class="mt-1 text-3xl font-extrabold app-text">{{ $room->upcoming_showtimes_count }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Tổng lịch sử suất chiếu</p><p class="mt-1 text-3xl font-extrabold app-text">{{ $room->showtimes_count }}</p></div>
     </div>
@@ -55,6 +56,8 @@
                 <div><dt class="text-sm app-muted">{{ __('rooms.fields.code') }}</dt><dd class="font-bold app-text">{{ $room->code }}</dd></div>
                 <div><dt class="text-sm app-muted">{{ __('rooms.fields.type') }}</dt><dd class="font-bold app-text">{{ $room->room_type_label }}</dd></div>
                 <div><dt class="text-sm app-muted">{{ __('rooms.fields.cinema') }}</dt><dd class="font-bold app-text">{{ $room->cinema->name }}</dd></div>
+                <div><dt class="text-sm app-muted">Kích thước phòng</dt><dd class="font-bold app-text">{{ $room->hasCompletePhysicalDimensions() ? $room->formattedWidthMeters().' m × '.$room->formattedLengthMeters().' m' : 'Chưa cấu hình' }}</dd></div>
+                <div><dt class="text-sm app-muted">Diện tích mặt bằng</dt><dd class="font-bold app-text">{{ $room->formattedAreaM2() !== null ? $room->formattedAreaM2().' m²' : 'Chưa cấu hình' }}</dd></div>
                 <div><dt class="text-sm app-muted">{{ __('rooms.fields.updated_at') }}</dt><dd class="font-bold app-text">{{ $room->updated_at->format('d/m/Y H:i') }}</dd></div>
             </dl>
         </section>
@@ -67,7 +70,7 @@
                     <div><dt class="text-sm app-muted">{{ __('rooms.fields.normal_seats') }}</dt><dd class="text-2xl font-extrabold app-text">{{ $publishedSeats->where('type', 'normal')->count() }}</dd></div>
                     <div><dt class="text-sm app-muted">{{ __('rooms.fields.vip_seats') }}</dt><dd class="text-2xl font-extrabold app-text">{{ $publishedSeats->where('type', 'vip')->count() }}</dd></div>
                     <div><dt class="text-sm app-muted">{{ __('rooms.fields.couple_seats') }}</dt><dd class="text-2xl font-extrabold app-text">{{ $publishedSeats->where('type', 'couple')->count() }}</dd></div>
-                    <div><dt class="text-sm app-muted">Kích thước</dt><dd class="text-2xl font-extrabold app-text">{{ $published->rows }} × {{ $published->columns }}</dd></div>
+                    <div><dt class="text-sm app-muted">Lưới logic</dt><dd class="text-2xl font-extrabold app-text">{{ $published->rows }} hàng × {{ $published->columns }} cột</dd></div>
                 </dl>
             @else
                 <p class="mt-5 app-muted">{{ __('rooms.no_layout') }}.</p>
@@ -96,7 +99,7 @@
             <h2 class="text-xl font-extrabold app-text">Tạo phiên bản từ mẫu</h2>
             <p class="mt-1 app-muted">Tạo một bản nháp độc lập để kiểm tra trước khi phát hành. Ghế lịch sử không bị đổi mã hay xóa.</p>
             <form method="POST" action="{{ route('admin.rooms.layout.apply-template', $room) }}" class="mt-4 grid gap-4 md:grid-cols-3">@csrf
-                <select name="template_id" class="cinema-input" required><option value="">Chọn mẫu</option>@foreach($templates as $template)<option value="{{ $template->id }}">{{ $template->name }} · {{ $template->rows }}×{{ $template->columns }}</option>@endforeach</select>
+                <select name="template_id" class="cinema-input" required><option value="">Chọn mẫu</option>@foreach($templates as $template)<option value="{{ $template->id }}">{{ $template->name }} · lưới {{ $template->rows }} hàng × {{ $template->columns }} cột logic</option>@endforeach</select>
                 <input name="layout_name" class="cinema-input" required minlength="5" placeholder="Tên phiên bản có ý nghĩa">
                 <input name="change_note" class="cinema-input" placeholder="Mục đích thay đổi">
                 <button class="btn-primary md:col-span-3">Tạo bản nháp từ mẫu</button>

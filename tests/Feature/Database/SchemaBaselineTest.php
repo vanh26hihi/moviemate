@@ -49,7 +49,7 @@ class SchemaBaselineTest extends TestCase
             'is_primary', 'archived_at',
         ]));
         $this->assertTrue(Schema::hasColumns('rooms', [
-            'cinema_id', 'code', 'room_type_id', 'total_seats', 'status',
+            'cinema_id', 'code', 'room_type_id', 'width_mm', 'length_mm', 'status',
         ]));
         $this->assertTrue(Schema::hasColumns('room_types', [
             'code', 'name', 'description', 'is_active', 'sort_order',

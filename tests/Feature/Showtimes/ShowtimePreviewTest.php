@@ -150,7 +150,8 @@ class ShowtimePreviewTest extends ShowtimeTestCase
             'code' => 'NO-LAYOUT',
             'name' => 'No layout',
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $noLayout->presentationCapabilities()->attach($this->presentationFormat);
@@ -221,7 +222,8 @@ class ShowtimePreviewTest extends ShowtimeTestCase
             'code' => 'OTHER-01',
             'name' => 'Other room',
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $otherRoom->presentationCapabilities()->attach($this->presentationFormat);

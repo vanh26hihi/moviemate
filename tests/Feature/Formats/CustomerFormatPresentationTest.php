@@ -70,7 +70,8 @@ final class CustomerFormatPresentationTest extends TestCase
             'code' => 'FORMAT-SELL-02',
             'name' => 'Physical room must stay hidden',
             'room_type' => 'STANDARD',
-            'total_seats' => 1,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $layout = $this->publishRoomForDiscovery($room);
@@ -116,7 +117,8 @@ final class CustomerFormatPresentationTest extends TestCase
                 'code' => 'FORMAT-HIDDEN-'.$index,
                 'name' => 'Hidden format room '.$index,
                 'room_type' => 'IMAX',
-                'total_seats' => 1,
+                'width_mm' => 8_000,
+                'length_mm' => 10_000,
                 'status' => 'active',
             ]);
             $layout = $this->publishRoomForDiscovery($room);

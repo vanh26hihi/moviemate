@@ -187,7 +187,7 @@
             </div>
             @if($layoutSummary)
                 <div class="mt-5 grid grid-cols-2 gap-3 border-t app-border pt-5 text-sm sm:grid-cols-4 lg:grid-cols-6" aria-label="Tóm tắt sơ đồ do máy chủ tính toán">
-                    @foreach(['rows' => 'Số hàng', 'columns' => 'Chiều rộng', 'used' => 'Vị trí đã dùng', 'empty' => 'Vị trí trống', 'normal' => 'Ghế thường', 'vip' => 'Ghế VIP', 'couple_pairs' => 'Cặp ghế đôi', 'aisles' => 'Lối đi', 'maintenance' => 'Bảo trì', 'inactive' => 'Không sử dụng', 'capacity' => 'Sức chứa'] as $key => $label)
+                    @foreach(['rows' => 'Số hàng logic', 'columns' => 'Số cột logic', 'used' => 'Vị trí đã dùng', 'empty' => 'Vị trí trống', 'physical_seats' => 'Vị trí ghế vật lý', 'normal' => 'Ghế thường', 'vip' => 'Ghế VIP', 'couple_pairs' => 'Cặp ghế đôi', 'aisles' => 'Ô lối đi', 'maintenance' => 'Bảo trì', 'inactive' => 'Không sử dụng', 'operational_available' => 'Ghế đang hoạt động'] as $key => $label)
                         <div><p class="app-muted">{{ $label }}</p><p class="font-extrabold app-text">{{ $layoutSummary[$key] }}</p></div>
                     @endforeach
                 </div>

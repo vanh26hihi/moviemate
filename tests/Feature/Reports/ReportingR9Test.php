@@ -280,7 +280,7 @@ final class ReportingR9Test extends TestCase
 
     private function showtime(Cinema $cinema, Movie $movie, string $date, string $time, array $seatTypes): array
     {
-        $room = Room::query()->create(['cinema_id' => $cinema->id, 'code' => 'R'.str()->upper(str()->random(7)), 'name' => 'Report Room', 'room_type' => '2D', 'total_seats' => count($seatTypes), 'status' => 'active']);
+        $room = Room::query()->create(['cinema_id' => $cinema->id, 'code' => 'R'.str()->upper(str()->random(7)), 'name' => 'Report Room', 'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active']);
         $layout = RoomLayout::query()->create(['room_id' => $room->id, 'version' => 1, 'name' => 'Report layout', 'rows' => 1, 'columns' => count($seatTypes), 'status' => 'draft']);
         $seats = collect();
         foreach ($seatTypes as $index => $type) {

@@ -429,7 +429,8 @@ final class Branch360CounterOperationsTest extends TestCase
             'code' => $code,
             'name' => 'Counter Room '.$code,
             'room_type' => '2D',
-            'total_seats' => 100,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         RoomLayout::query()->create([

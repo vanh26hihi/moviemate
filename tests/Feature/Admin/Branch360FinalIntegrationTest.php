@@ -113,7 +113,8 @@ final class Branch360FinalIntegrationTest extends TestCase
             'code' => 'LONG-ROOM-CODE-01',
             'name' => str_repeat('Phòng trình chiếu tên dài ', 6),
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $movie = Movie::query()->create([

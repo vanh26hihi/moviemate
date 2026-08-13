@@ -131,7 +131,7 @@ class CustomerCinemaDiscoveryTest extends TestCase
         foreach ($scenarios as $index => $scenario) {
             $room = Room::query()->create([
                 'cinema_id' => $scenario['cinema']->id, 'code' => 'PERF-'.$index.'-02',
-                'name' => 'PhÃ²ng phá»¥ '.$index, 'room_type' => '3D', 'total_seats' => 1, 'status' => 'active',
+                'name' => 'PhÃ²ng phá»¥ '.$index, 'room_type' => '3D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             ]);
             $layout = $this->publishRoomForDiscovery($room);
             $movie = Movie::query()->create([

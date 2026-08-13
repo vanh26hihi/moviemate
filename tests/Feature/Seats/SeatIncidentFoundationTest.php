@@ -426,7 +426,7 @@ final class SeatIncidentFoundationTest extends TestCase
     /** @return array{Room, RoomLayout, array<int, Seat>} */
     private function roomWithSeats(string $code = 'INC', int $count = 2): array
     {
-        $room = Room::factory()->create(['cinema_id' => app(CinemaContext::class)->id(), 'code' => $code, 'total_seats' => $count]);
+        $room = Room::factory()->create(['cinema_id' => app(CinemaContext::class)->id(), 'code' => $code]);
         $layout = $this->layout($room, 1);
         $seats = [];
         foreach ($count > 0 ? range(1, $count) : [] as $number) {

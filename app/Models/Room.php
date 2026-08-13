@@ -15,21 +15,81 @@ class Room extends Model
 {
     use HasFactory;
 
+    /** Technical ceiling keeps width_mm * length_mm within signed 64-bit integer range. */
+    public const MAX_DIMENSION_MM = 3_000_000_000;
+
     protected $fillable = [
         'cinema_id',
         'code',
         'name',
         'room_type',
         'room_type_id',
-        'total_seats',
+        'width_mm',
+        'length_mm',
         'cleaning_buffer_minutes',
         'status',
     ];
 
     protected $casts = [
-        'total_seats' => 'integer',
+        'width_mm' => 'integer',
+        'length_mm' => 'integer',
         'cleaning_buffer_minutes' => 'integer',
     ];
+
+    public function hasCompletePhysicalDimensions(): bool
+    {
+        return $this->width_mm !== null
+            && $this->length_mm !== null
+            && $this->width_mm > 0
+            && $this->length_mm > 0;
+    }
+
+    public function areaMm2(): ?int
+    {
+        if (! $this->hasCompletePhysicalDimensions()) {
+            return null;
+        }
+
+        return $this->width_mm * $this->length_mm;
+    }
+
+    public function widthMetersForInput(): ?string
+    {
+        return $this->width_mm === null ? null : $this->decimalFromScaledInteger($this->width_mm, 3, 0, '.');
+    }
+
+    public function lengthMetersForInput(): ?string
+    {
+        return $this->length_mm === null ? null : $this->decimalFromScaledInteger($this->length_mm, 3, 0, '.');
+    }
+
+    public function formattedWidthMeters(): ?string
+    {
+        return $this->width_mm === null ? null : $this->decimalFromScaledInteger($this->width_mm, 3, 2, ',');
+    }
+
+    public function formattedLengthMeters(): ?string
+    {
+        return $this->length_mm === null ? null : $this->decimalFromScaledInteger($this->length_mm, 3, 2, ',');
+    }
+
+    public function formattedAreaM2(): ?string
+    {
+        $area = $this->areaMm2();
+
+        return $area === null ? null : $this->decimalFromScaledInteger($area, 6, 2, ',');
+    }
+
+    private function decimalFromScaledInteger(int $value, int $scale, int $minimumDecimals, string $separator): string
+    {
+        $factor = 10 ** $scale;
+        $whole = intdiv($value, $factor);
+        $fraction = str_pad((string) ($value % $factor), $scale, '0', STR_PAD_LEFT);
+        $fraction = rtrim($fraction, '0');
+        $fraction = str_pad($fraction, $minimumDecimals, '0');
+
+        return number_format($whole, 0, '', '.').($fraction === '' ? '' : $separator.$fraction);
+    }
 
     public function cinema(): BelongsTo
     {
