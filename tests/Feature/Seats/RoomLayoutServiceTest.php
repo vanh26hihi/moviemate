@@ -54,7 +54,7 @@ class RoomLayoutServiceTest extends TestCase
         $this->service->createBlankDraft($this->room);
     }
 
-    public function test_save_draft_supports_empty_aisle_normal_vip_and_maintenance(): void
+    public function test_save_draft_supports_empty_aisle_blocked_normal_vip_and_maintenance(): void
     {
         $draft = $this->service->createBlankDraft($this->room, null, 2, 4);
         $saved = $this->service->saveDraft($draft, [
@@ -63,14 +63,91 @@ class RoomLayoutServiceTest extends TestCase
                 ['kind' => 'normal', 'x' => 1, 'y' => 1, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'status' => 'active'],
                 ['kind' => 'aisle', 'x' => 2, 'y' => 1],
                 ['kind' => 'vip', 'x' => 4, 'y' => 1, 'row' => 'A', 'number' => 2, 'seat_code' => 'A2', 'status' => 'maintenance'],
-                ['kind' => 'empty', 'x' => 3, 'y' => 2],
+                ['kind' => 'blocked', 'x' => 3, 'y' => 2],
+                ['kind' => 'empty', 'x' => 4, 'y' => 2],
             ],
         ]);
 
-        $this->assertCount(3, $saved->cells);
+        $this->assertCount(4, $saved->cells);
         $this->assertSame(2, $saved->cells->where('cell_type', 'seat')->count());
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $saved->id, 'x_position' => 3, 'y_position' => 2,
+            'cell_type' => 'blocked', 'seat_id' => null,
+        ]);
         $this->assertDatabaseHas('seats', ['seat_code' => 'A2', 'type' => 'vip', 'status' => 'maintenance']);
-        $this->assertDatabaseMissing('room_layout_cells', ['x_position' => 3, 'y_position' => 2]);
+        $this->assertDatabaseMissing('room_layout_cells', ['room_layout_id' => $saved->id, 'x_position' => 4, 'y_position' => 2]);
+    }
+
+    public function test_draft_structural_cells_convert_without_phantom_seats_and_blocked_can_become_a_new_seat(): void
+    {
+        $draft = $this->service->createBlankDraft($this->room, null, 1, 4);
+        $saved = $this->service->saveDraft($draft, [
+            'rows' => 1, 'columns' => 4, 'screen_position' => 'top',
+            'cells' => [
+                ['kind' => 'normal', 'x' => 1, 'y' => 1, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1'],
+                ['kind' => 'aisle', 'x' => 2, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 4, 'y' => 1],
+            ],
+        ]);
+        $a1 = $saved->cells->firstWhere('seat.seat_code', 'A1')->seat;
+
+        $converted = $this->service->saveDraft($saved, [
+            'rows' => 1, 'columns' => 4, 'screen_position' => 'top',
+            'cells' => [
+                ['kind' => 'blocked', 'x' => 1, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 2, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 3, 'y' => 1],
+                ['kind' => 'aisle', 'x' => 4, 'y' => 1],
+            ],
+        ]);
+
+        $this->assertSame(0, $converted->cells->where('cell_type', 'seat')->count());
+        $this->assertSame(3, $converted->cells->where('cell_type', 'blocked')->count());
+        $this->assertSame(Seat::STATUS_RETIRED, $a1->fresh()->status);
+
+        $final = $this->service->saveDraft($converted, [
+            'rows' => 1, 'columns' => 4, 'screen_position' => 'top',
+            'cells' => [
+                ['kind' => 'normal', 'x' => 2, 'y' => 1, 'row' => 'A', 'number' => 2, 'seat_code' => 'A2'],
+                ['kind' => 'aisle', 'x' => 3, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 4, 'y' => 1],
+            ],
+        ]);
+
+        $this->assertDatabaseMissing('room_layout_cells', [
+            'room_layout_id' => $final->id, 'x_position' => 1, 'y_position' => 1,
+        ]);
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $final->id, 'x_position' => 2, 'y_position' => 1, 'cell_type' => 'seat',
+        ]);
+        $this->assertDatabaseHas('seats', [
+            'room_id' => $this->room->id, 'seat_code' => 'A2', 'x_position' => 2, 'status' => 'active',
+        ]);
+        $this->assertSame(1, $final->cells->where('cell_type', 'seat')->count());
+        $this->assertSame(1, $final->cells->where('cell_type', 'aisle')->count());
+        $this->assertSame(1, $final->cells->where('cell_type', 'blocked')->count());
+    }
+
+    public function test_unknown_or_seat_bearing_structural_cell_payload_is_rejected(): void
+    {
+        $draft = $this->service->createBlankDraft($this->room, null, 1, 2);
+
+        foreach ([
+            [['kind' => 'pillar', 'x' => 1, 'y' => 1]],
+            [['kind' => 'blocked', 'x' => 1, 'y' => 1, 'seat_code' => 'A1']],
+            [['kind' => 'blocked', 'x' => 1, 'y' => 1, 'seat_type' => 'vip']],
+            [['kind' => 'blocked', 'x' => 1, 'y' => 1, 'pair_code' => 'PAIR-1']],
+            [['kind' => 'aisle', 'x' => 1, 'y' => 1, 'status' => 'maintenance']],
+        ] as $cells) {
+            try {
+                $this->service->saveDraft($draft, [
+                    'rows' => 1, 'columns' => 2, 'screen_position' => 'top', 'cells' => $cells,
+                ]);
+                $this->fail('Malformed structural layout payload must be rejected.');
+            } catch (ValidationException) {
+                $this->assertTrue(true);
+            }
+        }
     }
 
     public function test_duplicate_coordinate_duplicate_code_and_out_of_bounds_are_rejected(): void
@@ -174,6 +251,19 @@ class RoomLayoutServiceTest extends TestCase
         try {
             $this->service->saveDraft($draft->fresh(), ['rows' => 1, 'columns' => 2, 'screen_position' => 'top', 'cells' => []]);
             $this->fail('A booked historical seat must not be removed.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('Không thể xóa ghế A1', $exception->errors()['cells'][0]);
+        }
+
+        try {
+            $this->service->saveDraft($draft->fresh(), [
+                'rows' => 1, 'columns' => 2, 'screen_position' => 'top',
+                'cells' => [
+                    ['kind' => 'blocked', 'x' => 1, 'y' => 1],
+                    ['kind' => 'blocked', 'x' => 2, 'y' => 1],
+                ],
+            ]);
+            $this->fail('BLOCKED must not bypass booked-seat history protection.');
         } catch (ValidationException $exception) {
             $this->assertStringContainsString('Không thể xóa ghế A1', $exception->errors()['cells'][0]);
         }

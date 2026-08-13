@@ -570,6 +570,12 @@ button.layout-template-seat:hover {
     box-shadow: none;
 }
 
+.layout-template-seat.is-blocked {
+    border-color: rgb(100 116 139 / 0.85);
+    background: repeating-linear-gradient(135deg, rgb(30 41 59 / 0.95) 0 5px, rgb(71 85 105 / 0.9) 5px 10px);
+    color: rgb(226 232 240);
+}
+
 .layout-template-seat.is-empty {
     border-style: dashed;
     border-color: color-mix(in srgb, var(--app-text-muted) 35%, transparent);

@@ -11,7 +11,9 @@ class RoomLayoutTemplateCell extends Model
 
     public const TYPE_AISLE = 'aisle';
 
-    public const CELL_TYPES = [self::TYPE_SEAT, self::TYPE_AISLE];
+    public const TYPE_BLOCKED = 'blocked';
+
+    public const CELL_TYPES = [self::TYPE_SEAT, self::TYPE_AISLE, self::TYPE_BLOCKED];
 
     protected $fillable = [
         'room_layout_template_id', 'x_position', 'y_position', 'cell_type', 'seat_type',

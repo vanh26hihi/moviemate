@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\RoomLayoutTemplateCell;
 use Illuminate\Validation\ValidationException;
 
 class RoomLayoutTemplateGeometry
@@ -31,8 +32,8 @@ class RoomLayoutTemplateGeometry
             }
             $x = filter_var($cell['x_position'] ?? $cell['x'] ?? null, FILTER_VALIDATE_INT);
             $y = filter_var($cell['y_position'] ?? $cell['y'] ?? null, FILTER_VALIDATE_INT);
-            $type = (string) ($cell['cell_type'] ?? 'seat');
-            if (! $x || ! $y || $x > $columns || $y > $rows || ! in_array($type, ['seat', 'aisle'], true)) {
+            $type = strtolower(trim((string) ($cell['cell_type'] ?? RoomLayoutTemplateCell::TYPE_SEAT)));
+            if (! $x || ! $y || $x > $columns || $y > $rows || ! in_array($type, RoomLayoutTemplateCell::CELL_TYPES, true)) {
                 throw ValidationException::withMessages(['layout' => "Tọa độ ô thứ {$index} không hợp lệ."]);
             }
             $coordinate = "{$x}:{$y}";
@@ -41,8 +42,14 @@ class RoomLayoutTemplateGeometry
             }
             $coordinates[$coordinate] = true;
 
-            if ($type === 'aisle') {
-                $cells[] = ['x_position' => $x, 'y_position' => $y, 'cell_type' => 'aisle', 'seat_type' => null,
+            if ($type !== RoomLayoutTemplateCell::TYPE_SEAT) {
+                $seatFields = ['seat_id', 'seat_type', 'type', 'seat_label', 'seat_code', 'seat_unit_key', 'pair_key', 'pair_code', 'pair_position', 'status', 'metadata'];
+                $contradictory = collect($seatFields)->contains(fn (string $field): bool => array_key_exists($field, $cell)
+                    && $cell[$field] !== null && $cell[$field] !== '' && $cell[$field] !== []);
+                if ($contradictory) {
+                    throw ValidationException::withMessages(['layout' => "Ô cấu trúc {$coordinate} không được mang dữ liệu ghế hoặc ghế đôi."]);
+                }
+                $cells[] = ['x_position' => $x, 'y_position' => $y, 'cell_type' => $type, 'seat_type' => null,
                     'seat_label' => null, 'seat_unit_key' => null, 'pair_key' => null, 'metadata' => null];
 
                 continue;
@@ -63,11 +70,14 @@ class RoomLayoutTemplateGeometry
                 throw ValidationException::withMessages(['layout' => "Nhãn ghế {$label} không thuộc hàng ".$this->rowLabel($y).'.']);
             }
             $pairKey = $seatType === 'couple' ? trim((string) ($cell['pair_key'] ?? '')) : null;
+            if ($seatType !== 'couple' && trim((string) ($cell['pair_key'] ?? '')) !== '') {
+                throw ValidationException::withMessages(['layout' => "Ghế {$label} không phải ghế đôi nên không được có mã cặp."]);
+            }
             if ($seatType === 'couple' && $pairKey === '') {
                 throw ValidationException::withMessages(['layout' => "Ghế đôi {$label} thiếu mã cặp."]);
             }
             if ($pairKey) {
-                $pairs[$pairKey][] = ['x' => $x, 'y' => $y, 'index' => count($cells)];
+                $pairs[$pairKey][] = ['x' => $x, 'y' => $y, 'number' => (int) $parts[2], 'index' => count($cells)];
             }
             $cells[] = ['x_position' => $x, 'y_position' => $y, 'cell_type' => 'seat', 'seat_type' => $seatType,
                 'seat_label' => $label, 'seat_unit_key' => $pairKey ?: $label, 'pair_key' => $pairKey,
@@ -76,9 +86,12 @@ class RoomLayoutTemplateGeometry
 
         foreach ($pairs as $key => $members) {
             if (count($members) !== 2 || $members[0]['y'] !== $members[1]['y'] || abs($members[0]['x'] - $members[1]['x']) !== 1) {
-                throw ValidationException::withMessages(['layout' => "Cặp ghế {$key} phải gồm đúng hai ghế liền kề."]);
+                throw ValidationException::withMessages(['layout' => "Cặp ghế {$key} phải gồm đúng hai ghế liền kề theo chiều ngang."]);
             }
             usort($members, fn (array $a, array $b): int => $a['x'] <=> $b['x']);
+            if ($members[1]['number'] - $members[0]['number'] !== 1) {
+                throw ValidationException::withMessages(['layout' => "Cặp ghế {$key} phải dùng hai nhãn ghế tăng liên tiếp từ trái sang phải."]);
+            }
             $cells[$members[0]['index']]['metadata']['pair_position'] = 'left';
             $cells[$members[1]['index']]['metadata']['pair_position'] = 'right';
         }

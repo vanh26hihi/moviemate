@@ -67,6 +67,7 @@ function initializeLayoutTemplateEditor(form) {
         const coordinate = `${rowLabel(y)}${x}`;
         if (!cell) return `Ô ${coordinate}, trống`;
         if (cell.cell_type === 'aisle') return `Ô ${coordinate}, lối đi`;
+        if (cell.cell_type === 'blocked') return `Ô ${coordinate}, vật cản cố định, vị trí cấu trúc không bố trí ghế`;
         if (cell.seat_type === 'couple') {
             const labels = pairMembers(cell.pair_key).map(([, member]) => member.seat_label).sort();
             return `Ô ${labels.join('-') || coordinate}, ghế đôi`;
@@ -77,6 +78,7 @@ function initializeLayoutTemplateEditor(form) {
     function cellClass(cell, x) {
         if (!cell) return 'is-empty';
         if (cell.cell_type === 'aisle') return 'is-aisle';
+        if (cell.cell_type === 'blocked') return 'is-blocked';
         if (cell.seat_type !== 'couple') return cell.seat_type === 'vip' ? 'is-vip' : 'is-normal';
         const members = pairMembers(cell.pair_key).map(([, member]) => member).sort((a, b) => a.x_position - b.x_position);
         return `is-couple ${members[0]?.x_position === x ? 'is-couple-left' : 'is-couple-right'}`;
@@ -89,6 +91,7 @@ function initializeLayoutTemplateEditor(form) {
         const couplePositions = visibleCells.filter((cell) => cell.cell_type === 'seat' && cell.seat_type === 'couple').length;
         const couplePairs = new Set(visibleCells.filter((cell) => cell.pair_key).map((cell) => cell.pair_key)).size;
         const aisles = visibleCells.filter((cell) => cell.cell_type === 'aisle').length;
+        const blocked = visibleCells.filter((cell) => cell.cell_type === 'blocked').length;
         const values = {
             physical_seats: normal + vip + couplePositions,
             pricing_units: normal + vip + couplePairs,
@@ -96,6 +99,7 @@ function initializeLayoutTemplateEditor(form) {
             vip,
             couple: `${couplePairs} cặp`,
             aisle: `${aisles} ô`,
+            blocked: `${blocked} ô`,
             dimensions: `${rows} × ${columns}`,
         };
         Object.entries(values).forEach(([key, value]) => {
@@ -147,6 +151,11 @@ function initializeLayoutTemplateEditor(form) {
                     icon.className = 'ph ph-arrows-down-up';
                     icon.setAttribute('aria-hidden', 'true');
                     button.appendChild(icon);
+                } else if (cell?.cell_type === 'blocked') {
+                    const icon = document.createElement('i');
+                    icon.className = 'ph ph-bricks';
+                    icon.setAttribute('aria-hidden', 'true');
+                    button.appendChild(icon);
                 } else if (cell) {
                     button.textContent = cell.seat_label || '';
                     if (cell.seat_type === 'vip') {
@@ -176,6 +185,9 @@ function initializeLayoutTemplateEditor(form) {
         } else if (activeTool === 'aisle') {
             clearCell(key);
             cells.set(key, { x_position: x, y_position: y, cell_type: 'aisle' });
+        } else if (activeTool === 'blocked') {
+            clearCell(key);
+            cells.set(key, { x_position: x, y_position: y, cell_type: 'blocked' });
         } else if (activeTool === 'couple') {
             if (x >= columns) {
                 if (message) {

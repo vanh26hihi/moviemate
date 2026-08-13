@@ -198,6 +198,8 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
             ->assertSee('Thêm hàng phía sau')
             ->assertSee('Hoàn tác thao tác gần nhất')
             ->assertSee('Tách ghế đôi')
+            ->assertSee('data-tool="blocked"', false)
+            ->assertSee('Vật cản cố định')
             ->assertSee('Tóm tắt sơ đồ do máy chủ tính toán')
             ->assertSee('expected_updated_at', false)
             ->assertSee('seat_id', false);
