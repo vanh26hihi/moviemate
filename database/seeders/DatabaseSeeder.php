@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             MovieSeeder::class,
             DemoCinemaLayoutSeeder::class,
             PricingRuleSeeder::class,
+            PriceBookSeeder::class,
             ShowtimeSeeder::class,
             DemoUserSeeder::class,
             FoodItemSeeder::class,
