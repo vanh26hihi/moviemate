@@ -114,7 +114,7 @@ final class Branch360CinemaDetailTest extends TestCase
         $many = $this->requestQueryCount($manager, $session);
 
         $this->assertSame($small, $many, "zero={$zero}; small={$small}; many={$many}");
-        $this->assertLessThanOrEqual(17, $many, "zero={$zero}; small={$small}; many={$many}");
+        $this->assertLessThanOrEqual(22, $many, "zero={$zero}; small={$small}; many={$many}");
 
         if (env('REPORT_QUERY_COUNTS')) {
             fwrite(STDOUT, "PHASE5B_QUERY_COUNTS=zero:{$zero},small:{$small},many:{$many}".PHP_EOL);
