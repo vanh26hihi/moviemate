@@ -7,6 +7,7 @@ use App\Exceptions\PricingConfigurationException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\BulkShowtimeRequest;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\ActivityLogger;
@@ -32,10 +33,11 @@ final class BulkShowtimeController extends Controller
             ->filter(fn ($row): bool => is_array($row))
             ->values();
         $initialMovieIds = $initialRows->pluck('movie_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values();
+        $initialFormatIds = $initialRows->pluck('presentation_format_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values();
         $initialRoomIds = $initialRows->pluck('room_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values();
 
         $roomQuery = Room::query()
-            ->with(['cinema', 'latestPublishedLayout']);
+            ->with(['cinema', 'latestPublishedLayout', 'presentationCapabilities']);
         $this->cinemaAccess->scope($roomQuery, $request->user(), 'rooms.cinema_id');
         $roomQuery->where(function ($query) use ($initialRoomIds): void {
             $query->where(function ($available): void {
@@ -46,15 +48,23 @@ final class BulkShowtimeController extends Controller
             }
         });
 
-        $movieQuery = Movie::query()->where(function ($query) use ($initialMovieIds): void {
+        $movieQuery = Movie::query()->with('supportedPresentationFormats')->where(function ($query) use ($initialMovieIds): void {
             $query->whereIn('status', Movie::SCHEDULABLE_STATUSES);
             if ($initialMovieIds->isNotEmpty()) {
                 $query->orWhereIn('movies.id', $initialMovieIds);
             }
         });
 
+        $formatQuery = PresentationFormat::query()->where(function ($query) use ($initialFormatIds): void {
+            $query->active();
+            if ($initialFormatIds->isNotEmpty()) {
+                $query->orWhereIn('presentation_formats.id', $initialFormatIds);
+            }
+        });
+
         return view('admin.showtimes.bulk', [
             'movies' => $movieQuery->orderBy('title')->get(),
+            'presentationFormats' => $formatQuery->orderBy('sort_order')->orderBy('code')->get(),
             'rooms' => $roomQuery->orderBy('cinema_id')->orderBy('code')->get(),
             'cinema' => $this->cinemaAccess->currentCinema($request->user()),
             'initialRows' => $initialRows->all(),
@@ -113,6 +123,7 @@ final class BulkShowtimeController extends Controller
             'movie_id' => $showtime->movie_id,
             'room_id' => $showtime->room_id,
             'room_layout_id' => $showtime->room_layout_id,
+            'presentation_format_id' => $showtime->presentation_format_id,
             'show_date' => $showtime->show_date?->format('Y-m-d'),
             'show_time' => (string) $showtime->show_time,
             'movie_end_at' => $window->movieEnd->toIso8601String(),

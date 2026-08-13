@@ -166,6 +166,7 @@ final class MultiCinemaAuthorizationTest extends TestCase
         ]);
         $showtime = Showtime::query()->create([
             'movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'room_layout_id' => $layout->id, 'show_date' => now()->addDay()->toDateString(),
             'show_time' => '19:00:00', 'price' => 50000, 'status' => 'active',
         ]);

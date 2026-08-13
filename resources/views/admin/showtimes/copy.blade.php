@@ -77,7 +77,7 @@
         </div>
 
         <div class="rounded-2xl app-secondary p-4 text-sm app-muted">
-            Chỉ phim, phòng, ngày đích và giờ bắt đầu được chuyển thành ý định. Sơ đồ, giá vé, thời gian vệ sinh và xung đột được máy chủ xác định lại theo trạng thái hiện tại.
+            Phim, định dạng trình chiếu nguồn, phòng, ngày đích và giờ bắt đầu được chuyển thành ý định. Định dạng được giữ nguyên nhưng vẫn phải được kiểm tra lại ở đích; sơ đồ, giá vé, thời gian vệ sinh và xung đột được máy chủ xác định lại theo trạng thái hiện tại.
         </div>
 
         <div class="flex flex-wrap justify-end gap-3">

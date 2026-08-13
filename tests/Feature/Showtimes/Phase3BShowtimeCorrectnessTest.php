@@ -32,9 +32,9 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
         $movie = $this->movie(90);
         $room = $this->rooms['P01'];
 
-        $past = $service->validateCandidate($movie, $room, '2030-06-10', '20:32');
-        $sameMinute = $service->validateCandidate($movie, $room, '2030-06-10', '20:33');
-        $nextMinute = $service->validateCandidate($movie, $room, '2030-06-10', '20:34');
+        $past = $service->validateCandidate($movie, $room, '2030-06-10', '20:32', presentationFormatId: $this->presentationFormat->id);
+        $sameMinute = $service->validateCandidate($movie, $room, '2030-06-10', '20:33', presentationFormatId: $this->presentationFormat->id);
+        $nextMinute = $service->validateCandidate($movie, $room, '2030-06-10', '20:34', presentationFormatId: $this->presentationFormat->id);
 
         $this->assertFalse($past->isValid());
         $this->assertSame('PAST_START', $past->failureCode());
@@ -58,6 +58,7 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
             $this->rooms['P01']->fresh(),
             '2030-06-10',
             '20:33',
+            presentationFormatId: $this->presentationFormat->id,
         );
 
         $this->assertSame('Pacific/Honolulu', $result->timezone);
@@ -76,10 +77,10 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
             'is_closed' => false,
         ]);
 
-        $beforeOpen = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '08:59');
-        $atOpen = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '09:00');
-        $atLatest = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '23:00');
-        $afterLatest = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '23:01');
+        $beforeOpen = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '08:59', presentationFormatId: $this->presentationFormat->id);
+        $atOpen = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '09:00', presentationFormatId: $this->presentationFormat->id);
+        $atLatest = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '23:00', presentationFormatId: $this->presentationFormat->id);
+        $afterLatest = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '23:01', presentationFormatId: $this->presentationFormat->id);
 
         $this->assertSame('OUTSIDE_START_WINDOW', $beforeOpen->failureCode());
         $this->assertFalse($beforeOpen->isWithinOperatingHours);
@@ -89,12 +90,12 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
         $this->assertSame('OUTSIDE_START_WINDOW', $afterLatest->failureCode());
 
         $hours->update(['is_closed' => true]);
-        $closed = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '18:00');
+        $closed = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '18:00', presentationFormatId: $this->presentationFormat->id);
         $this->assertSame('CINEMA_CLOSED', $closed->failureCode());
 
         $hours->update(['is_closed' => false]);
         $this->existing($movie, $room, ['show_time' => '18:00:00']);
-        $conflict = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '18:30');
+        $conflict = $service->validateCandidate($movie, $room->fresh(), '2030-06-10', '18:30', presentationFormatId: $this->presentationFormat->id);
         $this->assertSame('ROOM_CONFLICT', $conflict->failureCode());
         $this->assertFalse($conflict->isConflictFree);
     }
@@ -397,6 +398,7 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
             DB::table('cinema_pricing_rules')->delete();
             DB::table('rooms')->delete();
             DB::table('movies')->delete();
+            DB::table('presentation_formats')->delete();
             DB::beginTransaction();
         }
     }

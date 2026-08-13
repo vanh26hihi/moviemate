@@ -287,6 +287,7 @@ final class SeatRelocationWorkflowTest extends TestCase
         Showtime::query()->create([
             'movie_id' => $scenario['showtime']->movie_id, 'cinema_id' => $scenario['cinema']->id,
             'room_id' => $scenario['room']->id, 'room_layout_id' => $otherLayout->id,
+            'presentation_format_id' => $scenario['showtime']->presentation_format_id,
             'show_date' => now()->addDays(4)->toDateString(), 'show_time' => '19:00:00',
             'price' => 50000, 'vip_price' => 70000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active',
         ]);
@@ -708,7 +709,7 @@ final class SeatRelocationWorkflowTest extends TestCase
         CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000, 'priority' => 500, 'status' => 'active']);
         CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000, 'priority' => 500, 'status' => 'active']);
         $movie = Movie::query()->create(['title' => 'Relocation Movie', 'slug' => 'relocation-'.str()->random(8), 'duration' => 100, 'status' => 'now_showing']);
-        $showtime = Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'show_date' => now()->addDays(3)->toDateString(), 'show_time' => '19:00:00', 'price' => 50000, 'vip_price' => 70000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active']);
+        $showtime = Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id, 'show_date' => now()->addDays(3)->toDateString(), 'show_time' => '19:00:00', 'price' => 50000, 'vip_price' => 70000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active']);
         $booking = $this->booking($showtime, 'RELOCATE', $paymentStatus === 'success' ? 'paid' : 'pending_payment', $paymentStatus === 'success' ? 'paid' : 'unpaid');
         $original = $seats[$originalCode];
         $isCouple = $original->type === 'couple';

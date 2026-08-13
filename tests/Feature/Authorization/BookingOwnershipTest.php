@@ -60,6 +60,7 @@ class BookingOwnershipTest extends TestCase
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '19:00:00',
             'price' => 100000,

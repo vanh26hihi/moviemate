@@ -133,9 +133,11 @@ class RebuildSeatLayoutsCommandTest extends TestCase
             'status' => 'now_showing', 'created_at' => now(), 'updated_at' => now(),
         ]);
         $room = Room::query()->where('code', 'P01')->firstOrFail();
+        $format = $this->presentationFormatFixture($movieId, $room);
         $seat = Seat::query()->create(['room_id' => $room->id, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'type' => 'normal', 'status' => 'active']);
         $showtimeId = DB::table('showtimes')->insertGetId([
             'movie_id' => $movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $format->id,
             'show_date' => now()->toDateString(), 'show_time' => '10:00:00', 'price' => 50000,
             'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
         ]);

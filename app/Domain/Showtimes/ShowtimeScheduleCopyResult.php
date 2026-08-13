@@ -5,7 +5,7 @@ namespace App\Domain\Showtimes;
 final readonly class ShowtimeScheduleCopyResult
 {
     /**
-     * @param  list<array{row_key: string, movie_id: int, room_id: int, show_date: string, show_time: string}>  $rows
+     * @param  list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}>  $rows
      */
     public function __construct(
         public string $scope,

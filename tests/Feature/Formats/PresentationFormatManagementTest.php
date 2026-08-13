@@ -86,8 +86,10 @@ final class PresentationFormatManagementTest extends ShowtimeTestCase
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 12:00:00', 'Asia/Ho_Chi_Minh'));
         $admin = $this->userWithRole('admin');
         $format = $this->format('3D');
-        $showtime = $this->existing($this->movie(), $this->rooms->get('P01'), ['show_time' => '18:00:00']);
-        DB::table('showtimes')->where('id', $showtime->id)->update(['presentation_format_id' => $format->id]);
+        $showtime = $this->existing($this->movie(), $this->rooms->get('P01'), [
+            'show_time' => '18:00:00',
+            'presentation_format_id' => $format->id,
+        ]);
 
         $this->actingAs($admin)->patch(route('admin.presentation-formats.archive', $format))
             ->assertSessionHasErrors(['format' => 'Không thể lưu trữ định dạng 3D vì còn suất chiếu tương lai đang sử dụng.']);
@@ -101,10 +103,11 @@ final class PresentationFormatManagementTest extends ShowtimeTestCase
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-11 12:00:00', 'Asia/Ho_Chi_Minh'));
         $admin = $this->userWithRole('admin');
         $format = $this->format('3D');
-        $completed = $this->existing($this->movie(), $this->rooms->get('P01'));
-        $cancelled = $this->existing($this->movie(), $this->rooms->get('P02'), ['status' => 'cancelled']);
-        DB::table('showtimes')->whereIn('id', [$completed->id, $cancelled->id])
-            ->update(['presentation_format_id' => $format->id]);
+        $completed = $this->existing($this->movie(), $this->rooms->get('P01'), ['presentation_format_id' => $format->id]);
+        $cancelled = $this->existing($this->movie(), $this->rooms->get('P02'), [
+            'status' => 'cancelled',
+            'presentation_format_id' => $format->id,
+        ]);
 
         $this->actingAs($admin)->patch(route('admin.presentation-formats.archive', $format))
             ->assertSessionHas('success');

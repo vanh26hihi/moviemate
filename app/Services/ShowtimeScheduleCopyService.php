@@ -33,7 +33,7 @@ final class ShowtimeScheduleCopyService
         $showtimes = Showtime::query()
             ->select('showtimes.*')
             ->join('rooms', 'rooms.id', '=', 'showtimes.room_id')
-            ->with(['movie:id,title', 'room:id,cinema_id,code,name'])
+            ->with(['movie:id,title', 'presentationFormat:id,code,name,is_active', 'room:id,cinema_id,code,name'])
             ->where('showtimes.cinema_id', $cinema->id)
             ->where('rooms.cinema_id', $cinema->id)
             ->whereDate('showtimes.show_date', $sourceDate)
@@ -50,9 +50,16 @@ final class ShowtimeScheduleCopyService
             ]);
         }
 
+        if ($showtimes->contains(fn (Showtime $showtime): bool => $showtime->presentation_format_id === null)) {
+            throw ValidationException::withMessages([
+                'source_date' => 'Lịch nguồn có suất chiếu chưa có định dạng trình chiếu nên không thể sao chép. Vui lòng sửa dữ liệu nguồn trước.',
+            ]);
+        }
+
         $rows = $showtimes->values()->map(fn (Showtime $showtime, int $index): array => [
             'row_key' => 'copy-'.($index + 1),
             'movie_id' => (int) $showtime->movie_id,
+            'presentation_format_id' => (int) $showtime->presentation_format_id,
             'room_id' => (int) $showtime->room_id,
             'show_date' => $targetDate,
             'show_time' => substr((string) $showtime->show_time, 0, 5),

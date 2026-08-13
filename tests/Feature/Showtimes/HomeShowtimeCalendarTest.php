@@ -102,11 +102,14 @@ class HomeShowtimeCalendarTest extends TestCase
             'slug' => 'calendar-regression-movie',
             'status' => 'now_showing',
         ]);
+        $format = $this->presentationFormatForDiscovery();
+        $movie->supportedPresentationFormats()->attach($format);
         Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
+            'presentation_format_id' => $format->id,
             'show_date' => '2026-08-07',
             'show_time' => '19:30:00',
             'price' => 90000,
@@ -183,6 +186,10 @@ class HomeShowtimeCalendarTest extends TestCase
             'slug' => 'stopped-calendar-movie',
             'status' => 'stopped',
         ]);
+        $format = $this->presentationFormatForDiscovery();
+        $publicMovie->supportedPresentationFormats()->attach($format);
+        $stoppedMovie->supportedPresentationFormats()->attach($format);
+        $inactiveRoom->presentationCapabilities()->attach($format);
 
         foreach ([
             [$publicMovie, $activeRoom, 'active'],
@@ -195,6 +202,7 @@ class HomeShowtimeCalendarTest extends TestCase
                 'cinema_id' => $cinema->id,
                 'room_id' => $room->id,
                 'room_layout_id' => $room->is($activeRoom) ? $layout->id : null,
+                'presentation_format_id' => $format->id,
                 'show_date' => '2026-08-07',
                 'show_time' => sprintf('%02d:30:00', 16 + $index),
                 'price' => 90000,

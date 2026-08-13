@@ -8,6 +8,8 @@ use Carbon\CarbonImmutable;
 
 class ShowtimeLifecycleTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_exact_lifecycle_and_booking_cutoff_boundaries_use_movie_end_not_room_readiness(): void
     {
         $showtime = $this->existing($this->movie(90), $this->rooms['P01'], [

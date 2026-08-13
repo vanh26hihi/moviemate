@@ -32,16 +32,17 @@
             <div class="p-5 border-b app-border flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 class="font-extrabold app-text">Danh sách suất dự kiến</h2>
-                    <p class="text-sm app-muted mt-1">Phim, phòng, ngày và giờ là ý định đầu vào; mọi giá trị vận hành còn lại do máy chủ xác định.</p>
+                    <p class="text-sm app-muted mt-1">Phim, định dạng, phòng, ngày và giờ là ý định đầu vào; mọi giá trị vận hành còn lại do máy chủ xác định.</p>
                 </div>
                 <button type="button" class="btn-secondary" data-bulk-add-row><i class="ph-bold ph-plus"></i> Thêm dòng</button>
             </div>
             <div class="overflow-x-auto">
-                <table class="admin-table min-w-[980px]">
+                <table class="admin-table min-w-[1180px]">
                     <thead>
                         <tr>
                             <th class="w-12">#</th>
                             <th>Phim</th>
+                            <th>Định dạng</th>
                             <th>Phòng</th>
                             <th>Ngày</th>
                             <th>Giờ bắt đầu</th>
@@ -75,7 +76,15 @@
                 <select class="cinema-input min-w-[220px]" data-row-movie required>
                     <option value="">Chọn phim</option>
                     @foreach($movies as $movie)
-                        <option value="{{ $movie->id }}">{{ $movie->title }} — {{ $movie->duration }} phút{{ in_array($movie->status, \App\Models\Movie::SCHEDULABLE_STATUSES, true) ? '' : ' · không còn khả dụng' }}</option>
+                        <option value="{{ $movie->id }}" data-format-ids="{{ $movie->supportedPresentationFormats->pluck('id')->implode(',') }}">{{ $movie->title }} — {{ $movie->duration }} phút{{ in_array($movie->status, \App\Models\Movie::SCHEDULABLE_STATUSES, true) ? '' : ' · không còn khả dụng' }}</option>
+                    @endforeach
+                </select>
+            </td>
+            <td>
+                <select class="cinema-input min-w-[180px]" data-row-format required>
+                    <option value="">Chọn định dạng</option>
+                    @foreach($presentationFormats as $format)
+                        <option value="{{ $format->id }}">{{ $format->code }} · {{ $format->name }}{{ $format->is_active ? '' : ' · không còn khả dụng' }}</option>
                     @endforeach
                 </select>
             </td>
@@ -83,7 +92,7 @@
                 <select class="cinema-input min-w-[220px]" data-row-room required>
                     <option value="">Chọn phòng</option>
                     @foreach($rooms as $room)
-                        <option value="{{ $room->id }}">{{ $room->cinema->code }} · {{ $room->code }} · {{ $room->name }}{{ $room->status === 'active' && $room->latestPublishedLayout ? '' : ' · không còn khả dụng' }}</option>
+                        <option value="{{ $room->id }}" data-format-ids="{{ $room->presentationCapabilities->pluck('id')->implode(',') }}">{{ $room->cinema->code }} · {{ $room->code }} · {{ $room->name }}{{ $room->status === 'active' && $room->latestPublishedLayout ? '' : ' · không còn khả dụng' }}</option>
                     @endforeach
                 </select>
             </td>

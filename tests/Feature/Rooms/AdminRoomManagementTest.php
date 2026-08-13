@@ -131,6 +131,7 @@ class AdminRoomManagementTest extends TestCase
             'movie_id' => $movie->id,
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00:00',
             'price' => 80000,
@@ -158,6 +159,7 @@ class AdminRoomManagementTest extends TestCase
         $movie = Movie::query()->create(['title' => 'Phim lịch sử', 'slug' => 'phim-lich-su']);
         Showtime::query()->create([
             'movie_id' => $movie->id, 'cinema_id' => $room->cinema_id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->subDay()->toDateString(), 'show_time' => '10:00:00',
             'price' => 70000, 'status' => 'finished',
         ]);

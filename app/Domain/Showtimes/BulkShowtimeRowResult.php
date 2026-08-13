@@ -4,6 +4,7 @@ namespace App\Domain\Showtimes;
 
 use App\Exceptions\ShowtimeConflictException;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 
 final readonly class BulkShowtimeRowResult
@@ -14,6 +15,7 @@ final readonly class BulkShowtimeRowResult
     public function __construct(
         public string $rowKey,
         public ?Movie $movie,
+        public ?PresentationFormat $presentationFormat,
         public ?Room $room,
         public ShowtimeScheduleValidationResult $candidate,
         public array $internalConflicts = [],
@@ -64,6 +66,11 @@ final readonly class BulkShowtimeRowResult
             'code' => $this->code(),
             'message' => $this->message(),
             'movie' => $this->movie ? ['id' => $this->movie->id, 'title' => $this->movie->title] : null,
+            'presentation_format' => $this->presentationFormat ? [
+                'id' => $this->presentationFormat->id,
+                'code' => $this->presentationFormat->code,
+                'name' => $this->presentationFormat->name,
+            ] : null,
             'room' => $this->room ? [
                 'id' => $this->room->id,
                 'code' => $this->room->code,

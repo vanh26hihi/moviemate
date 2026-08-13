@@ -147,6 +147,7 @@ class RoomLayoutServiceTest extends TestCase
         ]);
         $showtime = Showtime::query()->create([
             'movie_id' => $movieId, 'cinema_id' => $this->room->cinema_id, 'room_id' => $this->room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movieId, $this->room)->id,
             'room_layout_id' => $draft->id, 'show_date' => now()->addDay()->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);
@@ -210,6 +211,7 @@ class RoomLayoutServiceTest extends TestCase
         ]);
         $showtime = Showtime::query()->create([
             'movie_id' => $movieId, 'cinema_id' => $this->room->cinema_id, 'room_id' => $this->room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movieId, $this->room)->id,
             'room_layout_id' => $v1->id, 'show_date' => now()->addDay()->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);

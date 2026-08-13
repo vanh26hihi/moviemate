@@ -4,6 +4,8 @@ namespace Tests\Feature\Showtimes;
 
 class BulkShowtimeWorkspaceTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_workspace_is_available_to_admin_and_manager_but_not_staff_or_customer(): void
     {
         foreach (['admin', 'manager'] as $role) {
@@ -13,6 +15,7 @@ class BulkShowtimeWorkspaceTest extends ShowtimeTestCase
                 ->assertSee('data-preview-endpoint="'.route('admin.showtimes.bulk.preview').'"', false)
                 ->assertSee('data-publish-endpoint="'.route('admin.showtimes.bulk.store').'"', false)
                 ->assertSee('data-bulk-add-row', false)
+                ->assertSee('data-row-format', false)
                 ->assertSee('data-bulk-remove-row', false)
                 ->assertSee('data-bulk-preview', false)
                 ->assertSee('data-bulk-publish', false)
@@ -39,6 +42,9 @@ class BulkShowtimeWorkspaceTest extends ShowtimeTestCase
         $javascript = file_get_contents(resource_path('js/bulk-showtime-scheduling.js'));
         $this->assertIsString($javascript);
         $this->assertStringContainsString("input.addEventListener('change', invalidatePreview)", $javascript);
+        $this->assertStringContainsString('presentation_format_id:', $javascript);
+        $this->assertStringContainsString('filterFormats(true)', $javascript);
+        $this->assertStringContainsString('filterRooms(true)', $javascript);
         $this->assertStringContainsString('row.remove()', $javascript);
         $this->assertStringContainsString('addButton.addEventListener', $javascript);
         $this->assertStringContainsString('publishButton.disabled = true', $javascript);
