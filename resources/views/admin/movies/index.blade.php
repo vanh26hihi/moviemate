@@ -4,6 +4,7 @@
 @section('page-title', 'Quản lý phim')
 
 @php
+    $canManageGlobalCatalog = app(\App\Services\CinemaAccessService::class)->hasGlobalAccess(auth()->user());
     $statusMeta = [
         'draft' => [
             'label' => 'Bản nháp',
@@ -44,6 +45,7 @@
         </p>
     </div>
 
+    @if($canManageGlobalCatalog)
     @can('movies.create')
         <a
             href="{{ route('admin.movies.create') }}"
@@ -53,6 +55,7 @@
             Thêm mới
         </a>
     @endcan
+    @endif
 </div>
 
 <div class="admin-toolbar">
@@ -303,6 +306,7 @@
                                     <i class="ph ph-eye"></i>
                                 </a>
 
+                                @if($canManageGlobalCatalog)
                                 @can('movies.update')
                                     <a
                                         href="{{ route('admin.movies.edit', $movie) }}"
@@ -314,6 +318,7 @@
                                         <i class="ph ph-pencil-simple"></i>
                                     </a>
                                 @endcan
+                                @endif
 
                             </div>
                         </td>

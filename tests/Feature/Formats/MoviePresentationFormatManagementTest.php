@@ -20,11 +20,11 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
 
     public function test_movie_create_form_and_transaction_save_multiple_normalized_formats(): void
     {
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
         $twoD = $this->format('2D');
         $threeD = $this->format('3D');
 
-        $this->actingAs($manager)->get(route('admin.movies.create'))
+        $this->actingAs($admin)->get(route('admin.movies.create'))
             ->assertOk()->assertSee('Định dạng hỗ trợ')->assertSee('2D')->assertSee('3D');
         $this->post(route('admin.movies.store'), [
             'title' => 'Phim đa định dạng',
@@ -39,10 +39,10 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
 
     public function test_unknown_archived_and_duplicate_format_ids_fail_cleanly_without_creating_movie(): void
     {
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
         $active = $this->format('2D');
         $archived = $this->format('3D', false);
-        $this->actingAs($manager);
+        $this->actingAs($admin);
 
         $this->post(route('admin.movies.store'), [
             'title' => 'Unknown format', 'presentation_format_ids' => [999999],
@@ -71,7 +71,7 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
     public function test_future_active_showtime_blocks_detach_and_rolls_back_metadata_and_genres(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 12:00:00', 'Asia/Ho_Chi_Minh'));
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
         $twoD = $this->format('2D');
         $threeD = $this->format('3D');
         $movie = $this->movie(attributes: ['title' => 'Tên ban đầu']);
@@ -81,7 +81,7 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
         $movie->genres()->attach($oldGenre);
         $showtime = $this->existing($movie, $this->rooms->get('P01'), ['presentation_format_id' => $threeD->id]);
 
-        $this->actingAs($manager)->put(route('admin.movies.update', $movie), [
+        $this->actingAs($admin)->put(route('admin.movies.update', $movie), [
             'title' => 'Tên không được lưu',
             'duration' => $movie->duration,
             'genres' => [$newGenre->id],
@@ -99,7 +99,7 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
     public function test_completed_history_allows_detach_and_retains_showtime_format(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 12:00:00', 'Asia/Ho_Chi_Minh'));
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
         $twoD = $this->format('2D');
         $threeD = $this->format('3D');
         $movie = $this->movie();
@@ -109,7 +109,7 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
             'presentation_format_id' => $threeD->id,
         ]);
 
-        $this->actingAs($manager)->put(route('admin.movies.update', $movie), [
+        $this->actingAs($admin)->put(route('admin.movies.update', $movie), [
             'title' => $movie->title,
             'duration' => $movie->duration,
             'presentation_format_ids' => [$twoD->id],
@@ -122,7 +122,7 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
     public function test_cancelled_future_showtime_allows_detach_and_retains_showtime_format(): void
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 12:00:00', 'Asia/Ho_Chi_Minh'));
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
         $twoD = $this->format('2D');
         $threeD = $this->format('3D');
         $movie = $this->movie();
@@ -132,7 +132,7 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
             'presentation_format_id' => $threeD->id,
         ]);
 
-        $this->actingAs($manager)->put(route('admin.movies.update', $movie), [
+        $this->actingAs($admin)->put(route('admin.movies.update', $movie), [
             'title' => $movie->title,
             'duration' => $movie->duration,
             'presentation_format_ids' => [$twoD->id],
@@ -144,13 +144,13 @@ final class MoviePresentationFormatManagementTest extends ShowtimeTestCase
 
     public function test_archived_current_attachment_is_visible_and_preserved_on_unrelated_edit(): void
     {
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
         $active = $this->format('2D');
         $archived = $this->format('3D', false);
         $movie = $this->movie();
         $movie->supportedPresentationFormats()->attach([$active->id, $archived->id]);
 
-        $this->actingAs($manager)->get(route('admin.movies.edit', $movie))
+        $this->actingAs($admin)->get(route('admin.movies.edit', $movie))
             ->assertOk()->assertSee('Đã lưu trữ · bỏ chọn để gỡ liên kết')->assertSee('value="'.$archived->id.'"', false);
         $this->put(route('admin.movies.update', $movie), [
             'title' => 'Tên cập nhật',
