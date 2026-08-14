@@ -26,6 +26,7 @@ final class DiscountController extends Controller
     {
         $query = $this->promotionAccess->visibleQuery(Promotion::query(), $request->user());
         $discounts = $query->with('cinemas')
+            ->withExists('usages')
             ->withCount(['usages as active_usage_count' => fn ($q) => $q->whereIn('status', ['reserved', 'redeemed'])])
             ->orderByDesc('id')->paginate(20);
         $discounts->getCollection()->each(fn (Promotion $discount) => $discount->setAttribute(
@@ -46,7 +47,7 @@ final class DiscountController extends Controller
 
     public function edit(Request $request, Promotion $discount): View
     {
-        $discount->load('cinemas');
+        $discount->load('cinemas')->loadExists('usages');
         $this->promotionAccess->authorizeManage($request->user(), $discount);
 
         return $this->form($request, $discount);

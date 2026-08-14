@@ -45,7 +45,8 @@
                 ['label' => 'Kinh doanh', 'items' => [
                     ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],
                     ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
-                    ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Mã giảm giá', 'icon' => 'ph-ticket-percent'],
+                    ['route' => 'admin.price-books.index', 'active' => 'admin.price-books.*', 'permission' => 'pricing.view', 'label' => 'Bảng giá', 'icon' => 'ph-currency-circle-dollar'],
+                    ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Khuyến mãi', 'icon' => 'ph-ticket-percent'],
                 ]],
                 ['label' => 'Dịch vụ', 'items' => [
                     ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
@@ -108,7 +109,7 @@
                 <span class="hidden xl:inline-flex rounded-full border app-border px-3 py-1 text-xs font-bold text-brand-start">{{ $adminCurrentCinema?->name ?? ($adminHasGlobalCinemaAccess ? 'Toàn hệ thống' : 'Chưa phân công') }}</span>
                 <div class="relative hidden md:block w-56">
                     <i class="ph ph-magnifying-glass app-muted text-sm absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"></i>
-                    <input type="text" class="app-input w-full pl-9 pr-3 py-2 rounded-lg border app-border focus:outline-none focus:border-brand-start transition-colors text-sm" placeholder="Tìm kiếm (Ctrl+K)">
+                    <input type="text" class="app-input w-full pl-9 pr-3 py-2 rounded-lg border app-border focus:outline-none focus:border-brand-start transition-colors text-sm" placeholder="Tìm kiếm (Ctrl+K)" aria-label="Tìm kiếm quản trị">
                 </div>
                 <button type="button" class="relative app-muted hover:app-text transition-colors p-2" aria-label="Thông báo"><i class="ph ph-bell text-lg"></i></button>
                 <button data-theme-toggle type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border app-muted hover:border-brand-start transition-all text-sm" aria-label="Đổi giao diện sáng/tối" aria-pressed="false"><span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span><span class="theme-text hidden lg:inline text-xs font-medium">Tối</span></button>

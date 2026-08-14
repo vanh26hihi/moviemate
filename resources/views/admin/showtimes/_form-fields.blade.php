@@ -74,7 +74,10 @@
         <p class="font-bold app-text">Giá vé được chụp theo loại ghế khi phát hành suất chiếu</p>
         <p class="mt-1 text-sm app-muted">Xem trước lịch sẽ xác thực PriceBookVersion hiện hành và hiển thị giá của đúng các loại ghế có trong sơ đồ phòng. Snapshot đã phát hành là bất biến.</p>
         @if($editing && $showtime->ticketPrices?->isNotEmpty())
-            <p class="mt-2 text-sm text-brand-start">Giá hiện tại: @foreach($showtime->ticketPrices as $price){{ $price->seatType?->name ?? $price->seatType?->code }} {{ number_format((int) $price->final_unit_amount_vnd, 0, ',', '.') }} VNĐ{{ $loop->last ? '' : ' · ' }}@endforeach</p>
+            @php($sourceVersions = $showtime->ticketPrices->map(fn($price) => data_get($price->breakdown_json, 'version_number'))->filter()->unique()->values())
+            <p class="mt-2 text-sm font-bold text-brand-start">Giá đã khóa cho suất chiếu</p>
+            <p class="mt-1 text-sm app-text">@foreach($showtime->ticketPrices as $price){{ $price->seatType?->name ?? $price->seatType?->code }} {{ number_format((int) $price->final_unit_amount_vnd, 0, ',', '.') }} VNĐ{{ $loop->last ? '' : ' · ' }}@endforeach</p>
+            @if($sourceVersions->count() === 1)<p class="mt-1 text-xs app-muted">Nguồn bảng giá: v{{ $sourceVersions->first() }}</p>@endif
         @endif
         <p id="showtime-price-preview" class="mt-2 text-sm font-bold text-brand-start" aria-live="polite">Chọn đủ dữ liệu để xem snapshot giá dự kiến.</p>
     </div>
