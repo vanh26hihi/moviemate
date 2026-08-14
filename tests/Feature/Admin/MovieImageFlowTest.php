@@ -28,11 +28,11 @@ class MovieImageFlowTest extends TestCase
         ]);
     }
 
-    public function test_manager_can_upload_poster_and_banner_to_canonical_paths(): void
+    public function test_admin_can_upload_poster_and_banner_to_canonical_paths(): void
     {
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
 
-        $this->actingAs($manager)->post(route('admin.movies.store'), $this->validPayload([
+        $this->actingAs($admin)->post(route('admin.movies.store'), $this->validPayload([
             'poster' => UploadedFile::fake()->image('../../unsafe poster.jpg', 600, 900),
             'cover_image' => UploadedFile::fake()->image('banner.png', 1600, 900),
         ]))->assertRedirect(route('admin.movies.index'));
@@ -79,7 +79,7 @@ class MovieImageFlowTest extends TestCase
         Storage::disk('public')->put($movie->poster, 'poster');
         Storage::disk('public')->put($movie->cover_image, 'banner');
 
-        $this->actingAs($this->userWithRole('manager'))->put(route('admin.movies.update', $movie), $this->validPayload([
+        $this->actingAs($this->userWithRole('admin'))->put(route('admin.movies.update', $movie), $this->validPayload([
             'title' => 'Updated title',
             'slug' => $movie->slug,
         ]))->assertRedirect(route('admin.movies.index'));
@@ -225,7 +225,7 @@ class MovieImageFlowTest extends TestCase
             ->assertSee('src="/storage/movies/posters/visible.jpg"', false)
             ->assertDontSee('http://', false);
 
-        $this->actingAs($this->userWithRole('manager'))->get(route('admin.movies.edit', $visible))
+        $this->actingAs($this->userWithRole('admin'))->get(route('admin.movies.edit', $visible))
             ->assertOk()
             ->assertSee('src="/storage/movies/posters/visible.jpg"', false)
             ->assertSee('src="/storage/movies/banners/visible.jpg"', false);

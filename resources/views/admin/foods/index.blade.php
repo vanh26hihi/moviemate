@@ -3,6 +3,10 @@
 @section('title', 'Quản lý món ăn - Quản trị MovieMate')
 @section('page-title', 'Quản lý món ăn')
 
+@php
+    $canManageGlobalCatalog = app(\App\Services\CinemaAccessService::class)->hasGlobalAccess(auth()->user());
+@endphp
+
 @section('content')
 <div class="admin-page-header gap-4 flex-col lg:flex-row lg:items-end">
     <div>
@@ -17,10 +21,10 @@
                 Tìm kiếm
             </button>
         </form>
-        @can('foods.create')<a href="{{ route('admin.foods.create') }}" class="admin-btn-primary whitespace-nowrap">
+        @if($canManageGlobalCatalog)@can('foods.create')<a href="{{ route('admin.foods.create') }}" class="admin-btn-primary whitespace-nowrap">
             <i class="ph-bold ph-plus-circle"></i>
             Thêm món mới
-        </a>@endcan
+        </a>@endcan @endif
     </div>
 </div>
 
@@ -49,18 +53,18 @@
                             </span>
                         </td>
                         <td class="px-5 py-4 text-right space-x-2">
-                            @can('foods.update')<a href="{{ route('admin.foods.edit', $food) }}" class="inline-flex items-center gap-2 rounded-xl border app-border app-muted px-3 py-2 text-sm hover:app-text hover:border-brand-start transition-colors">
+                            @if($canManageGlobalCatalog)@can('foods.update')<a href="{{ route('admin.foods.edit', $food) }}" class="inline-flex items-center gap-2 rounded-xl border app-border app-muted px-3 py-2 text-sm hover:app-text hover:border-brand-start transition-colors">
                                 <i class="ph ph-pencil"></i>
                                 Sửa
-                            </a>@endcan
-                            @can('foods.delete')<form action="{{ route('admin.foods.destroy', $food) }}" method="POST" class="inline-block">
+                            </a>@endcan @endif
+                            @if($canManageGlobalCatalog)@can('foods.delete')<form action="{{ route('admin.foods.destroy', $food) }}" method="POST" class="inline-block">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="inline-flex items-center gap-2 rounded-xl border app-border border-error/20 text-error px-3 py-2 text-sm hover:bg-error/10 transition-colors" onclick="return confirm('Xác nhận xóa món này?')">
                                     <i class="ph ph-trash"></i>
                                     Xóa
                                 </button>
-                            </form>@endcan
+                            </form>@endcan @endif
                         </td>
                     </tr>
                 @empty

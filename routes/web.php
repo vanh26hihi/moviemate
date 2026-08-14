@@ -321,9 +321,9 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:bookings.operate')->name('bookings.cancel');
         Route::resource('foods', AdminFoodController::class)->except(['show'])
             ->middlewareFor('index', 'permission:foods.view')
-            ->middlewareFor(['create', 'store'], 'permission:foods.create')
-            ->middlewareFor(['edit', 'update'], 'permission:foods.update')
-            ->middlewareFor('destroy', 'permission:foods.delete');
+            ->middlewareFor(['create', 'store'], ['role:admin', 'permission:foods.create'])
+            ->middlewareFor(['edit', 'update'], ['role:admin', 'permission:foods.update'])
+            ->middlewareFor('destroy', ['role:admin', 'permission:foods.delete']);
 
         Route::resource('discounts', AdminDiscountController::class)->except(['show', 'destroy'])
             ->middlewareFor('index', 'permission:discounts.view')
@@ -355,11 +355,11 @@ Route::prefix('admin')->name('admin.')
         Route::patch('/reviews/{review}', [AdminReviewController::class, 'moderate'])->middleware('permission:reviews.moderate')->name('reviews.moderate');
         Route::resource('movies', AdminMovieController::class)->except(['destroy'])
             ->middlewareFor(['index', 'show'], 'permission:movies.view')
-            ->middlewareFor(['create', 'store'], 'permission:movies.create')
-            ->middlewareFor(['edit', 'update'], 'permission:movies.update');
+            ->middlewareFor(['create', 'store'], ['role:admin', 'permission:movies.create'])
+            ->middlewareFor(['edit', 'update'], ['role:admin', 'permission:movies.update']);
 
         Route::post('/movies/{movie}/lifecycle', [AdminMovieController::class, 'lifecycle'])
-            ->middleware('permission:movies.lifecycle')->name('movies.lifecycle');
+            ->middleware(['role:admin', 'permission:movies.lifecycle'])->name('movies.lifecycle');
 
         Route::resource('layout-templates', AdminRoomLayoutTemplateController::class)
             ->parameters(['layout-templates' => 'layout_template'])->except(['destroy'])
@@ -372,9 +372,9 @@ Route::prefix('admin')->name('admin.')
 
         Route::resource('genres', AdminGenreController::class)->except(['show'])
             ->middlewareFor('index', 'permission:genres.view')
-            ->middlewareFor(['create', 'store'], 'permission:genres.create')
-            ->middlewareFor(['edit', 'update'], 'permission:genres.update')
-            ->middlewareFor('destroy', 'permission:genres.delete');
+            ->middlewareFor(['create', 'store'], ['role:admin', 'permission:genres.create'])
+            ->middlewareFor(['edit', 'update'], ['role:admin', 'permission:genres.update'])
+            ->middlewareFor('destroy', ['role:admin', 'permission:genres.delete']);
 
         Route::post('/cinema-context', AdminCinemaContextController::class)
             ->middleware('permission:cinemas.view')->name('cinema-context.update');
