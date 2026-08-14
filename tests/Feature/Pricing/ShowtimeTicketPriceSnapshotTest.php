@@ -6,6 +6,7 @@ use App\Models\BookingSeat;
 use App\Models\PriceBookVersion;
 use App\Models\Seat;
 use App\Services\BookingCheckoutService;
+use App\Services\BookingPricingService;
 use App\Services\BookingTokenService;
 use App\Services\PriceBookVersionService;
 use App\Services\ShowtimeScheduleService;
@@ -94,6 +95,38 @@ final class ShowtimeTicketPriceSnapshotTest extends TestCase
         $this->assertSame(50_000, (int) $after->final_unit_amount_vnd);
         $this->assertSame(PriceBookVersion::STATUS_RETIRED, $after->priceBookVersion()->value('status'));
         $this->assertNotSame($draft->id, $after->price_book_version_id);
+    }
+
+    public function test_review_quote_and_confirm_do_not_drift_after_new_price_book_publication(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        $seat = $scenario['seats']->firstWhere('status', Seat::STATUS_ACTIVE);
+        $quote = app(BookingPricingService::class)->calculate(
+            $scenario['showtime']->fresh(['ticketPrices.seatType']),
+            collect([$seat]),
+        );
+        $sourceId = $scenario['showtime']->ticketPrices()->sole()->id;
+        $versions = app(PriceBookVersionService::class);
+        $versions->retire(PriceBookVersion::query()->where('status', PriceBookVersion::STATUS_PUBLISHED)->sole());
+        $next = $versions->createDraft($this->chainPriceBook(), [
+            'base_price_vnd' => 90_000,
+            'effective_from' => now()->subYear()->toDateString(),
+            'effective_until' => now()->addYear()->toDateString(),
+        ]);
+        $versions->publish($next);
+
+        $booking = app(BookingCheckoutService::class)->createPendingBooking(
+            $scenario['showtime']->id,
+            [$seat->id],
+            null,
+            'review-confirm@example.test',
+            app(BookingTokenService::class)->issueCheckoutToken(),
+        )->booking->fresh('bookingSeats');
+
+        $this->assertSame(50_000, $quote->seatSubtotal);
+        $this->assertSame(50_000, (int) $booking->seat_subtotal);
+        $this->assertSame($sourceId, $booking->bookingSeats->sole()->showtime_ticket_price_id);
+        $this->assertNotSame($next->id, $scenario['showtime']->ticketPrices()->sole()->price_book_version_id);
     }
 
     public function test_couple_physical_seats_reference_one_logical_snapshot_and_charge_once(): void

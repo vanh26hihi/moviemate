@@ -5,12 +5,14 @@ namespace Tests\Feature\Showtimes;
 use App\Models\ActivityLog;
 use App\Models\Cinema;
 use App\Models\PresentationFormat;
+use App\Models\PriceBookVersion;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Showtime;
 use App\Services\BulkShowtimeScheduleService;
 use App\Services\MoviePresentationFormatService;
 use App\Services\PresentationFormatManagementService;
+use App\Services\PriceBookVersionService;
 use App\Services\RoomPresentationCapabilityService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
@@ -312,6 +314,35 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             'rows' => [$valid, $malformed],
         ])->assertUnprocessable()->assertJsonValidationErrors('rows.1.show_time');
         $this->assertDatabaseCount('showtimes', 0);
+    }
+
+    public function test_price_book_gap_marks_one_row_invalid_and_blocks_the_whole_batch(): void
+    {
+        $versions = app(PriceBookVersionService::class);
+        $versions->retire(PriceBookVersion::query()->where('status', PriceBookVersion::STATUS_PUBLISHED)->sole());
+        $limited = $versions->createDraft($this->chainPriceBook(), [
+            'base_price_vnd' => 80_000,
+            'effective_from' => '2030-06-10',
+            'effective_until' => '2030-06-11',
+        ]);
+        $versions->publish($limited);
+        $movie = $this->movie(90);
+        $rows = [
+            $this->row('priced', $movie, $this->rooms['P01'], '2030-06-10', '18:00'),
+            $this->row('gap', $movie, $this->rooms['P02'], '2030-06-11', '18:00'),
+        ];
+        $manager = $this->userWithRole('manager');
+
+        $this->actingAs($manager)->postJson(route('admin.showtimes.bulk.preview'), ['rows' => $rows])
+            ->assertOk()
+            ->assertJsonPath('summary.valid_count', 1)
+            ->assertJsonPath('summary.invalid_count', 1)
+            ->assertJsonPath('rows.1.code', 'SHOWTIME_PRICE_UNRESOLVABLE');
+        $this->actingAs($manager)->postJson(route('admin.showtimes.bulk.store'), ['rows' => $rows])
+            ->assertUnprocessable()
+            ->assertJsonPath('rows.1.code', 'SHOWTIME_PRICE_UNRESOLVABLE');
+        $this->assertDatabaseCount('showtimes', 0);
+        $this->assertDatabaseCount('showtime_ticket_prices', 0);
     }
 
     public function test_publish_creates_valid_multi_room_multi_date_batch_with_single_create_pricing_and_audit_parity(): void
