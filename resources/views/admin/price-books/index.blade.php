@@ -5,7 +5,7 @@
 <div class="admin-page-header">
     <div>
         <h1 class="admin-page-title sr-only sm:not-sr-only">Bảng giá</h1>
-        <p class="admin-page-subtitle">Một giá cơ sở toàn chuỗi theo từng phiên bản; loại ghế, loại phòng, thời điểm, chi nhánh và phòng chỉ là điều chỉnh giá.</p>
+        <p class="admin-page-subtitle">{{ $canManagePriceBook ? 'Một giá cơ sở toàn chuỗi theo từng phiên bản; loại ghế, loại phòng, thời điểm, chi nhánh và phòng chỉ là điều chỉnh giá.' : 'Xem bảng giá áp dụng tại chi nhánh hiện tại và kiểm tra giá theo bối cảnh vận hành. Phiên bản đã phát hành là chỉ đọc.' }}</p>
     </div>
     @unless($canManagePriceBook)<span class="status-badge border app-border">Chỉ xem · chi nhánh hiện tại</span>@endunless
 </div>

@@ -1,8 +1,5 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý phim')
-@section('page-title', 'Quản lý phim')
-
 @php
     $canManageGlobalCatalog = app(\App\Services\CinemaAccessService::class)->hasGlobalAccess(auth()->user());
     $statusMeta = [
@@ -34,18 +31,27 @@
     $countryValue = $country ?? request('country', '');
 @endphp
 
+@section('title', $canManageGlobalCatalog ? 'Quản lý phim' : 'Danh mục phim')
+@section('page-title', $canManageGlobalCatalog ? 'Quản lý phim' : 'Danh mục phim')
+
 @section('content')
 
 <div class="admin-page-header">
     <div>
-        <h1 class="admin-page-title">Quản lý phim</h1>
+        <h1 class="admin-page-title">{{ $canManageGlobalCatalog ? 'Quản lý phim' : 'Danh mục phim dùng chung' }}</h1>
 
         <p class="admin-page-subtitle">
-            Quản lý danh sách phim, poster, trạng thái và thể loại.
+            {{ $canManageGlobalCatalog ? 'Quản lý danh sách phim, poster, trạng thái và thể loại.' : 'Danh mục phim toàn chuỗi để tham chiếu khi vận hành lịch chiếu tại chi nhánh. Manager chỉ xem.' }}
         </p>
     </div>
 
     @if($canManageGlobalCatalog)
+        @can('genres.view')
+            <a href="{{ route('admin.genres.index') }}" class="admin-btn-secondary">
+                <i class="ph ph-tag"></i>
+                Thể loại phim
+            </a>
+        @endcan
     @can('movies.create')
         <a
             href="{{ route('admin.movies.create') }}"
