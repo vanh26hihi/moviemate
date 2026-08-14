@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentReconciliationController;
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\PresentationFormatController as AdminPresentationFormatController;
+use App\Http\Controllers\Admin\PriceBookController as AdminPriceBookController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
@@ -329,6 +330,27 @@ Route::prefix('admin')->name('admin.')
             ->middlewareFor(['create', 'store', 'edit', 'update'], 'permission:discounts.manage');
         Route::patch('/discounts/{discount}/archive', [AdminDiscountController::class, 'archive'])
             ->middleware('permission:discounts.manage')->name('discounts.archive');
+
+        Route::get('/price-books', [AdminPriceBookController::class, 'index'])
+            ->middleware('permission:pricing.view')->name('price-books.index');
+        Route::post('/price-books/preview', [AdminPriceBookController::class, 'preview'])
+            ->middleware(['permission:pricing.view', 'throttle:60,1'])->name('price-books.preview');
+        Route::get('/price-books/versions/{version}', [AdminPriceBookController::class, 'show'])
+            ->whereNumber('version')->middleware('permission:pricing.view')->name('price-books.versions.show');
+        Route::post('/price-books/versions/{version}/copy', [AdminPriceBookController::class, 'copy'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.copy');
+        Route::patch('/price-books/versions/{version}', [AdminPriceBookController::class, 'update'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.update');
+        Route::post('/price-books/versions/{version}/adjustments', [AdminPriceBookController::class, 'storeAdjustment'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.adjustments.store');
+        Route::patch('/price-books/versions/{version}/adjustments/{adjustment}', [AdminPriceBookController::class, 'updateAdjustment'])
+            ->whereNumber(['version', 'adjustment'])->middleware('permission:pricing.manage')->name('price-books.versions.adjustments.update');
+        Route::delete('/price-books/versions/{version}/adjustments/{adjustment}', [AdminPriceBookController::class, 'destroyAdjustment'])
+            ->whereNumber(['version', 'adjustment'])->middleware('permission:pricing.manage')->name('price-books.versions.adjustments.destroy');
+        Route::post('/price-books/versions/{version}/publish', [AdminPriceBookController::class, 'publish'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.publish');
+        Route::post('/price-books/versions/{version}/retire', [AdminPriceBookController::class, 'retire'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.retire');
         Route::get('/reviews', [AdminReviewController::class, 'index'])->middleware('permission:reviews.view')->name('reviews.index');
         Route::patch('/reviews/{review}', [AdminReviewController::class, 'moderate'])->middleware('permission:reviews.moderate')->name('reviews.moderate');
         Route::resource('movies', AdminMovieController::class)->except(['destroy'])

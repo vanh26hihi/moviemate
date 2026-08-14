@@ -69,4 +69,24 @@ final class PriceBookAdjustment extends Model
     {
         return $this->belongsTo(PriceBookVersion::class, 'price_book_version_id');
     }
+
+    public function seatType(): BelongsTo
+    {
+        return $this->belongsTo(SeatType::class);
+    }
+
+    public function roomType(): BelongsTo
+    {
+        return $this->belongsTo(RoomType::class);
+    }
+
+    public function cinema(): BelongsTo
+    {
+        return $this->belongsTo(Cinema::class);
+    }
+
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(Room::class);
+    }
 }
