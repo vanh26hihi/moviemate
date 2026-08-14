@@ -1,17 +1,17 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý món ăn - Quản trị MovieMate')
-@section('page-title', 'Quản lý món ăn')
-
 @php
     $canManageGlobalCatalog = app(\App\Services\CinemaAccessService::class)->hasGlobalAccess(auth()->user());
 @endphp
 
+@section('title', ($canManageGlobalCatalog ? 'Quản lý món ăn' : 'Danh mục món ăn').' - MovieMate')
+@section('page-title', $canManageGlobalCatalog ? 'Quản lý món ăn' : 'Danh mục món ăn')
+
 @section('content')
 <div class="admin-page-header gap-4 flex-col lg:flex-row lg:items-end">
     <div>
-        <h1 class="admin-page-title">Quản lý món ăn</h1>
-        <p class="admin-page-subtitle">Thêm, sửa và quản lý danh sách đồ ăn phục vụ khách tại rạp.</p>
+        <h1 class="admin-page-title">{{ $canManageGlobalCatalog ? 'Quản lý món ăn' : 'Danh mục món ăn dùng chung' }}</h1>
+        <p class="admin-page-subtitle">{{ $canManageGlobalCatalog ? 'Thêm, sửa và quản lý danh sách đồ ăn phục vụ khách tại rạp.' : 'Danh mục món ăn và giá dùng chung toàn chuỗi. Manager chỉ xem để phục vụ vận hành tại chi nhánh.' }}</p>
     </div>
     <div class="w-full lg:w-auto flex flex-col sm:flex-row items-stretch gap-3">
         <form action="{{ route('admin.foods.index') }}" method="GET" class="flex flex-1 min-w-0 gap-2">

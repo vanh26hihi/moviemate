@@ -20,43 +20,68 @@
         <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0" data-admin-sidebar-logo>
             <a href="{{ route('home') }}" class="min-w-0" aria-label="MovieMate - Trang chủ">
                 <x-brand.logo class="brand-logo--sidebar" />
-                <span class="mt-0.5 block text-[10px] font-bold uppercase tracking-widest app-muted">Khu vực quản trị</span>
+                <span class="mt-0.5 block text-[10px] font-bold uppercase tracking-widest app-muted">{{ $adminHasGlobalCinemaAccess ? 'Quản trị toàn chuỗi' : 'Vận hành chi nhánh' }}</span>
             </a>
         </div>
 
+        <div class="border-b app-border px-4 py-3 lg:hidden">
+            <form method="POST" action="{{ route('admin.cinema-context.update') }}">
+                @csrf
+                <label for="admin-cinema-context-mobile" class="mb-1.5 block text-[10px] font-bold uppercase tracking-wider app-muted">{{ $adminHasGlobalCinemaAccess ? 'Phạm vi quản trị' : 'Chi nhánh hiện tại' }}</label>
+                <select id="admin-cinema-context-mobile" name="cinema_id" class="app-input w-full rounded-lg border app-border px-3 py-2 text-sm" onchange="this.form.submit()">
+                    @if($adminHasGlobalCinemaAccess)<option value="all" @selected(!$adminCurrentCinema)>Toàn hệ thống</option>@endif
+                    @foreach($adminAccessibleCinemas as $contextCinema)
+                        <option value="{{ $contextCinema->id }}" @selected($adminCurrentCinema?->id === $contextCinema->id)>{{ $contextCinema->name }}</option>
+                    @endforeach
+                </select>
+            </form>
+        </div>
+
         @php
-            $adminNavigation = [
-                ['label' => 'Tổng quan', 'items' => [
-                    ['route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'permission' => 'dashboard.view', 'label' => 'Tổng quan', 'icon' => 'ph-squares-four'],
-                    ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
-                ]],
-                ['label' => 'Nội dung', 'items' => [
-                    ['route' => 'admin.movies.index', 'active' => 'admin.movies.*', 'permission' => 'movies.view', 'label' => 'Phim', 'icon' => 'ph-film-slate'],
-                    ['route' => 'admin.genres.index', 'active' => 'admin.genres.*', 'permission' => 'genres.view', 'label' => 'Thể loại', 'icon' => 'ph-tag'],
-                    ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
-                ]],
-                ['label' => 'Rạp & lịch chiếu', 'items' => [
-                    ['route' => 'admin.cinemas.index', 'active' => ['admin.cinema.*', 'admin.cinemas.*'], 'permission' => 'cinemas.view', 'label' => 'Chi nhánh', 'icon' => 'ph-buildings'],
-                    ['route' => 'admin.rooms.index', 'active' => ['admin.rooms.*', 'admin.seats.*'], 'permission' => 'rooms.view', 'label' => 'Phòng chiếu', 'icon' => 'ph-projector-screen'],
-                    ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ phòng', 'icon' => 'ph-grid-four'],
-                    ['route' => 'admin.presentation-formats.index', 'active' => 'admin.presentation-formats.*', 'permission' => 'presentation_formats.view', 'label' => 'Định dạng trình chiếu', 'icon' => 'ph-cube-focus'],
-                    ['route' => 'admin.showtimes.index', 'active' => 'admin.showtimes.*', 'permission' => 'showtimes.view', 'label' => 'Suất chiếu', 'icon' => 'ph-calendar-plus'],
+            $navItems = [
+                'dashboard' => ['route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'permission' => 'dashboard.view', 'label' => 'Tổng quan', 'icon' => 'ph-squares-four'],
+                'cinemas' => ['route' => 'admin.cinemas.index', 'active' => ['admin.cinema.*', 'admin.cinemas.*'], 'permission' => 'cinemas.view', 'label' => 'Chi nhánh', 'icon' => 'ph-buildings'],
+                'showtimes' => ['route' => 'admin.showtimes.index', 'active' => 'admin.showtimes.*', 'permission' => 'showtimes.view', 'label' => 'Lịch vận hành', 'icon' => 'ph-calendar-plus'],
+                'rooms' => ['route' => 'admin.rooms.index', 'active' => ['admin.rooms.*', 'admin.seats.*'], 'permission' => 'rooms.view', 'label' => 'Phòng chiếu', 'icon' => 'ph-projector-screen'],
+                'bookings' => ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],
+                'foodOrders' => ['route' => 'admin.food-orders.index', 'active' => 'admin.food-orders.*', 'permission' => 'food-orders.view', 'label' => 'Đơn đồ ăn tại rạp', 'icon' => 'ph-shopping-bag'],
+                'movies' => ['route' => 'admin.movies.index', 'active' => ['admin.movies.*', 'admin.genres.*'], 'permission' => 'movies.view', 'label' => 'Phim', 'icon' => 'ph-film-slate'],
+                'priceBooks' => ['route' => 'admin.price-books.index', 'active' => 'admin.price-books.*', 'permission' => 'pricing.view', 'label' => 'Bảng giá', 'icon' => 'ph-currency-circle-dollar'],
+                'discounts' => ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Khuyến mãi', 'icon' => 'ph-ticket-percent'],
+                'foods' => ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
+                'reviews' => ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
+                'payments' => ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
+                'reports' => ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
+                'roomTypes' => ['route' => 'admin.room-types.index', 'active' => 'admin.room-types.*', 'permission' => 'room_types.view', 'label' => 'Loại phòng', 'icon' => 'ph-stack'],
+                'layoutTemplates' => ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ', 'icon' => 'ph-grid-four'],
+                'presentationFormats' => ['route' => 'admin.presentation-formats.index', 'active' => 'admin.presentation-formats.*', 'permission' => 'presentation_formats.view', 'label' => 'Định dạng trình chiếu', 'icon' => 'ph-cube-focus'],
+                'users' => ['route' => 'admin.users.index', 'active' => 'admin.users.*', 'permission' => 'users.view', 'label' => 'Người dùng', 'icon' => 'ph-users'],
+                'roles' => ['route' => 'admin.roles.index', 'active' => 'admin.roles.*', 'permission' => 'roles.view', 'label' => 'Vai trò và quyền', 'icon' => 'ph-shield-check'],
+                'activityLogs' => ['route' => 'admin.activity-logs.index', 'active' => 'admin.activity-logs.*', 'permission' => 'activity_logs.view', 'label' => 'Nhật ký hoạt động', 'icon' => 'ph-list-magnifying-glass'],
+            ];
+
+            $adminNavigation = $adminHasGlobalCinemaAccess ? [
+                ['label' => 'Tổng quan', 'items' => [$navItems['dashboard']]],
+                ['label' => 'Vận hành', 'items' => [$navItems['cinemas'], $navItems['showtimes'], $navItems['rooms'], $navItems['bookings'], $navItems['foodOrders']]],
+                ['label' => 'Kinh doanh', 'items' => [$navItems['movies'], $navItems['priceBooks'], $navItems['discounts'], $navItems['foods']]],
+                ['label' => 'Khách hàng', 'items' => [$navItems['reviews']]],
+                ['label' => 'Tài chính', 'items' => [$navItems['payments'], $navItems['reports']]],
+                ['label' => 'Cấu hình', 'items' => [$navItems['roomTypes'], $navItems['layoutTemplates'], $navItems['presentationFormats'], $navItems['users'], $navItems['roles'], $navItems['activityLogs']]],
+            ] : [
+                ['label' => 'Tổng quan chi nhánh', 'items' => [[...$navItems['dashboard'], 'label' => 'Tổng quan chi nhánh']]],
+                ['label' => 'Vận hành', 'items' => [
+                    $navItems['showtimes'], $navItems['rooms'], $navItems['bookings'],
+                    [...$navItems['payments'], 'label' => 'Thanh toán chi nhánh'],
+                    $navItems['foodOrders'],
+                    [...$navItems['users'], 'label' => 'Nhân sự chi nhánh'],
                 ]],
                 ['label' => 'Kinh doanh', 'items' => [
-                    ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],
-                    ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
-                    ['route' => 'admin.price-books.index', 'active' => 'admin.price-books.*', 'permission' => 'pricing.view', 'label' => 'Bảng giá', 'icon' => 'ph-currency-circle-dollar'],
-                    ['route' => 'admin.discounts.index', 'active' => 'admin.discounts.*', 'permission' => 'discounts.view', 'label' => 'Khuyến mãi', 'icon' => 'ph-ticket-percent'],
+                    [...$navItems['movies'], 'label' => 'Danh mục phim · Chỉ xem'],
+                    [...$navItems['priceBooks'], 'label' => 'Bảng giá áp dụng'],
+                    $navItems['discounts'],
+                    [...$navItems['foods'], 'label' => 'Món ăn dùng chung · Chỉ xem'],
                 ]],
-                ['label' => 'Dịch vụ', 'items' => [
-                    ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
-                    ['route' => 'admin.food-orders.index', 'active' => 'admin.food-orders.*', 'permission' => 'food-orders.view', 'label' => 'Đơn đồ ăn', 'icon' => 'ph-shopping-bag'],
-                ]],
-                ['label' => 'Hệ thống', 'items' => [
-                    ['route' => 'admin.users.index', 'active' => 'admin.users.*', 'permission' => 'users.view', 'label' => 'Người dùng', 'icon' => 'ph-users'],
-                    ['route' => 'admin.roles.index', 'active' => 'admin.roles.*', 'permission' => 'roles.view', 'label' => 'Vai trò và quyền', 'icon' => 'ph-shield-check'],
-                    ['route' => 'admin.activity-logs.index', 'active' => 'admin.activity-logs.*', 'permission' => 'activity_logs.view', 'label' => 'Nhật ký hoạt động', 'icon' => 'ph-list-magnifying-glass'],
-                ]],
+                ['label' => 'Báo cáo', 'items' => [[...$navItems['reports'], 'label' => 'Báo cáo chi nhánh']]],
             ];
         @endphp
 
@@ -123,6 +148,10 @@
             </div>
         </header>
         <div class="flex-grow overflow-y-auto" data-app-scroll-container><div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-12">
+            <div class="mb-4 flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1 rounded-xl border app-border app-card-soft px-4 py-3 text-sm" data-admin-context-banner>
+                <span class="shrink-0 font-semibold app-muted">{{ $adminHasGlobalCinemaAccess ? 'Phạm vi quản trị' : 'Chi nhánh hiện tại' }}</span>
+                <strong class="min-w-0 break-words app-text" data-admin-context-name title="{{ $adminCurrentCinema?->name ?? ($adminHasGlobalCinemaAccess ? 'Toàn hệ thống' : 'Chưa phân công') }}">{{ $adminCurrentCinema?->name ?? ($adminHasGlobalCinemaAccess ? 'Toàn hệ thống' : 'Chưa phân công') }}</strong>
+            </div>
             <div class="sm:hidden mb-4"><p class="text-xl font-bold app-heading">@yield('page-title')</p></div>
             <x-flash-messages :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
             @yield('content')

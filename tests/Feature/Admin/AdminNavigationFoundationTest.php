@@ -29,8 +29,15 @@ class AdminNavigationFoundationTest extends TestCase
 
         $this->assertSame(1, substr_count($navigation, 'aria-current="page"'));
         $this->assertStringContainsString('is-active', $this->anchorFor($navigation, 'admin.movies.index'));
-        $this->assertStringNotContainsString('is-active', $this->anchorFor($navigation, 'admin.genres.index'));
+        $this->assertStringNotContainsString('data-admin-nav-route="admin.genres.index"', $navigation);
         $this->assertDoesNotMatchRegularExpression('/>\s*Ghế\s*</u', $navigation);
+
+        $genreNavigation = $this->navigationHtml(
+            $this->get(route('admin.genres.index'))->assertOk()->getContent()
+        );
+        $this->assertSame(1, substr_count($genreNavigation, 'aria-current="page"'));
+        $this->assertStringContainsString('is-active', $this->anchorFor($genreNavigation, 'admin.movies.index'));
+        $this->assertStringNotContainsString('data-admin-nav-route="admin.genres.index"', $genreNavigation);
     }
 
     public function test_only_menu_area_scrolls_between_fixed_logo_and_footer(): void
@@ -120,12 +127,14 @@ class AdminNavigationFoundationTest extends TestCase
         $this->assertStringNotContainsString('Gửi tài liệu nhận vé', $managerNavigation);
         $this->assertStringNotContainsString('admin.ticket-checkins.index', $managerNavigation);
         $this->assertStringContainsString('admin.reports.index', $managerNavigation);
-        foreach (['Tổng quan', 'Nội dung', 'Rạp &amp; lịch chiếu', 'Kinh doanh', 'Dịch vụ', 'Hệ thống'] as $group) {
+        foreach (['Tổng quan chi nhánh', 'Vận hành', 'Kinh doanh', 'Báo cáo'] as $group) {
             $this->assertStringContainsString($group, $managerNavigation);
         }
-        foreach (['admin.discounts.index', 'admin.reviews.index'] as $implementedRoute) {
-            $this->assertStringContainsString($implementedRoute, $managerNavigation);
+        foreach (['Nội dung', 'Rạp &amp; lịch chiếu', 'Dịch vụ', 'Hệ thống'] as $retiredGroup) {
+            $this->assertStringNotContainsString($retiredGroup, $managerNavigation);
         }
+        $this->assertStringContainsString('admin.discounts.index', $managerNavigation);
+        $this->assertStringNotContainsString('admin.reviews.index', $managerNavigation);
 
         $adminNavigation = $this->navigationHtml(
             $this->actingAs($this->userWithRole('admin'))->get(route('admin.dashboard'))->assertOk()->getContent()
