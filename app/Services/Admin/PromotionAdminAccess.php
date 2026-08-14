@@ -3,7 +3,7 @@
 namespace App\Services\Admin;
 
 use App\Models\Cinema;
-use App\Models\DiscountCode;
+use App\Models\Promotion;
 use App\Models\User;
 use App\Services\CinemaAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -47,7 +47,7 @@ final class PromotionAdminAccess
         return $this->mutationCinemas($actor)->pluck('id')->map(fn ($id): int => (int) $id)->values();
     }
 
-    public function canManage(User $actor, DiscountCode $discount): bool
+    public function canManage(User $actor, Promotion $discount): bool
     {
         if ($this->cinemas->hasGlobalAccess($actor)) {
             return true;
@@ -60,7 +60,7 @@ final class PromotionAdminAccess
             && $scope->diff($this->mutationCinemaIds($actor))->isEmpty();
     }
 
-    public function authorizeManage(User $actor, DiscountCode $discount): void
+    public function authorizeManage(User $actor, Promotion $discount): void
     {
         abort_unless($this->canManage($actor, $discount), 404);
     }

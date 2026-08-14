@@ -8,10 +8,10 @@ use App\Exceptions\PaymentInitiationException;
 use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
-use App\Models\DiscountCode;
 use App\Models\FoodItem;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\Promotion;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use App\Services\Payments\PaymentInitiationService;
@@ -31,11 +31,12 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
             'active' => true,
         ]);
         foreach ([['OLD20K', 20_000], ['FINAL10K', 10_000]] as [$code, $discount]) {
-            DiscountCode::query()->create([
+            Promotion::query()->create([
                 'code' => $code,
                 'name' => $code,
-                'discount_type' => 'fixed',
-                'discount_value' => $discount,
+                'type' => Promotion::TYPE_FIXED,
+                'discount_amount_vnd' => $discount,
+                'minimum_order_vnd' => 0,
             ]);
         }
 
@@ -55,7 +56,7 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         }
 
         $response = $this->post(route('user.bookings.confirm'), ['payment_method' => 'vnpay']);
-        $booking = Booking::query()->with(['discountCodeRedemptions', 'payments'])->sole();
+        $booking = Booking::query()->with(['promotionUsage', 'payments'])->sole();
         parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $parameters);
 
         $response->assertRedirectContains('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
@@ -63,7 +64,7 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->assertSame(95_000, (int) $booking->total_amount);
         $this->assertSame(95_000, $booking->payments->sole()->amount);
         $this->assertSame('9500000', $parameters['vnp_Amount']);
-        $this->assertSame(['FINAL10K'], $booking->discountCodeRedemptions->pluck('code_snapshot')->all());
+        $this->assertSame('FINAL10K', $booking->promotionUsage->code_snapshot);
     }
 
     public function test_discounted_review_confirms_with_the_net_amount_and_redirects_to_vnpay(): void
@@ -74,11 +75,12 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
             'price' => 55_000,
             'active' => true,
         ]);
-        DiscountCode::query()->create([
+        Promotion::query()->create([
             'code' => 'PAYMENT20K',
             'name' => 'Payment redirect regression',
-            'discount_type' => 'fixed',
-            'discount_value' => 20_000,
+            'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 20_000,
+            'minimum_order_vnd' => 0,
         ]);
 
         $this->get(route('user.bookings.checkout', [
@@ -103,7 +105,7 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
             ->assertSee('85.000 VNĐ');
 
         $response = $this->post(route('user.bookings.confirm'), ['payment_method' => 'vnpay']);
-        $booking = Booking::query()->with(['discountCodeRedemptions', 'payments'])->sole();
+        $booking = Booking::query()->with(['promotionUsage', 'payments'])->sole();
         $payment = $booking->payments->sole();
         parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $parameters);
 
@@ -115,9 +117,9 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->assertSame(85_000, (int) $booking->total_amount);
         $this->assertSame(85_000, $payment->amount);
         $this->assertSame('8500000', $parameters['vnp_Amount']);
-        $this->assertSame('PAYMENT20K', $booking->discountCodeRedemptions->sole()->code_snapshot);
-        $this->assertSame(20_000, $booking->discountCodeRedemptions->sole()->discount_amount);
-        $this->assertSame('reserved', $booking->discountCodeRedemptions->sole()->status);
+        $this->assertSame('PAYMENT20K', $booking->promotionUsage->code_snapshot);
+        $this->assertSame(20_000, $booking->promotionUsage->applied_discount_vnd);
+        $this->assertSame('reserved', $booking->promotionUsage->status);
         $this->assertNotSame(route('user.bookings.pending', $booking), $response->headers->get('Location'));
     }
 

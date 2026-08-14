@@ -3,7 +3,7 @@
 namespace Tests\Feature\Promotions;
 
 use App\Models\Cinema;
-use App\Models\DiscountCode;
+use App\Models\Promotion;
 use App\Models\UserCinemaAssignment;
 use App\Services\CinemaAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -66,7 +66,7 @@ final class PromotionAdminBranchAuthorizationTest extends TestCase
         $this->actingAs($manager)->withSession($session)
             ->post(route('admin.discounts.store'), $this->payload('CREATE-OWN', [$this->cinemaA->id]))
             ->assertRedirect()->assertSessionHasNoErrors();
-        $own = DiscountCode::query()->where('code', 'CREATE-OWN')->firstOrFail();
+        $own = Promotion::query()->where('code', 'CREATE-OWN')->firstOrFail();
         $this->assertSame([$this->cinemaA->id], $own->cinemas()->pluck('cinemas.id')->all());
 
         foreach ([
@@ -77,7 +77,7 @@ final class PromotionAdminBranchAuthorizationTest extends TestCase
             $this->actingAs($manager)->withSession($session)
                 ->post(route('admin.discounts.store'), $this->payload($code, $cinemaIds))
                 ->assertSessionHasErrors($errorKey);
-            $this->assertDatabaseMissing('discount_codes', ['code' => $code]);
+            $this->assertDatabaseMissing('promotions', ['code' => $code]);
         }
     }
 
@@ -129,7 +129,7 @@ final class PromotionAdminBranchAuthorizationTest extends TestCase
         $session = [CinemaAccessService::SESSION_KEY => $this->cinemaA->id];
 
         foreach ([$global, $foreign, $mixed] as $protected) {
-            $before = $protected->only(['code', 'name', 'discount_value', 'is_active', 'archived_at']);
+            $before = $protected->only(['code', 'name', 'discount_amount_vnd', 'is_active', 'archived_at']);
             $beforeScope = $protected->cinemas()->pluck('cinemas.id')->all();
             $this->actingAs($manager)->withSession($session)
                 ->put(route('admin.discounts.update', $protected), $this->payload($protected->code, [$this->cinemaA->id], 'Takeover'))
@@ -299,16 +299,15 @@ final class PromotionAdminBranchAuthorizationTest extends TestCase
     }
 
     /** @param list<int> $cinemaIds */
-    private function discount(string $code, array $cinemaIds = []): DiscountCode
+    private function discount(string $code, array $cinemaIds = []): Promotion
     {
-        $discount = DiscountCode::query()->create([
+        $discount = Promotion::query()->create([
             'code' => $code,
             'name' => 'Promotion '.$code,
-            'discount_type' => 'fixed',
-            'discount_value' => 10_000,
-            'minimum_order_amount' => 0,
+            'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 10_000,
+            'minimum_order_vnd' => 0,
             'is_active' => true,
-            'priority' => 0,
         ]);
         $discount->cinemas()->sync($cinemaIds);
 
@@ -321,16 +320,16 @@ final class PromotionAdminBranchAuthorizationTest extends TestCase
         return [
             'code' => $code,
             'name' => $name ?? 'Promotion '.$code,
-            'discount_type' => 'fixed',
-            'discount_value' => 10_000,
-            'maximum_discount_amount' => null,
-            'minimum_order_amount' => 0,
+            'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 10_000,
+            'discount_percent' => null,
+            'maximum_discount_vnd' => null,
+            'minimum_order_vnd' => 0,
             'starts_at' => null,
             'ends_at' => null,
             'is_active' => true,
-            'total_quota' => null,
-            'per_user_quota' => null,
-            'priority' => 0,
+            'global_usage_limit' => null,
+            'per_user_usage_limit' => null,
             'cinema_ids' => $cinemaIds,
         ];
     }

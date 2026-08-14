@@ -141,9 +141,9 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
-    public function discountCodeRedemptions(): HasMany
+    public function promotionUsage(): HasOne
     {
-        return $this->hasMany(BookingDiscountCode::class);
+        return $this->hasOne(BookingPromotion::class);
     }
 
     public function authoritativePayment(): HasOne

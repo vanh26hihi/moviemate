@@ -31,7 +31,7 @@ class UnifiedBookingCheckoutService
             $draft['customer_email'],
             $draft['checkout_token'],
             $draft['food_items'],
-            discountCodes: $draft['discount_codes'] ?? [],
+            promotionCode: $draft['promotion_code'] ?? null,
         );
 
         if ((int) $checkout->booking->total_amount === 0) {

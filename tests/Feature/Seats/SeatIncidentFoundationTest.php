@@ -3,13 +3,12 @@
 namespace Tests\Feature\Seats;
 
 use App\Models\Booking;
-use App\Models\BookingDiscountCode;
 use App\Models\BookingSeat;
 use App\Models\Cinema;
-use App\Models\DiscountCode;
 use App\Models\Movie;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\Promotion;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\RoomLayoutCell;
@@ -21,6 +20,7 @@ use App\Models\Showtime;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use App\Services\CinemaContext;
+use App\Services\PromotionService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -161,19 +161,12 @@ final class SeatIncidentFoundationTest extends TestCase
             'booking_id' => $booking->id, 'customer_name' => 'Khách', 'pickup_cinema_id' => $room->cinema_id,
             'subtotal' => 30000, 'total_amount' => 30000, 'status' => 'pending',
         ]);
-        $discount = DiscountCode::query()->create([
-            'code' => 'INCIDENT20', 'name' => 'Incident', 'discount_type' => 'fixed', 'discount_value' => 20000,
-            'minimum_order_amount' => 0, 'starts_at' => now()->subDay(), 'ends_at' => now()->addDay(),
-            'is_active' => true, 'registered_users_only' => false, 'first_order_only' => false,
-            'can_combine' => false, 'priority' => 1,
+        $discount = Promotion::query()->create([
+            'code' => 'INCIDENT20', 'name' => 'Incident', 'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 20000, 'minimum_order_vnd' => 0, 'is_active' => true,
         ]);
-        $reservation = BookingDiscountCode::query()->create([
-            'booking_id' => $booking->id, 'discount_code_id' => $discount->id,
-            'code_snapshot' => $discount->code, 'name_snapshot' => $discount->name,
-            'discount_type_snapshot' => 'fixed', 'discount_value_snapshot' => 20000,
-            'discount_amount' => 20000, 'subtotal_before' => 150000, 'subtotal_after' => 130000,
-            'status' => 'reserved', 'reserved_at' => now(),
-        ]);
+        DB::transaction(fn () => app(PromotionService::class)->reserveForBooking($booking, $discount->code, 150000));
+        $reservation = $booking->promotionUsage()->sole();
 
         $this->actingAs($this->userWithRole('manager'))
             ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[1]]), [

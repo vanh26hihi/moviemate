@@ -146,6 +146,18 @@
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tổng trước giảm giá</dt><dd class="font-bold app-text">{{ number_format((int) $booking->gross_amount, 0, ',', '.') }} VNĐ</dd></div>
                 @if($booking->promotion_discount_amount > 0)<div class="flex justify-between gap-4 text-success"><dt>Giảm từ mã khuyến mãi</dt><dd class="font-bold">−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} VNĐ</dd></div>@endif
+                @if($booking->promotionUsage)
+                    @php($promotionSnapshot = $booking->promotionUsage)
+                    <div class="rounded-xl border app-border p-3 text-sm">
+                        <dt class="font-semibold app-text">Khuyến mãi lịch sử: {{ $promotionSnapshot->code_snapshot }} — {{ $promotionSnapshot->name_snapshot }}</dt>
+                        <dd class="mt-1 space-y-1 app-muted">
+                            <div>Loại: {{ $promotionSnapshot->type_snapshot === 'fixed' ? 'Cố định' : 'Phần trăm' }} · Giá trị: {{ $promotionSnapshot->type_snapshot === 'fixed' ? number_format((int) $promotionSnapshot->discount_amount_vnd_snapshot, 0, ',', '.').' VNĐ' : $promotionSnapshot->discount_percent_snapshot.'%' }}</div>
+                            <div>Cap: {{ $promotionSnapshot->maximum_discount_vnd_snapshot === null ? 'Không cap' : number_format((int) $promotionSnapshot->maximum_discount_vnd_snapshot, 0, ',', '.').' VNĐ' }} · Đơn tối thiểu: {{ number_format((int) $promotionSnapshot->minimum_order_vnd_snapshot, 0, ',', '.') }} VNĐ</div>
+                            <div>Phạm vi: {{ $promotionSnapshot->scope_kind_snapshot === 'global' ? 'Toàn hệ thống' : $promotionSnapshot->booking_cinema_name_snapshot }} · Gross: {{ number_format((int) $promotionSnapshot->gross_before_vnd, 0, ',', '.') }} VNĐ · Sau giảm: {{ number_format((int) $promotionSnapshot->final_after_vnd, 0, ',', '.') }} VNĐ</div>
+                            <div>Điều kiện: {{ $promotionSnapshot->registered_users_only_snapshot ? 'Khách đăng nhập' : 'Có thể dùng cho khách' }}{{ $promotionSnapshot->first_order_only_snapshot ? ' · Đơn đầu tiên' : '' }} · Trạng thái usage: {{ $promotionSnapshot->status }}</div>
+                        </dd>
+                    </div>
+                @endif
                 <div class="flex justify-between gap-4 border-t app-border pt-3"><dt class="font-extrabold app-text">Tổng cuối cùng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4"><dt class="app-muted">Khoản thanh toán đã xác minh</dt><dd class="font-bold app-text">{{ $authoritativePayment ? number_format((int) $authoritativePayment->amount, 0, ',', '.').' VNĐ' : 'Chưa có' }}</dd></div>
             </dl>

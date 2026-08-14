@@ -4,8 +4,8 @@ namespace Tests\Feature\Reports;
 
 use App\Models\Booking;
 use App\Models\Cinema;
-use App\Models\DiscountCode;
 use App\Models\Payment;
+use App\Models\Promotion;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Showtime;
@@ -118,11 +118,12 @@ final class AuthoritativePaymentInternalZeroTest extends PaymentTestCase
         $scenario = $this->bookingScenario(false);
         $admin = $this->userWithRole('admin');
         $manager = $this->userWithRole('manager');
-        DiscountCode::query()->create([
+        Promotion::query()->create([
             'code' => 'REPORTFREE',
             'name' => 'Reporting full promotion',
-            'discount_type' => 'fixed',
-            'discount_value' => 1_000_000,
+            'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 1_000_000,
+            'minimum_order_vnd' => 0,
         ]);
         $result = app(UnifiedBookingCheckoutService::class)->confirm([
             'showtime_id' => $scenario['showtime']->id,
@@ -130,7 +131,7 @@ final class AuthoritativePaymentInternalZeroTest extends PaymentTestCase
             'customer_email' => 'report-zero@example.test',
             'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
             'food_items' => [],
-            'discount_codes' => ['REPORTFREE'],
+            'promotion_code' => 'REPORTFREE',
         ], null, 'vnpay');
         $payment = $result->payment?->fresh();
 

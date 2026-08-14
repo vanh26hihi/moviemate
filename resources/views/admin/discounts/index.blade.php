@@ -10,7 +10,7 @@
         @forelse($discounts as $discount)
             <tr>
                 <td><strong>{{ $discount->code }}</strong><span class="block text-xs app-muted">{{ $discount->name }}</span></td>
-                <td>{{ $discount->discount_type === 'percent' ? $discount->discount_value.'%' : number_format($discount->discount_value, 0, ',', '.').' VNĐ' }}</td>
+                <td>{{ $discount->type === 'percentage' ? $discount->discount_percent.'%' : number_format($discount->discount_amount_vnd, 0, ',', '.').' VNĐ' }}</td>
                 <td>
                     @if($discount->cinemas->isEmpty())
                         Toàn hệ thống
@@ -22,7 +22,7 @@
                     @endif
                     @unless($discount->admin_can_manage)<span class="block text-xs app-muted">Chỉ xem</span>@endunless
                 </td>
-                <td>{{ $discount->active_usage_count }} / {{ $discount->total_quota ?? '∞' }}</td>
+                <td>{{ $discount->active_usage_count }} / {{ $discount->global_usage_limit ?? '∞' }}</td>
                 <td>{{ $discount->starts_at?->format('d/m/Y H:i') ?? 'Ngay' }} – {{ $discount->ends_at?->format('d/m/Y H:i') ?? 'Không hạn' }}</td>
                 <td>{{ $discount->is_active && !$discount->archived_at ? 'Đang áp dụng' : 'Đã lưu trữ' }}</td>
                 <td>@can('discounts.manage') @if($discount->admin_can_manage)<a class="text-brand-start" href="{{ route('admin.discounts.edit', $discount) }}">Sửa</a>@endif @endcan</td>

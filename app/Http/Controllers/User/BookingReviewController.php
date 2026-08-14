@@ -22,7 +22,7 @@ class BookingReviewController extends Controller
         $draft = $drafts->current($request, true);
         $preview = $previews->preview($draft);
         $paymentProviders = $payments->availability();
-        $promotion = $promotions->quote($preview->prices->grandTotal, $draft['discount_codes'] ?? [], $request->user()?->id, (int) $preview->showtime->cinema_id);
+        $promotion = $promotions->quote($preview->prices->grandTotal, $draft['promotion_code'] ?? null, $request->user()?->id, (int) $preview->showtime->cinema_id);
 
         return view('user.bookings.review', compact('draft', 'preview', 'paymentProviders', 'promotion'));
     }
