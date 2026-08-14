@@ -76,7 +76,8 @@ final class DiscountController extends Controller
     {
         $discount->load('cinemas');
         $this->promotionAccess->authorizeManage($request->user(), $discount);
-        if ($discount->usages()->exists()) {
+        $hasEverBeenUsed = $discount->usages()->exists();
+        if ($hasEverBeenUsed) {
             $businessFields = [
                 'code', 'name', 'description', 'type', 'discount_amount_vnd', 'discount_percent',
                 'maximum_discount_vnd', 'minimum_order_vnd', 'starts_at', 'ends_at',
@@ -94,11 +95,14 @@ final class DiscountController extends Controller
         }
         DB::transaction(function () use ($request, $discount, $data): void {
             $discount = Promotion::query()->lockForUpdate()->findOrFail($discount->id);
+            $hasEverBeenUsed = $discount->usages()->exists();
             $cinemas = $data['cinema_ids'] ?? [];
             unset($data['cinema_ids']);
             $before = $discount->only(['code', 'name', 'type', 'discount_amount_vnd', 'discount_percent', 'is_active']);
             $discount->update([...$data, 'updated_by_user_id' => $request->user()->id]);
-            $discount->cinemas()->sync($cinemas);
+            if (! $hasEverBeenUsed) {
+                $discount->cinemas()->sync($cinemas);
+            }
             $this->activity->log('discount.updated', $discount, $before, $discount->only(array_keys($before)));
         });
 
