@@ -93,7 +93,7 @@
                                         <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
                                         <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
                                         @if($booking->promotion_discount_amount > 0)
-                                            <p class="text-xs text-success">Mã {{ $booking->discountCodeRedemptions->pluck('code_snapshot')->join(', ') }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
+                                            <p class="text-xs text-success">Mã {{ $booking->promotionUsage?->code_snapshot }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
                                         @endif
                                     </div>
                                     <div class="flex flex-wrap gap-2">

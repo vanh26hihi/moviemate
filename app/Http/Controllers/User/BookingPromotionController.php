@@ -20,13 +20,10 @@ final class BookingPromotionController extends Controller
             throw ValidationException::withMessages(['discount_code' => 'Mã giảm giá đã được khóa cho lần thanh toán hiện tại.']);
         }
         $draft = $drafts->current($request, true);
-        $code = mb_strtoupper(trim($data['code']));
-        $codes = collect($draft['discount_codes'] ?? []);
-        $codes = $data['action'] === 'remove' ? $codes->reject(fn ($item) => $item === $code) : $codes->push($code);
-        $codes = $codes->unique()->values()->all();
+        $code = $data['action'] === 'remove' ? null : mb_strtoupper(trim($data['code']));
         $preview = $previews->preview($draft);
-        $promotions->quote($preview->prices->grandTotal, $codes, $request->user()?->id, (int) $preview->showtime->cinema_id);
-        $drafts->updateDiscountCodes($request, $codes);
+        $promotions->quote($preview->prices->grandTotal, $code, $request->user()?->id, (int) $preview->showtime->cinema_id);
+        $drafts->updatePromotionCode($request, $code);
 
         return back()->with('success', $data['action'] === 'remove' ? 'Đã gỡ mã giảm giá.' : 'Đã áp dụng mã giảm giá.');
     }

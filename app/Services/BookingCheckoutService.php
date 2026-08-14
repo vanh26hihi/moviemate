@@ -47,7 +47,7 @@ class BookingCheckoutService
         ?User $counterActor = null,
         ?string $customerName = null,
         ?string $customerPhone = null,
-        array $discountCodes = [],
+        ?string $promotionCode = null,
     ): BookingCheckoutResult {
         if (! in_array($salesChannel, Booking::SALES_CHANNELS, true)) {
             throw new InvalidArgumentException('Unsupported booking sales channel.');
@@ -73,7 +73,7 @@ class BookingCheckoutService
             $foodSelection,
             $salesChannel,
             $counterActor?->getKey(),
-            $discountCodes,
+            $promotionCode,
         );
         $existing = Booking::query()
             ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -101,7 +101,7 @@ class BookingCheckoutService
                     $counterActor,
                     $customerName,
                     $customerPhone,
-                    $discountCodes,
+                    $promotionCode,
                 ): Booking {
                     $existing = Booking::query()
                         ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -183,7 +183,7 @@ class BookingCheckoutService
                         'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
                     ])->save();
 
-                    $promotionQuote = $this->promotions->reserveForBooking($booking, $discountCodes, $priceBreakdown->grandTotal);
+                    $promotionQuote = $this->promotions->reserveForBooking($booking, $promotionCode, $priceBreakdown->grandTotal);
                     $booking->forceFill([
                         'promotion_discount_amount' => $promotionQuote->discountAmount,
                         'total_amount' => $promotionQuote->finalAmount,

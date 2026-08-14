@@ -31,6 +31,7 @@ final class AdminBookingDetailService
             'showtime.roomLayout:id,room_id,version,status',
             'bookingSeats.seat',
             'foodOrder.items.food:id,name',
+            'promotionUsage',
             'ticketDelivery',
             'ticketPrint.printedBy:id,name',
             'ticketPrint.lastFailedBy:id,name',

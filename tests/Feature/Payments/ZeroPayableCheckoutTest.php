@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Payments;
 
-use App\Models\DiscountCode;
 use App\Models\Payment;
+use App\Models\Promotion;
 use App\Services\BookingTokenService;
 use App\Services\UnifiedBookingCheckoutService;
 use Illuminate\Support\Facades\Http;
@@ -14,11 +14,12 @@ final class ZeroPayableCheckoutTest extends PaymentTestCase
     {
         Http::fake();
         $scenario = $this->bookingScenario(false);
-        DiscountCode::query()->create([
+        Promotion::query()->create([
             'code' => 'FREEORDER',
             'name' => 'Full promotion',
-            'discount_type' => 'fixed',
-            'discount_value' => 1_000_000,
+            'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 1_000_000,
+            'minimum_order_vnd' => 0,
         ]);
         $draft = [
             'showtime_id' => $scenario['showtime']->id,
@@ -26,7 +27,7 @@ final class ZeroPayableCheckoutTest extends PaymentTestCase
             'customer_email' => 'zero@example.test',
             'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
             'food_items' => [],
-            'discount_codes' => ['FREEORDER'],
+            'promotion_code' => 'FREEORDER',
         ];
 
         $result = app(UnifiedBookingCheckoutService::class)->confirm($draft, null, 'vnpay');

@@ -3,9 +3,9 @@
 namespace Tests\Feature\Bookings;
 
 use App\Models\Booking;
-use App\Models\DiscountCode;
 use App\Models\FoodItem;
 use App\Models\Payment;
+use App\Models\Promotion;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingTokenService;
 use App\Services\PromotionService;
@@ -210,7 +210,7 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
         $before = app(BookingPrintAmountAllocator::class)->allocate($booking)->forTicket($ticket);
 
         $food?->update(['price' => 888_888]);
-        $discount?->update(['discount_value' => 1]);
+        $discount?->update(['is_active' => false, 'archived_at' => now()]);
         $after = app(BookingPrintAmountAllocator::class)->allocate($booking->fresh())->forTicket($ticket);
 
         $this->assertSame(68_148, $before);
@@ -232,7 +232,7 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
             discountType: 'fixed',
             discountValue: 20_000,
         );
-        $discount?->update(['discount_value' => 1]);
+        $discount?->update(['is_active' => false, 'archived_at' => now()]);
         $booking = $this->settleExternally($booking);
         $amounts = app(BookingPrintAmountAllocator::class)->allocate($booking);
 
@@ -278,11 +278,13 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
             'price' => $foodAmount,
             'active' => true,
         ]);
-        $discount = $discountType === null ? null : DiscountCode::query()->create([
+        $discount = $discountType === null ? null : Promotion::query()->create([
             'code' => 'PRINT'.Str::upper(Str::random(8)),
             'name' => 'Khuyến mãi bản in',
-            'discount_type' => $discountType,
-            'discount_value' => $discountValue,
+            'type' => $discountType === 'percent' ? Promotion::TYPE_PERCENTAGE : Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => $discountType === 'fixed' ? $discountValue : null,
+            'discount_percent' => $discountType === 'percent' ? $discountValue : null,
+            'minimum_order_vnd' => 0,
         ]);
         $booking = app(BookingCheckoutService::class)->createPendingBooking(
             $scenario['showtime']->id,
@@ -291,7 +293,7 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
             'print-allocation@example.test',
             app(BookingTokenService::class)->issueCheckoutToken(),
             $food ? [['food_id' => $food->id, 'quantity' => 1]] : [],
-            discountCodes: $discount ? [$discount->code] : [],
+            promotionCode: $discount?->code,
         )->booking;
 
         return [$booking, $discount, $food];
