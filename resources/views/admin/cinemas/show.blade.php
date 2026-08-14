@@ -76,7 +76,7 @@
                 <article class="min-w-0 py-3">
                     <div class="flex flex-wrap items-start justify-between gap-2">
                         <h3 class="min-w-0 break-words font-semibold app-text">
-                            @can('showtimes.view')<a href="{{ route('admin.showtimes.index', ['show_date' => $showtime['startsAt']->toDateString()]) }}" class="hover:text-brand-start" aria-label="Mở lịch chiếu ngày {{ $showtime['startsAt']->format('d/m/Y') }} cho {{ $showtime['movieTitle'] }}">{{ $showtime['movieTitle'] }}</a>@else{{ $showtime['movieTitle'] }}@endcan
+                            @can('showtimes.view')<a href="{{ route('admin.showtimes.show', $showtime['showtimeId']) }}" class="hover:text-brand-start" aria-label="Mở chi tiết suất chiếu {{ $showtime['movieTitle'] }}">{{ $showtime['movieTitle'] }}</a>@else{{ $showtime['movieTitle'] }}@endcan
                         </h3>
                         <span class="shrink-0 text-sm font-semibold text-brand-start">{{ $showtime['formatName'] }}</span>
                     </div>
@@ -95,7 +95,7 @@
                 <article class="flex min-w-0 flex-wrap items-start justify-between gap-3 py-3">
                     <div class="min-w-0">
                         <h3 class="break-words font-semibold app-text">
-                            @can('showtimes.view')<a href="{{ route('admin.showtimes.index', ['show_date' => $showtime['startsAt']->toDateString()]) }}" class="hover:text-brand-start" aria-label="Mở lịch chiếu ngày {{ $showtime['startsAt']->format('d/m/Y') }} cho {{ $showtime['movieTitle'] }}">{{ $showtime['movieTitle'] }}</a>@else{{ $showtime['movieTitle'] }}@endcan
+                            @can('showtimes.view')<a href="{{ route('admin.showtimes.show', $showtime['showtimeId']) }}" class="hover:text-brand-start" aria-label="Mở chi tiết suất chiếu {{ $showtime['movieTitle'] }}">{{ $showtime['movieTitle'] }}</a>@else{{ $showtime['movieTitle'] }}@endcan
                         </h3>
                         <p class="mt-1 break-words text-sm app-muted">{{ $showtime['formatName'] }} · Phòng {{ $showtime['roomCode'] }} · {{ $showtime['roomName'] }}</p>
                     </div>

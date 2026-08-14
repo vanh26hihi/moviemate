@@ -31,7 +31,7 @@ class ShowtimeController extends Controller
     public function index(Request $request)
     {
         $query = Showtime::query()
-            ->with(['movie', 'cinema', 'room', 'roomLayout', 'ticketPrices.seatType'])
+            ->with(['movie', 'cinema', 'room.cinema', 'roomLayout', 'presentationFormat', 'ticketPrices.seatType'])
             ->withExists(['bookings', 'bookingSeats']);
         $this->cinemaAccess->scope($query, $request->user(), 'showtimes.cinema_id');
 
@@ -70,6 +70,66 @@ class ShowtimeController extends Controller
             'cleaningBufferMinutes' => $this->schedule->cleaningBufferMinutes(),
             'cinemaTimezone' => $this->schedule->timezone(),
         ]);
+    }
+
+    public function show(Showtime $showtime)
+    {
+        $this->assertViewableShowtime($showtime);
+        $showtime->load([
+            'movie:id,title,duration,age_rating',
+            'cinema:id,code,name,timezone,default_cleaning_buffer_minutes',
+            'room:id,cinema_id,room_type_id,code,name,room_type,status,cleaning_buffer_minutes',
+            'room.roomType:id,code,name',
+            'room.cinema:id,code,name,timezone,default_cleaning_buffer_minutes',
+            'roomLayout:id,room_id,version,name,status,published_at',
+            'presentationFormat:id,code,name',
+            'ticketPrices' => fn ($query) => $query->orderBy('seat_type_id'),
+            'ticketPrices.seatType:id,code,name,is_pair,sort_order',
+            'ticketPrices.priceBookVersion:id,version_number,status',
+        ])->loadExists(['bookings', 'bookingSeats']);
+
+        $lifecycle = $this->lifecycle->snapshot($showtime);
+        $bookingCount = $showtime->bookings()->count();
+        $recentBookings = $showtime->bookings()
+            ->select([
+                'id', 'showtime_id', 'booking_code', 'customer_name', 'sales_channel',
+                'booking_status', 'payment_status', 'total_amount', 'currency', 'created_at',
+            ])
+            ->withCount('bookingSeats')
+            ->latest('id')
+            ->limit(10)
+            ->get();
+        $hasBookingHistory = $showtime->bookings_exists || $showtime->booking_seats_exists;
+        $canEdit = $showtime->status === 'active'
+            && $lifecycle['state'] === ShowtimeLifecycleService::UPCOMING
+            && ! $hasBookingHistory;
+        $canCancel = $showtime->status === 'active'
+            && in_array($lifecycle['state'], [ShowtimeLifecycleService::UPCOMING, ShowtimeLifecycleService::PLAYING], true)
+            && ! $hasBookingHistory;
+        $roomState = match (true) {
+            $lifecycle['state'] === ShowtimeLifecycleService::CANCELLED => [
+                'key' => 'cancelled', 'label' => 'Không áp dụng — suất đã hủy',
+            ],
+            $lifecycle['state'] === ShowtimeLifecycleService::PLAYING => [
+                'key' => 'playing', 'label' => 'Đang trình chiếu',
+            ],
+            $lifecycle['state'] === ShowtimeLifecycleService::COMPLETED
+                && $lifecycle['now']->lt($lifecycle['room_ready_at']) => [
+                    'key' => 'cleaning', 'label' => 'Đang vệ sinh',
+                ],
+            default => ['key' => 'ready', 'label' => 'Sẵn sàng'],
+        };
+
+        return view('admin.showtimes.show', compact(
+            'showtime',
+            'lifecycle',
+            'roomState',
+            'bookingCount',
+            'recentBookings',
+            'hasBookingHistory',
+            'canEdit',
+            'canCancel',
+        ));
     }
 
     public function create()
@@ -213,6 +273,13 @@ class ShowtimeController extends Controller
         $showtime->loadMissing('room');
         $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $showtime->cinema_id);
         abort_unless($showtime->room?->cinema_id === $showtime->cinema_id && $showtime->room?->status === 'active', 404);
+    }
+
+    private function assertViewableShowtime(Showtime $showtime): void
+    {
+        $showtime->loadMissing('room');
+        $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $showtime->cinema_id);
+        abort_unless((int) $showtime->room?->cinema_id === (int) $showtime->cinema_id, 404);
     }
 
     private function assertUpcomingForMutation(Showtime $showtime): void
