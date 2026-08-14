@@ -22,7 +22,7 @@
         </div>
         <div class="flex flex-wrap gap-2">
             @can('tickets.print')
-                @if($ticketEligible)<a href="{{ route('staff.tickets.operations', $booking) }}" class="btn-secondary"><i class="ph ph-printer" aria-hidden="true"></i>Vận hành in vé</a>@endif
+                @if($ticketEligible)<a href="{{ route('staff.tickets.operations', $booking) }}" class="btn-secondary"><i class="ph ph-printer" aria-hidden="true"></i>Tra cứu & in tại quầy</a>@endif
             @endcan
             @can('payments.reconcile')
                 @if($hasReconcilablePayment)
@@ -166,18 +166,60 @@
 
     <section class="cinema-card overflow-hidden">
         <div class="border-b app-border p-6"><h2 class="text-xl font-extrabold app-heading">Lịch sử giao dịch</h2><p class="mt-1 app-muted">Không hiển thị chữ ký, URL thanh toán hoặc payload nhà cung cấp.</p></div>
-        <div class="overflow-x-auto"><table class="admin-table min-w-[78rem]"><thead><tr><th>Nhà cung cấp</th><th>Mã tham chiếu</th><th class="text-right">Số tiền</th><th>Trạng thái</th><th>Phân loại an toàn</th><th>Tạo lúc</th><th>Xác minh lúc</th><th>Nhà cung cấp ghi nhận</th></tr></thead><tbody>
+        <div class="overflow-x-auto"><table class="admin-table min-w-[86rem]"><thead><tr><th scope="col">Nhà cung cấp</th><th scope="col">Mã tham chiếu</th><th scope="col" class="text-right">Số tiền</th><th scope="col">Trạng thái</th><th scope="col">Phân loại an toàn</th><th scope="col">Tạo lúc</th><th scope="col">Đã xác minh lúc</th><th scope="col">Thanh toán/thu tiền lúc</th><th scope="col">Tác vụ</th></tr></thead><tbody>
             @forelse($payments as $payment)
                 <tr class="{{ $authoritativePayment?->id === $payment->id ? 'bg-success/5' : '' }}">
                     <td class="font-bold app-text">{{ \App\Support\PaymentPresentation::providerLabel($payment->provider) }}@if($authoritativePayment?->id === $payment->id)<span class="ml-2 status-badge bg-success/10 text-success">Giao dịch xác thực</span>@endif</td>
                     <td class="font-mono text-xs">{{ $payment->provider === 'counter_cash' ? ($payment->transaction_code ?? '—') : ($payment->provider === 'zalopay' ? ($payment->app_trans_id ?? '—') : ($payment->order_code ?? '—')) }}</td>
                     <td class="text-right">{{ number_format((int) $payment->amount, 0, ',', '.') }} VNĐ</td>
                     <td>{{ $payment->status_label }}</td><td>{{ $paymentCategories[$payment->id] }}</td>
-                    <td>{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->verified_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? $payment->paid_at?->format('d/m/Y H:i:s') ?? '—' }}</td>
+                    <td>{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->verified_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->settled_at?->format('d/m/Y H:i:s') ?? $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? $payment->paid_at?->format('d/m/Y H:i:s') ?? '—' }}</td>
+                    <td>@can('payments.view')<a class="font-bold text-brand-start" href="{{ route('admin.payments.show', $payment) }}">Xem thanh toán #{{ $payment->id }}</a>@else<span class="app-muted">Không có quyền xem</span>@endcan</td>
                 </tr>
-            @empty<tr><td colspan="8" class="py-8 text-center app-muted">Chưa có lần thanh toán.</td></tr>@endforelse
+            @empty<tr><td colspan="9" class="py-8 text-center app-muted">Chưa có lần thanh toán.</td></tr>@endforelse
         </tbody></table></div>
     </section>
+
+    @if($incidentImpacts->isNotEmpty())
+        <section data-booking-incident-context class="cinema-card overflow-hidden" aria-labelledby="booking-incident-title">
+            <div class="border-b app-border p-6">
+                <h2 id="booking-incident-title" class="text-xl font-extrabold app-heading">Sự cố ghế liên quan</h2>
+                <p class="mt-1 app-muted">Chỉ hiển thị ảnh hưởng được gắn trực tiếp với ghế của đơn này.</p>
+            </div>
+            <div class="grid gap-4 p-6 lg:grid-cols-2">
+                @foreach($incidentImpacts as $impact)
+                    @php($resolution = $impact->resolution)
+                    <article class="rounded-xl border app-border p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <p class="font-extrabold app-text">Ghế {{ $impact->bookingSeat?->seat?->seat_code ?? '—' }} · Sự cố #{{ $impact->incident?->id }}</p>
+                                <p class="mt-1 text-sm app-muted">Trạng thái ảnh hưởng: {{ $impact->resolution_status === 'resolved' ? 'Đã xử lý' : 'Chưa xử lý' }}</p>
+                            </div>
+                            @can('seats.maintenance.view')
+                                @if($impact->incident)
+                                    <a class="font-bold text-brand-start" href="{{ route('admin.rooms.seat-incidents.show', [$impact->incident->room_id, $impact->incident]) }}">Xem xử lý sự cố</a>
+                                @endif
+                            @endcan
+                        </div>
+                        @if($resolution && in_array($resolution->resolution_type, ['equivalent', 'upgrade'], true))
+                            <div class="mt-4 rounded-xl bg-success/10 p-3 text-sm">
+                                <p class="font-extrabold text-success">{{ $resolution->originalSeat?->seat_code ?? '—' }} → {{ $resolution->replacementSeat?->seat_code ?? '—' }}</p>
+                                <p class="mt-1 app-muted">{{ $resolution->resolution_type === 'upgrade' ? 'Chuyển ghế nâng hạng' : 'Chuyển ghế tương đương' }} · Không phát sinh thu thêm.</p>
+                                @if($resolution->reprint_required)<p class="mt-1 app-muted">Vé thay thế: {{ $resolution->reprint_satisfied_at ? 'Đã in' : 'Đang chờ in tại quầy' }}</p>@endif
+                            </div>
+                        @elseif($resolution?->resolution_type === 'requires_refund')
+                            <div class="mt-4 rounded-xl bg-warning/10 p-3 text-sm">
+                                <p class="font-extrabold text-warning">Yêu cầu xử lý hoàn tiền</p>
+                                <p class="mt-1 app-muted">Chức năng hoàn tiền chưa được triển khai; không có số tiền hoặc trạng thái hoàn tiền được suy diễn tại đây.</p>
+                            </div>
+                        @else
+                            <p class="mt-4 rounded-xl bg-warning/10 p-3 text-sm font-bold text-warning">Chưa có kết quả xử lý cuối cùng.</p>
+                        @endif
+                    </article>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
     <div class="grid gap-6 xl:grid-cols-2">
         <section class="cinema-card p-6">

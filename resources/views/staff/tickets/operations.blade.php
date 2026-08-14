@@ -12,6 +12,37 @@
         <p class="mt-2 app-muted">{{ $booking->showtime?->movie?->title }} · {{ $booking->showtime_label }} · {{ $booking->showtime?->cinema?->name }} · {{ $booking->showtime?->room?->name }}</p>
     </header>
 
+    <div class="grid gap-6 lg:grid-cols-2">
+        <section class="cinema-card p-6" aria-labelledby="staff-showtime-context-title">
+            <h2 id="staff-showtime-context-title" class="text-xl font-extrabold app-heading">Ngữ cảnh trình chiếu</h2>
+            <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                <div><dt class="text-sm app-muted">Loại phòng</dt><dd class="font-extrabold app-text">{{ $booking->showtime?->room?->room_type_label ?? '—' }}</dd></div>
+                <div><dt class="text-sm app-muted">Định dạng trình chiếu</dt><dd class="font-extrabold app-text">{{ $booking->showtime?->presentationFormat?->name ?? '—' }}</dd></div>
+            </dl>
+        </section>
+
+        <section class="cinema-card p-6" aria-labelledby="staff-payment-evidence-title">
+            <h2 id="staff-payment-evidence-title" class="text-xl font-extrabold app-heading">Bằng chứng thanh toán</h2>
+            @if($authoritativePayment)
+                <dl class="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div><dt class="text-sm app-muted">Phương thức</dt><dd class="font-extrabold app-text">{{ \App\Support\PaymentPresentation::providerLabel($authoritativePayment->provider) }}</dd></div>
+                    <div><dt class="text-sm app-muted">Trạng thái</dt><dd class="font-extrabold app-text">{{ $authoritativePayment->status_label }}</dd></div>
+                    <div><dt class="text-sm app-muted">Đã xác minh lúc</dt><dd class="font-bold app-text">{{ $authoritativePayment->verified_at?->format('d/m/Y H:i:s') ?? 'Không áp dụng' }}</dd></div>
+                    <div><dt class="text-sm app-muted">Đã thu tiền lúc</dt><dd class="font-bold app-text">{{ $authoritativePayment->settled_at?->format('d/m/Y H:i:s') ?? 'Không áp dụng' }}</dd></div>
+                </dl>
+                <p class="mt-4 rounded-xl bg-success/10 p-3 text-sm font-bold text-success">
+                    {{ match($authoritativePayment->provider) {
+                        \App\Models\Payment::PROVIDER_COUNTER_CASH => 'Đã thu tiền tại quầy với người thu và thời điểm quyết toán được lưu.',
+                        \App\Models\Payment::PROVIDER_INTERNAL_ZERO => 'Đơn 0 VNĐ đã được xác nhận nội bộ; không yêu cầu giao dịch nhà cung cấp.',
+                        default => 'Thanh toán online đã có bằng chứng xác minh từ nhà cung cấp.',
+                    } }}
+                </p>
+            @else
+                <p class="mt-4 rounded-xl bg-warning/10 p-3 text-sm font-bold text-warning">Chưa có thanh toán mang bằng chứng xác minh hoặc quyết toán có thẩm quyền.</p>
+            @endif
+        </section>
+    </div>
+
     @can('tickets.print')
         @if($booking->admissionTickets->isNotEmpty() && $booking->admissionTickets->every(fn($ticket) => $ticket->printState === null) && (!$booking->foodPickupVoucher || $booking->foodPickupVoucher->print_count === 0))
             <form method="POST" action="{{ route('staff.tickets.print-all', $booking) }}" target="_blank" data-submit-once>

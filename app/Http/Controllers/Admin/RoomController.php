@@ -9,10 +9,12 @@ use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayoutTemplate;
 use App\Models\RoomType;
+use App\Models\SeatIncident;
 use App\Services\ActivityLogger;
 use App\Services\ApplyRoomLayoutTemplateService;
 use App\Services\CinemaAccessService;
 use App\Services\RoomPresentationCapabilityService;
+use App\Services\ShowtimeLifecycleService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -102,7 +104,7 @@ class RoomController extends Controller
             ->with('success', $templateId ? 'Đã tạo phòng và phát hành sơ đồ độc lập từ mẫu.' : 'Đã tạo phòng chiếu ở trạng thái ngừng hoạt động.');
     }
 
-    public function show(Room $room): View
+    public function show(Room $room, ShowtimeLifecycleService $lifecycle): View
     {
         $this->assertManagedRoom($room);
         $room->load([
@@ -115,11 +117,37 @@ class RoomController extends Controller
             'showtimes',
             'showtimes as upcoming_showtimes_count' => fn (Builder $query) => $this->futureActiveShowtimes($query),
         ]);
+        $upcomingShowtimes = $this->futureActiveShowtimes($room->showtimes()->getQuery())
+            ->with(['movie', 'presentationFormat'])
+            ->orderBy('show_date')
+            ->orderBy('show_time')
+            ->limit(8)
+            ->get()
+            ->each(function ($showtime) use ($lifecycle, $room): void {
+                $showtime->setRelation('room', $room);
+                $showtime->setRelation('cinema', $room->cinema);
+                $showtime->setAttribute('operational_lifecycle', $lifecycle->snapshot($showtime));
+            });
+        $openIncidentsCount = $room->seatIncidents()->where('status', SeatIncident::STATUS_OPEN)->count();
+        $openIncidents = $room->seatIncidents()
+            ->where('status', SeatIncident::STATUS_OPEN)
+            ->withCount([
+                'impacts as unresolved_impacts_count' => fn (Builder $query) => $query->where('resolution_status', 'unresolved'),
+            ])
+            ->latest('id')
+            ->limit(5)
+            ->get();
         $templates = auth()->user()->hasPermission('room_layouts.apply_template')
             ? RoomLayoutTemplate::query()->active()->orderBy('name')->get()
             : collect();
 
-        return view('admin.rooms.show', compact('room', 'templates'));
+        return view('admin.rooms.show', compact(
+            'room',
+            'templates',
+            'upcomingShowtimes',
+            'openIncidentsCount',
+            'openIncidents',
+        ));
     }
 
     public function applyTemplate(Request $request, Room $room): RedirectResponse

@@ -49,9 +49,12 @@ final class TicketWorkspaceController extends Controller
 
     private function operationsView(Booking $booking): View
     {
-        $verified = $booking->payments->contains(
-            fn ($payment): bool => $payment->hasAuthoritativeSuccessEvidence()
-        );
+        $booking->loadMissing(['showtime.presentationFormat', 'showtime.room.roomType']);
+        $authoritativePayment = $booking->payments
+            ->filter(fn ($payment): bool => $payment->hasAuthoritativeSuccessEvidence())
+            ->sortByDesc('id')
+            ->first();
+        $verified = $authoritativePayment !== null;
         $eligibility = match (true) {
             $booking->payment_status === 'refunded' => 'Vé đã được hoàn tiền và không còn hiệu lực.',
             $booking->booking_status === 'cancelled' => 'Đơn đã hủy.',
@@ -72,6 +75,7 @@ final class TicketWorkspaceController extends Controller
             'customerEmail' => PrivacyMask::email($booking->recipient_email),
             'eligibilityMessage' => $eligibility,
             'incidentReprints' => $incidentReprints,
+            'authoritativePayment' => $authoritativePayment,
         ]);
     }
 }
