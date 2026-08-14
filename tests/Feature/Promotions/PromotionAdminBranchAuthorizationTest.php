@@ -2,16 +2,20 @@
 
 namespace Tests\Feature\Promotions;
 
+use App\Models\BookingPromotion;
 use App\Models\Cinema;
 use App\Models\Promotion;
 use App\Models\UserCinemaAssignment;
 use App\Services\CinemaAccessService;
+use App\Services\PromotionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesBookingFixtures;
 use Tests\TestCase;
 
 final class PromotionAdminBranchAuthorizationTest extends TestCase
 {
+    use CreatesBookingFixtures;
     use RefreshDatabase;
 
     private Cinema $cinemaA;
@@ -159,6 +163,92 @@ final class PromotionAdminBranchAuthorizationTest extends TestCase
             $this->assertNull($protected->fresh()->archived_at);
             $this->assertTrue($protected->fresh()->is_active);
         }
+    }
+
+    public function test_used_branch_promotion_lifecycle_updates_preserve_scope_exactly(): void
+    {
+        $manager = $this->userWithRole('manager');
+        $promotion = $this->discount('USED-BRANCH', [$this->cinemaA->id]);
+        $this->markUsed($promotion);
+        $session = [CinemaAccessService::SESSION_KEY => $this->cinemaA->id];
+        $businessBefore = $this->businessSnapshot($promotion);
+
+        $this->actingAs($manager)->withSession($session)
+            ->put(route('admin.discounts.update', $promotion), ['is_active' => false])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse($promotion->fresh()->is_active);
+        $this->assertSame([$this->cinemaA->id], $this->scopeIds($promotion));
+
+        $this->put(route('admin.discounts.update', $promotion), ['is_active' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertTrue($promotion->fresh()->is_active);
+        $this->assertSame([$this->cinemaA->id], $this->scopeIds($promotion));
+        $this->assertSame($businessBefore, $this->businessSnapshot($promotion));
+    }
+
+    public function test_used_mixed_promotion_lifecycle_is_global_admin_only_and_preserves_both_scopes(): void
+    {
+        $promotion = $this->discount('USED-MIXED', [$this->cinemaA->id, $this->cinemaB->id]);
+        $this->markUsed($promotion);
+        $manager = $this->userWithRole('manager');
+
+        $this->actingAs($manager)->withSession([CinemaAccessService::SESSION_KEY => $this->cinemaA->id])
+            ->put(route('admin.discounts.update', $promotion), ['is_active' => false])
+            ->assertNotFound();
+        $this->assertTrue($promotion->fresh()->is_active);
+
+        $this->actingAs($this->userWithRole('admin'))
+            ->put(route('admin.discounts.update', $promotion), ['is_active' => false])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertFalse($promotion->fresh()->is_active);
+        $this->assertSame([$this->cinemaA->id, $this->cinemaB->id], $this->scopeIds($promotion));
+    }
+
+    public function test_released_used_promotion_lifecycle_succeeds_but_economic_and_scope_tampering_are_rejected(): void
+    {
+        $promotion = $this->discount('USED-RELEASED', [$this->cinemaA->id]);
+        $this->markUsed($promotion, released: true);
+        $manager = $this->userWithRole('manager');
+        $session = [CinemaAccessService::SESSION_KEY => $this->cinemaA->id];
+        $businessBefore = $this->businessSnapshot($promotion);
+
+        $this->actingAs($manager)->withSession($session)
+            ->put(route('admin.discounts.update', $promotion), ['is_active' => false])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->put(route('admin.discounts.update', $promotion), ['is_active' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        foreach ([
+            ['is_active' => false, 'discount_amount_vnd' => 1],
+            ['is_active' => false, 'cinema_ids' => []],
+            ['is_active' => false, 'cinema_ids' => [$this->cinemaB->id]],
+        ] as $tampering) {
+            $this->put(route('admin.discounts.update', $promotion), $tampering)
+                ->assertSessionHasErrors('promotion');
+        }
+
+        $this->assertTrue($promotion->fresh()->is_active);
+        $this->assertSame([$this->cinemaA->id], $this->scopeIds($promotion));
+        $this->assertSame($businessBefore, $this->businessSnapshot($promotion));
+        $this->assertSame(
+            BookingPromotion::STATUS_RELEASED,
+            $promotion->usages()->sole()->status,
+        );
+    }
+
+    public function test_used_global_promotion_lifecycle_succeeds_and_remains_global(): void
+    {
+        $promotion = $this->discount('USED-GLOBAL');
+        $this->markUsed($promotion);
+        $admin = $this->userWithRole('admin');
+
+        $this->actingAs($admin)->put(route('admin.discounts.update', $promotion), ['is_active' => false])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->put(route('admin.discounts.update', $promotion), ['is_active' => true])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertTrue($promotion->fresh()->is_active);
+        $this->assertSame([], $this->scopeIds($promotion));
     }
 
     public function test_global_admin_retains_global_branch_and_multi_branch_authority(): void
@@ -332,6 +422,35 @@ final class PromotionAdminBranchAuthorizationTest extends TestCase
             'per_user_usage_limit' => null,
             'cinema_ids' => $cinemaIds,
         ];
+    }
+
+    private function markUsed(Promotion $promotion, bool $released = false): void
+    {
+        $scenario = $this->bookingScenario(false);
+        $booking = $this->bookingForScenario($scenario);
+        DB::transaction(fn () => app(PromotionService::class)->reserveForBooking(
+            $booking,
+            $promotion->code,
+            100_000,
+        ));
+        if ($released) {
+            app(PromotionService::class)->release($booking);
+        }
+    }
+
+    /** @return list<int> */
+    private function scopeIds(Promotion $promotion): array
+    {
+        return $promotion->cinemas()->orderBy('cinemas.id')->pluck('cinemas.id')->map(fn ($id): int => (int) $id)->all();
+    }
+
+    private function businessSnapshot(Promotion $promotion): array
+    {
+        return $promotion->fresh()->only([
+            'id', 'code', 'name', 'description', 'type', 'discount_amount_vnd', 'discount_percent',
+            'maximum_discount_vnd', 'minimum_order_vnd', 'starts_at', 'ends_at',
+            'global_usage_limit', 'per_user_usage_limit', 'registered_users_only', 'first_order_only',
+        ]);
     }
 
     private function countQueries(callable $operation): int
