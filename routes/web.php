@@ -481,8 +481,8 @@ Route::prefix('admin')->name('admin.')
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.bulk.store');
 
-        Route::resource('showtimes', AdminShowtimeController::class)->except(['show'])
-            ->middlewareFor('index', 'permission:showtimes.view')
+        Route::resource('showtimes', AdminShowtimeController::class)
+            ->middlewareFor(['index', 'show'], 'permission:showtimes.view')
             ->middlewareFor(['create', 'store'], 'permission:showtimes.create')
             ->middlewareFor(['edit', 'update'], 'permission:showtimes.update')
             ->middlewareFor('destroy', 'permission:showtimes.delete');

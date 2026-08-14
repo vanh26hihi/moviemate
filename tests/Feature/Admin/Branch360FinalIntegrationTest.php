@@ -85,7 +85,7 @@ final class Branch360FinalIntegrationTest extends TestCase
     {
         $manager = $this->userWithRole('manager');
         $showtime = $this->showtime();
-        $url = route('admin.showtimes.index', ['show_date' => '2026-08-13']);
+        $url = route('admin.showtimes.show', $showtime);
         $session = [CinemaAccessService::SESSION_KEY => $this->cinema->id];
 
         $this->actingAs($manager)->withSession($session)

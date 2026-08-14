@@ -47,6 +47,7 @@
                 <thead>
                     <tr>
                         <th>Phim / Phòng</th>
+                        <th>Định dạng</th>
                         <th>Bắt đầu</th>
                         <th>Phim kết thúc</th>
                         <th>Phòng sẵn sàng</th>
@@ -75,6 +76,7 @@
                                 <span class="font-extrabold app-text text-sm block max-w-[240px]">{{ $showtime->movie->title }}</span>
                                 <span class="text-xs app-muted">{{ $showtime->room->code }} · {{ $showtime->room->name }} · sơ đồ phiên bản {{ $showtime->roomLayout?->version ?? '?' }}</span>
                             </td>
+                            <td><span class="status-badge app-secondary app-text">{{ $showtime->presentationFormat?->name ?? 'Chưa xác định' }}</span></td>
                             <td>
                                 <span class="font-extrabold app-text block">{{ $window?->start->format('H:i') ?? '--:--' }}</span>
                                 <span class="text-xs app-muted">{{ $window?->start->format('d/m/Y') ?? 'Thời lượng không hợp lệ' }}</span>
@@ -99,7 +101,8 @@
                                 >{{ $lifecycle['label'] ?? 'Không xác định' }}</span>
                             </td>
                             <td>
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="flex flex-wrap items-center justify-end gap-2">
+                                    <a href="{{ route('admin.showtimes.show', $showtime) }}" class="admin-btn-secondary whitespace-nowrap" aria-label="Xem chi tiết suất chiếu {{ $showtime->movie->title }}">Xem chi tiết</a>
                                     @can('showtimes.update')
                                         @if($showtime->status === 'active' && ($lifecycle['state'] ?? null) === 'upcoming' && ! $showtime->bookings_exists && ! $showtime->booking_seats_exists)
                                         <a href="{{ route('admin.showtimes.edit', $showtime) }}" data-showtime-edit-action class="inline-flex items-center justify-center w-9 h-9 rounded-xl border app-border app-muted hover:text-brand-start hover:border-brand-start transition-colors" title="Chỉnh sửa"><i class="ph-bold ph-pencil-simple text-xs"></i></a>
@@ -120,7 +123,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="text-center app-muted py-10">Không có suất chiếu nào.</td></tr>
+                        <tr><td colspan="8" class="text-center app-muted py-10">Không có suất chiếu nào.</td></tr>
                     @endforelse
                 </tbody>
             </table>
