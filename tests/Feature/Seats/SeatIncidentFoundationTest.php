@@ -469,7 +469,7 @@ final class SeatIncidentFoundationTest extends TestCase
     {
         $movie = Movie::query()->create(['title' => 'Incident '.uniqid(), 'slug' => 'incident-'.uniqid(), 'duration' => 120, 'age_rating' => 'P', 'status' => 'now_showing']);
 
-        return Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $room->cinema_id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id, 'show_date' => $date, 'show_time' => $time, 'price' => 50000, 'vip_price' => 70000, 'status' => 'active']);
+        return Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $room->cinema_id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id, 'show_date' => $date, 'show_time' => $time, 'status' => 'active']);
     }
 
     private function booking(Showtime $showtime, string $code, string $bookingStatus = 'pending_payment', string $paymentStatus = 'unpaid'): Booking
@@ -479,6 +479,6 @@ final class SeatIncidentFoundationTest extends TestCase
 
     private function bookingSeat(Booking $booking, Seat $seat): BookingSeat
     {
-        return BookingSeat::query()->create(['booking_id' => $booking->id, 'showtime_id' => $booking->showtime_id, 'seat_id' => $seat->id, 'active_lock_key' => 'ACTIVE', 'price' => 50000]);
+        return BookingSeat::query()->create(['booking_id' => $booking->id, 'showtime_id' => $booking->showtime_id, 'seat_id' => $seat->id, 'active_lock_key' => 'ACTIVE', 'price' => 50000, 'final_unit_amount' => 50000]);
     }
 }

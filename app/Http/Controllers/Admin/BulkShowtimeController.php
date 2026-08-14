@@ -115,7 +115,7 @@ final class BulkShowtimeController extends Controller
     /** @return array<string, mixed> */
     private function auditData(Showtime $showtime): array
     {
-        $showtime->loadMissing(['movie', 'room.cinema']);
+        $showtime->loadMissing(['movie', 'room.cinema', 'ticketPrices.seatType']);
         $window = $this->schedule->windowFor($showtime);
 
         return [
@@ -129,9 +129,13 @@ final class BulkShowtimeController extends Controller
             'movie_end_at' => $window->movieEnd->toIso8601String(),
             'room_available_at' => $window->operationalEnd->toIso8601String(),
             'cleaning_buffer' => $window->cleaningBufferMinutes,
-            'price' => (int) $showtime->price,
-            'vip_price' => $showtime->vip_price === null ? null : (int) $showtime->vip_price,
-            'pricing_version' => $showtime->pricing_version,
+            'ticket_prices' => $showtime->ticketPrices->map(fn ($price): array => [
+                'seat_type_id' => (int) $price->seat_type_id,
+                'seat_type' => (string) $price->seatType?->code,
+                'final_unit_amount_vnd' => (int) $price->final_unit_amount_vnd,
+                'price_book_version_id' => (int) $price->price_book_version_id,
+                'pricing_fingerprint' => (string) $price->pricing_fingerprint,
+            ])->values()->all(),
             'status' => $showtime->status,
         ];
     }

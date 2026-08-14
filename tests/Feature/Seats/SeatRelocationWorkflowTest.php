@@ -7,13 +7,13 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\BookingTicketPrint;
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\Movie;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\RoomLayoutCell;
+use App\Models\RoomType;
 use App\Models\Seat;
 use App\Models\SeatIncident;
 use App\Models\SeatIncidentImpact;
@@ -32,11 +32,12 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Tests\Support\CreatesPriceBookFixtures;
 use Tests\TestCase;
 
 final class SeatRelocationWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
+    use CreatesPriceBookFixtures, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -194,21 +195,14 @@ final class SeatRelocationWorkflowTest extends TestCase
         $this->assertDatabaseCount('seat_incident_resolutions', 0);
     }
 
-    public function test_same_type_candidate_with_lower_current_value_is_not_offered_or_accepted(): void
+    public function test_same_showtime_snapshot_keeps_equivalent_and_upgrade_relocation_values_frozen(): void
     {
         $scenario = $this->scenario();
-        CinemaPricingRule::query()->where('name', 'Relocation base')->update(['amount_vnd' => 40000]);
         $incident = $this->incident($scenario);
         $impact = $incident->impacts()->firstOrFail();
         $options = app(SeatRelocationCandidateService::class)->forIncident($incident)[$impact->id];
-        $this->assertTrue($options['equivalent']->isEmpty());
+        $this->assertSame(['A2', 'A3'], $options['equivalent']->pluck('label')->all());
         $this->assertSame(['B1'], $options['upgrade']->pluck('label')->all());
-
-        $this->actingAs($scenario['manager'])->post(route('admin.rooms.seat-incidents.relocate', [$scenario['room'], $incident, $impact]), [
-            'replacement_seat_id' => $scenario['seats']['A2']->id,
-        ])->assertSessionHasErrors('replacement_seat_id');
-        $this->assertSame($scenario['seats']['A1']->id, $scenario['bookingSeat']->fresh()->seat_id);
-        $this->assertDatabaseCount('seat_incident_resolutions', 0);
     }
 
     public function test_stale_candidate_collision_preserves_both_bookings_without_history(): void
@@ -686,6 +680,10 @@ final class SeatRelocationWorkflowTest extends TestCase
     ): array {
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
         $room = Room::factory()->create(['cinema_id' => $cinema->id, 'code' => 'R'.str()->random(6)]);
+        $roomType = RoomType::query()->firstOrCreate(['code' => $room->room_type ?: '2D'], [
+            'name' => '2D', 'slug' => '2d', 'is_active' => true, 'status' => true, 'sort_order' => 1,
+        ]);
+        $room->forceFill(['room_type' => $roomType->code, 'room_type_id' => $roomType->id])->save();
         $layout = RoomLayout::query()->create(['room_id' => $room->id, 'version' => 1, 'name' => 'Relocation', 'rows' => $includeIncidentSeat ? 5 : 4, 'columns' => 8, 'status' => 'draft']);
         $definitions = [
             ['A1', 'normal', null, null], ['A2', 'normal', null, null], ['A3', 'normal', null, null], ['B1', 'vip', null, null],
@@ -709,12 +707,12 @@ final class SeatRelocationWorkflowTest extends TestCase
             ]);
             $seats->put($code, $seat);
         }
+        $seats->each(fn (Seat $seat) => $this->assignLogicalSeatType($seat));
         $layout->update(['status' => 'published', 'published_at' => now()]);
-        CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation base', 'rule_type' => 'base', 'amount_vnd' => 50000, 'priority' => 500, 'status' => 'active']);
-        CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000, 'priority' => 500, 'status' => 'active']);
-        CinemaPricingRule::query()->create(['cinema_id' => $cinema->id, 'name' => 'Relocation couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000, 'priority' => 500, 'status' => 'active']);
+        $this->ensurePublishedPriceBook(50_000);
         $movie = Movie::query()->create(['title' => 'Relocation Movie', 'slug' => 'relocation-'.str()->random(8), 'duration' => 100, 'status' => 'now_showing']);
-        $showtime = Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id, 'show_date' => now()->addDays(3)->toDateString(), 'show_time' => '19:00:00', 'price' => 50000, 'vip_price' => 70000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active']);
+        $showtime = Showtime::query()->create(['movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id, 'room_layout_id' => $layout->id, 'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id, 'show_date' => now()->addDays(3)->toDateString(), 'show_time' => '19:00:00', 'status' => 'active']);
+        $this->snapshotShowtime($showtime);
         $booking = $this->booking($showtime, 'RELOCATE', $paymentStatus === 'success' ? 'paid' : 'pending_payment', $paymentStatus === 'success' ? 'paid' : 'unpaid');
         $original = $seats[$originalCode];
         $isCouple = $original->type === 'couple';

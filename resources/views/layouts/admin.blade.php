@@ -41,7 +41,6 @@
                     ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ phòng', 'icon' => 'ph-grid-four'],
                     ['route' => 'admin.presentation-formats.index', 'active' => 'admin.presentation-formats.*', 'permission' => 'presentation_formats.view', 'label' => 'Định dạng trình chiếu', 'icon' => 'ph-cube-focus'],
                     ['route' => 'admin.showtimes.index', 'active' => 'admin.showtimes.*', 'permission' => 'showtimes.view', 'label' => 'Suất chiếu', 'icon' => 'ph-calendar-plus'],
-                    ['route' => 'admin.pricing-rules.index', 'active' => 'admin.pricing-rules.*', 'permission' => 'pricing.view', 'label' => 'Bảng giá vé', 'icon' => 'ph-ticket'],
                 ]],
                 ['label' => 'Kinh doanh', 'items' => [
                     ['route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'permission' => 'bookings.view', 'label' => 'Đơn đặt vé', 'icon' => 'ph-ticket'],

@@ -5,6 +5,7 @@ namespace App\Domain\Showtimes;
 use App\Exceptions\ShowtimeScheduleException;
 use App\Models\PresentationFormat;
 use App\Models\RoomLayout;
+use Illuminate\Support\Collection;
 
 final readonly class ShowtimeScheduleValidationResult
 {
@@ -13,6 +14,7 @@ final readonly class ShowtimeScheduleValidationResult
         public ?ShowtimeWindow $window,
         public ?RoomLayout $layout,
         public ?PresentationFormat $presentationFormat,
+        public ?Collection $ticketPriceSnapshots,
         public ?bool $isFuture,
         public ?bool $isWithinOperatingHours,
         public ?bool $isConflictFree,
@@ -24,8 +26,9 @@ final readonly class ShowtimeScheduleValidationResult
         ShowtimeWindow $window,
         RoomLayout $layout,
         ?PresentationFormat $presentationFormat = null,
+        ?Collection $ticketPriceSnapshots = null,
     ): self {
-        return new self($timezone, $window, $layout, $presentationFormat, true, true, true, null);
+        return new self($timezone, $window, $layout, $presentationFormat, $ticketPriceSnapshots, true, true, true, null);
     }
 
     public static function invalid(
@@ -43,6 +46,7 @@ final readonly class ShowtimeScheduleValidationResult
             $window,
             $layout,
             $presentationFormat,
+            null,
             $isFuture,
             $isWithinOperatingHours,
             $isConflictFree,

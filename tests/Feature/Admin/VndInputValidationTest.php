@@ -4,7 +4,6 @@ namespace Tests\Feature\Admin;
 
 use App\Models\FoodItem;
 use App\Models\Showtime;
-use App\Services\TicketPricingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -23,12 +22,12 @@ class VndInputValidationTest extends ShowtimeTestCase
             $this->payload($movie, $this->rooms['P01'], ['price' => 1, 'vip_price' => 2]),
         )->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
 
-        $showtime = Showtime::query()->with(['cinema', 'room'])->sole();
-        $prices = app(TicketPricingService::class)->calculateSeatTypes($showtime);
-        $this->assertSame(80_000, (int) $showtime->price);
-        $this->assertSame(110_000, (int) $showtime->vip_price);
-        $this->assertSame(160_000, $prices['couple']->finalAmount);
-        $this->assertSame('cinema-pricing-v1', $showtime->pricing_version);
+        $showtime = Showtime::query()->with('ticketPrices.seatType')->sole();
+        $prices = $showtime->ticketPrices->keyBy('seatType.code');
+        $this->assertSame(80_000, (int) $prices['normal']->final_unit_amount_vnd);
+        $this->assertSame(110_000, (int) $prices['vip']->final_unit_amount_vnd);
+        $this->assertSame(160_000, (int) $prices['couple']->final_unit_amount_vnd);
+        $this->assertSame(1, $prices->pluck('price_book_version_id')->unique()->count());
     }
 
     public function test_showtime_forms_do_not_render_authoritative_price_inputs(): void
@@ -39,7 +38,7 @@ class VndInputValidationTest extends ShowtimeTestCase
         foreach ([route('admin.showtimes.create'), route('admin.showtimes.edit', $showtime)] as $route) {
             $response = $this->actingAs($admin)->get($route)->assertOk();
             $response->assertDontSee('name="price"', false)->assertDontSee('name="vip_price"', false);
-            $response->assertSee('Giá vé được tính từ Bảng giá vé');
+            $response->assertSee('Giá vé được chụp theo loại ghế khi phát hành suất chiếu');
         }
     }
 

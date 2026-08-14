@@ -2,21 +2,19 @@
 
 namespace App\Services\Seats;
 
-use App\Exceptions\PricingConfigurationException;
 use App\Models\BookingSeat;
 use App\Models\Seat;
 use App\Models\SeatIncident;
 use App\Models\SeatIncidentImpact;
 use App\Models\SeatIncidentSeat;
-use App\Services\TicketPricingService;
 use App\Support\SeatPresentation;
 use Illuminate\Support\Collection;
+use LogicException;
 
 final class SeatRelocationCandidateService
 {
     public function __construct(
         private readonly SeatIncidentImpactClassifier $classifier,
-        private readonly TicketPricingService $pricing,
     ) {}
 
     /**
@@ -42,18 +40,23 @@ final class SeatRelocationCandidateService
         if ($eligible->isEmpty()) {
             return [];
         }
-        $eligible->loadMissing(['bookingSeat.showtime.room', 'bookingSeat.showtime.cinema']);
+        $eligible->loadMissing([
+            'bookingSeat.showtime.room', 'bookingSeat.showtime.cinema',
+            'bookingSeat.showtime.ticketPrices.seatType',
+        ]);
 
         $units = $this->logicalUnits($eligible);
         $showtimes = $units->pluck('showtime')->unique('id')->values();
-        $this->pricing->warmForShowtimes($showtimes);
         $layoutIds = $showtimes->pluck('room_layout_id')->map(fn ($id): int => (int) $id)->unique()->values();
         $showtimeIds = $showtimes->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
         $seats = Seat::query()->where('room_id', $incident->room_id)
             ->where('status', Seat::STATUS_ACTIVE)
             ->whereHas('layoutCells', fn ($query) => $query->whereIn('room_layout_id', $layoutIds)->where('cell_type', 'seat'))
-            ->with(['layoutCells' => fn ($query) => $query->whereIn('room_layout_id', $layoutIds)->where('cell_type', 'seat')])
+            ->with([
+                'seatType',
+                'layoutCells' => fn ($query) => $query->whereIn('room_layout_id', $layoutIds)->where('cell_type', 'seat'),
+            ])
             ->orderBy('id')->get();
         $occupied = BookingSeat::query()->whereIn('showtime_id', $showtimeIds)
             ->where('active_lock_key', BookingSeat::ACTIVE_LOCK_KEY)
@@ -79,23 +82,15 @@ final class SeatRelocationCandidateService
 
             foreach ($candidateUnits as $candidate) {
                 if ($candidate['type'] === $originalType) {
-                    try {
-                        $candidate['hypothetical_amount'] = $this->currentAmount($showtime, $candidate['type']);
-                        if ($candidate['hypothetical_amount'] < $originalAmount) {
-                            continue;
-                        }
-                    } catch (PricingConfigurationException) {
-                        $candidate['hypothetical_amount'] = $originalAmount;
+                    $candidate['hypothetical_amount'] = $this->currentAmount($showtime, $candidate['seat_type_id']);
+                    if ($candidate['hypothetical_amount'] === null || $candidate['hypothetical_amount'] < $originalAmount) {
+                        continue;
                     }
                     $equivalent->push($candidate);
                 } elseif ($originalType !== 'couple' && $candidate['type'] !== 'couple') {
-                    try {
-                        $candidate['hypothetical_amount'] = $this->currentAmount($showtime, $candidate['type']);
-                        if ($candidate['hypothetical_amount'] >= $originalAmount) {
-                            $upgrades->push($candidate);
-                        }
-                    } catch (PricingConfigurationException) {
-                        // Without current authoritative pricing this seat cannot be approved as an upgrade.
+                    $candidate['hypothetical_amount'] = $this->currentAmount($showtime, $candidate['seat_type_id']);
+                    if ($candidate['hypothetical_amount'] !== null && $candidate['hypothetical_amount'] >= $originalAmount) {
+                        $upgrades->push($candidate);
                     }
                 }
             }
@@ -177,7 +172,7 @@ final class SeatRelocationCandidateService
             return $type === 'couple' ? (int) $snapshots->first() : (int) $snapshots->sum();
         }
 
-        return (int) $bookingSeats->sum(fn (BookingSeat $row): int => (int) $row->getRawOriginal('price'));
+        throw new LogicException('Relocation requires the immutable BookingSeat logical-unit amount snapshot.');
     }
 
     /** @param Collection<int, Seat> $seats @return Collection<int,array<string,mixed>> */
@@ -191,6 +186,7 @@ final class SeatRelocationCandidateService
                     'seat_ids' => [(int) $seat->id],
                     'label' => (string) $seat->seat_code,
                     'type' => (string) $seat->type,
+                    'seat_type_id' => (int) $seat->seat_type_id,
                 ]);
             }
         }
@@ -203,6 +199,7 @@ final class SeatRelocationCandidateService
                     'seat_ids' => $pair->sortBy('id')->pluck('id')->map(fn ($id): int => (int) $id)->all(),
                     'label' => SeatPresentation::groups($pair)->first()['label'],
                     'type' => 'couple',
+                    'seat_type_id' => (int) $left->seat_type_id,
                 ]);
             }
         }
@@ -210,8 +207,10 @@ final class SeatRelocationCandidateService
         return $units;
     }
 
-    private function currentAmount($showtime, string $type): int
+    private function currentAmount($showtime, int $seatTypeId): ?int
     {
-        return $this->pricing->calculate($showtime, $type, false)->finalAmount;
+        $snapshot = $showtime->ticketPrices->firstWhere('seat_type_id', $seatTypeId);
+
+        return $snapshot ? (int) $snapshot->final_unit_amount_vnd : null;
     }
 }

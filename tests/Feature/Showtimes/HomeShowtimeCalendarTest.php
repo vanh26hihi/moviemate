@@ -104,7 +104,7 @@ class HomeShowtimeCalendarTest extends TestCase
         ]);
         $format = $this->presentationFormatForDiscovery();
         $movie->supportedPresentationFormats()->attach($format);
-        Showtime::query()->create([
+        $showtime = Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
@@ -112,10 +112,9 @@ class HomeShowtimeCalendarTest extends TestCase
             'presentation_format_id' => $format->id,
             'show_date' => '2026-08-07',
             'show_time' => '19:30:00',
-            'price' => 90000,
-            'pricing_version' => 'cinema-pricing-v1',
             'status' => 'active',
         ]);
+        $this->snapshotShowtime($showtime);
 
         $response = $this->get(route('home', ['date' => '2026-08-07']));
 
@@ -198,7 +197,7 @@ class HomeShowtimeCalendarTest extends TestCase
             [$publicMovie, $activeRoom, 'cancelled'],
             [$stoppedMovie, $activeRoom, 'active'],
         ] as $index => [$movie, $room, $status]) {
-            Showtime::query()->create([
+            $showtime = Showtime::query()->create([
                 'movie_id' => $movie->id,
                 'cinema_id' => $cinema->id,
                 'room_id' => $room->id,
@@ -206,10 +205,12 @@ class HomeShowtimeCalendarTest extends TestCase
                 'presentation_format_id' => $format->id,
                 'show_date' => '2026-08-07',
                 'show_time' => sprintf('%02d:30:00', 16 + $index),
-                'price' => 90000,
-                'pricing_version' => 'cinema-pricing-v1',
                 'status' => $status,
             ]);
+            if ($status === 'active' && $movie->status === 'now_showing' && $room->status === 'active'
+                && $showtime->roomLayout->cells()->where('cell_type', 'seat')->exists()) {
+                $this->snapshotShowtime($showtime);
+            }
         }
 
         $response = $this->get(route('home', ['date' => '2026-08-07']));

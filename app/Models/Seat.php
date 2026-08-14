@@ -55,6 +55,11 @@ class Seat extends Model
         return $this->belongsTo(Room::class);
     }
 
+    public function seatType(): BelongsTo
+    {
+        return $this->belongsTo(SeatType::class);
+    }
+
     public function bookingSeats(): HasMany
     {
         return $this->hasMany(BookingSeat::class);

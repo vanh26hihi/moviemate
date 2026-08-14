@@ -90,6 +90,11 @@ final class PriceBookVersion extends Model
         return $this->hasMany(PriceBookAdjustment::class);
     }
 
+    public function showtimeTicketPrices(): HasMany
+    {
+        return $this->hasMany(ShowtimeTicketPrice::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');

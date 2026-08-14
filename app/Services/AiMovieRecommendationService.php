@@ -71,7 +71,7 @@ class AiMovieRecommendationService
         $now = now('Asia/Ho_Chi_Minh');
 
         $showtimes = Showtime::query()
-            ->with(['movie.genres', 'cinema', 'room'])
+            ->with(['movie.genres', 'cinema', 'room', 'ticketPrices'])
             ->where('status', 'active')
             ->where(function ($query) use ($now) {
                 $query->whereDate('show_date', '>', $now->toDateString())
@@ -113,7 +113,7 @@ class AiMovieRecommendationService
                             'cinema' => $showtime->cinema?->name,
                             'city' => $showtime->cinema?->city,
                             'room' => $showtime->room?->name,
-                            'price' => (float) $showtime->price,
+                            'price' => (int) $showtime->ticketPrices->min('final_unit_amount_vnd'),
                         ];
                     })->values()->all(),
                 ];

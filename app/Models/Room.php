@@ -126,11 +126,6 @@ class Room extends Model
         return $this->hasMany(SeatIncident::class);
     }
 
-    public function pricingRules(): HasMany
-    {
-        return $this->hasMany(CinemaPricingRule::class);
-    }
-
     public function layouts(): HasMany
     {
         return $this->hasMany(RoomLayout::class);

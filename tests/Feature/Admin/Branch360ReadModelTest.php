@@ -377,6 +377,10 @@ final class Branch360ReadModelTest extends TestCase
             'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
             'price' => 50_000,
             'pricing_unit_key' => 'seat:'.$scenario['seat']->id,
+            'seat_type_snapshot' => 'normal',
+            'base_amount' => 50_000,
+            'surcharge_total' => 0,
+            'final_unit_amount' => 50_000,
         ]);
         if ($paid) {
             Payment::createForProvider('vnpay', [

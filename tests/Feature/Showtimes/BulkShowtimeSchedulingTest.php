@@ -4,7 +4,6 @@ namespace Tests\Feature\Showtimes;
 
 use App\Models\ActivityLog;
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayout;
@@ -157,10 +156,12 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             'rows' => [$twoDRow, $threeDRow],
         ])->assertCreated()->assertJson(['created_count' => 2]);
 
-        $showtimes = Showtime::query()->orderBy('id')->get();
+        $showtimes = Showtime::query()->with('ticketPrices.seatType')->orderBy('id')->get();
         $this->assertSame([$this->presentationFormat->id, $threeD->id], $showtimes->pluck('presentation_format_id')->all());
-        $this->assertSame((string) $showtimes[0]->price, (string) $showtimes[1]->price);
-        $this->assertSame((string) $showtimes[0]->vip_price, (string) $showtimes[1]->vip_price);
+        $this->assertSame(
+            $showtimes[0]->ticketPrices->pluck('final_unit_amount_vnd', 'seatType.code')->all(),
+            $showtimes[1]->ticketPrices->pluck('final_unit_amount_vnd', 'seatType.code')->all(),
+        );
     }
 
     public function test_cross_midnight_candidates_compare_authoritative_datetimes_across_business_dates(): void
@@ -326,11 +327,11 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
 
         $this->assertDatabaseCount('showtimes', 2);
         $this->assertDatabaseCount('activity_logs', 2);
-        foreach (Showtime::query()->get() as $showtime) {
+        foreach (Showtime::query()->with('ticketPrices.seatType')->get() as $showtime) {
             $this->assertSame('active', $showtime->status);
-            $this->assertSame('cinema-pricing-v1', $showtime->pricing_version);
-            $this->assertSame(80_000, (int) $showtime->price);
-            $this->assertSame(110_000, (int) $showtime->vip_price);
+            $this->assertSame(80_000, (int) $showtime->ticketPrices->firstWhere('seatType.code', 'normal')->final_unit_amount_vnd);
+            $this->assertSame(110_000, (int) $showtime->ticketPrices->firstWhere('seatType.code', 'vip')->final_unit_amount_vnd);
+            $this->assertSame(1, $showtime->ticketPrices->pluck('price_book_version_id')->unique()->count());
             $this->assertSame($this->cinema->id, (int) $showtime->cinema_id);
             $this->assertNotNull($showtime->room_layout_id);
             $this->assertSame($this->presentationFormat->id, $showtime->presentation_format_id);
@@ -365,16 +366,17 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             'presentation_format_id' => $this->presentationFormat->id,
         ]);
         $this->actingAs($admin)->post(route('admin.showtimes.store'), $singlePayload)->assertRedirect(route('admin.showtimes.index'));
-        $single = Showtime::query()->firstOrFail();
+        $single = Showtime::query()->with('ticketPrices.seatType')->firstOrFail();
 
         $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.store'), ['rows' => [
             $this->row('bulk', $movie, $this->rooms['P02'], time: '18:00'),
         ]])->assertCreated();
-        $bulk = Showtime::query()->latest('id')->firstOrFail();
+        $bulk = Showtime::query()->with('ticketPrices.seatType')->latest('id')->firstOrFail();
 
-        $this->assertSame((int) $single->price, (int) $bulk->price);
-        $this->assertSame((int) $single->vip_price, (int) $bulk->vip_price);
-        $this->assertSame($single->pricing_version, $bulk->pricing_version);
+        $this->assertSame(
+            $single->ticketPrices->pluck('final_unit_amount_vnd', 'seatType.code')->all(),
+            $bulk->ticketPrices->pluck('final_unit_amount_vnd', 'seatType.code')->all(),
+        );
         $this->assertSame('active', $bulk->status);
     }
 
@@ -612,7 +614,6 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
             DB::table('room_layout_cells')->delete();
             DB::table('room_layouts')->delete();
             DB::table('seats')->delete();
-            DB::table('cinema_pricing_rules')->delete();
             DB::table('rooms')->delete();
             DB::table('movies')->delete();
             DB::table('presentation_formats')->delete();
@@ -680,7 +681,7 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThanOrEqual(40, $queryCount, "Ten-row bulk preview query count exceeded budget: {$queryCount}");
+        $this->assertLessThanOrEqual(48, $queryCount, "Ten-row bulk preview query count exceeded Phase 7C snapshot budget: {$queryCount}");
     }
 
     public function test_publish_query_count_is_bounded_for_ten_rows_without_format_compatibility_n_plus_one(): void
@@ -701,7 +702,7 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThanOrEqual(70, $queryCount, "Ten-row bulk publish query count exceeded budget: {$queryCount}");
+        $this->assertLessThanOrEqual(100, $queryCount, "Ten-row bulk publish query count exceeded Phase 7C atomic snapshot budget: {$queryCount}");
     }
 
     private function assertPreviewCode($user, array $row, string $code): void
@@ -749,7 +750,7 @@ class BulkShowtimeSchedulingTest extends ShowtimeTestCase
         return [
             'showtimes' => Showtime::query()->count(),
             'activity_logs' => ActivityLog::query()->count(),
-            'pricing_rules' => CinemaPricingRule::query()->count(),
+            'showtime_ticket_prices' => DB::table('showtime_ticket_prices')->count(),
             'rooms' => Room::query()->count(),
         ];
     }

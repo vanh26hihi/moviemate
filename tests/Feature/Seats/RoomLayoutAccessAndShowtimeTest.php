@@ -3,19 +3,20 @@
 namespace Tests\Feature\Seats;
 
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\PresentationFormat;
 use App\Models\Room;
+use App\Models\RoomType;
 use App\Models\Showtime;
 use App\Services\CinemaContext;
 use App\Services\RoomLayoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesPriceBookFixtures;
 use Tests\TestCase;
 
 class RoomLayoutAccessAndShowtimeTest extends TestCase
 {
-    use RefreshDatabase;
+    use CreatesPriceBookFixtures, RefreshDatabase;
 
     private Cinema $cinema;
 
@@ -30,12 +31,15 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         parent::setUp();
         $this->seedRbac();
         $this->cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
-        CinemaPricingRule::query()->create(['name' => 'Giá cơ bản layout test', 'rule_type' => 'base', 'cinema_id' => $this->cinema->id, 'amount_vnd' => 50_000, 'priority' => 100, 'status' => 'active']);
-        CinemaPricingRule::query()->create(['name' => 'VIP layout test', 'rule_type' => 'seat_type', 'cinema_id' => $this->cinema->id, 'seat_type' => 'vip', 'amount_vnd' => 20_000, 'priority' => 100, 'status' => 'active']);
+        $this->ensurePublishedPriceBook(50_000);
+        $roomType = RoomType::query()->firstOrCreate(['code' => '2D'], [
+            'name' => '2D', 'slug' => '2d', 'is_active' => true, 'status' => true, 'sort_order' => 1,
+        ]);
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([
                 'cinema_id' => $this->cinema->id, 'code' => $code, 'name' => 'Phòng '.($index + 1),
-                'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
+                'room_type' => '2D', 'room_type_id' => $roomType->id,
+                'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             ]);
         }
         $this->artisan('moviemate:rebuild-seat-layouts', ['--initialize-empty' => true])->assertSuccessful();
@@ -277,11 +281,14 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
 
     private function createShowtime(Room $room, int $layoutId): Showtime
     {
-        return Showtime::query()->create([
+        $showtime = Showtime::query()->create([
             'movie_id' => $this->movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
             'room_layout_id' => $layoutId, 'presentation_format_id' => $this->presentationFormatId,
             'show_date' => now()->addDays(5)->toDateString(), 'show_time' => '10:00:00',
-            'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
+            'status' => 'active',
         ]);
+        $this->snapshotShowtime($showtime);
+
+        return $showtime;
     }
 }

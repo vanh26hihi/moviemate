@@ -3,7 +3,6 @@
 namespace Tests\Feature\Bookings;
 
 use App\Models\Booking;
-use App\Models\CinemaPricingRule;
 use App\Models\DiscountCode;
 use App\Models\FoodItem;
 use App\Models\Payment;
@@ -84,9 +83,9 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
         );
         $amounts = app(BookingPrintAmountAllocator::class)->allocate($booking);
 
-        $this->assertSame([60_000, 60_000], array_values($amounts->ticketAmounts));
-        $this->assertSame(30_000, $amounts->foodVoucherAmount);
-        $this->assertSame(150_000, $amounts->allocatedTotal());
+        $this->assertSame([32_143, 32_143], array_values($amounts->ticketAmounts));
+        $this->assertSame(25_714, $amounts->foodVoucherAmount);
+        $this->assertSame(90_000, $amounts->allocatedTotal());
         $this->assertSame((int) $booking->total_amount, $amounts->allocatedTotal());
     }
 
@@ -144,10 +143,10 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
         $amounts = app(BookingPrintAmountAllocator::class)->allocate($booking);
 
         $this->assertSame(2, $booking->admissionTickets->count());
-        $this->assertSame(150_001, (int) $booking->seat_subtotal);
-        $this->assertSame(150_000, (int) $booking->total_amount);
-        $this->assertSame([75_000, 75_000], array_values($amounts->ticketAmounts));
-        $this->assertSame(150_000, $amounts->allocatedTotal());
+        $this->assertSame(100_000, (int) $booking->seat_subtotal);
+        $this->assertSame(99_999, (int) $booking->total_amount);
+        $this->assertSame([50_000, 49_999], array_values($amounts->ticketAmounts));
+        $this->assertSame(99_999, $amounts->allocatedTotal());
     }
 
     public function test_allocator_rejects_inconsistent_finalized_food_item_snapshot(): void
@@ -210,7 +209,6 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
         $ticket = $booking->admissionTickets->sole();
         $before = app(BookingPrintAmountAllocator::class)->allocate($booking)->forTicket($ticket);
 
-        CinemaPricingRule::query()->where('cinema_id', $booking->cinema_id)->update(['amount_vnd' => 999_999]);
         $food?->update(['price' => 888_888]);
         $discount?->update(['discount_value' => 1]);
         $after = app(BookingPrintAmountAllocator::class)->allocate($booking->fresh())->forTicket($ticket);
@@ -272,11 +270,7 @@ final class BookingPrintAmountAllocationTest extends PaymentTestCase
         ?array $scenario = null,
         ?array $seatIds = null,
     ): array {
-        $scenario ??= $this->bookingScenario(true);
-        CinemaPricingRule::query()
-            ->where('cinema_id', $scenario['cinema']->id)
-            ->where('name', 'Booking fixture base')
-            ->update(['amount_vnd' => $seatAmount]);
+        $scenario ??= $this->bookingScenario(true, basePrice: $seatAmount);
 
         $food = $foodAmount === null ? null : FoodItem::query()->create([
             'cinema_id' => $scenario['cinema']->id,

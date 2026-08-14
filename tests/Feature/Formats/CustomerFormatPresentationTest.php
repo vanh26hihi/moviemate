@@ -76,7 +76,7 @@ final class CustomerFormatPresentationTest extends TestCase
         ]);
         $layout = $this->publishRoomForDiscovery($room);
         $room->presentationCapabilities()->syncWithoutDetaching($threeD);
-        Showtime::query()->create([
+        $threeDShowtime = Showtime::query()->create([
             'movie_id' => $scenario['movie']->id,
             'cinema_id' => $scenario['cinema']->id,
             'room_id' => $room->id,
@@ -84,11 +84,9 @@ final class CustomerFormatPresentationTest extends TestCase
             'presentation_format_id' => $threeD->id,
             'show_date' => '2030-06-02',
             'show_time' => '21:30:00',
-            'price' => 1,
-            'vip_price' => 2,
-            'pricing_version' => 'cinema-pricing-v1',
             'status' => 'active',
         ]);
+        $this->snapshotShowtime($threeDShowtime);
 
         $response = $this->get(route('cinemas.show', ['cinema' => $scenario['cinema']->code, 'date' => '2030-06-02']))
             ->assertOk()
@@ -131,9 +129,6 @@ final class CustomerFormatPresentationTest extends TestCase
                 'presentation_format_id' => $threeD->id,
                 'show_date' => '2030-06-01',
                 'show_time' => $time,
-                'price' => 1,
-                'vip_price' => 2,
-                'pricing_version' => 'cinema-pricing-v1',
                 'status' => $status,
             ]);
         }

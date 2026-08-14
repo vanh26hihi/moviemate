@@ -28,6 +28,7 @@ class BookingSeatLockService
                     'booking_id' => $lockedBooking->id,
                     'showtime_id' => $lockedBooking->showtime_id,
                     'seat_id' => $seat->id,
+                    'showtime_ticket_price_id' => $pricingSnapshots[$seat->id]['showtime_ticket_price_id'] ?? null,
                     'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
                     'price' => $priceSnapshots[$seat->id],
                     ...($pricingSnapshots[$seat->id] ?? []),

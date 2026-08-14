@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Domain\Showtimes\ShowtimeScheduleValidationResult;
 use App\Domain\Showtimes\ShowtimeWindow;
 use App\Exceptions\InvalidMovieRuntimeException;
+use App\Exceptions\PriceBookException;
 use App\Exceptions\ShowtimeConflictException;
 use App\Exceptions\ShowtimeScheduleConfigurationException;
 use App\Exceptions\ShowtimeScheduleException;
@@ -20,6 +21,7 @@ use Carbon\Exceptions\InvalidFormatException;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 class ShowtimeScheduleService
 {
@@ -40,11 +42,11 @@ class ShowtimeScheduleService
         'presentation_format_id',
     ];
 
-    private readonly TicketPricingService $pricing;
+    private readonly ShowtimeTicketPriceService $snapshotPrices;
 
-    public function __construct(?TicketPricingService $pricing = null)
+    public function __construct(?ShowtimeTicketPriceService $snapshotPrices = null)
     {
-        $this->pricing = $pricing ?? new TicketPricingService;
+        $this->snapshotPrices = $snapshotPrices ?? app(ShowtimeTicketPriceService::class);
     }
 
     public function timezone(?Room $room = null): string
@@ -178,8 +180,23 @@ class ShowtimeScheduleService
             $isWithinOperatingHours = true;
             $this->assertNoConflict($room, $window, 'active', $existingShowtime?->id);
             $isConflictFree = true;
+            try {
+                $ticketPriceSnapshots = $this->snapshotPrices->preview($room, $layout, $window);
+            } catch (PriceBookException|LogicException $exception) {
+                throw new ShowtimeScheduleException(
+                    $exception->getMessage(),
+                    'pricing',
+                    'SHOWTIME_PRICE_UNRESOLVABLE',
+                );
+            }
 
-            return ShowtimeScheduleValidationResult::valid($timezone, $window, $layout, $presentationFormat);
+            return ShowtimeScheduleValidationResult::valid(
+                $timezone,
+                $window,
+                $layout,
+                $presentationFormat,
+                $ticketPriceSnapshots,
+            );
         } catch (ShowtimeScheduleException $exception) {
             if ($exception->failureCode === 'PAST_START') {
                 $isFuture = false;
@@ -282,6 +299,8 @@ class ShowtimeScheduleService
                 authoritativePresentationFormat: $presentationFormat,
             )->requireValid();
 
+            $priceSnapshots = $candidate->ticketPriceSnapshots;
+
             $showtime = Showtime::query()->create($this->persistenceData(
                 $movie,
                 $room,
@@ -289,6 +308,7 @@ class ShowtimeScheduleService
                 $candidate->window,
                 $candidate->presentationFormat,
             ));
+            $this->persistPriceSnapshots($showtime, $priceSnapshots);
             $afterPersist?->__invoke($showtime);
 
             return $showtime;
@@ -353,7 +373,15 @@ class ShowtimeScheduleService
                 authoritativePresentationFormat: $presentationFormat,
             )->requireValid();
 
-            if ($this->hasStructuralChanges($lockedShowtime, $movie, $targetRoom, $candidate->layout, $candidate->window, $candidate->presentationFormat)
+            $structuralChanges = $this->hasStructuralChanges(
+                $lockedShowtime,
+                $movie,
+                $targetRoom,
+                $candidate->layout,
+                $candidate->window,
+                $candidate->presentationFormat,
+            );
+            if ($structuralChanges
                 && $this->hasBookingHistory($lockedShowtime)) {
                 throw new ShowtimeScheduleException(
                     'Suất chiếu đã phát sinh đơn đặt vé nên không thể thay đổi phim, phòng, ngày hoặc giờ chiếu.',
@@ -363,6 +391,9 @@ class ShowtimeScheduleService
             }
 
             $before = clone $lockedShowtime;
+            $priceSnapshots = $structuralChanges
+                ? $candidate->ticketPriceSnapshots
+                : null;
             $lockedShowtime->update($this->persistenceData(
                 $movie,
                 $targetRoom,
@@ -370,7 +401,12 @@ class ShowtimeScheduleService
                 $candidate->window,
                 $candidate->presentationFormat,
             ));
-            $updated = $lockedShowtime->fresh(['movie', 'room.cinema', 'cinema', 'roomLayout', 'presentationFormat']);
+            if ($priceSnapshots !== null) {
+                $this->persistPriceSnapshots($lockedShowtime, $priceSnapshots, true);
+            }
+            $updated = $lockedShowtime->fresh([
+                'movie', 'room.cinema', 'cinema', 'roomLayout', 'presentationFormat', 'ticketPrices.seatType',
+            ]);
             $afterPersist?->__invoke($updated, $before);
 
             return $updated;
@@ -642,18 +678,6 @@ class ShowtimeScheduleService
         ShowtimeWindow $window,
         PresentationFormat $presentationFormat,
     ): array {
-        $preview = new Showtime([
-            'movie_id' => $movie->id,
-            'cinema_id' => $room->cinema_id,
-            'room_id' => $room->id,
-            'show_date' => $window->start->toDateString(),
-            'show_time' => $window->start->format('H:i:s'),
-        ]);
-        $preview->setRelation('room', $room);
-        $preview->setRelation('cinema', $room->cinema);
-        $normal = $this->pricing->calculate($preview, 'normal', false);
-        $vip = $this->pricing->calculate($preview, 'vip', false);
-
         return [
             'movie_id' => $movie->id,
             'cinema_id' => $room->cinema_id,
@@ -662,10 +686,22 @@ class ShowtimeScheduleService
             'presentation_format_id' => $presentationFormat->id,
             'show_date' => $window->start->toDateString(),
             'show_time' => $window->start->format('H:i:s'),
-            'price' => $normal->finalAmount,
-            'vip_price' => $vip->finalAmount,
-            'pricing_version' => 'cinema-pricing-v1',
             'status' => 'active',
         ];
+    }
+
+    public function priceSnapshots(Room $room, RoomLayout $layout, ShowtimeWindow $window): Collection
+    {
+        return $this->snapshotPrices->preview($room, $layout, $window);
+    }
+
+    public function persistPriceSnapshots(Showtime $showtime, Collection $snapshots, bool $replace = false): void
+    {
+        $this->snapshotPrices->persist($showtime, $snapshots, $replace);
+    }
+
+    public function persistPriceSnapshotBatch(array $items): void
+    {
+        $this->snapshotPrices->persistBatch($items);
     }
 }

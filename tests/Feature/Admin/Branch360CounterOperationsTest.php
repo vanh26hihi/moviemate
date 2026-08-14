@@ -410,6 +410,10 @@ final class Branch360CounterOperationsTest extends TestCase
             'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY,
             'price' => 50_000,
             'pricing_unit_key' => $couple ? 'couple:'.$booking->id : 'seat:'.$seat->id,
+            'seat_type_snapshot' => $couple ? 'couple' : 'normal',
+            'base_amount' => 50_000,
+            'surcharge_total' => 0,
+            'final_unit_amount' => 50_000,
         ]);
         $ticket = AdmissionTicket::query()->where('booking_seat_id', $bookingSeat->id)->firstOrFail();
         if ($printCount > 0) {

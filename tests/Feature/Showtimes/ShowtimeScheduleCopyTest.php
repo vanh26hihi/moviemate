@@ -8,14 +8,15 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\BookingTicketPrint;
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\Payment;
 use App\Models\PresentationFormat;
+use App\Models\PriceBookVersion;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Models\SeatIncident;
 use App\Models\Showtime;
+use App\Services\PriceBookVersionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -319,12 +320,26 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
             'rows' => 1,
             'columns' => 1,
             'screen_position' => 'top',
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
+        $sourceSeat = $oldLayout->cells()->where('cell_type', 'seat')->firstOrFail()->seat;
+        $latestLayout->cells()->create([
+            'x_position' => 1, 'y_position' => 1, 'cell_type' => 'seat', 'seat_id' => $sourceSeat->id,
+        ]);
+        $latestLayout->update(['status' => 'published', 'published_at' => now()]);
         $room->update(['cleaning_buffer_minutes' => 30]);
-        CinemaPricingRule::query()->where('cinema_id', $this->cinema->id)->where('rule_type', 'base')
-            ->update(['amount_vnd' => 95_000]);
+        $versions = app(PriceBookVersionService::class);
+        $versions->retire(PriceBookVersion::query()->where('status', 'published')->sole());
+        $version = $versions->createDraft($this->chainPriceBook(), [
+            'base_price_vnd' => 95_000,
+            'effective_from' => '2030-01-01',
+            'effective_until' => '2031-01-01',
+        ]);
+        $versions->replaceAdjustments($version, [
+            ['dimension' => 'seat_type', 'label' => 'VIP', 'seat_type_id' => $this->seatType('vip')->id, 'amount_vnd' => 30_000],
+            ['dimension' => 'seat_type', 'label' => 'Couple', 'seat_type_id' => $this->seatType('couple', true)->id, 'amount_vnd' => 80_000],
+        ]);
+        $versions->publish($version);
         $admin = $this->userWithRole('admin');
         $rows = $this->generateRows($admin, $this->copyPayload('room', '2025-08-12', '2030-08-19', $room));
 
@@ -339,11 +354,13 @@ class ShowtimeScheduleCopyTest extends ShowtimeTestCase
         $this->actingAs($admin)->postJson(route('admin.showtimes.bulk.store'), ['rows' => $rows])
             ->assertCreated()->assertJson(['valid' => true, 'created_count' => 1]);
 
-        $target = Showtime::query()->whereDate('show_date', '2030-08-19')->sole();
+        $target = Showtime::query()->with('ticketPrices.seatType')->whereDate('show_date', '2030-08-19')->sole();
         $this->assertSame($latestLayout->id, $target->room_layout_id);
-        $this->assertSame(95_000, (int) $target->price);
-        $this->assertSame(125_000, (int) $target->vip_price);
-        $this->assertNotSame($source->pricing_version, $target->pricing_version);
+        $this->assertSame(95_000, (int) $target->ticketPrices->firstWhere('seatType.code', 'normal')->final_unit_amount_vnd);
+        $this->assertNotSame(
+            $source->ticketPrices()->value('price_book_version_id'),
+            $target->ticketPrices()->value('price_book_version_id'),
+        );
     }
 
     public function test_stale_state_after_copy_rejects_whole_batch_and_edited_intent_requires_a_new_preview(): void
