@@ -30,7 +30,7 @@
             @endcan
             @can('seats.maintenance.view')
                 @if($room->status === 'active' && $published)
-                    <a href="{{ route('admin.rooms.seat-maintenance.index', $room) }}" class="btn-secondary"><i class="ph ph-wrench" aria-hidden="true"></i> Bảo trì ghế</a>
+                    <a href="{{ route('admin.rooms.seat-maintenance.index', $room) }}" class="btn-secondary"><i class="ph ph-wrench" aria-hidden="true"></i> Tình trạng ghế & bảo trì</a>
                 @endif
             @endcan
         </div>
@@ -47,6 +47,62 @@
         <div class="cinema-card p-5"><p class="text-sm app-muted">{{ __('rooms.fields.physical_seat_count') }}</p><p class="mt-1 text-3xl font-extrabold app-text">{{ $physicalSeatCount }}</p><p class="mt-1 text-xs app-muted">Vị trí ghế trong sơ đồ đã phát hành</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">{{ __('rooms.fields.upcoming_showtimes') }}</p><p class="mt-1 text-3xl font-extrabold app-text">{{ $room->upcoming_showtimes_count }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Tổng lịch sử suất chiếu</p><p class="mt-1 text-3xl font-extrabold app-text">{{ $room->showtimes_count }}</p></div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <section class="cinema-card overflow-hidden xl:col-span-2" aria-labelledby="room-showtimes-title">
+            <div class="border-b app-border p-6">
+                <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Handoff vận hành</p>
+                <h2 id="room-showtimes-title" class="mt-2 text-xl font-extrabold app-text">Lịch chiếu của phòng</h2>
+                <p class="mt-1 text-sm app-muted">Tối đa 8 suất đang hoạt động sắp tới; mở từng suất để xem đúng ngữ cảnh vận hành.</p>
+            </div>
+            @if($upcomingShowtimes->isNotEmpty())
+                <div class="overflow-x-auto">
+                    <table class="admin-table min-w-[42rem]">
+                        <thead><tr><th scope="col">Bắt đầu</th><th scope="col">Phim</th><th scope="col">Định dạng</th><th scope="col">Vòng đời</th><th scope="col">Tác vụ</th></tr></thead>
+                        <tbody>
+                            @foreach($upcomingShowtimes as $showtime)
+                                @php($snapshot = $showtime->operational_lifecycle)
+                                <tr>
+                                    <td class="whitespace-nowrap font-bold app-text">{{ $snapshot['starts_at']->format('d/m/Y H:i') }}</td>
+                                    <td class="font-bold app-text">{{ $showtime->movie->title }}</td>
+                                    <td>{{ $showtime->presentationFormat?->name ?? '—' }}</td>
+                                    <td><span class="status-badge bg-brand-start/10 text-brand-start">{{ $snapshot['label'] }}</span></td>
+                                    <td><a class="font-bold text-brand-start" href="{{ route('admin.showtimes.show', $showtime) }}">Xem chi tiết suất chiếu</a></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <p class="p-6 app-muted">Phòng chưa có suất chiếu đang hoạt động sắp tới.</p>
+            @endif
+        </section>
+
+        <section class="cinema-card p-6" aria-labelledby="room-seat-operations-title">
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Ghế vật lý</p>
+            <h2 id="room-seat-operations-title" class="mt-2 text-xl font-extrabold app-text">Tình trạng ghế & bảo trì</h2>
+            <p class="mt-1 text-sm app-muted">Bảo trì là trạng thái vật lý; sự cố là lịch sử vận hành có liên kết riêng. Ô BLOCKED không được tính là sự cố.</p>
+            @can('seats.maintenance.view')
+                @if($room->status === 'active' && $published)
+                    <a href="{{ route('admin.rooms.seat-maintenance.index', $room) }}" class="btn-secondary mt-4"><i class="ph ph-wrench" aria-hidden="true"></i> Mở tình trạng ghế & bảo trì</a>
+                @endif
+                <div class="mt-5 border-t app-border pt-4">
+                    <p class="font-extrabold app-text">{{ $openIncidentsCount }} sự cố đang mở</p>
+                    @forelse($openIncidents as $incident)
+                        <a data-open-seat-incident class="mt-3 block rounded-xl border app-border p-3 hover:border-brand-start" href="{{ route('admin.rooms.seat-incidents.show', [$room, $incident]) }}">
+                            <span class="block font-bold text-brand-start">Sự cố #{{ $incident->id }}</span>
+                            <span class="mt-1 block text-sm app-muted">{{ match($incident->reason) { 'seat_broken' => 'Ghế hỏng', 'maintenance_required' => 'Cần bảo trì', 'safety_issue' => 'Vấn đề an toàn', default => 'Lý do khác' } }} · {{ $incident->unresolved_impacts_count }} ảnh hưởng chưa xử lý</span>
+                        </a>
+                    @empty
+                        <p class="mt-3 text-sm app-muted">Không có sự cố ghế đang mở.</p>
+                    @endforelse
+                    @if($openIncidentsCount > $openIncidents->count())
+                        <p class="mt-3 text-xs app-muted">Chỉ hiển thị 5 sự cố mới nhất. Mở trang bảo trì để xem đầy đủ lịch sử.</p>
+                    @endif
+                </div>
+            @endcan
+        </section>
     </div>
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">

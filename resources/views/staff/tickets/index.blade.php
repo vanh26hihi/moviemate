@@ -16,7 +16,7 @@
 
     <div class="grid gap-6 xl:grid-cols-2">
         <section class="cinema-card p-6">
-            <h2 class="text-xl font-extrabold app-heading">Quét bằng camera</h2>
+            <h2 class="text-xl font-extrabold app-heading">Quét QR đơn đặt vé bằng camera</h2>
             <p class="mt-2 text-sm app-muted">Camera cần HTTPS hoặc localhost và quyền truy cập từ trình duyệt.</p>
             <video data-scanner-video class="mt-4 aspect-video w-full rounded-2xl bg-black object-cover" muted playsinline></video>
             <p data-scanner-error class="mt-3 rounded-xl bg-error/10 p-3 text-sm text-error" role="alert" hidden></p>
@@ -29,7 +29,7 @@
         <form method="POST" action="{{ route('staff.tickets.resolve') }}" class="cinema-card p-6" autocomplete="off" data-submit-once>
             @csrf
             <h2 class="text-xl font-extrabold app-heading">Tra cứu thủ công</h2>
-            <label for="ticket" class="cinema-label mt-5 block">Mã đơn hoặc QR đơn đặt vé</label>
+            <label for="ticket" class="cinema-label mt-5 block">Mã đơn đặt vé hoặc QR đơn đặt vé</label>
             <textarea id="ticket" name="ticket" data-scanner-input class="cinema-input mt-2 min-h-32" required maxlength="512" autocomplete="off" spellcheck="false">{{ old('ticket') }}</textarea>
             <p class="mt-2 text-sm app-muted">Nhập chính xác mã MMT-… hoặc dữ liệu QR bảo mật. Máy chủ luôn xác minh đơn và phạm vi chi nhánh trước khi hiển thị.</p>
             @error('ticket')<p class="mt-2 text-sm text-error" role="alert">{{ $message }}</p>@enderror

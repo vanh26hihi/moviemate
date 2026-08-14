@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\BookingTicketPrintEvent;
 use App\Models\Payment;
+use App\Models\SeatIncidentImpact;
 use App\Services\BookingCancellationService;
 use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\TicketDeliveryRetryService;
@@ -62,6 +63,19 @@ final class AdminBookingDetailService
             : collect();
         $latestPrintEvent = $printEvents->firstWhere('event_type', 'print_started');
         $latestReprintEvent = $printEvents->firstWhere('event_type', 'reprint_requested');
+        $incidentImpacts = SeatIncidentImpact::query()
+            ->whereHas('bookingSeat', fn ($query) => $query->where('booking_id', $booking->id))
+            ->with([
+                'bookingSeat:id,booking_id,seat_id',
+                'bookingSeat.seat:id,seat_code',
+                'incident:id,room_id,status,reason,created_at',
+                'resolution:id,seat_incident_impact_id,resolution_type,original_seat_id,replacement_seat_id,reprint_required,reprint_satisfied_at',
+                'resolution.originalSeat:id,seat_code',
+                'resolution.replacementSeat:id,seat_code',
+            ])
+            ->latest('id')
+            ->limit(50)
+            ->get();
 
         return [
             'booking' => $booking,
@@ -88,6 +102,7 @@ final class AdminBookingDetailService
             'printEvents' => $printEvents,
             'latestPrintEvent' => $latestPrintEvent,
             'latestReprintEvent' => $latestReprintEvent,
+            'incidentImpacts' => $incidentImpacts,
         ];
     }
 
