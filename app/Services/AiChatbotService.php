@@ -48,7 +48,7 @@ class AiChatbotService
         $now = now('Asia/Ho_Chi_Minh');
 
         $showtimes = Showtime::query()
-            ->with(['movie.genres', 'cinema', 'room'])
+            ->with(['movie.genres', 'cinema', 'room', 'ticketPrices.seatType'])
             ->where('status', 'active')
             ->where(function ($query) use ($now) {
                 $query->whereDate('show_date', '>', $now->toDateString())
@@ -104,8 +104,10 @@ class AiChatbotService
                 'cinema' => $showtime->cinema?->name,
                 'city' => $showtime->cinema?->city,
                 'room' => $showtime->room?->name,
-                'price' => (float) $showtime->price,
-                'vip_price' => (float) ($showtime->vip_price ?? $showtime->price),
+                'price' => (int) $showtime->ticketPrices->min('final_unit_amount_vnd'),
+                'vip_price' => (int) ($showtime->ticketPrices->first(
+                    fn ($price): bool => $price->seatType?->code === 'vip',
+                )?->final_unit_amount_vnd ?? $showtime->ticketPrices->max('final_unit_amount_vnd')),
             ])->values()->all(),
             'cinemas' => $cinemas->map(fn (Cinema $cinema) => [
                 'name' => $cinema->name,

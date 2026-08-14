@@ -67,9 +67,9 @@ class ActiveSeatLockTest extends TestCase
             'presentation_format_id' => $scenario['showtime']->presentation_format_id,
             'show_date' => now()->addDays(6)->toDateString(),
             'show_time' => '20:00:00',
-            'price' => 50000,
             'status' => 'active',
         ]);
+        $this->snapshotShowtime($secondShowtime);
         $this->reserve($scenario, [$scenario['seats'][0]->id]);
         $scenario['showtime'] = $secondShowtime;
         $this->reserve($scenario, [$scenario['seats'][0]->id]);

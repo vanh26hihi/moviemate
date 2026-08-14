@@ -3,6 +3,8 @@
 namespace Tests\Feature\Showtimes;
 
 use App\Models\Booking;
+use App\Models\PriceBookVersion;
+use App\Services\PriceBookVersionService;
 use App\Services\RoomLayoutService;
 use Illuminate\Support\Facades\DB;
 
@@ -40,10 +42,67 @@ class ShowtimeUpdateTest extends ShowtimeTestCase
         $this->assertDatabaseHas('showtimes', [
             'id' => $showtime->id,
             'show_time' => '21:00:00',
-            'price' => 80000,
-            'pricing_version' => 'cinema-pricing-v1',
         ]);
+        $this->assertSame(80_000, (int) $showtime->fresh('ticketPrices.seatType')->ticketPrices
+            ->firstWhere('seatType.code', 'normal')->final_unit_amount_vnd);
         $this->assertDatabaseHas('activity_logs', ['action' => 'showtime.updated', 'subject_id' => (string) $showtime->id]);
+    }
+
+    public function test_structural_reschedule_without_history_atomically_replaces_snapshot_with_target_version(): void
+    {
+        $movie = $this->movie(90);
+        $room = $this->rooms['P01'];
+        $showtime = $this->existing($movie, $room);
+        $before = $showtime->ticketPrices()->orderBy('seat_type_id')->get();
+        $versions = app(PriceBookVersionService::class);
+        $versions->retire(PriceBookVersion::query()->where('status', PriceBookVersion::STATUS_PUBLISHED)->sole());
+        $next = $versions->createDraft($this->chainPriceBook(), [
+            'base_price_vnd' => 95_000,
+            'effective_from' => '2030-01-01',
+            'effective_until' => '2031-01-01',
+        ]);
+        $versions->replaceAdjustments($next, [
+            ['dimension' => 'seat_type', 'label' => 'VIP', 'seat_type_id' => $this->seatType('vip')->id, 'amount_vnd' => 30_000],
+            ['dimension' => 'seat_type', 'label' => 'Couple', 'seat_type_id' => $this->seatType('couple', true)->id, 'amount_vnd' => 80_000],
+        ]);
+        $versions->publish($next);
+
+        $this->actingAs($this->userWithRole('admin'))->put(route('admin.showtimes.update', $showtime), $this->payload($movie, $room, [
+            'show_date' => '2030-06-11',
+            'show_time' => '21:00',
+        ]))->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
+
+        $after = $showtime->fresh('ticketPrices.seatType')->ticketPrices;
+        $this->assertSame($before->count(), $after->count());
+        $this->assertEmpty(array_intersect($before->pluck('id')->all(), $after->pluck('id')->all()));
+        $this->assertSame([$next->id], $after->pluck('price_book_version_id')->unique()->values()->all());
+        $this->assertSame(95_000, (int) $after->firstWhere('seatType.code', 'normal')->final_unit_amount_vnd);
+    }
+
+    public function test_structural_reschedule_with_booking_history_keeps_snapshot_unchanged(): void
+    {
+        $movie = $this->movie(90);
+        $room = $this->rooms['P01'];
+        $showtime = $this->existing($movie, $room);
+        $before = $showtime->ticketPrices()->orderBy('id')->get()->map->getAttributes()->all();
+        Booking::query()->create([
+            'showtime_id' => $showtime->id,
+            'booking_code' => 'HISTORY-SNAPSHOT-001',
+            'total_amount' => 80_000,
+            'seat_subtotal' => 80_000,
+            'food_subtotal' => 0,
+            'currency' => 'VND',
+            'payment_status' => 'unpaid',
+            'booking_status' => 'pending_payment',
+            'expires_at' => now()->addMinutes(10),
+        ]);
+
+        $this->actingAs($this->userWithRole('admin'))->put(route('admin.showtimes.update', $showtime), $this->payload($movie, $room, [
+            'show_time' => '21:00',
+        ]))->assertSessionHasErrors('showtime');
+
+        $this->assertSame('18:00:00', $showtime->fresh()->show_time);
+        $this->assertSame($before, $showtime->ticketPrices()->orderBy('id')->get()->map->getAttributes()->all());
     }
 
     public function test_delete_route_non_destructively_cancels_and_records_the_event(): void
@@ -115,7 +174,7 @@ class ShowtimeUpdateTest extends ShowtimeTestCase
         ]))->assertSessionHasErrors('show_time');
 
         $after = $showtime->fresh()->getAttributes();
-        foreach (['movie_id', 'room_id', 'room_layout_id', 'show_date', 'show_time', 'price', 'status'] as $field) {
+        foreach (['movie_id', 'room_id', 'room_layout_id', 'show_date', 'show_time', 'status'] as $field) {
             $this->assertSame((string) $before[$field], (string) $after[$field]);
         }
     }
@@ -175,7 +234,9 @@ class ShowtimeUpdateTest extends ShowtimeTestCase
         $showtime->refresh();
         $this->assertSame($source->id, $showtime->room_id);
         $this->assertSame($originalLayout, $showtime->room_layout_id);
-        $this->assertSame('80000.00', $showtime->price);
+        $this->assertSame(80_000, (int) $showtime->ticketPrices()->whereHas(
+            'seatType', fn ($query) => $query->where('code', 'normal'),
+        )->value('final_unit_amount_vnd'));
     }
 
     public function test_room_change_locks_both_rooms_in_stable_id_order_before_showtime(): void

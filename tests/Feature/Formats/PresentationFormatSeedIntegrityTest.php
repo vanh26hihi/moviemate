@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Formats;
 
-use App\Models\CinemaPricingRule;
 use App\Models\Movie;
 use App\Models\PresentationFormat;
 use App\Models\Room;
@@ -72,8 +71,7 @@ final class PresentationFormatSeedIntegrityTest extends TestCase
         $this->assertSame(0, Showtime::query()->whereNull('presentation_format_id')->count());
         $this->assertSame(0, $this->invalidMovieFormatShowtimes());
         $this->assertSame(0, $this->invalidRoomCapabilityShowtimes());
-        $this->assertSame(0, CinemaPricingRule::query()->where('rule_type', 'room_type')->where('room_type', '3D')->count());
-        $this->assertFalse(Schema::hasColumn('cinema_pricing_rules', 'presentation_format_id'));
+        $this->assertFalse(Schema::hasTable('cinema_pricing_rules'));
 
         $template = RoomLayoutTemplate::query()->where('code', 'STANDARD_100')->firstOrFail();
         $this->assertSame('STANDARD', $template->room_type);

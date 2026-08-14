@@ -72,8 +72,10 @@ final class BulkShowtimeScheduleService
             }
 
             $created = [];
+            $snapshotItems = [];
             foreach ($result->rows as $row) {
                 $candidate = $row->candidate->requireValid();
+                $priceSnapshots = $candidate->ticketPriceSnapshots;
                 $showtime = Showtime::query()->create($this->schedule->persistenceData(
                     $row->movie,
                     $row->room,
@@ -83,8 +85,12 @@ final class BulkShowtimeScheduleService
                 ));
                 $showtime->setRelation('movie', $row->movie);
                 $showtime->setRelation('room', $row->room);
-                $afterPersist?->__invoke($showtime, $row->rowKey);
+                $snapshotItems[] = ['showtime' => $showtime, 'snapshots' => $priceSnapshots, 'row_key' => $row->rowKey];
                 $created[] = $showtime;
+            }
+            $this->schedule->persistPriceSnapshotBatch($snapshotItems);
+            foreach ($snapshotItems as $item) {
+                $afterPersist?->__invoke($item['showtime'], $item['row_key']);
             }
 
             return $created;

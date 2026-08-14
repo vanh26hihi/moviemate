@@ -31,7 +31,7 @@ class ShowtimeController extends Controller
     public function index(Request $request)
     {
         $query = Showtime::query()
-            ->with(['movie', 'cinema', 'room', 'roomLayout'])
+            ->with(['movie', 'cinema', 'room', 'roomLayout', 'ticketPrices.seatType'])
             ->withExists(['bookings', 'bookingSeats']);
         $this->cinemaAccess->scope($query, $request->user(), 'showtimes.cinema_id');
 
@@ -228,6 +228,7 @@ class ShowtimeController extends Controller
     /** @return array<string, mixed> */
     private function auditData(Showtime $showtime): array
     {
+        $showtime->loadMissing('ticketPrices.seatType');
         $window = $this->schedule->windowFor($showtime);
 
         return [
@@ -241,8 +242,13 @@ class ShowtimeController extends Controller
             'movie_end_at' => $window->movieEnd->toIso8601String(),
             'room_available_at' => $window->operationalEnd->toIso8601String(),
             'cleaning_buffer' => $window->cleaningBufferMinutes,
-            'price' => (int) $showtime->price,
-            'vip_price' => $showtime->vip_price === null ? null : (int) $showtime->vip_price,
+            'ticket_prices' => $showtime->ticketPrices->map(fn ($price): array => [
+                'seat_type_id' => (int) $price->seat_type_id,
+                'seat_type' => (string) $price->seatType?->code,
+                'final_unit_amount_vnd' => (int) $price->final_unit_amount_vnd,
+                'price_book_version_id' => (int) $price->price_book_version_id,
+                'pricing_fingerprint' => (string) $price->pricing_fingerprint,
+            ])->values()->all(),
             'status' => $showtime->status,
         ];
     }

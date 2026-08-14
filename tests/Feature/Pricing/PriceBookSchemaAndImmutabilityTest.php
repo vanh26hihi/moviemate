@@ -36,8 +36,8 @@ class PriceBookSchemaAndImmutabilityTest extends TestCase
         $this->assertFalse(Schema::hasColumn('price_book_adjustments', 'base_price_vnd'));
         $this->assertSame('integer', collect(Schema::getColumns('price_book_versions'))->firstWhere('name', 'base_price_vnd')['type_name']);
         $this->assertSame('integer', collect(Schema::getColumns('price_book_adjustments'))->firstWhere('name', 'amount_vnd')['type_name']);
-        $this->assertTrue(Schema::hasTable('cinema_pricing_rules'));
-        $this->assertTrue(Schema::hasColumn('seat_types', 'price_modifier'));
+        $this->assertFalse(Schema::hasTable('cinema_pricing_rules'));
+        $this->assertFalse(Schema::hasColumn('seat_types', 'price_modifier'));
     }
 
     public function test_database_constraints_reject_invalid_money_periods_and_foreign_keys(): void

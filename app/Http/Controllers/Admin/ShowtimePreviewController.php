@@ -90,6 +90,17 @@ final class ShowtimePreviewController extends Controller
         $hours = $window
             ? $room->cinema?->operatingHours->firstWhere('day_of_week', $window->start->dayOfWeekIso)
             : null;
+        $prices = $result->isValid()
+            ? $result->ticketPriceSnapshots
+                ->map(fn ($snapshot): array => [
+                    'seat_type_id' => (int) $snapshot->seat_type_id,
+                    'seat_type' => (string) $snapshot->seatType?->code,
+                    'base_price_vnd' => (int) $snapshot->base_price_vnd,
+                    'adjustment_total_vnd' => (int) $snapshot->adjustment_total_vnd,
+                    'final_unit_amount_vnd' => (int) $snapshot->final_unit_amount_vnd,
+                    'price_book_version_id' => (int) $snapshot->price_book_version_id,
+                ])->values()->all()
+            : [];
 
         return [
             'valid' => $result->isValid(),
@@ -119,6 +130,7 @@ final class ShowtimePreviewController extends Controller
                 'latest_show_start_at' => $hours->latest_show_start_at,
             ] : null,
             'conflict' => $conflict,
+            'ticket_prices' => $prices,
         ];
     }
 
@@ -134,6 +146,7 @@ final class ShowtimePreviewController extends Controller
             'window' => null,
             'operating_window' => null,
             'conflict' => null,
+            'ticket_prices' => [],
         ];
     }
 }

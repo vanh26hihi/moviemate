@@ -28,6 +28,7 @@ function initializeShowtimeSchedulePreview(preview) {
     const conflictWindow = preview.querySelector('[data-conflict-window]');
     const conflictReady = preview.querySelector('[data-conflict-ready]');
     const save = form.querySelector('[data-showtime-save]');
+    const pricePreview = form.querySelector('#showtime-price-preview');
     let timer = null;
     let sequence = 0;
     let controller = null;
@@ -46,6 +47,7 @@ function initializeShowtimeSchedulePreview(preview) {
         ready.textContent = '--';
         if (presentationFormat) presentationFormat.textContent = '--';
         conflict.hidden = true;
+        if (pricePreview) pricePreview.textContent = 'Chọn đủ dữ liệu để xem snapshot giá dự kiến.';
     }
 
     function isComplete() {
@@ -65,6 +67,11 @@ function initializeShowtimeSchedulePreview(preview) {
         }
 
         if (data.valid) {
+            if (pricePreview) {
+                pricePreview.textContent = (data.ticket_prices || []).map((price) =>
+                    `${price.seat_type}: ${Number(price.final_unit_amount_vnd).toLocaleString('vi-VN')} VNĐ`
+                ).join(' · ');
+            }
             setState('Khung giờ hợp lệ.', 'valid');
             if (save) save.disabled = false;
             return;

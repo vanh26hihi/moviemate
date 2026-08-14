@@ -142,7 +142,7 @@ class RebuildSeatLayoutsCommandTest extends TestCase
             'movie_id' => $movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
             'room_layout_id' => $layout->id,
             'presentation_format_id' => $format->id,
-            'show_date' => now()->toDateString(), 'show_time' => '10:00:00', 'price' => 50000,
+            'show_date' => now()->toDateString(), 'show_time' => '10:00:00',
             'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
         ]);
         $bookingId = DB::table('bookings')->insertGetId([

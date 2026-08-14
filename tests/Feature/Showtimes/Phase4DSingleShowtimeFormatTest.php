@@ -244,7 +244,7 @@ final class Phase4DSingleShowtimeFormatTest extends ShowtimeTestCase
 
         $this->actingAs($admin)->post(route('admin.showtimes.store'), $payload)
             ->assertRedirect(route('admin.showtimes.index'))->assertSessionHasNoErrors();
-        $this->assertLessThanOrEqual(30, count($queries));
+        $this->assertLessThanOrEqual(34, count($queries));
 
         $roomLock = collect($queries)->search(fn (string $sql): bool => str_contains($sql, 'from "rooms"') && str_contains($sql, 'where "id"'));
         $movieLock = collect($queries)->search(fn (string $sql): bool => str_contains($sql, 'from "movies"') && str_contains($sql, 'where "movies"."id"'));

@@ -37,7 +37,7 @@ class RoomLayoutServiceTest extends TestCase
         foreach ([['normal', false], ['vip', false], ['couple', true]] as [$code, $pair]) {
             DB::table('seat_types')->insert([
                 'name' => ucfirst($code), 'code' => $code, 'slug' => $code,
-                'price_modifier' => 0, 'is_pair' => $pair, 'status' => true,
+                'is_pair' => $pair, 'status' => true,
                 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now(),
             ]);
         }

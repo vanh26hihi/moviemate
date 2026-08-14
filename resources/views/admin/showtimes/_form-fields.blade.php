@@ -71,10 +71,12 @@
     </div>
 
     <div class="rounded-2xl border app-border p-4 md:col-span-2">
-        <p class="font-bold app-text">Giá vé được tính từ Bảng giá vé</p>
-        <p class="mt-1 text-sm app-muted">Máy chủ áp dụng giá cơ bản và các phụ thu theo chi nhánh, phòng, loại ghế, khung giờ và ngày chiếu. Giá không thể nhập thủ công tại suất chiếu.</p>
-        @if($editing)<p class="mt-2 text-sm text-brand-start">Giá tham chiếu hiện tại: thường {{ number_format((int) $showtime->price, 0, ',', '.') }} VNĐ · VIP {{ number_format((int) $showtime->vip_price, 0, ',', '.') }} VNĐ</p>@endif
-        <p id="showtime-price-preview" class="mt-2 text-sm font-bold text-brand-start" aria-live="polite">Chọn phòng và thời gian để xem giá theo loại ghế.</p>
+        <p class="font-bold app-text">Giá vé được chụp theo loại ghế khi phát hành suất chiếu</p>
+        <p class="mt-1 text-sm app-muted">Xem trước lịch sẽ xác thực PriceBookVersion hiện hành và hiển thị giá của đúng các loại ghế có trong sơ đồ phòng. Snapshot đã phát hành là bất biến.</p>
+        @if($editing && $showtime->ticketPrices?->isNotEmpty())
+            <p class="mt-2 text-sm text-brand-start">Giá hiện tại: @foreach($showtime->ticketPrices as $price){{ $price->seatType?->name ?? $price->seatType?->code }} {{ number_format((int) $price->final_unit_amount_vnd, 0, ',', '.') }} VNĐ{{ $loop->last ? '' : ' · ' }}@endforeach</p>
+        @endif
+        <p id="showtime-price-preview" class="mt-2 text-sm font-bold text-brand-start" aria-live="polite">Chọn đủ dữ liệu để xem snapshot giá dự kiến.</p>
     </div>
 
     <input type="hidden" name="status" value="active">
@@ -155,35 +157,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (previousRoom !== room.value) room.dispatchEvent(new Event('change'));
     }
 
-    let pricingRequest = 0;
-    async function refreshPricePreview() {
-        const option = room.selectedOptions[0];
-        const output = document.getElementById('showtime-price-preview');
-        if (!option?.value || !date.value || !time.value) { output.textContent = 'Chọn phòng và thời gian để xem giá theo loại ghế.'; return; }
-        const requestId = ++pricingRequest;
-        output.textContent = 'Đang tính giá từ máy chủ…';
-        const prices = [];
-        for (const type of ['normal','vip','couple']) {
-            const csrfToken = document.querySelector('input[name="_token"]')?.value
-                ?? document.querySelector('meta[name="csrf-token"]')?.content;
-            if (!csrfToken) { output.textContent = 'Không thể xác thực yêu cầu xem trước giá.'; return; }
-            const body = new FormData(); body.append('_token', csrfToken);
-            body.append('cinema_id', option.dataset.cinemaId); body.append('room_id', option.value);
-            body.append('show_date', date.value); body.append('show_time', time.value); body.append('seat_type', type);
-            const response = await fetch(@json(route('admin.pricing-rules.preview')), {method:'POST',headers:{Accept:'application/json'},body});
-            const data = await response.json();
-            if (requestId !== pricingRequest) return;
-            if (!response.ok) { output.textContent = Object.values(data.errors || {}).flat()[0] || 'Chưa có cấu hình giá phù hợp.'; return; }
-            prices.push(`${type}: ${Number(data.final_amount).toLocaleString('vi-VN')} VNĐ`);
-        }
-        output.textContent = prices.join(' · ');
-    }
-
-    [room, date, time].forEach(input => input.addEventListener('change', refreshPricePreview));
     movie.addEventListener('change', () => refreshFormatChoices(false));
     format.addEventListener('change', refreshRoomChoices);
     refreshFormatChoices(true);
-    refreshPricePreview();
 });
 </script>
 @endpush

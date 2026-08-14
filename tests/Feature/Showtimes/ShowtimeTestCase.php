@@ -3,20 +3,21 @@
 namespace Tests\Feature\Showtimes;
 
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\Movie;
 use App\Models\PresentationFormat;
 use App\Models\Room;
+use App\Models\RoomType;
 use App\Models\Showtime;
 use App\Services\CinemaContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Tests\Support\CreatesPriceBookFixtures;
 use Tests\TestCase;
 
 abstract class ShowtimeTestCase extends TestCase
 {
-    use RefreshDatabase;
+    use CreatesPriceBookFixtures, RefreshDatabase;
 
     protected bool $prepareSingleShowtimeFormats = false;
 
@@ -41,25 +42,18 @@ abstract class ShowtimeTestCase extends TestCase
             ]);
         }
         $this->cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
-        CinemaPricingRule::query()->create([
-            'name' => 'Giá cơ bản kiểm thử', 'rule_type' => 'base', 'cinema_id' => $this->cinema->id,
-            'amount_vnd' => 80_000, 'priority' => 100, 'status' => 'active',
-        ]);
-        CinemaPricingRule::query()->create([
-            'name' => 'Phụ thu VIP kiểm thử', 'rule_type' => 'seat_type', 'cinema_id' => $this->cinema->id,
-            'seat_type' => 'vip', 'amount_vnd' => 30_000, 'priority' => 100, 'status' => 'active',
-        ]);
-        CinemaPricingRule::query()->create([
-            'name' => 'Phụ thu ghế đôi kiểm thử', 'rule_type' => 'seat_type', 'cinema_id' => $this->cinema->id,
-            'seat_type' => 'couple', 'amount_vnd' => 80_000, 'priority' => 100, 'status' => 'active',
-        ]);
+        $this->ensurePublishedPriceBook(80_000);
 
+        $roomType = RoomType::query()->firstOrCreate(['code' => '2D'], [
+            'name' => '2D', 'slug' => '2d', 'is_active' => true, 'status' => true, 'sort_order' => 1,
+        ]);
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([
                 'cinema_id' => $this->cinema->id,
                 'code' => $code,
                 'name' => 'Phòng '.($index + 1),
                 'room_type' => '2D',
+                'room_type_id' => $roomType->id,
                 'width_mm' => 8_000,
                 'length_mm' => 10_000,
                 'status' => 'active',
@@ -107,7 +101,7 @@ abstract class ShowtimeTestCase extends TestCase
 
     protected function existing(Movie $movie, Room $room, array $overrides = []): Showtime
     {
-        return Showtime::query()->create(array_filter([
+        $showtime = Showtime::query()->create(array_filter([
             'movie_id' => $movie->id,
             'cinema_id' => $this->cinema->id,
             'room_id' => $room->id,
@@ -115,10 +109,13 @@ abstract class ShowtimeTestCase extends TestCase
             'presentation_format_id' => $this->prepareSingleShowtimeFormats ? $this->presentationFormat->id : null,
             'show_date' => '2030-06-10',
             'show_time' => '18:00:00',
-            'price' => 80000,
-            'vip_price' => 110000,
             'status' => 'active',
             ...$overrides,
         ], fn ($value, $key): bool => $key !== 'presentation_format_id' || $value !== null, ARRAY_FILTER_USE_BOTH));
+        if ($showtime->presentation_format_id !== null) {
+            $this->snapshotShowtime($showtime);
+        }
+
+        return $showtime;
     }
 }

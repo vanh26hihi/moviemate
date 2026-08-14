@@ -7,8 +7,12 @@ use App\Models\PriceBook;
 use App\Models\PriceBookVersion;
 use App\Models\Room;
 use App\Models\RoomType;
+use App\Models\Seat;
 use App\Models\SeatType;
+use App\Models\Showtime;
 use App\Services\PriceBookVersionService;
+use App\Services\ShowtimeScheduleService;
+use App\Services\ShowtimeTicketPriceService;
 
 trait CreatesPriceBookFixtures
 {
@@ -36,11 +40,56 @@ trait CreatesPriceBookFixtures
         return SeatType::query()->firstOrCreate(['code' => $code], [
             'name' => ucfirst($code),
             'slug' => $code,
-            'price_modifier' => $code === 'vip' ? 999_999 : 0,
             'is_pair' => $pair,
             'status' => true,
             'sort_order' => 10,
         ]);
+    }
+
+    protected function ensurePublishedPriceBook(int $base = 50_000): PriceBookVersion
+    {
+        $published = PriceBookVersion::query()->where('status', PriceBookVersion::STATUS_PUBLISHED)->first();
+        if ($published) {
+            return $published;
+        }
+
+        $this->seatType('normal');
+        $vip = $this->seatType('vip');
+        $couple = $this->seatType('couple', true);
+        $vipAdjustment = $base === 80_000 ? 30_000 : 20_000;
+        $coupleAdjustment = $base === 80_000 ? 80_000 : 50_000;
+        $version = app(PriceBookVersionService::class)->createDraft($this->chainPriceBook(), [
+            'base_price_vnd' => $base,
+            'effective_from' => now()->subYears(2)->toDateString(),
+            'effective_until' => now()->addYears(5)->toDateString(),
+        ]);
+        app(PriceBookVersionService::class)->replaceAdjustments($version, [
+            ['dimension' => 'seat_type', 'label' => 'VIP', 'seat_type_id' => $vip->id, 'amount_vnd' => $vipAdjustment],
+            ['dimension' => 'seat_type', 'label' => 'Couple', 'seat_type_id' => $couple->id, 'amount_vnd' => $coupleAdjustment],
+        ]);
+        app(PriceBookVersionService::class)->publish($version);
+
+        return $version->refresh();
+    }
+
+    protected function assignLogicalSeatType(Seat $seat): void
+    {
+        $seatType = $this->seatType((string) $seat->type, $seat->type === 'couple');
+        $seat->forceFill(['seat_type_id' => $seatType->id])->save();
+    }
+
+    protected function snapshotShowtime(Showtime $showtime): void
+    {
+        $this->ensurePublishedPriceBook();
+        $showtime->loadMissing(['room.cinema', 'room.roomType', 'roomLayout.cells.seat.seatType', 'movie']);
+        $schedule = app(ShowtimeScheduleService::class);
+        $snapshots = app(ShowtimeTicketPriceService::class)->preview(
+            $showtime->room,
+            $showtime->roomLayout,
+            $schedule->windowFor($showtime),
+        );
+        app(ShowtimeTicketPriceService::class)->persist($showtime, $snapshots);
+        $showtime->load('ticketPrices.seatType');
     }
 
     /** @return array{Cinema, RoomType, Room} */

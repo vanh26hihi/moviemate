@@ -17,7 +17,6 @@ use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentReconciliationController;
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\PresentationFormatController as AdminPresentationFormatController;
-use App\Http\Controllers\Admin\PricingRuleController as AdminPricingRuleController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
@@ -366,21 +365,6 @@ Route::prefix('admin')->name('admin.')
             ->middlewareFor(['create', 'store', 'edit', 'update'], 'permission:cinemas.manage');
         Route::patch('/cinemas/{cinema}/operating-hours', [AdminCinemaOperatingHoursController::class, 'update'])
             ->middleware('permission:cinemas.operations.manage')->name('cinemas.operating-hours.update');
-
-        Route::get('/pricing-rules', [AdminPricingRuleController::class, 'index'])
-            ->middleware('permission:pricing.view')->name('pricing-rules.index');
-        Route::get('/pricing-rules/create', [AdminPricingRuleController::class, 'create'])
-            ->middleware('permission:pricing.manage')->name('pricing-rules.create');
-        Route::post('/pricing-rules', [AdminPricingRuleController::class, 'store'])
-            ->middleware('permission:pricing.manage')->name('pricing-rules.store');
-        Route::get('/pricing-rules/{pricingRule}/edit', [AdminPricingRuleController::class, 'edit'])
-            ->middleware('permission:pricing.manage')->name('pricing-rules.edit');
-        Route::patch('/pricing-rules/{pricingRule}', [AdminPricingRuleController::class, 'update'])
-            ->middleware('permission:pricing.manage')->name('pricing-rules.update');
-        Route::post('/pricing-rules/{pricingRule}/status', [AdminPricingRuleController::class, 'status'])
-            ->middleware('permission:pricing.manage')->name('pricing-rules.status');
-        Route::post('/pricing-rules-preview', [AdminPricingRuleController::class, 'preview'])
-            ->middleware(['permission:pricing.view', 'throttle:30,1'])->name('pricing-rules.preview');
 
         Route::get('/room-types', [AdminRoomTypeController::class, 'index'])
             ->middleware('permission:room_types.view')->name('room-types.index');

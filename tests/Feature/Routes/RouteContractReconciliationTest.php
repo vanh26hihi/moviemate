@@ -43,7 +43,7 @@ final class RouteContractReconciliationTest extends TestCase
             'admin.genres.index', 'admin.reviews.index',
             'admin.cinemas.index', 'admin.rooms.index',
             'admin.room-types.index', 'admin.layout-templates.index',
-            'admin.showtimes.index', 'admin.pricing-rules.index', 'admin.bookings.index',
+            'admin.showtimes.index', 'admin.bookings.index',
             'admin.payments.index', 'admin.discounts.index',
             'admin.foods.index', 'admin.food-orders.index', 'admin.users.index',
             'admin.roles.index', 'admin.activity-logs.index',

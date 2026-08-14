@@ -399,7 +399,6 @@ class Phase3BShowtimeCorrectnessTest extends ShowtimeTestCase
             DB::table('room_layout_cells')->delete();
             DB::table('room_layouts')->delete();
             DB::table('seats')->delete();
-            DB::table('cinema_pricing_rules')->delete();
             DB::table('rooms')->delete();
             DB::table('movies')->delete();
             DB::table('presentation_formats')->delete();

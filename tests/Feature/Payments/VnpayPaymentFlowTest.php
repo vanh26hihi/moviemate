@@ -8,7 +8,6 @@ use App\Exceptions\PaymentInitiationException;
 use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\BookingTicketDelivery;
-use App\Models\CinemaPricingRule;
 use App\Models\DiscountCode;
 use App\Models\FoodItem;
 use App\Models\Order;
@@ -26,10 +25,6 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
     public function test_removed_promotion_cannot_leak_into_the_final_provider_amount(): void
     {
         $scenario = $this->bookingScenario(false);
-        CinemaPricingRule::query()
-            ->where('cinema_id', $scenario['cinema']->id)
-            ->where('name', 'Booking fixture base')
-            ->update(['amount_vnd' => 80_000]);
         $food = FoodItem::query()->create([
             'name' => 'Promotion replacement combo',
             'price' => 55_000,
@@ -65,19 +60,15 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
 
         $response->assertRedirectContains('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
         $this->assertSame(10_000, $booking->promotion_discount_amount);
-        $this->assertSame(125_000, (int) $booking->total_amount);
-        $this->assertSame(125_000, $booking->payments->sole()->amount);
-        $this->assertSame('12500000', $parameters['vnp_Amount']);
+        $this->assertSame(95_000, (int) $booking->total_amount);
+        $this->assertSame(95_000, $booking->payments->sole()->amount);
+        $this->assertSame('9500000', $parameters['vnp_Amount']);
         $this->assertSame(['FINAL10K'], $booking->discountCodeRedemptions->pluck('code_snapshot')->all());
     }
 
     public function test_discounted_review_confirms_with_the_net_amount_and_redirects_to_vnpay(): void
     {
         $scenario = $this->bookingScenario(false);
-        CinemaPricingRule::query()
-            ->where('cinema_id', $scenario['cinema']->id)
-            ->where('name', 'Booking fixture base')
-            ->update(['amount_vnd' => 80_000]);
         $food = FoodItem::query()->create([
             'name' => 'Promotion payment combo',
             'price' => 55_000,
@@ -106,10 +97,10 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         $this->get(route('user.bookings.review'))
             ->assertOk()
             ->assertViewHas('promotion', fn ($promotion): bool => $promotion->discountAmount === 20_000
-                && $promotion->finalAmount === 115_000)
-            ->assertSee('80.000 VNĐ')
+                && $promotion->finalAmount === 85_000)
+            ->assertSee('50.000 VNĐ')
             ->assertSee('55.000 VNĐ')
-            ->assertSee('115.000 VNĐ');
+            ->assertSee('85.000 VNĐ');
 
         $response = $this->post(route('user.bookings.confirm'), ['payment_method' => 'vnpay']);
         $booking = Booking::query()->with(['discountCodeRedemptions', 'payments'])->sole();
@@ -117,13 +108,13 @@ class VnpayPaymentFlowTest extends VnpayPaymentTestCase
         parse_str((string) parse_url($response->headers->get('Location'), PHP_URL_QUERY), $parameters);
 
         $response->assertRedirectContains('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html');
-        $this->assertSame(80_000, $booking->seat_subtotal);
+        $this->assertSame(50_000, $booking->seat_subtotal);
         $this->assertSame(55_000, $booking->food_subtotal);
-        $this->assertSame(135_000, $booking->gross_amount);
+        $this->assertSame(105_000, $booking->gross_amount);
         $this->assertSame(20_000, $booking->promotion_discount_amount);
-        $this->assertSame(115_000, (int) $booking->total_amount);
-        $this->assertSame(115_000, $payment->amount);
-        $this->assertSame('11500000', $parameters['vnp_Amount']);
+        $this->assertSame(85_000, (int) $booking->total_amount);
+        $this->assertSame(85_000, $payment->amount);
+        $this->assertSame('8500000', $parameters['vnp_Amount']);
         $this->assertSame('PAYMENT20K', $booking->discountCodeRedemptions->sole()->code_snapshot);
         $this->assertSame(20_000, $booking->discountCodeRedemptions->sole()->discount_amount);
         $this->assertSame('reserved', $booking->discountCodeRedemptions->sole()->status);

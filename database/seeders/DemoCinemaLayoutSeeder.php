@@ -13,12 +13,12 @@ final class DemoCinemaLayoutSeeder extends Seeder
     {
         $now = now();
         foreach ([
-            'normal' => ['Normal', 0, false],
-            'vip' => ['VIP', 20000, false],
-            'couple' => ['Couple', 40000, true],
-        ] as $code => [$name, $modifier, $pair]) {
+            'normal' => ['Normal', false],
+            'vip' => ['VIP', false],
+            'couple' => ['Couple', true],
+        ] as $code => [$name, $pair]) {
             DB::table('seat_types')->updateOrInsert(['code' => $code], [
-                'name' => $name, 'slug' => $code, 'price_modifier' => $modifier,
+                'name' => $name, 'slug' => $code,
                 'is_pair' => $pair, 'status' => true, 'sort_order' => 0,
                 'updated_at' => $now, 'created_at' => $now,
             ]);

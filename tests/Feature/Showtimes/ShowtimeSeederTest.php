@@ -4,6 +4,7 @@ namespace Tests\Feature\Showtimes;
 
 use App\Models\Cinema;
 use App\Models\Movie;
+use App\Models\PriceBook;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\ShowtimeScheduleService;
@@ -12,7 +13,7 @@ use Database\Seeders\DemoCinemaLayoutSeeder;
 use Database\Seeders\GenreSeeder;
 use Database\Seeders\MovieSeeder;
 use Database\Seeders\PresentationFormatSeeder;
-use Database\Seeders\PricingRuleSeeder;
+use Database\Seeders\PriceBookSeeder;
 use Database\Seeders\RoomSeeder;
 use Database\Seeders\RoomTypeSeeder;
 use Database\Seeders\ShowtimeSeeder;
@@ -26,6 +27,9 @@ final class ShowtimeSeederTest extends TestCase
 
     public function test_demo_showtimes_are_multi_date_and_idempotent_even_when_a_slot_already_exists(): void
     {
+        if (! PriceBook::query()->exists()) {
+            $this->seed(PriceBookSeeder::class);
+        }
         $this->seed([
             GenreSeeder::class,
             CinemaSeeder::class,
@@ -34,7 +38,6 @@ final class ShowtimeSeederTest extends TestCase
             RoomSeeder::class,
             MovieSeeder::class,
             DemoCinemaLayoutSeeder::class,
-            PricingRuleSeeder::class,
             ShowtimeSeeder::class,
         ]);
         $firstIds = Showtime::query()->orderBy('id')->pluck('id')->all();

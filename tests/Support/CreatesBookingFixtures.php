@@ -4,12 +4,12 @@ namespace Tests\Support;
 
 use App\Models\Booking;
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\Movie;
 use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\RoomLayoutCell;
+use App\Models\RoomType;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutResult;
@@ -19,19 +19,26 @@ use App\Services\CinemaContext;
 
 trait CreatesBookingFixtures
 {
+    use CreatesPriceBookFixtures;
+
     protected function bookingScenario(
         bool $withCouple = true,
         array $extraLayoutCells = [],
         int $layoutRows = 2,
         int $layoutColumns = 4,
         array $extraSeats = [],
+        int $basePrice = 50_000,
     ): array {
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
+        $roomType = RoomType::query()->firstOrCreate(['code' => '2D'], [
+            'name' => '2D', 'slug' => '2d', 'is_active' => true, 'status' => true, 'sort_order' => 1,
+        ]);
         $room = Room::query()->create([
             'cinema_id' => $cinema->id,
             'code' => 'T'.str()->upper(str()->random(7)),
             'name' => 'Test booking room',
             'room_type' => '2D',
+            'room_type_id' => $roomType->id,
             'width_mm' => 8_000,
             'length_mm' => 10_000,
             'status' => 'active',
@@ -86,6 +93,7 @@ trait CreatesBookingFixtures
                 'pair_position' => $attributes['pair_position'] ?? null,
             ]));
         }
+        $seats->each(fn (Seat $seat) => $this->assignLogicalSeatType($seat));
 
         $layout = RoomLayout::query()->create([
             'room_id' => $room->id,
@@ -114,24 +122,7 @@ trait CreatesBookingFixtures
             ]);
         }
         $layout->update(['status' => 'published', 'published_at' => now()]);
-
-        foreach ([
-            ['name' => 'Booking fixture base', 'rule_type' => 'base', 'seat_type' => null, 'amount_vnd' => 50000],
-            ['name' => 'Booking fixture VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000],
-            ['name' => 'Booking fixture couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000],
-        ] as $rule) {
-            CinemaPricingRule::query()->updateOrCreate(
-                ['name' => $rule['name'], 'cinema_id' => $cinema->id],
-                [
-                    'rule_type' => $rule['rule_type'],
-                    'room_id' => null,
-                    'seat_type' => $rule['seat_type'],
-                    'amount_vnd' => $rule['amount_vnd'],
-                    'priority' => 1000,
-                    'status' => 'active',
-                ],
-            );
-        }
+        $this->ensurePublishedPriceBook($basePrice);
 
         $showtime = Showtime::query()->create([
             'movie_id' => $movie->id,
@@ -141,11 +132,9 @@ trait CreatesBookingFixtures
             'presentation_format_id' => $format->id,
             'show_date' => now()->addDays(5)->toDateString(),
             'show_time' => '19:00:00',
-            'price' => 50000,
-            'vip_price' => 70000,
-            'pricing_version' => 'cinema-pricing-v1',
             'status' => 'active',
         ]);
+        $this->snapshotShowtime($showtime);
 
         return compact('cinema', 'room', 'movie', 'seats', 'layout', 'showtime');
     }

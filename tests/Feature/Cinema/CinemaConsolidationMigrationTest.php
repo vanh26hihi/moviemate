@@ -145,7 +145,7 @@ class CinemaConsolidationMigrationTest extends TestCase
             'id' => 950, 'movie_id' => 2, 'cinema_id' => $canonicalId, 'room_id' => 9,
             'room_layout_id' => 9001,
             'presentation_format_id' => $format->id,
-            'show_date' => '2026-08-20', 'show_time' => '20:00:00', 'price' => 90000,
+            'show_date' => '2026-08-20', 'show_time' => '20:00:00',
             'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('orders')->insert([
@@ -390,7 +390,7 @@ class CinemaConsolidationMigrationTest extends TestCase
                     },
                     'presentation_format_id' => $format->id,
                     'show_date' => '2026-08-10', 'show_time' => sprintf('%02d:00:00', 8 + $index),
-                    'price' => 80000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
+                    'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
                 ];
             }
         }

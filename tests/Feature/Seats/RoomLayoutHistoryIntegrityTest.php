@@ -173,7 +173,6 @@ final class RoomLayoutHistoryIntegrityTest extends TestCase
                 'name' => ucfirst($code),
                 'code' => $code,
                 'slug' => $code,
-                'price_modifier' => 0,
                 'is_pair' => $isPair,
                 'status' => true,
                 'sort_order' => 0,

@@ -85,11 +85,6 @@ class Cinema extends Model
         return $this->hasMany(CinemaOperatingHour::class);
     }
 
-    public function pricingRules(): HasMany
-    {
-        return $this->hasMany(CinemaPricingRule::class);
-    }
-
     public function pickupOrders(): HasMany
     {
         return $this->hasMany(Order::class, 'pickup_cinema_id');
