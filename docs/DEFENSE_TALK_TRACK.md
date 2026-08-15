@@ -1,61 +1,85 @@
-# MovieMate — Bộ câu hỏi bảo vệ
+# MovieMate — Talk track và Viva Q&A
 
-**Vì sao cần multi-branch?** Một chủ chuỗi cần dùng chung catalog và tiêu chuẩn vận hành nhưng phải tách phòng, suất, giá, đơn và nhân sự theo chi nhánh. `cinema_id` cùng assignment tạo ranh giới đó.
+## 10 điều cả đội phải nhớ
 
-**Manager khác Admin thế nào?** Với dữ liệu vận hành theo chi nhánh, Manager chỉ xem và thao tác trên các chi nhánh được gán, kể cả khi được gán nhiều nơi. Catalog phim/thể loại là dữ liệu dùng chung và Manager chỉ thao tác theo các permission nội dung đã cấp. Global Admin có phạm vi toàn chuỗi, quản lý chi nhánh, nội dung toàn cục, người dùng và báo cáo hợp nhất.
+1. MovieMate phục vụ **một công ty rạp, nhiều chi nhánh**; không phải marketplace hoặc SaaS đa công ty.
+2. Global Admin quản trị toàn chuỗi; Manager vận hành chi nhánh được phân công.
+3. Room là phòng vật lý; RoomLayout là phiên bản cấu trúc được phát hành và ghim vào Showtime.
+4. BLOCKED là vật cản cố định; ghế bảo trì vẫn là Seat và có thể gắn SeatIncident.
+5. RoomType là loại trải nghiệm phòng; PresentationFormat là phương thức trình chiếu và không tạo phụ thu.
+6. END là lúc phim kết thúc; ROOM_READY là sau cleaning buffer.
+7. PriceBookVersion cấu hình giá tương lai; ShowtimeTicketPrice khóa giá của Showtime; Booking khóa số tiền đã bán.
+8. QR đơn đặt vé dùng tra cứu Booking; AdmissionTicket là vé giấy theo từng vị trí ghế vật lý.
+9. Mỗi Booking áp dụng tối đa một Khuyến mãi.
+10. Browser return không chứng minh đã trả tiền; báo cáo dựa trên Payment đã xác minh hoặc đã thu tiền.
 
-**Staff có vào Admin không?** Không. Admin portal yêu cầu `admin.access`; workspace Staff yêu cầu role Staff/Manager/Admin và permission nghiệp vụ cụ thể. Staff có quyền quầy/ticket vẫn không được mở CRUD Admin.
+## 15 câu hỏi hội đồng dễ hỏi
 
-**Vì sao không lưu booking chỉ bằng localStorage?** LocalStorage do browser kiểm soát, có thể sửa/xóa và không khóa ghế giữa nhiều người. Booking, hold, giá và idempotency phải nằm ở server/database; local state chỉ hỗ trợ giao diện.
+**1. Vì sao hệ thống này không chỉ là CRUD?**
+MovieMate có read model theo tác vụ, handoff Branch → Room → Showtime → Booking → Payment, snapshot lịch sử, invariant phía server, row lock và authorization theo chi nhánh. Giá trị nằm ở tính đúng đắn liên domain, không phải số lượng màn hình.
 
-**Vì sao cần seat hold?** Hold tạo quyền sở hữu ghế tạm thời có hạn và unique active lock, tránh hai khách cùng thanh toán một ghế. Hết hạn có quy trình giải phóng an toàn.
+**2. Manager khác Global Admin thế nào?**
+Global Admin quản trị cấu hình và master toàn chuỗi. Manager bắt đầu từ chi nhánh hiện tại, vận hành Room, Showtime, Booking, báo cáo và Khuyến mãi đúng phạm vi; Movie, Genre, Food chỉ read/use.
 
-**Vì sao D6 + D8 phải bị chặn?** Tổ hợp đó để D7 thành một ghế lẻ khó bán. Client phản hồi sớm, nhưng `SeatSelectionPolicy` phía server mới là kiểm tra có thẩm quyền.
+**3. Room khác RoomLayout thế nào?**
+Room là phòng chiếu vật lý có width/length lưu mm. RoomLayout là phiên bản lưới cấu trúc; khi phát hành thì bất biến và Showtime ghim đúng version.
 
-**Ghế đôi tính tiền thế nào?** Hai bản ghi ghế vật lý dùng chung `pricing_unit_key`; pricing tính một đơn vị ghế đôi và chia snapshot sao cho tổng hai hàng đúng bằng giá cặp. Báo cáo ghi 1 logical ticket, 2 physical seats.
+**4. Vì sao lưới Room không phải mét?**
+Rows × columns là lưới logic để định vị Ghế, Lối đi, Vật cản cố định và Ô trống. Kích thước vật lý được lưu riêng bằng mm, hiển thị mét; hệ thống không tuyên bố CAD.
 
-**Giá vé lấy từ đâu?** `TicketPricingService` chọn rule có hiệu lực theo rạp/phòng/suất/ghế và trả số nguyên VND. Browser không gửi giá quyết định.
+**5. BLOCKED có phải ghế hỏng không?**
+Không. BLOCKED là vật cản cấu trúc; ghế hỏng vẫn là Seat, được đánh dấu bảo trì và có thể tạo SeatIncident.
 
-**Vì sao không nhập giá tùy ý mỗi suất?** Giá thủ công gây lệch giữa kênh online/quầy và phá lịch sử. Trường `showtimes.price` còn để tương thích/snapshot hiển thị, nhưng lịch mới và checkout lấy từ pricing engine.
+**6. RoomType khác PresentationFormat thế nào?**
+RoomType mô tả trải nghiệm/auditorium như phòng premium hoặc IMAX. PresentationFormat là phương thức chiếu như 2D/3D và hiện tại price-neutral.
 
-**Hai suất cùng phòng chồng giờ được xử lý thế nào?** `ShowtimeScheduleService` khóa và so sánh toàn bộ cửa sổ từ start đến hết phim cộng cleaning buffer, kể cả qua nửa đêm; conflict bị từ chối trước khi lưu.
+**7. Showtime kết thúc khi nào?**
+END = START + runtime của Movie. ROOM_READY = END + cleaning buffer; phim đã hoàn tất ở END dù phòng vẫn đang vệ sinh.
 
-**Vì sao có cleaning buffer?** Phòng chưa sẵn sàng ngay khi phim hết. Buffer phản ánh dọn vệ sinh/chuyển ca và tham gia trực tiếp vào kiểm tra overlap.
+**8. Qua nửa đêm và ngày nghiệp vụ xử lý ra sao?**
+Showtime được phép qua nửa đêm; ngày nghiệp vụ là ngày local của START. Payment dùng timestamp xác minh/thu tiền thực tế, không dùng ngày nghiệp vụ của Showtime.
 
-**Phim kết thúc sau 0h xử lý thế nào?** `show_date` là ngày bắt đầu kinh doanh; thời điểm kết thúc được tính bằng timezone chi nhánh và có thể sang ngày kế tiếp. Latest show start không đồng nghĩa phim phải kết thúc trước 0h.
+**9. Vì sao giá của Showtime cũ không đổi?**
+PriceBookVersion cấu hình phép tính tương lai, ShowtimeTicketPrice đóng băng khi lập lịch và Booking lưu sold snapshot. Thay đổi cấu hình sau đó không viết lại lịch sử.
 
-**Vì sao return URL không được tự đánh dấu paid?** Return chạy trong browser và có thể bị giả mạo/đóng giữa chừng. VNPAY dùng IPN đã ký; ZaloPay dùng callback MAC; payOS return phải query provider hoặc nhận webhook đã xác minh.
+**10. Vì sao Holiday không cộng thêm Weekend?**
+Rule được Product Owner duyệt là Holiday thay Weekend để một ngữ cảnh lịch không nhận hai adjustment. Đây là quyết định sản phẩm, không phải tuyên bố quy luật ngành.
 
-**payOS webhook dùng để làm gì?** Nhận trạng thái provider độc lập với tab browser, kiểm tra chữ ký/order/amount/currency rồi mới finalize idempotent hoặc chuyển review.
+**11. Ghế đôi tính vé và tính tiền thế nào?**
+Couple có hai vị trí ghế vật lý nên in hai AdmissionTicket, nhưng là một pricing unit và chỉ charge một lần. Hai vị trí phải được xử lý nguyên tử.
 
-**Đóng tab thanh toán thì ghế thế nào?** Attempt pending/unresolved giữ ghế đến hạn an toàn; job query/expiration xử lý tiếp. Đóng tab không được coi là success hoặc cancel.
+**12. Vì sao chỉ một Khuyến mãi?**
+Đây là rule Product Owner giúp loại bỏ stacking ambiguity và làm quota, snapshot, audit deterministic. Khuyến mãi áp dụng trên ticket + food gross trước giảm.
 
-**Người dùng hủy payment thì ghế thế nào?** Chỉ cancellation/terminal failure đã được provider xác minh mới giải phóng active seat locks đủ điều kiện. Một cancel return giả không có tác dụng.
+**13. Quota Khuyến mãi chống tranh chấp ra sao?**
+Quote không tiêu quota. Authoritative Booking confirm giữ slot dưới row lock; reserved và redeemed tiêu quota, released không còn tiêu quota nhưng định nghĩa vẫn bất biến vì đã có usage.
 
-**Reconciliation dùng khi nào?** Chỉ cho pending/unresolved hoặc exception cần back-office kiểm tra provider; success đã xác minh bình thường không cần Admin “duyệt paid”.
+**14. Vì sao không có digital check-in?**
+MovieMate không duy trì attendance điện tử. QR của Customer chỉ tra cứu Booking; Staff in AdmissionTicket và rạp kiểm tra vé giấy theo quy trình thủ công.
 
-**Vì sao khách không được in vé?** Vé khách là capability điện tử phục vụ QR. In cứng là nghiệp vụ Staff cần máy in, actor, trạng thái và retry evidence; không đặt nút Print/PDF trên trang khách.
+**15. Vì sao dùng “đã xác minh/đã thu tiền”?**
+Browser redirect có thể bị giả mạo hoặc đóng giữa chừng. Provider callback/query đã xác minh hoặc counter settlement mới là evidence; báo cáo dùng các trạng thái và timestamp đó.
 
-**Staff in vé lại thế nào?** Lần đầu start rồi success/failure rõ ràng. Một failure có lý do cho phép một retry tự động; lần tiếp theo cần Manager/Admin cấp quyền. Không reset lịch sử.
+## Câu hỏi tình huống ngắn
 
-**Scan QR có tự check-in không?** Không. Resolve/preview là read-only. Staff phải xác nhận ở endpoint check-in riêng mới đổi booking sang used và ghi event append-only.
+**Ghế hỏng sau khi đã bán thì sao?** Seat vẫn là Seat; ghi incident, xác định Booking bị ảnh hưởng và chuyển sang vị trí tương đương/nâng hạng, không downgrade, không thu thêm, giữ nguyên Booking. Couple được chuyển nguyên tử và có thể cần in thay thế.
 
-**Ai tạo đơn quầy?** `created_by_staff_id` lấy từ actor đang đăng nhập khi tạo hold, không nhận từ browser.
+**Template đổi thì Room đã áp dụng có đổi không?** Không. Apply tạo bản sao độc lập; Template không phải runtime authority của RoomLayout đã áp dụng.
 
-**Ai thu tiền?** `settled_by_user_id` và `settled_at` lấy từ actor đang đăng nhập khi xác nhận thu tiền mặt.
+**PriceBook đổi thì Showtime cũ có đổi không?** Không. Showtime giữ snapshot từ PriceBookVersion ban đầu.
 
-**Có phân biệt người in và người soát vé không?** Có. Print lưu `printed_by_user_id`; check-in event lưu `actor_user_id`; cả hai độc lập với creator và settler.
+**Promotion reservation được released thì có sửa nội dung lại được không?** Không. Released không còn tiêu quota hiện tại nhưng usage đã tồn tại nên economics, eligibility và scope vẫn khóa; chỉ lifecycle controls còn hiệu lực.
 
-**Vì sao phim không hard-delete?** Booking, ticket và báo cáo lịch sử cần movie còn tồn tại. Lifecycle draft/coming soon/now showing/inactive/archived kiểm soát sellability mà không phá tham chiếu.
+**Payment callback đến muộn thì sao?** Hệ thống áp dụng provider verification và idempotency trên đúng attempt. Trạng thái ambiguous được giữ để reconciliation, không suy diễn từ browser return.
 
-**Vì sao cần layout template?** Template chuẩn hóa thiết kế nhiều phòng, cho preview/apply nhanh. Khi publish, layout version bất biến; layout cũ và ghế đã đặt vẫn được giữ.
+## Không được tuyên bố
 
-**Dashboard tính doanh thu theo ngày nào?** Online theo `payments.verified_at`, counter cash theo `payments.settled_at`, quy đổi sang ngày địa phương của chi nhánh. Không dùng `booking.created_at` hay generic `paid_at`.
-
-**Couple seat trong báo cáo tính thế nào?** Một pair là 1 logical ticket nhưng 2 physical seats. Doanh thu lấy payment authoritative một lần, không nhân qua join ghế.
-
-**Hệ thống chống truy cập chéo chi nhánh ra sao?** Route có auth/role/permission; controller/service gọi `CinemaAccessService`; query index được scope; ID trực tiếp và forged POST được kiểm thử. Revoking assignment có hiệu lực ở request kế tiếp.
-
-**Kiến trúc authoritative tóm tắt?** Browser → Laravel route/controller → validation/permission → domain service → MySQL. Provider và email là boundary ngoài. Server quyết định giá, hold, branch, actor và trạng thái; database giữ snapshot/guard/event lịch sử.
-
-**Các entity chính?** `cinemas` có `rooms`; phòng có versioned `room_layouts` và `seats`; `movies` có `showtimes`; `bookings` có `booking_seats`, food order và `payments`; user assignment tạo scope; ticket delivery, print và check-in là ba workflow độc lập; pricing rules và layout templates là cấu hình dùng lại.
+- QR vào cổng, vé điện tử hoặc attendance tracking.
+- Refund ledger, net revenue sau refund hoặc hoàn tiền tự động.
+- Occupancy/check-in analytics.
+- AI/dynamic pricing hoặc yield management.
+- CAD, mô phỏng thoát hiểm, QCVN/legal certification.
+- Manager sở hữu Movie/Food theo chi nhánh.
+- Nhiều Khuyến mãi được stacking.
+- Phụ thu dựa trên PresentationFormat.
+- Phỏng vấn/khảo sát không có bằng chứng nguồn.
