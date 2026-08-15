@@ -19,7 +19,7 @@
     </div>
     <div class="cinema-card p-4 sm:p-6">
         <x-admin.layout-template-legend />
-        <p class="mt-3 text-sm app-muted"><strong class="app-text">Trạng thái vận hành:</strong> Ghế bảo trì vẫn là Seat vật lý tạm thời không khả dụng; Vật cản cố định là ô cấu trúc không có Seat.</p>
+        <p class="mt-3 text-sm app-muted"><strong class="app-text">Trạng thái vận hành:</strong> Ghế bảo trì vẫn là ghế vật lý tạm thời không khả dụng; Vật cản cố định là ô cấu trúc không bố trí ghế.</p>
         <div class="mt-5 max-w-full overflow-x-auto overscroll-x-contain" tabindex="0" aria-label="Sơ đồ chỉ đọc, có thể cuộn ngang trên màn hình nhỏ">
         @if($layout->screen_position === 'top')<div class="mx-auto mb-8 h-2 min-w-[30rem] max-w-4xl rounded-t-[100%] bg-brand-start/50" aria-hidden="true"></div>@endif
         <div class="mx-auto grid w-max gap-1.5" style="grid-template-columns: repeat({{ $layout->columns }}, 2.35rem)">

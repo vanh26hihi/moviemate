@@ -176,7 +176,7 @@
                     <td>{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->verified_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->settled_at?->format('d/m/Y H:i:s') ?? $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? $payment->paid_at?->format('d/m/Y H:i:s') ?? '—' }}</td>
                     <td>@can('payments.view')<a class="font-bold text-brand-start" href="{{ route('admin.payments.show', $payment) }}">Xem thanh toán #{{ $payment->id }}</a>@else<span class="app-muted">Không có quyền xem</span>@endcan</td>
                 </tr>
-            @empty<tr><td colspan="9" class="py-8 text-center app-muted">Chưa có lần thanh toán.</td></tr>@endforelse
+            @empty<tr><td colspan="9" class="py-8 text-center app-muted">Chưa có bằng chứng thanh toán nào cho đơn này. Trạng thái đơn được hiển thị riêng ở phần tổng quan.</td></tr>@endforelse
         </tbody></table></div>
     </section>
 

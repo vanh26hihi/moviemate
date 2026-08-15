@@ -49,7 +49,7 @@
                 ['Mã mẫu', $layoutTemplate->code, 'ph-hash'],
                 ['Loại phòng', $roomTypeName ?: 'Mọi loại phòng', 'ph-projector-screen'],
                 ['Lưới logic', $layoutTemplate->rows.' hàng × '.$layoutTemplate->columns.' cột', 'ph-grid-four'],
-                ['Vị trí SEAT trong mẫu', $statistics['physical_seats'].' vị trí', 'ph-users-three'],
+                ['Vị trí ghế trong mẫu', $statistics['physical_seats'].' vị trí', 'ph-users-three'],
             ] as [$label, $value, $icon])
                 <div class="min-w-0 rounded-2xl border app-border app-bg p-4">
                     <dt class="flex items-center gap-2 text-xs font-bold app-muted"><i class="ph {{ $icon }} text-brand-start" aria-hidden="true"></i>{{ $label }}</dt>
@@ -66,7 +66,7 @@
         </div>
         <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                ['Vị trí SEAT trong mẫu', $statistics['physical_seats'], 'vị trí', 'ph-users-three'],
+                ['Vị trí ghế trong mẫu', $statistics['physical_seats'], 'vị trí', 'ph-users-three'],
                 ['Đơn vị tính giá', $statistics['pricing_units'], 'đơn vị', 'ph-ticket'],
                 ['Ghế thường', $statistics['normal'], 'vị trí', 'ph-armchair'],
                 ['VIP', $statistics['vip'], 'vị trí', 'ph-star'],

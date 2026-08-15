@@ -77,7 +77,7 @@ class CustomerCinemaDiscoveryTest extends TestCase
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-02']))
             ->assertOk()->assertSee('Lịch chiếu tại '.$branch['cinema']->name)
             ->assertSee($branch['movie']->title)->assertSee('80.000 ₫')
-            ->assertSee('Định dạng: Test 2D')->assertSee('Loại phòng: IMAX')
+            ->assertSee('Định dạng trình chiếu: Test 2D')->assertSee('Loại phòng: IMAX')
             ->assertDontSee($other['movie']->title);
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-03']))
             ->assertOk()->assertSee('Chưa có suất chiếu');

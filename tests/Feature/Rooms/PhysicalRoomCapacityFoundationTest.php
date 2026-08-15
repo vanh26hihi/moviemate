@@ -306,7 +306,7 @@ final class PhysicalRoomCapacityFoundationTest extends TestCase
 
         $this->actingAs($this->userWithRole('admin'))->get(route('admin.layout-templates.show', $template))
             ->assertOk()
-            ->assertSee('Vị trí SEAT trong mẫu')
+            ->assertSee('Vị trí ghế trong mẫu')
             ->assertSee('3 vị trí')
             ->assertSee('Đơn vị tính giá')
             ->assertSeeInOrder(['Đơn vị tính giá', '2', 'đơn vị']);

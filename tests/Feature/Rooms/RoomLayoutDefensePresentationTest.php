@@ -60,7 +60,7 @@ final class RoomLayoutDefensePresentationTest extends TestCase
             ->assertSee('Lối đi')
             ->assertSee('Vật cản cố định')
             ->assertSee('Ô trống')
-            ->assertSee('Ghế bảo trì vẫn là một Seat vật lý tạm thời không khả dụng')
+            ->assertSee('Ghế bảo trì vẫn là ghế vật lý tạm thời không khả dụng')
             ->assertSee('Sao chép thành bản nháp phiên bản 2')
             ->assertDontSee('Lưu bản nháp')
             ->assertDontSee('Phát hành '.$layout->display_name);
@@ -70,7 +70,7 @@ final class RoomLayoutDefensePresentationTest extends TestCase
             ->assertSee('Lưới logic: 2 hàng × 4 cột')
             ->assertSee('Sức chứa vật lý: 5 vị trí')
             ->assertSee('Sơ đồ chỉ đọc, có thể cuộn ngang trên màn hình nhỏ', false)
-            ->assertSee('Vật cản cố định là ô cấu trúc không có Seat');
+            ->assertSee('Vật cản cố định là ô cấu trúc không bố trí ghế');
     }
 
     public function test_template_pages_use_logical_grid_and_explain_copy_on_apply_without_physical_room_fields(): void
@@ -113,7 +113,7 @@ final class RoomLayoutDefensePresentationTest extends TestCase
             ->assertSee('Mẫu lưới bố trí logic dùng lại khi cấu hình phòng chiếu')
             ->assertSee('Áp dụng mẫu sẽ tạo một sơ đồ phòng độc lập')
             ->assertSee('thay đổi sau này trên mẫu không làm thay đổi sơ đồ đã áp dụng', false)
-            ->assertSee('Vị trí SEAT trong mẫu')
+            ->assertSee('Vị trí ghế trong mẫu')
             ->assertSee('Chú thích cấu trúc')
             ->assertDontSee('Chiều rộng phòng')
             ->assertDontSee('Chiều dài phòng')
@@ -122,7 +122,7 @@ final class RoomLayoutDefensePresentationTest extends TestCase
         $this->get(route('admin.layout-templates.edit', $template))
             ->assertOk()
             ->assertSee('Hàng × cột là lưới logic, không phải kích thước phòng theo mét')
-            ->assertSee('Ô trống là tọa độ không sử dụng và không được lưu thành một cell')
+            ->assertSee('Ô trống là tọa độ không sử dụng và không được lưu thành ô sơ đồ')
             ->assertSee('Sơ đồ ghế có thể cuộn ngang', false)
             ->assertDontSee('width_mm')
             ->assertDontSee('length_mm');

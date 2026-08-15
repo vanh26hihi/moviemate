@@ -198,7 +198,7 @@
                         <div><dt class="app-muted">Rạp</dt><dd class="mt-1 font-semibold app-text">{{ $cinemaName }}</dd></div>
                         <div><dt class="app-muted">Địa chỉ</dt><dd class="mt-1 font-semibold app-text">{{ $cinemaAddress }}</dd></div>
                         <div><dt class="app-muted">Phòng</dt><dd class="mt-1 font-semibold app-text">{{ $roomLabel }}</dd></div>
-                        <div><dt class="app-muted">Định dạng</dt><dd class="mt-1 font-semibold app-text">{{ $presentationFormat }}</dd></div>
+                        <div><dt class="app-muted">Định dạng trình chiếu</dt><dd class="mt-1 font-semibold app-text">{{ $presentationFormat }}</dd></div>
                     </dl>
 
                     <div class="mt-5 border-t pt-4 app-border">

@@ -27,7 +27,7 @@
                     <td class="text-right"><a class="font-bold text-brand-start" href="{{ route('admin.price-books.versions.show', $version) }}">Mở workspace</a></td>
                 </tr>
             @empty
-                <tr><td colspan="6" class="py-10 text-center app-muted">Chưa có phiên bản bảng giá khả dụng.</td></tr>
+                <tr><td colspan="6" class="py-10 text-center app-muted">@if($canManagePriceBook)Chưa có phiên bản bảng giá. Cần khởi tạo phiên bản nền trước khi cấu hình và phát hành.@else Hiện chưa có bảng giá đã phát hành trong phạm vi chi nhánh hiện tại. Liên hệ Global Admin để cấu hình bảng giá.@endif</td></tr>
             @endforelse
             </tbody>
         </table>

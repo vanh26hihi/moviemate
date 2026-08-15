@@ -70,7 +70,7 @@ final class DiscountController extends Controller
             return $discount;
         });
 
-        return redirect()->route('admin.discounts.edit', $discount)->with('success', 'Đã tạo mã giảm giá.');
+        return redirect()->route('admin.discounts.edit', $discount)->with('success', 'Đã tạo khuyến mãi.');
     }
 
     public function update(Request $request, Promotion $discount): RedirectResponse
@@ -87,7 +87,7 @@ final class DiscountController extends Controller
             ];
             if (array_intersect($businessFields, array_keys($request->all())) !== []) {
                 throw ValidationException::withMessages([
-                    'promotion' => 'Định nghĩa business của khuyến mãi đã dùng là bất biến.',
+                    'promotion' => 'Nội dung kinh doanh và phạm vi của khuyến mãi đã sử dụng không thể chỉnh sửa.',
                 ]);
             }
             $data = $request->validate(['is_active' => ['required', 'boolean']]);
@@ -107,7 +107,7 @@ final class DiscountController extends Controller
             $this->activity->log('discount.updated', $discount, $before, $discount->only(array_keys($before)));
         });
 
-        return back()->with('success', 'Đã cập nhật mã giảm giá.');
+        return back()->with('success', 'Đã cập nhật khuyến mãi.');
     }
 
     public function archive(Request $request, Promotion $discount): RedirectResponse
@@ -120,7 +120,7 @@ final class DiscountController extends Controller
             $this->activity->log('discount.archived', $discount);
         });
 
-        return back()->with('success', 'Đã lưu trữ mã; dữ liệu lịch sử được giữ nguyên.');
+        return back()->with('success', 'Đã lưu trữ khuyến mãi; dữ liệu lịch sử được giữ nguyên.');
     }
 
     private function form(Request $request, Promotion $discount): View

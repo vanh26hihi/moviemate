@@ -8,7 +8,7 @@
     <div class="cinema-card p-6 sm:p-8">
         <h1 class="text-2xl font-extrabold app-text mb-2">Cập nhật suất chiếu</h1>
         <p class="app-muted mb-6">
-            Chi nhánh: {{ $showtime->cinema?->name ?? $cinema?->name ?? '—' }} · Định dạng: {{ $showtime->presentationFormat?->code ?? 'Chưa gán' }} · Sơ đồ hiện tại: phiên bản {{ $showtime->roomLayout->version }}
+            Chi nhánh: {{ $showtime->cinema?->name ?? $cinema?->name ?? '—' }} · Định dạng trình chiếu: {{ $showtime->presentationFormat?->code ?? 'Chưa gán' }} · Sơ đồ hiện tại: phiên bản {{ $showtime->roomLayout->version }}
         </p>
 
         @error('showtime')<div class="rounded-2xl border border-error/30 bg-error/10 p-4 text-sm text-error mb-6">{{ $message }}</div>@enderror

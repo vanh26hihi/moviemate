@@ -75,14 +75,17 @@
                     </table>
                 </div>
             @else
-                <p class="p-6 app-muted">Phòng chưa có suất chiếu đang hoạt động sắp tới.</p>
+                <div class="p-6">
+                    <p class="app-muted">Chưa có suất chiếu sắp tới cho phòng này.</p>
+                    @can('showtimes.create')<a class="btn-secondary mt-4" href="{{ route('admin.showtimes.create') }}">Tạo suất chiếu</a>@endcan
+                </div>
             @endif
         </section>
 
         <section class="cinema-card p-6" aria-labelledby="room-seat-operations-title">
             <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Ghế vật lý</p>
             <h2 id="room-seat-operations-title" class="mt-2 text-xl font-extrabold app-text">Tình trạng ghế & bảo trì</h2>
-            <p class="mt-1 text-sm app-muted">Bảo trì là trạng thái vật lý; sự cố là lịch sử vận hành có liên kết riêng. Ô BLOCKED không được tính là sự cố.</p>
+            <p class="mt-1 text-sm app-muted">Bảo trì là trạng thái vật lý; sự cố là lịch sử vận hành có liên kết riêng. Vật cản cố định không phải là ghế và không được tính là sự cố.</p>
             @can('seats.maintenance.view')
                 @if($room->status === 'active' && $published)
                     <a href="{{ route('admin.rooms.seat-maintenance.index', $room) }}" class="btn-secondary mt-4"><i class="ph ph-wrench" aria-hidden="true"></i> Mở tình trạng ghế & bảo trì</a>
@@ -161,9 +164,9 @@
             <h2 class="text-xl font-extrabold app-text">Tạo phiên bản từ mẫu</h2>
             <p class="mt-1 app-muted">Áp dụng mẫu sẽ tạo một sơ đồ phòng độc lập để kiểm tra trước khi phát hành. Thay đổi mẫu sau này không làm thay đổi sơ đồ đã áp dụng; ghế lịch sử không bị đổi mã hay xóa.</p>
             <form method="POST" action="{{ route('admin.rooms.layout.apply-template', $room) }}" class="mt-4 grid gap-4 md:grid-cols-3">@csrf
-                <select name="template_id" class="cinema-input" required><option value="">Chọn mẫu</option>@foreach($templates as $template)<option value="{{ $template->id }}">{{ $template->name }} · lưới {{ $template->rows }} hàng × {{ $template->columns }} cột logic</option>@endforeach</select>
-                <input name="layout_name" class="cinema-input" required minlength="5" placeholder="Tên phiên bản có ý nghĩa">
-                <input name="change_note" class="cinema-input" placeholder="Mục đích thay đổi">
+                <label class="sr-only" for="room-layout-template">Mẫu sơ đồ</label><select id="room-layout-template" name="template_id" class="cinema-input" required><option value="">Chọn mẫu</option>@foreach($templates as $template)<option value="{{ $template->id }}">{{ $template->name }} · lưới {{ $template->rows }} hàng × {{ $template->columns }} cột logic</option>@endforeach</select>
+                <label class="sr-only" for="room-layout-name">Tên phiên bản sơ đồ</label><input id="room-layout-name" name="layout_name" class="cinema-input" required minlength="5" placeholder="Tên phiên bản có ý nghĩa">
+                <label class="sr-only" for="room-layout-change-note">Mục đích thay đổi sơ đồ</label><input id="room-layout-change-note" name="change_note" class="cinema-input" placeholder="Mục đích thay đổi">
                 <button class="btn-primary md:col-span-3">Tạo bản nháp từ mẫu</button>
             </form>
         </section>

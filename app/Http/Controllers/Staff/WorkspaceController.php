@@ -44,7 +44,12 @@ final class WorkspaceController extends Controller
             $showtimes = Showtime::query()->where('cinema_id', $cinema->id)
                 ->where('status', 'active')
                 ->whereDate('show_date', $now->toDateString())
-                ->with(['movie:id,title,duration,age_rating', 'room:id,name,room_type'])
+                ->with([
+                    'movie:id,title,duration,age_rating',
+                    'room:id,name,room_type,room_type_id',
+                    'room.roomType:id,code,name',
+                    'presentationFormat:id,name',
+                ])
                 ->select('showtimes.*')
                 ->selectSub(RoomLayoutCell::query()->selectRaw('COUNT(*)')
                     ->join('seats', 'seats.id', '=', 'room_layout_cells.seat_id')

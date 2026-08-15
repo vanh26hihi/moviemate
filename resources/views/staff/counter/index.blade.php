@@ -52,7 +52,8 @@
                     <dl class="mt-4 space-y-2 text-sm">
                         <div class="flex justify-between gap-3"><dt class="app-muted">Thời gian</dt><dd class="font-bold">{{ $showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}</dd></div>
                         <div class="flex justify-between gap-3"><dt class="app-muted">Phòng</dt><dd class="font-bold">{{ $showtime->room->name }}</dd></div>
-                        <div class="flex justify-between gap-3"><dt class="app-muted">Định dạng</dt><dd class="font-bold">{{ $showtime->room->room_type ?: '2D' }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Loại phòng</dt><dd class="font-bold">{{ $showtime->room->room_type_label }}</dd></div>
+                        <div class="flex justify-between gap-3"><dt class="app-muted">Định dạng trình chiếu</dt><dd class="font-bold">{{ $showtime->presentationFormat?->name ?? 'Không xác định' }}</dd></div>
                         <div class="flex justify-between gap-3"><dt class="app-muted">Giá từ</dt><dd class="font-bold">{{ number_format((int)$showtime->starting_price, 0, ',', '.') }} VNĐ</dd></div>
                     </dl>
                     <a href="{{ route('staff.counter.seats', $showtime) }}" class="btn-primary mt-5 w-full">Chọn ghế</a>

@@ -16,10 +16,10 @@
         data-booking-cutoff-at="{{ $showtime['booking_closes_at']->toIso8601String() }}"
     >
         <span>{{ $label }}</span>
-        @if($formatName)<span class="text-[11px] font-semibold opacity-80">Định dạng: {{ $formatName }}</span>@endif
+        @if($formatName)<span class="text-[11px] font-semibold opacity-80">Định dạng trình chiếu: {{ $formatName }}</span>@endif
         @if($showtime['starting_price'] !== null)<span class="text-[11px] font-semibold opacity-80">Từ {{ number_format($showtime['starting_price'], 0, ',', '.') }} ₫</span>@endif
         <span class="hidden text-[11px] font-semibold" data-showtime-booking-status>Đã đóng đặt vé</span>
     </a>
 @else
-    <span class="{{ $classes }} app-border app-muted opacity-60" aria-disabled="true"><span>{{ $label }}</span>@if($formatName)<span class="text-[11px] font-semibold">Định dạng: {{ $formatName }}</span>@endif<span class="text-[11px] font-semibold">Đã đóng đặt vé</span></span>
+    <span class="{{ $classes }} app-border app-muted opacity-60" aria-disabled="true"><span>{{ $label }}</span>@if($formatName)<span class="text-[11px] font-semibold">Định dạng trình chiếu: {{ $formatName }}</span>@endif<span class="text-[11px] font-semibold">Đã đóng đặt vé</span></span>
 @endif

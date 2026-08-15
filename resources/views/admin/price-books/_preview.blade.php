@@ -4,7 +4,7 @@
             <h2 id="price-preview-title" class="text-xl font-extrabold app-heading">Xem trước giá</h2>
             <p class="mt-1 text-sm app-muted">Máy chủ dùng bảng giá đã phát hành áp dụng cho giờ bắt đầu suất chiếu tại địa phương của chi nhánh. Khuyến mãi không thuộc phép tính này.</p>
         </div>
-        <span class="status-badge border app-border">PresentationFormat không ảnh hưởng giá</span>
+        <span class="status-badge border app-border">Định dạng trình chiếu không ảnh hưởng giá</span>
     </div>
 
     <form method="POST" action="{{ route('admin.price-books.preview') }}" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

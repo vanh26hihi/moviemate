@@ -526,7 +526,7 @@ class ShowtimeScheduleService
     {
         $layout = RoomLayout::query()->published()->where('room_id', $room->id)->orderByDesc('version')->first();
         if (! $layout) {
-            throw new ShowtimeScheduleException('Phòng phải có layout published trước khi xếp lịch.', 'room_id', 'LAYOUT_UNAVAILABLE');
+            throw new ShowtimeScheduleException('Phòng phải có sơ đồ đã phát hành trước khi xếp lịch. Hãy phát hành sơ đồ hợp lệ rồi thử lại.', 'room_id', 'LAYOUT_UNAVAILABLE');
         }
 
         return $layout;
@@ -616,7 +616,7 @@ class ShowtimeScheduleService
                 ->first();
             if (! $layout) {
                 throw new ShowtimeScheduleException(
-                    'Suất chiếu hiện tại không có layout published hợp lệ.',
+                    'Suất chiếu hiện tại không còn sơ đồ đã phát hành hợp lệ. Hãy kiểm tra lại cấu hình phòng.',
                     'room_id',
                     'LAYOUT_UNAVAILABLE',
                 );

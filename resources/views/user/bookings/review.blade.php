@@ -82,9 +82,9 @@
 
                 <aside class="self-start rounded-2xl app-secondary p-5 sm:p-6 lg:sticky lg:top-24" aria-labelledby="payment-summary-title">
                     <section class="mb-5 rounded-xl border app-border p-4" aria-labelledby="promotion-title">
-                        <h2 id="promotion-title" class="text-sm font-bold app-text">Mã giảm giá</h2>
-                        <p class="mt-1 text-xs app-muted">Mỗi đơn đặt vé áp dụng tối đa một mã khuyến mãi.</p>
-                        <form method="POST" action="{{ route('user.bookings.promotions') }}" class="mt-3 flex gap-2">@csrf<input type="hidden" name="action" value="apply"><label class="sr-only" for="discount-code">Mã giảm giá</label><input id="discount-code" name="code" maxlength="50" class="user-form-control uppercase" placeholder="Nhập mã"><button class="btn-secondary" type="submit">Áp dụng</button></form>
+                        <h2 id="promotion-title" class="text-sm font-bold app-text">Khuyến mãi</h2>
+                        <p class="mt-1 text-xs app-muted">Mỗi đơn đặt vé áp dụng tối đa một khuyến mãi.</p>
+                        <form method="POST" action="{{ route('user.bookings.promotions') }}" class="mt-3 flex gap-2">@csrf<input type="hidden" name="action" value="apply"><label class="sr-only" for="discount-code">Mã khuyến mãi</label><input id="discount-code" name="code" maxlength="50" class="user-form-control uppercase" placeholder="Nhập mã khuyến mãi"><button class="btn-secondary" type="submit">Áp dụng</button></form>
                         @error('promotion_code')<p class="mt-2 text-sm text-error" role="alert">{{ $message }}</p>@enderror
                         <div class="mt-3 space-y-2">@foreach($promotion->lines as $line)<div class="flex items-center justify-between gap-2 text-sm"><span><strong class="app-text">{{ $line['promotion']->code }}</strong><span class="block text-xs app-muted">{{ $line['promotion']->name }}</span></span><div class="flex items-center gap-2"><strong class="text-success">−{{ number_format($line['discount_amount'], 0, ',', '.') }} VNĐ</strong><form method="POST" action="{{ route('user.bookings.promotions') }}">@csrf<input type="hidden" name="action" value="remove"><input type="hidden" name="code" value="{{ $line['promotion']->code }}"><button type="submit" class="text-error" aria-label="Gỡ mã {{ $line['promotion']->code }}"><i class="ph ph-x"></i></button></form></div></div>@endforeach</div>
                     </section>

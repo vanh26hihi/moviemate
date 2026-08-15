@@ -8,5 +8,5 @@
     <span class="inline-flex items-center gap-2"><i class="layout-template-legend-swatch border-slate-500 bg-slate-800 text-slate-300" aria-hidden="true"><span class="ph ph-bricks"></span></i>Vật cản cố định</span>
     <span class="inline-flex items-center gap-2"><i class="layout-template-legend-swatch border-dashed app-border bg-transparent" aria-hidden="true"></i>Ô trống</span>
     </div>
-    <p class="mt-3 text-xs leading-relaxed app-muted">Ghế là vị trí SEAT. Lối đi và Vật cản cố định là ô cấu trúc không có Seat. Ô trống là tọa độ không sử dụng và không được lưu thành một cell.</p>
+    <p class="mt-3 text-xs leading-relaxed app-muted">Ghế là vị trí vật lý. Lối đi và Vật cản cố định là ô cấu trúc không bố trí ghế. Ô trống là tọa độ không sử dụng và không được lưu thành ô sơ đồ.</p>
 </div>

@@ -24,7 +24,7 @@
                 <div><dt class="app-muted">Phim</dt><dd class="font-bold app-text">{{ $booking->showtime?->movie?->title }}</dd></div>
                 <div><dt class="app-muted">Rạp</dt><dd class="font-bold app-text">{{ $booking->showtime?->cinema?->name }}</dd></div>
                 <div><dt class="app-muted">Suất chiếu</dt><dd class="font-bold app-text">{{ $booking->showtime_label }}</dd></div>
-                <div><dt class="app-muted">Định dạng</dt><dd class="font-bold app-text">{{ $booking->showtime?->presentationFormat?->name ?? 'Không xác định' }}</dd></div>
+                <div><dt class="app-muted">Định dạng trình chiếu</dt><dd class="font-bold app-text">{{ $booking->showtime?->presentationFormat?->name ?? 'Không xác định' }}</dd></div>
                 <div><dt class="app-muted">Ghế</dt><dd class="font-bold app-text">{{ $booking->seat_codes }}</dd></div>
                 <div><dt class="app-muted">Khách hàng</dt><dd class="font-bold app-text">{{ $ticketCustomer }} · {{ $ticketRecipient }}</dd></div>
             </dl>
