@@ -38,8 +38,8 @@ final class Phase7EAdminPresentationTest extends TestCase
             ->assertDontSee(' name="discount_percent"', false)
             ->assertDontSee(' name="maximum_discount_vnd"', false)
             ->assertSee('Đơn tối thiểu được tính trên tổng tiền vé + đồ ăn trước khuyến mãi.')
-            ->assertSee('Mỗi đơn đặt vé áp dụng tối đa một mã khuyến mãi.')
-            ->assertSee('Tại đúng thời điểm kết thúc, mã không còn hiệu lực.');
+            ->assertSee('Mỗi đơn đặt vé áp dụng tối đa một khuyến mãi.')
+            ->assertSee('Tại đúng thời điểm kết thúc, khuyến mãi không còn hiệu lực.');
 
         $this->actingAs($admin)->get(route('admin.discounts.edit', ['discount' => $percentage->getKey()]))
             ->assertOk()
@@ -66,7 +66,7 @@ final class Phase7EAdminPresentationTest extends TestCase
         $this->actingAs($admin)->get(route('admin.discounts.edit', $promotion))
             ->assertOk()
             ->assertSee('Đã phát sinh sử dụng — nội dung khuyến mãi đã được khóa.')
-            ->assertSee('kể cả đã released')
+            ->assertSee('kể cả lượt đã giải phóng')
             ->assertSee('name="is_active"', false)
             ->assertSee('disabled', false);
 

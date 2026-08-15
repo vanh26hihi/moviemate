@@ -75,7 +75,7 @@
                     <i class="ph ph-eye" aria-hidden="true"></i>Xem trước {{ $layout->display_name }}
                 </a>
             @endif
-            <a class="btn-secondary" href="{{ route('admin.rooms.index') }}"><i class="ph ph-list-bullets" aria-hidden="true"></i>Danh sách phòng</a>
+            <a class="btn-secondary" href="{{ route('admin.rooms.show', $room) }}"><i class="ph ph-arrow-left" aria-hidden="true"></i>Về phòng {{ $room->code }}</a>
         </div>
     </div>
 
@@ -129,7 +129,7 @@
         <div class="cinema-card p-5 sm:p-6">
             <div class="mb-5">
                 <x-admin.layout-template-legend />
-                <p class="mt-3 rounded-xl border border-warning/25 bg-warning/5 px-4 py-3 text-sm app-muted"><strong class="app-text">Trạng thái vận hành:</strong> Ghế bảo trì vẫn là một Seat vật lý tạm thời không khả dụng; không phải Vật cản cố định và không làm thay đổi cấu trúc sơ đồ.</p>
+                <p class="mt-3 rounded-xl border border-warning/25 bg-warning/5 px-4 py-3 text-sm app-muted"><strong class="app-text">Trạng thái vận hành:</strong> Ghế bảo trì vẫn là ghế vật lý tạm thời không khả dụng; không phải Vật cản cố định và không làm thay đổi cấu trúc sơ đồ.</p>
             </div>
             <div class="grid gap-4 md:grid-cols-4">
                 <label class="cinema-label">Tên sơ đồ<input id="layoutName" class="cinema-input mt-1" value="{{ $layoutName }}" @disabled(!$isDraft)></label>

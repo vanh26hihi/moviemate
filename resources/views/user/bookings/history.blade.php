@@ -85,7 +85,7 @@
                                     <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->seat_codes }}</p></div>
                                     <div><p class="app-muted mb-0.5">Rạp</p><p class="app-text font-semibold">{{ $booking->showtime->cinema->name }}</p></div>
                                     <div><p class="app-muted mb-0.5">Phòng</p><p class="app-text font-semibold">{{ $booking->showtime->room->name }}</p></div>
-                                    <div><p class="app-muted mb-0.5">Định dạng</p><p class="app-text font-semibold">{{ $booking->showtime?->presentationFormat?->name ?? 'Không xác định' }}</p></div>
+                                    <div><p class="app-muted mb-0.5">Định dạng trình chiếu</p><p class="app-text font-semibold">{{ $booking->showtime?->presentationFormat?->name ?? 'Không xác định' }}</p></div>
                                 </div>
 
                                 <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
@@ -93,7 +93,7 @@
                                         <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
                                         <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
                                         @if($booking->promotion_discount_amount > 0)
-                                            <p class="text-xs text-success">Mã {{ $booking->promotionUsage?->code_snapshot }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
+                                            <p class="text-xs text-success">Khuyến mãi {{ $booking->promotionUsage?->code_snapshot }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
                                         @endif
                                     </div>
                                     <div class="flex flex-wrap gap-2">
@@ -153,7 +153,9 @@
                         <div class="w-16 h-16 rounded-2xl bg-brand-start/10 text-brand-start flex items-center justify-center mx-auto mb-4">
                             <i class="ph ph-ticket text-3xl"></i>
                         </div>
-                        <p class="app-muted">Bạn chưa có đơn đặt vé nào.</p>
+                        <h2 class="text-lg font-extrabold app-text">Bạn chưa có đơn đặt vé nào</h2>
+                        <p class="mt-2 app-muted">Hãy chọn một phim và suất chiếu phù hợp để bắt đầu đặt vé.</p>
+                        <a href="{{ route('user.movies.index') }}" class="btn-primary mt-5">Tìm suất chiếu</a>
                     </div>
                 @endforelse
 

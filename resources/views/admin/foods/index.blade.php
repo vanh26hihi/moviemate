@@ -69,7 +69,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="px-5 py-8 text-center app-muted">Chưa có món ăn nào. Hãy thêm món mới.</td>
+                        <td colspan="4" class="px-5 py-8 text-center app-muted">@if($canManageGlobalCatalog)Chưa có món ăn trong danh mục dùng chung. Hãy thêm món mới để phục vụ các chi nhánh.@else Chưa có món ăn trong danh mục dùng chung. Liên hệ Global Admin để cấu hình danh mục món ăn toàn chuỗi.@endif</td>
                     </tr>
                 @endforelse
             </tbody>

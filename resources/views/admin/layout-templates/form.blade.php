@@ -142,7 +142,7 @@
         </div>
         <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                'physical_seats' => ['Vị trí SEAT trong mẫu', 'ph-users-three'],
+                'physical_seats' => ['Vị trí ghế trong mẫu', 'ph-users-three'],
                 'pricing_units' => ['Đơn vị tính giá', 'ph-ticket'],
                 'normal' => ['Ghế thường', 'ph-armchair'],
                 'vip' => ['VIP', 'ph-star'],

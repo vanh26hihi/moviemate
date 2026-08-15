@@ -77,7 +77,7 @@
 <div class="rounded-2xl border border-info/20 bg-info/5 p-4 text-sm app-muted">
     <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Sơ đồ bố trí logic</p>
     <p class="mt-2 font-bold app-text">Lưới logic và sức chứa vật lý</p>
-    <p class="mt-1">Sức chứa vật lý là số vị trí SEAT trong sơ đồ đã phát hành. Ghế bảo trì vẫn là một vị trí vật lý; số hàng × số cột chỉ là lưới bố trí logic và không có đơn vị mét.</p>
+    <p class="mt-1">Sức chứa vật lý là số vị trí ghế trong sơ đồ đã phát hành. Ghế bảo trì vẫn là một vị trí vật lý; số hàng × số cột chỉ là lưới bố trí logic và không có đơn vị mét.</p>
 </div>
 
 @if(! $editing && isset($templates) && $templates->isNotEmpty() && auth()->user()->hasPermission('room_layouts.apply_template'))

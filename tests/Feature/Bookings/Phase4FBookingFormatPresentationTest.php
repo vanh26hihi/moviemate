@@ -32,7 +32,7 @@ final class Phase4FBookingFormatPresentationTest extends PaymentTestCase
 
         $this->get(route('user.bookings.selectSeat', $scenario['showtime']))
             ->assertOk()
-            ->assertSee('Định dạng:')
+            ->assertSee('Định dạng trình chiếu:')
             ->assertSee($format->name)
             ->assertSee($scenario['room']->name);
 

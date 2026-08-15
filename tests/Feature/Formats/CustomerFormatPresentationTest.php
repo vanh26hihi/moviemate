@@ -44,7 +44,7 @@ final class CustomerFormatPresentationTest extends TestCase
 
             $this->get(route('user.movies.show', ['slug' => $scenario['movie']->slug, 'date' => '2030-06-02']))
                 ->assertOk()
-                ->assertSee('Định dạng: '.$format->name)
+                ->assertSee('Định dạng trình chiếu: '.$format->name)
                 ->assertSee('Loại phòng: '.$roomType)
                 ->assertDontSee($scenario['room']->name);
         }
@@ -63,7 +63,7 @@ final class CustomerFormatPresentationTest extends TestCase
             ->assertOk()
             ->assertSee('Định dạng suất chiếu:')
             ->assertSee('<strong class="app-text">2D</strong>', false)
-            ->assertDontSee('Định dạng: 3D');
+            ->assertDontSee('Định dạng trình chiếu: 3D');
 
         $room = Room::query()->create([
             'cinema_id' => $scenario['cinema']->id,
@@ -91,7 +91,7 @@ final class CustomerFormatPresentationTest extends TestCase
         $response = $this->get(route('cinemas.show', ['cinema' => $scenario['cinema']->code, 'date' => '2030-06-02']))
             ->assertOk()
             ->assertSee('<strong class="app-text">2D, 3D</strong>', false)
-            ->assertSee('Định dạng: 3D')
+            ->assertSee('Định dạng trình chiếu: 3D')
             ->assertSee('Loại phòng: STANDARD')
             ->assertDontSee($room->name);
 
@@ -136,7 +136,7 @@ final class CustomerFormatPresentationTest extends TestCase
         $this->get(route('cinemas.show', ['cinema' => $scenario['cinema']->code, 'date' => '2030-06-01']))
             ->assertOk()
             ->assertSee('<strong class="app-text">2D</strong>', false)
-            ->assertDontSee('Định dạng: 3D')
+            ->assertDontSee('Định dạng trình chiếu: 3D')
             ->assertDontSee('2D, 3D');
     }
 
