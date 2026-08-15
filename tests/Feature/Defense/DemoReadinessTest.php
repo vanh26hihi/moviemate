@@ -2,18 +2,24 @@
 
 namespace Tests\Feature\Defense;
 
+use App\Models\Booking;
+use App\Models\BookingPromotion;
 use App\Models\Payment;
+use App\Models\Promotion;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Models\User;
 use App\Services\PublicShowtimeCatalog;
+use App\Services\Reports\AuthoritativePaymentQuery;
 use App\Services\Seats\SeatSelectionPolicy;
+use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DemoCinemaLayoutSeeder;
 use Database\Seeders\DemoUserSeeder;
 use Database\Seeders\RoomSeeder;
 use Database\Seeders\ShowtimeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -24,6 +30,7 @@ final class DemoReadinessTest extends TestCase
 
     public function test_local_demo_data_covers_all_human_actors_and_the_defense_seat_scenario(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-08-15 01:00:00', 'UTC'));
         $this->seed(DatabaseSeeder::class);
 
         foreach ([
@@ -39,6 +46,16 @@ final class DemoReadinessTest extends TestCase
 
         $customer = User::query()->where('email', 'customer@moviemate.test')->sole();
         $this->assertSame(0, $customer->cinemaAssignments()->count());
+        $this->assertDatabaseHas('user_cinema_assignments', [
+            'user_id' => User::query()->where('email', 'manager.cg@moviemate.test')->value('id'),
+            'cinema_id' => Room::query()->where('code', 'DEMO')->value('cinema_id'),
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('user_cinema_assignments', [
+            'user_id' => User::query()->where('email', 'staff.cg@moviemate.test')->value('id'),
+            'cinema_id' => Room::query()->where('code', 'DEMO')->value('cinema_id'),
+            'status' => 'active',
+        ]);
         foreach (['admin.access', 'counter_sales.view', 'counter_sales.create', 'tickets.lookup', 'tickets.print'] as $permission) {
             $this->assertFalse($customer->hasPermission($permission));
         }
@@ -92,17 +109,41 @@ final class DemoReadinessTest extends TestCase
         $this->assertTrue($demoShowtimes->every(fn (Showtime $showtime) => $showtime->room_layout_id === $layout->id));
         $this->assertTrue($demoShowtimes->every(fn (Showtime $showtime) => $showtime->roomLayout?->room_id === $room->id));
 
-        $showtime = $demoShowtimes->first(fn (Showtime $showtime) => $showtime->status === 'active'
-            && $showtime->show_date->toDateString() >= now($room->cinema->timezone)->toDateString());
+        $showtime = $demoShowtimes->first(fn (Showtime $showtime) => app(PublicShowtimeCatalog::class)->isCustomerSellable($showtime));
         $this->assertNotNull($showtime);
         $this->assertSame($layout->id, $showtime->room_layout_id);
-        $this->assertTrue(app(PublicShowtimeCatalog::class)->isSellable($showtime));
+        $this->assertTrue(app(PublicShowtimeCatalog::class)->isCustomerSellable($showtime));
+        $this->assertGreaterThanOrEqual(2, $demoShowtimes
+            ->filter(fn (Showtime $candidate) => app(PublicShowtimeCatalog::class)->isCustomerSellable($candidate))->count());
 
         $this->assertSame(3, Payment::query()->whereIn('provider', Payment::SUPPORTED_PROVIDERS)
             ->where('status', Payment::STATUS_SUCCESS)->count());
         $this->assertDatabaseCount('bookings', 4);
         $this->assertDatabaseCount('admission_tickets', 6);
         $this->assertDatabaseCount('food_pickup_vouchers', 1);
+
+        $paidFixture = Booking::query()->with([
+            'payments', 'bookingSeats.seat', 'foodOrder.items.food', 'promotionUsage',
+            'admissionTickets', 'foodPickupVoucher', 'showtime.room.cinema',
+        ])->where('booking_code', 'MMT-2026-0000000000000004')->sole();
+        $payment = $paidFixture->payments->sole();
+        $this->assertSame($customer->id, $paidFixture->user_id);
+        $this->assertSame('CG', $paidFixture->showtime->room->cinema->code);
+        $this->assertSame(['D1'], $paidFixture->bookingSeats->pluck('seat.seat_code')->all());
+        $this->assertSame('Bắp rang bơ', $paidFixture->foodOrder->items->sole()->food->name);
+        $this->assertSame('MOVIEMATE10', $paidFixture->promotionUsage?->code_snapshot);
+        $this->assertSame(BookingPromotion::STATUS_REDEEMED, $paidFixture->promotionUsage?->status);
+        $this->assertSame((int) $paidFixture->gross_amount - (int) $paidFixture->promotion_discount_amount, (int) $paidFixture->total_amount);
+        $this->assertSame((int) $paidFixture->total_amount, $payment->amount);
+        $this->assertTrue($payment->hasAuthoritativeSuccessEvidence());
+        $this->assertNotNull($payment->verified_at);
+        $this->assertNotNull($payment->query_response_hash);
+        $this->assertTrue(app(AuthoritativePaymentQuery::class)->authoritative()
+            ->where('booking_id', $paidFixture->id)->exists());
+        $this->assertTrue($paidFixture->admissionTickets->every(fn ($ticket): bool => $ticket->print_count === 0));
+        $this->assertSame(0, $paidFixture->foodPickupVoucher?->print_count);
+        $this->assertSame(1, Promotion::query()->where('code', 'MOVIEMATE10')->sole()->usages()
+            ->where('status', BookingPromotion::STATUS_REDEEMED)->count());
     }
 
     public function test_demo_seeders_are_idempotent(): void
@@ -136,5 +177,43 @@ final class DemoReadinessTest extends TestCase
         $this->assertStringContainsString('Không thể tải trình quét camera', $app);
         $this->assertStringContainsString("workspace.dataset.scannerInitialized === 'true'", $scanner);
         $this->assertStringContainsString("window.addEventListener('pagehide', stopCamera);", $scanner);
+    }
+
+    public function test_demo_check_is_read_only_and_reports_the_semantic_fixture_chain(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-08-15 01:00:00', 'UTC'));
+        $this->seed(DatabaseSeeder::class);
+        $mutations = [];
+        DB::listen(function ($query) use (&$mutations): void {
+            if (preg_match('/^\s*(insert|update|delete|replace|alter|drop|create|truncate)\b/i', $query->sql)) {
+                $mutations[] = $query->sql;
+            }
+        });
+
+        $this->artisan('moviemate:demo-check')
+            ->expectsOutputToContain('MMT-2026-0000000000000004')
+            ->expectsOutputToContain('MOVIEMATE10')
+            ->expectsOutputToContain('AISLE: 5x1, 5x2, 5x3, 5x4')
+            ->expectsOutputToContain('BLOCKED: 9x2')
+            ->expectsOutputToContain('EMPTY: 9x1, 9x3, 9x4')
+            ->expectsOutputToContain('DEMO READY')
+            ->assertSuccessful();
+
+        $this->assertSame([], $mutations);
+    }
+
+    public function test_demo_check_fails_without_repairing_consumed_first_print_state(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-08-15 01:00:00', 'UTC'));
+        $this->seed(DatabaseSeeder::class);
+        $booking = Booking::query()->where('booking_code', 'MMT-2026-0000000000000004')->sole();
+        $ticket = $booking->admissionTickets()->firstOrFail();
+        $ticket->forceFill(['print_count' => 1, 'last_printed_at' => now()])->save();
+
+        $this->artisan('moviemate:demo-check')
+            ->expectsOutputToContain('DEMO NOT READY')
+            ->assertFailed();
+
+        $this->assertSame(1, $ticket->fresh()->print_count);
     }
 }

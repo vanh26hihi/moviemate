@@ -6,7 +6,7 @@ Chuẩn bị ba profile độc lập, không dùng công cụ impersonation:
 - **B — Customer:** mở trang Phim và một Đơn đặt vé đã thanh toán hợp lệ.
 - **C — Staff:** mở workspace Tra cứu & in tại quầy.
 
-Dùng suất chiếu sắp tới và fixture đã được kiểm tra ở rehearsal. Không phụ thuộc giao dịch provider thật. Không nhập URL trực tiếp trong lúc trình bày; toàn bộ bước dưới đây đi bằng navigation hoặc handoff hiện hữu.
+Dùng PRIMARY/FALLBACK Showtime và paid Booking được `php artisan moviemate:demo-check` báo sau fresh seed local. Không phụ thuộc giao dịch provider thật. Không nhập URL trực tiếp trong lúc trình bày; toàn bộ bước dưới đây đi bằng navigation hoặc handoff hiện hữu. Checklist thực thi và chính sách bảo vệ first-print nằm tại `DEMO_REHEARSAL_CHECKLIST.md`.
 
 ## Luồng duy nhất để trình bày
 
@@ -17,8 +17,8 @@ Dùng suất chiếu sắp tới và fixture đã được kiểm tra ở rehear
 | 1:10–1:50 | A | Room → Sơ đồ; quay lại Room → Bảo trì | “RoomLayout là cấu trúc versioned. Ghế, lối đi, vật cản cố định và ô trống khác nhau; ghế bảo trì vẫn là Seat.” | Published layout bất biến; maintenance/incident không bị gọi là BLOCKED. |
 | 1:50–2:45 | A | Room → suất chiếu sắp tới → chi tiết Showtime | “Showtime ghim đúng RoomLayout và Format. END là lúc phim hết; ROOM_READY là sau cleaning. Giá đã khóa cho suất chiếu.” | RoomType tách khỏi Định dạng trình chiếu; có START/END/cleaning/ready và frozen prices. |
 | 2:45–3:30 | B | Phim → suất chiếu → chọn ghế | “Customer đi theo Movie-first. Server quyết định branch, ghế, seat-gap và giá; Couple là hai vị trí nhưng một pricing unit.” | Seat map hiển thị ghế khả dụng và policy; không nhập giá từ browser. |
-| 3:30–4:10 | B | Tiếp tục qua Food và Review | “Food là tùy chọn. Mỗi Booking tối đa một Khuyến mãi trên ticket + food gross; quote chưa tiêu quota.” | Review hiển thị breakdown server và một lựa chọn Khuyến mãi. |
-| 4:10–5:15 | B | Mở Đơn đặt vé đã chuẩn bị | “Browser return không chứng minh thanh toán. Customer nhận booking code và QR đơn đặt vé để Staff tra cứu; đây không phải vé vào rạp.” | Trang Customer có QR đơn, Format và lịch sử; không có digital admission action. |
+| 3:30–4:10 | B | Tiếp tục qua Food, nhập `MOVIEMATE10`, xem Review/payment selection rồi dừng | “Food là tùy chọn. Mỗi Booking tối đa một Khuyến mãi trên ticket + food gross; quote chưa tiêu quota. Demo dừng tại đây để không phụ thuộc callback mạng.” | Review hiển thị breakdown server, đúng một lựa chọn Khuyến mãi và final payable. |
+| 4:10–5:15 | B | Mở Đơn đặt vé paid do demo-check báo | “Để demo không phụ thuộc callback mạng, phần sau dùng Booking đã có verified payment evidence. Browser return không chứng minh thanh toán. QR đơn đặt vé chỉ để Staff tra cứu; đây không phải vé vào rạp.” | Trang Customer có QR đơn, Format và lịch sử; không có digital admission action. |
 | 5:15–6:10 | C | Nhập booking code hoặc quét QR đơn tại quầy | “Lookup mở đúng một Booking và cho Staff xem bằng chứng Payment, RoomType, Format cùng hiện vật cần in.” | Staff thấy trạng thái Đã xác minh/Đã thu tiền và đúng Booking context. |
 | 6:10–7:20 | C | Mở nghiệp vụ Print All | “Một vị trí ghế vật lý tạo một AdmissionTicket; Couple tạo hai vé nhưng charge một lần. Food có một FoodPickupVoucher cho phần đồ ăn của Booking. First print không cần lý do; reprint bắt buộc lý do và có audit.” | Print All liệt kê AdmissionTickets và Food voucher; actor/thời điểm/reason được tách. Chỉ xác nhận in thật khi rehearsal đã chuẩn bị trạng thái phù hợp. |
 | 7:20–8:00 | A | Từ Showtime mở Booking liên quan; Booking → Payment | “Đây là handoff liên domain, không phải tìm kiếm thủ công. Payment detail quay lại đúng Booking; evidence đến từ provider verification hoặc counter settlement.” | Liên kết Showtime → Booking → Payment hoạt động hai chiều theo context. |
@@ -45,7 +45,7 @@ Không quay lại sidebar để tìm Showtime. Room có handoff trực tiếp v�
 
 ## Checklist ngay trước rehearsal
 
-- Revalidate tài khoản trong `DEMO_ACCOUNTS.md` và suất chiếu sắp tới; không hard-code ngày lâu dài.
+- Chạy `php artisan moviemate:demo-check`; dùng PRIMARY/FALLBACK, Booking code và report filter mà command báo, không hard-code ngày hoặc numeric ID.
 - Chuẩn bị một Booking paid có Format, RoomType, ít nhất một AdmissionTicket và tùy chọn FoodPickupVoucher.
 - Kiểm tra Booking đó đang ở first-print hay reprint state trước khi bấm hành động làm thay đổi audit.
 - Mở ba profile sẵn và kiểm tra tất cả handoff bằng click.
