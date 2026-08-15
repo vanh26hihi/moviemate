@@ -11,6 +11,7 @@ class DefenseDocumentationSemanticContractTest extends TestCase
         'docs/DEFENSE_READINESS.md',
         'docs/DEFENSE_TALK_TRACK.md',
         'docs/DEMO_ACCOUNTS.md',
+        'docs/DEMO_REHEARSAL_CHECKLIST.md',
         'docs/DEMO_SCRIPT.md',
         'docs/FINAL_ACCEPTANCE_CHECKLIST.md',
         'docs/PRESENTATION_OUTLINE.md',
@@ -109,6 +110,30 @@ class DefenseDocumentationSemanticContractTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/`\/(?:admin|staff|booking|movies|cinemas)/i', $demo);
         $this->assertStringNotContainsString('phần này chưa có', $demo);
         $this->assertStringNotContainsString('giả sử', $demo);
+    }
+
+    public function test_rehearsal_checklist_is_executable_date_relative_and_protects_mutable_state(): void
+    {
+        $checklist = file_get_contents(base_path('docs/DEMO_REHEARSAL_CHECKLIST.md'));
+
+        $this->assertIsString($checklist);
+        foreach ([
+            'php artisan migrate:fresh --seed',
+            'php artisan moviemate:demo-check',
+            'PRIMARY',
+            'FALLBACK',
+            'MOVIEMATE10',
+            'first-print',
+            'report filter',
+            'Manager → Customer → Staff → Manager',
+            'không gọi HTTP',
+        ] as $required) {
+            $this->assertStringContainsString($required, $checklist);
+        }
+
+        $this->assertDoesNotMatchRegularExpression('/`\/(?:admin|staff|booking|movies|cinemas)/i', $checklist);
+        $this->assertDoesNotMatchRegularExpression('/\b20\d{2}-\d{2}-\d{2}\b/', $checklist);
+        $this->assertStringContainsString('numeric database ID', $checklist);
     }
 
     private function activeDefenseContent(): string

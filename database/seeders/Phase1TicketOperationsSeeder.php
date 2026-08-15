@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Payments\VerifiedPaymentData;
 use App\Models\Booking;
 use App\Models\FoodItem;
 use App\Models\Payment;
@@ -12,8 +13,11 @@ use App\Models\User;
 use App\Services\BookingCheckoutService;
 use App\Services\BookingFoodService;
 use App\Services\BookingTokenService;
+use App\Services\Payments\VerifiedPaymentService;
+use App\Services\PromotionService;
 use App\Services\Tickets\TicketArtifactProvisioner;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class Phase1TicketOperationsSeeder extends Seeder
@@ -48,7 +52,12 @@ final class Phase1TicketOperationsSeeder extends Seeder
         }
 
         $customer = User::query()->where('email', 'customer@moviemate.test')->firstOrFail();
-        $staff = User::query()->where('email', 'like', 'staff.%@moviemate.test')->orderBy('id')->firstOrFail();
+        $staff = User::query()
+            ->where('email', 'staff.'.mb_strtolower($room->cinema->code).'@moviemate.test')
+            ->whereHas('cinemaAssignments', fn ($query) => $query
+                ->where('cinema_id', $room->cinema_id)
+                ->where('status', 'active'))
+            ->firstOrFail();
         $food = FoodItem::query()->where('active', true)->orderBy('id')->firstOrFail();
         $checkout = app(BookingCheckoutService::class);
         $tokens = app(BookingTokenService::class);
@@ -87,6 +96,7 @@ final class Phase1TicketOperationsSeeder extends Seeder
             'MMT-'.now()->format('Y').'-0000000000000004',
             $customer,
             foodSelection: [['food_id' => $food->id, 'quantity' => 2]],
+            promotionCode: 'MOVIEMATE10',
         );
     }
 
@@ -101,6 +111,7 @@ final class Phase1TicketOperationsSeeder extends Seeder
         string $salesChannel = Booking::SALES_CHANNEL_ONLINE,
         ?User $counterActor = null,
         ?array $foodSelection = null,
+        ?string $promotionCode = null,
     ): void {
         $booking = $checkout->createPendingBooking(
             $showtime->id,
@@ -113,12 +124,12 @@ final class Phase1TicketOperationsSeeder extends Seeder
             $counterActor,
             $customer?->name ?? 'Khách tại quầy Phase 1',
             '0901000001',
+            null,
         )->booking;
         $booking->forceFill([
             'booking_code' => $bookingCode,
             'cinema_id' => $showtime->cinema_id,
         ])->save();
-
         if ($foodSelection !== null) {
             $food = app(BookingFoodService::class);
             $foodBreakdown = $food->calculate($foodSelection, (int) $showtime->cinema_id);
@@ -127,11 +138,25 @@ final class Phase1TicketOperationsSeeder extends Seeder
                 'customer_name' => $booking->customer_name,
                 'customer_phone' => $booking->customer_phone,
             ]);
+            $gross = (int) $booking->seat_subtotal + $foodBreakdown->foodSubtotal;
             $booking->forceFill([
                 'food_subtotal' => $foodBreakdown->foodSubtotal,
-                'total_amount' => (int) $booking->seat_subtotal + $foodBreakdown->foodSubtotal,
-                'gross_amount' => (int) $booking->seat_subtotal + $foodBreakdown->foodSubtotal,
+                'gross_amount' => $gross,
+                'total_amount' => $gross,
             ])->save();
+        }
+        if ($promotionCode !== null) {
+            DB::transaction(function () use ($booking, $promotionCode): void {
+                $quote = app(PromotionService::class)->reserveForBooking(
+                    $booking,
+                    $promotionCode,
+                    (int) $booking->gross_amount,
+                );
+                $booking->forceFill([
+                    'promotion_discount_amount' => $quote->discountAmount,
+                    'total_amount' => $quote->finalAmount,
+                ])->save();
+            });
         }
 
         if ($salesChannel === Booking::SALES_CHANNEL_COUNTER) {
@@ -147,26 +172,38 @@ final class Phase1TicketOperationsSeeder extends Seeder
                 'settled_at' => now(),
                 'paid_at' => now(),
             ])->save();
+            $booking->forceFill([
+                'payment_method' => Payment::PROVIDER_COUNTER_CASH,
+                'payment_status' => 'paid',
+                'booking_status' => 'paid',
+                'paid_at' => now(),
+                'expires_at' => null,
+            ])->save();
         } else {
-            Payment::createForProvider('vnpay', [
+            $payment = Payment::createForProvider('vnpay', [
                 'booking_id' => $booking->id,
                 'payment_method' => 'vnpay',
                 'order_code' => 'SEED-'.$bookingCode,
                 'amount' => (int) $booking->total_amount,
                 'currency' => 'VND',
-                'status' => Payment::STATUS_SUCCESS,
-                'verified_at' => now(),
-                'paid_at' => now(),
+                'status' => Payment::STATUS_PENDING,
             ]);
+            $verified = app(VerifiedPaymentService::class)->verify($payment, new VerifiedPaymentData(
+                provider: 'vnpay',
+                merchantReference: 'SEED-'.$bookingCode,
+                amount: (int) $booking->total_amount,
+                providerTransactionId: 'SEED-TXN-'.$bookingCode,
+                source: 'query',
+                payloadHash: hash('sha256', 'seed-query-'.$bookingCode),
+                responseCode: '00',
+                transactionStatus: '00',
+                providerPaidAt: now(),
+            ));
+            if (! $verified->accepted || ! $verified->transitioned) {
+                throw new RuntimeException("Phase 1 demo payment verification failed for {$bookingCode}: {$verified->message}");
+            }
         }
 
-        $booking->foodOrder()->update(['status' => 'paid']);
-        $booking->forceFill([
-            'payment_status' => 'paid',
-            'booking_status' => 'paid',
-            'paid_at' => now(),
-            'expires_at' => null,
-        ])->save();
         app(TicketArtifactProvisioner::class)->provision($booking->fresh());
     }
 }
