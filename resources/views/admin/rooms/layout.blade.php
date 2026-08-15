@@ -53,6 +53,8 @@
                 'seat_id' => $cell->seat_id,
                 'type' => $cell->seat->type,
                 'status' => $cell->seat->status,
+                'row' => $cell->seat->row,
+                'number' => $cell->seat->number,
                 'seat_code' => $cell->seat->seat_code,
                 'pair_code' => $cell->seat->pair_code,
                 'pair_position' => $cell->seat->pair_position,
