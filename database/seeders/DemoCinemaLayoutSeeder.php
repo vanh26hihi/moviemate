@@ -30,8 +30,8 @@ final class DemoCinemaLayoutSeeder extends Seeder
                 continue;
             }
             $isDefenseRoom = app()->environment(['local', 'testing']) && $room->code === 'DEMO';
-            $rows = $isDefenseRoom ? 4 : 3;
-            $columns = $isDefenseRoom ? 9 : 4;
+            $rows = $isDefenseRoom ? 4 : 8;
+            $columns = $isDefenseRoom ? 9 : 13;
             $draft = $layouts->createBlankDraft($room, rows: $rows, columns: $columns);
             $cells = [];
             foreach (range(1, $rows) as $row) {
@@ -50,19 +50,31 @@ final class DemoCinemaLayoutSeeder extends Seeder
                     if ($isDefenseRoom && $column === 9) {
                         continue;
                     }
-                    $isCouple = $isDefenseRoom && $row === 3 && in_array($column, [1, 2], true);
-                    $isVip = $isDefenseRoom && $row === 1 && $column === 6;
+                    if (! $isDefenseRoom && $column === 7) {
+                        $cells[] = ['kind' => 'aisle', 'x' => $column, 'y' => $row];
+
+                        continue;
+                    }
+
+                    $isCouple = $isDefenseRoom
+                        ? $row === 3 && in_array($column, [1, 2], true)
+                        : $row === $rows;
+                    $isVip = $isDefenseRoom
+                        ? $row === 1 && $column === 6
+                        : $row >= 4 && $row < $rows;
+                    $seatNumber = $isDefenseRoom || $column < 7 ? $column : $column - 1;
+                    $pairNumber = (int) ceil($seatNumber / 2);
                     $cells[] = [
                         'kind' => $isCouple ? 'couple' : ($isVip ? 'vip' : 'normal'), 'x' => $column, 'y' => $row,
-                        'row' => $label, 'number' => $column,
-                        'seat_code' => $label.$column, 'status' => $isDefenseRoom && $row === 4 && $column === 8 ? 'maintenance' : 'active',
-                        'pair_code' => $isCouple ? 'DEMO-C-PAIR-1' : null,
-                        'pair_position' => $isCouple ? ($column === 1 ? 'left' : 'right') : null,
+                        'row' => $label, 'number' => $seatNumber,
+                        'seat_code' => $label.$seatNumber, 'status' => $isDefenseRoom && $row === 4 && $column === 8 ? 'maintenance' : 'active',
+                        'pair_code' => $isCouple ? ($isDefenseRoom ? 'DEMO-C-PAIR-1' : "{$room->code}-{$label}-PAIR-{$pairNumber}") : null,
+                        'pair_position' => $isCouple ? ($seatNumber % 2 === 1 ? 'left' : 'right') : null,
                     ];
                 }
             }
             $layouts->saveDraft($draft, [
-                'name' => 'Sơ đồ demo '.$room->code,
+                'name' => ($isDefenseRoom ? 'Sơ đồ demo ' : 'Sơ đồ hỗn hợp Thường VIP Đôi ').$room->code,
                 'rows' => $rows, 'columns' => $columns, 'screen_position' => 'top', 'cells' => $cells,
             ]);
             $layouts->publish($draft->fresh());
