@@ -27,7 +27,7 @@ final class ShowtimeSeeder extends Seeder
             if ($cinema->rooms->isEmpty()) {
                 continue;
             }
-            foreach (range(1, 10) as $dayOffset) {
+            foreach (range(0, 9) as $dayOffset) {
                 $date = CarbonImmutable::now($cinema->timezone)->addDays($dayOffset)->toDateString();
                 foreach ($cinema->rooms as $roomOffset => $room) {
                     foreach (['09:00', '12:45', '16:30', '20:15'] as $slotOffset => $time) {
