@@ -24,12 +24,12 @@
     <div class="space-y-5">
         <div>
             <label class="admin-label">Tên *</label>
-            <input type="text" name="name" value="{{ old('name') }}" required class="admin-input" placeholder="Ví dụ: Hành động">
+            <input type="text" name="name" value="{{ old('name') }}" required maxlength="255" class="admin-input" placeholder="Ví dụ: Hành động">
         </div>
 
         <div>
             <label class="admin-label">Đường dẫn rút gọn</label>
-            <input type="text" name="slug" value="{{ old('slug') }}" class="admin-input" placeholder="Để trống để tự tạo">
+            <input type="text" name="slug" value="{{ old('slug') }}" maxlength="255" class="admin-input" placeholder="Để trống để tự tạo" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="genre.slug">
             <p class="admin-help">Slug dùng cho URL và lọc dữ liệu.</p>
         </div>
 

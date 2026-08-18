@@ -1007,6 +1007,24 @@ html.light .flash-banner-info {
     box-shadow: 0 0 0 4px rgba(255, 61, 87, 0.14);
 }
 
+.admin-shell [aria-invalid="true"],
+.staff-shell [aria-invalid="true"],
+[data-inline-validation] [aria-invalid="true"] {
+    border-color: var(--color-error) !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-error) 16%, transparent) !important;
+}
+
+.form-validation-error {
+    margin-top: 0.25rem;
+    color: var(--color-error);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.form-validation-error[hidden] {
+    display: none;
+}
+
 .admin-label {
     display: block;
     color: var(--app-text-soft);

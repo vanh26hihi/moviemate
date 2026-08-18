@@ -36,7 +36,7 @@
         <div class="grid gap-5 md:grid-cols-2">
             <label class="block min-w-0">
                 <span class="cinema-label">Mã mẫu <span class="text-error" aria-hidden="true">*</span></span>
-                <input class="cinema-input min-h-12 uppercase" name="code" value="{{ old('code', $template->code) }}" required maxlength="32" autocomplete="off" placeholder="STANDARD_100" aria-describedby="template-code-help @error('code') template-code-error @enderror">
+                <input class="cinema-input min-h-12 uppercase" name="code" value="{{ old('code', $template->code) }}" required maxlength="32" pattern="[A-Za-z0-9_-]+" autocomplete="off" placeholder="STANDARD_100" aria-describedby="template-code-help @error('code') template-code-error @enderror" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="layout-template.code" data-validation-record="{{ $template->exists ? $template->getKey() : '' }}">
                 <span id="template-code-help" class="mt-2 block text-xs leading-relaxed app-muted">Mã dùng để nhận diện mẫu trong hệ thống và không được trùng.</span>
                 @error('code')<span id="template-code-error" class="mt-2 block text-sm font-semibold text-error" role="alert">{{ $message }}</span>@enderror
             </label>

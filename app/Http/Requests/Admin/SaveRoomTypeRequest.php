@@ -3,8 +3,8 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\RoomType;
+use App\Support\AdminUniqueRules;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 final class SaveRoomTypeRequest extends FormRequest
 {
@@ -34,11 +34,11 @@ final class SaveRoomTypeRequest extends FormRequest
         return [
             'name' => [
                 'required', 'string', 'max:120',
-                Rule::unique('room_types', 'name')->ignore($roomType instanceof RoomType ? $roomType->id : null),
+                AdminUniqueRules::roomTypeName($roomType instanceof RoomType ? $roomType : null),
             ],
             'code' => [
                 'required', 'string', 'max:40', 'regex:/^[A-Z0-9]+(?:_[A-Z0-9]+)*$/',
-                Rule::unique('room_types', 'code')->ignore($roomType instanceof RoomType ? $roomType->id : null),
+                AdminUniqueRules::roomTypeCode($roomType instanceof RoomType ? $roomType : null),
             ],
             'description' => ['nullable', 'string', 'max:500'],
             'is_active' => ['required', 'boolean'],
@@ -54,6 +54,14 @@ final class SaveRoomTypeRequest extends FormRequest
             'description' => 'mô tả',
             'is_active' => 'trạng thái',
             'sort_order' => 'thứ tự',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.unique' => 'Tên loại phòng này đã tồn tại.',
+            'code.unique' => 'Mã loại phòng này đã tồn tại.',
         ];
     }
 }
