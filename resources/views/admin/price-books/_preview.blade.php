@@ -1,10 +1,11 @@
 <section class="cinema-card p-5 sm:p-6" aria-labelledby="price-preview-title">
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-            <h2 id="price-preview-title" class="text-xl font-extrabold app-heading">Xem trước giá</h2>
-            <p class="mt-1 text-sm app-muted">Máy chủ dùng bảng giá đã phát hành áp dụng cho giờ bắt đầu suất chiếu tại địa phương của chi nhánh. Khuyến mãi không thuộc phép tính này.</p>
+            <p class="text-xs font-bold uppercase tracking-[0.16em] text-brand-start">Kiểm tra nhanh</p>
+            <h2 id="price-preview-title" class="mt-1 text-xl font-extrabold app-heading">Thử một trường hợp thực tế</h2>
+            <p class="mt-1 text-sm app-muted">Chọn nơi, loại vé và giờ chiếu để xem cách bảng giá đang áp dụng tính tiền. Kết quả chưa trừ khuyến mãi.</p>
         </div>
-        <span class="status-badge border app-border">Định dạng trình chiếu không ảnh hưởng giá</span>
+        <span class="status-badge border app-border">Định dạng trình chiếu không ảnh hưởng giá <span class="ml-1 opacity-70">· 2D, 3D hay IMAX không tự đổi giá</span></span>
     </div>
 
     <form method="POST" action="{{ route('admin.price-books.preview') }}" class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -36,11 +37,11 @@
             @error('room_id')<p class="mt-1 text-sm text-error" role="alert">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label class="admin-label" for="preview-seat-type">Loại ghế</label>
+            <label class="admin-label" for="preview-seat-type">Loại vé</label>
             <select class="admin-input" id="preview-seat-type" name="seat_type_id" required>
-                <option value="">Chọn loại ghế</option>
+                <option value="">Chọn loại vé</option>
                 @foreach($seatTypes as $seatType)
-                    <option value="{{ $seatType->id }}" @selected((string) old('seat_type_id', $preview['seatType']->id ?? '') === (string) $seatType->id)>{{ $seatType->name }}{{ $seatType->is_pair ? ' · một cặp ghế đôi' : '' }}</option>
+                    <option value="{{ $seatType->id }}" @selected((string) old('seat_type_id', $preview['seatType']->id ?? '') === (string) $seatType->id)>{{ \App\Support\StatusLabel::for('seat_type', $seatType->code) }}{{ $seatType->is_pair ? ' · giá cho một cặp' : '' }}</option>
                 @endforeach
             </select>
             @error('seat_type_id')<p class="mt-1 text-sm text-error" role="alert">{{ $message }}</p>@enderror
@@ -51,8 +52,8 @@
             @error('showtime_local_start')<p class="mt-1 text-sm text-error" role="alert">{{ $message }}</p>@enderror
         </div>
         <div class="md:col-span-2 xl:col-span-4 flex flex-wrap items-center gap-3">
-            <button class="admin-btn-primary" type="submit">Tính giá bằng bảng giá đã phát hành</button>
-            <p class="text-xs app-muted">Bản nháp không được tính bằng một calculator riêng; hãy dùng kiểm tra phát hành để xác thực bản nháp.</p>
+            <button class="admin-btn-primary" type="submit">Xem giá vé</button>
+            <p class="text-xs app-muted">Công cụ này luôn dùng bảng giá đã phát hành. Bảng đang soạn được kiểm tra ở bước “Kiểm tra và áp dụng”.</p>
         </div>
     </form>
 
@@ -64,7 +65,7 @@
             <div class="overflow-hidden rounded-2xl border app-border">
                 <div class="border-b app-border p-4">
                     <h3 class="font-extrabold app-heading">Giá vé đã tính</h3>
-                    <p class="mt-1 text-sm app-muted">Phiên bản v{{ $resolved->versionNumber }} · {{ $preview['cinema']->name }} · {{ $preview['room']->code }} · {{ $preview['seatType']->name }}</p>
+                    <p class="mt-1 text-sm app-muted">Bảng giá v{{ $resolved->versionNumber }} · {{ $preview['cinema']->name }} · {{ $preview['room']->code }} · {{ \App\Support\StatusLabel::for('seat_type', $preview['seatType']->code) }}</p>
                 </div>
                 <dl class="divide-y app-border">
                     <div class="flex justify-between gap-4 p-4" data-preview-dimension="base"><dt>Giá cơ sở toàn chuỗi</dt><dd class="font-bold tabular-nums">{{ number_format($resolved->basePriceVnd, 0, ',', '.') }} ₫</dd></div>

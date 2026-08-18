@@ -38,7 +38,10 @@ final class PriceBookController extends Controller
         $versions = $this->access->visibleVersions(
             PriceBookVersion::query()->where('price_book_id', $book->id),
             $request->user(),
-        )->withCount('adjustments')->orderByDesc('version_number')->get();
+        )->withCount([
+            'adjustments',
+            'adjustments as contextual_adjustments_count' => fn ($query) => $query->where('dimension', '!=', 'seat_type'),
+        ])->orderByDesc('version_number')->get();
 
         return view('admin.price-books.index', [
             'priceBook' => $book,
@@ -181,6 +184,11 @@ final class PriceBookController extends Controller
         ]);
     }
 
+    public function previewRedirect(): RedirectResponse
+    {
+        return redirect()->route('admin.price-books.index');
+    }
+
     private function detailView(Request $request, PriceBookVersion $version, ?array $preview = null): View
     {
         $this->access->authorizeVersionView($request->user(), $version);
@@ -219,7 +227,9 @@ final class PriceBookController extends Controller
             'canManagePriceBook' => $this->access->canManage($request->user()),
             'previewCinemas' => $cinemas,
             'previewRooms' => $rooms,
-            'seatTypes' => SeatType::query()->where('status', true)->orderBy('sort_order')->orderBy('name')->get(),
+            'seatTypes' => SeatType::query()->where('status', true)
+                ->orderByRaw("CASE code WHEN 'normal' THEN 1 WHEN 'vip' THEN 2 WHEN 'couple' THEN 3 ELSE 4 END")
+                ->orderBy('sort_order')->orderBy('name')->get(),
             'roomTypes' => RoomType::query()->active()->orderBy('sort_order')->orderBy('name')->get(),
         ];
     }
