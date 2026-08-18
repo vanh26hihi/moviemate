@@ -7,6 +7,8 @@ use App\Models\BookingTicketPrint;
 use App\Models\Cinema;
 use App\Models\Payment;
 use App\Models\UserCinemaAssignment;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -17,6 +19,14 @@ final class StaffWorkspaceCompletionTest extends PaymentTestCase
         parent::setUp();
         $this->withoutVite();
         $this->seedRbac();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_staff_print_workspace_is_available_without_admin_or_checkin_access(): void
@@ -49,11 +59,16 @@ final class StaffWorkspaceCompletionTest extends PaymentTestCase
 
     public function test_dashboard_presents_actionable_paid_print_and_personal_hold_work(): void
     {
+        $now = CarbonImmutable::parse('2030-08-18 10:00:00', 'Asia/Ho_Chi_Minh');
+        Carbon::setTestNow($now);
+        CarbonImmutable::setTestNow($now);
+
         $staff = $this->userWithRole('staff');
         $scenario = $this->bookingScenario(false);
+        $showtimeStart = $now->addHours(2);
         $scenario['showtime']->forceFill([
-            'show_date' => now('Asia/Ho_Chi_Minh')->toDateString(),
-            'show_time' => now('Asia/Ho_Chi_Minh')->addHours(2)->format('H:i:s'),
+            'show_date' => $showtimeStart->toDateString(),
+            'show_time' => $showtimeStart->format('H:i:s'),
         ])->save();
 
         $counterBooking = new Booking([
