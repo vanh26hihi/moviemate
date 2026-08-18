@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CopyPriceBookVersionRequest;
 use App\Http\Requests\Admin\PreviewPriceBookRequest;
 use App\Http\Requests\Admin\PriceBookAdjustmentRequest;
+use App\Http\Requests\Admin\SchedulePriceBookChangeRequest;
 use App\Http\Requests\Admin\UpdatePriceBookVersionRequest;
 use App\Http\Requests\Admin\UpdateSimpleTicketPricesRequest;
 use App\Models\Cinema;
@@ -16,6 +17,7 @@ use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\SeatType;
 use App\Services\Admin\PriceBookAdminAccess;
+use App\Services\PriceBookScheduleChangeService;
 use App\Services\PriceBookVersionService;
 use App\Services\VersionedTicketPricingService;
 use Carbon\CarbonImmutable;
@@ -31,6 +33,7 @@ final class PriceBookController extends Controller
         private readonly PriceBookAdminAccess $access,
         private readonly PriceBookVersionService $versions,
         private readonly VersionedTicketPricingService $pricing,
+        private readonly PriceBookScheduleChangeService $scheduleChanges,
     ) {}
 
     public function index(Request $request): View
@@ -264,6 +267,66 @@ final class PriceBookController extends Controller
     public function previewRedirect(): RedirectResponse
     {
         return redirect()->route('admin.price-books.index');
+    }
+
+    public function previewScheduleChange(
+        SchedulePriceBookChangeRequest $request,
+        PriceBookVersion $version,
+    ): View|RedirectResponse {
+        $this->access->authorizeManage($request->user());
+        $this->assertChainVersion($version);
+
+        try {
+            $plan = $this->scheduleChanges->preview(
+                $version,
+                $request->validated('change_kind'),
+                $request->validated('change_date'),
+                $request->validated('ticket_prices'),
+            );
+        } catch (PriceBookException $exception) {
+            return back()->withErrors(['schedule_change' => $this->message($exception)])->withInput();
+        }
+
+        return view('admin.price-books.schedule-change-preview', [
+            'priceBook' => $this->versions->chainPriceBook(),
+            'version' => $version,
+            'plan' => $plan,
+        ]);
+    }
+
+    public function scheduleChangePreviewRedirect(Request $request, PriceBookVersion $version): RedirectResponse
+    {
+        $this->access->authorizeManage($request->user());
+        $this->assertChainVersion($version);
+
+        return redirect()->route('admin.price-books.versions.show', $version);
+    }
+
+    public function applyScheduleChange(
+        SchedulePriceBookChangeRequest $request,
+        PriceBookVersion $version,
+    ): RedirectResponse {
+        $this->access->authorizeManage($request->user());
+        $this->assertChainVersion($version);
+
+        try {
+            $published = $this->scheduleChanges->apply(
+                $version,
+                $request->validated('change_kind'),
+                $request->validated('change_date'),
+                $request->validated('ticket_prices'),
+                $request->user(),
+            );
+        } catch (PriceBookException $exception) {
+            return redirect()->route('admin.price-books.versions.show', $version)
+                ->withErrors(['schedule_change' => $this->message($exception)])
+                ->withInput();
+        }
+
+        return redirect()->route('admin.price-books.index')->with(
+            'success',
+            'Đã thay lịch giá an toàn và phát hành '.$published->count().' khoảng giá liền kề.',
+        );
     }
 
     private function detailView(Request $request, PriceBookVersion $version, ?array $preview = null): View

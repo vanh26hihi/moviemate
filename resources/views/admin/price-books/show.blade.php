@@ -68,6 +68,8 @@
         </form>
     </section>
 @elseif($canManagePriceBook && $version->status === 'published')
+    @include('admin.price-books._schedule_change')
+
     <details class="cinema-card mt-6 overflow-hidden">
         <summary class="cursor-pointer p-5 font-bold app-muted sm:p-6">Công cụ kỹ thuật nâng cao</summary>
         <div class="grid gap-6 border-t app-border p-5 sm:p-6 xl:grid-cols-2">

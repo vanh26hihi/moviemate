@@ -358,6 +358,12 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.publish');
         Route::post('/price-books/versions/{version}/retire', [AdminPriceBookController::class, 'retire'])
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.retire');
+        Route::get('/price-books/versions/{version}/schedule-change/preview', [AdminPriceBookController::class, 'scheduleChangePreviewRedirect'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.schedule-change.preview.redirect');
+        Route::post('/price-books/versions/{version}/schedule-change/preview', [AdminPriceBookController::class, 'previewScheduleChange'])
+            ->whereNumber('version')->middleware(['permission:pricing.manage', 'throttle:30,1'])->name('price-books.versions.schedule-change.preview');
+        Route::post('/price-books/versions/{version}/schedule-change/apply', [AdminPriceBookController::class, 'applyScheduleChange'])
+            ->whereNumber('version')->middleware(['permission:pricing.manage', 'throttle:10,1'])->name('price-books.versions.schedule-change.apply');
         Route::get('/reviews', [AdminReviewController::class, 'index'])->middleware('permission:reviews.view')->name('reviews.index');
         Route::patch('/reviews/{review}', [AdminReviewController::class, 'moderate'])->middleware('permission:reviews.moderate')->name('reviews.moderate');
         Route::resource('movies', AdminMovieController::class)->except(['destroy'])
