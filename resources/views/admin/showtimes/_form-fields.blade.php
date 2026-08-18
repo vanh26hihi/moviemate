@@ -43,18 +43,22 @@
     <div>
         <label class="cinema-label" for="room_id">Phòng đang hoạt động *</label>
         <select id="room_id" name="room_id" class="cinema-input">
-            <option value="">-- Chọn phòng --</option>
+            <option value="">-- Chọn định dạng trước --</option>
             @foreach($rooms as $room)
                 @php
                     $layout = $editing && (int) $showtime->room_id === (int) $room->id
                         ? $showtime->roomLayout
                         : $room->latestPublishedLayout;
+                    $roomFormatIds = $room->presentationCapabilities->pluck('id')->map(fn ($id) => (int) $id);
+                    $roomFormatCodes = $room->presentationCapabilities->pluck('code')->implode(', ');
+                    $roomSupportsSelectedFormat = $formatValue && $roomFormatIds->contains((int) $formatValue);
                 @endphp
-                <option value="{{ $room->id }}" data-cinema-id="{{ $room->cinema_id }}" data-timezone="{{ $room->cinema->timezone ?? $cinemaTimezone }}" data-layout-version="{{ $layout->version }}" data-cleaning-buffer="{{ $room->cleaning_buffer_minutes ?? $room->cinema->default_cleaning_buffer_minutes ?? $cleaningBufferMinutes }}" data-format-ids="{{ $room->presentationCapabilities->pluck('id')->implode(',') }}" @selected($roomValue == $room->id)>
-                    {{ $room->code }} — {{ $room->name }} (sơ đồ phiên bản {{ $layout->version }})
+                <option value="{{ $room->id }}" data-cinema-id="{{ $room->cinema_id }}" data-timezone="{{ $room->cinema->timezone ?? $cinemaTimezone }}" data-layout-version="{{ $layout->version }}" data-cleaning-buffer="{{ $room->cleaning_buffer_minutes ?? $room->cinema->default_cleaning_buffer_minutes ?? $cleaningBufferMinutes }}" data-format-ids="{{ $roomFormatIds->implode(',') }}" data-format-codes="{{ $roomFormatCodes }}" @selected($roomValue == $room->id) @disabled(!$roomSupportsSelectedFormat) @if(!$roomSupportsSelectedFormat) hidden @endif>
+                    {{ $room->code }} — {{ $room->name }} (sơ đồ phiên bản {{ $layout->version }}) · hỗ trợ {{ $roomFormatCodes ?: 'chưa cấu hình' }}
                 </option>
             @endforeach
         </select>
+        <p class="mt-2 text-xs app-muted" data-room-guidance>Chọn định dạng để hệ thống chỉ hiển thị những phòng có thiết bị phù hợp.</p>
         @error('room_id')<p class="text-sm text-error mt-2">{{ $message }}</p>@enderror
     </div>
 
@@ -124,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const date = document.getElementById('show_date');
     const time = document.getElementById('show_time');
     const formatGuidance = document.querySelector('[data-format-guidance]');
+    const roomGuidance = document.querySelector('[data-room-guidance]');
 
     function idsFor(option) {
         return new Set((option?.dataset.formatIds || '').split(',').filter(Boolean));
@@ -151,12 +156,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function refreshRoomChoices() {
         const selectedFormat = format.value;
+        const selectedFormatCode = format.selectedOptions[0]?.dataset.formatCode || 'đã chọn';
+        let compatibleRooms = 0;
         Array.from(room.options).forEach(option => {
             if (!option.value) return;
-            option.disabled = !selectedFormat || !idsFor(option).has(selectedFormat);
+            const compatible = Boolean(selectedFormat) && idsFor(option).has(selectedFormat);
+            option.disabled = !compatible;
+            option.hidden = !compatible;
+            if (compatible) compatibleRooms += 1;
         });
         const previousRoom = room.value;
         if (room.value && room.selectedOptions[0]?.disabled) room.value = '';
+        room.options[0].textContent = !selectedFormat
+            ? '-- Chọn định dạng trước --'
+            : compatibleRooms === 0
+                ? `-- Không có phòng hỗ trợ ${selectedFormatCode} --`
+                : `-- Chọn phòng (${compatibleRooms} phòng phù hợp) --`;
+        if (roomGuidance) {
+            roomGuidance.textContent = !selectedFormat
+                ? 'Chọn định dạng để hệ thống chỉ hiển thị những phòng có thiết bị phù hợp.'
+                : compatibleRooms === 0
+                    ? `Không có phòng đang hoạt động hỗ trợ ${selectedFormatCode} trong phạm vi quản trị hiện tại.`
+                    : `Có ${compatibleRooms} phòng đang hoạt động hỗ trợ ${selectedFormatCode}; các phòng không tương thích đã được ẩn.`;
+            roomGuidance.classList.toggle('text-error', Boolean(selectedFormat) && compatibleRooms === 0);
+            roomGuidance.classList.toggle('app-muted', !selectedFormat || compatibleRooms > 0);
+        }
         if (previousRoom !== room.value) room.dispatchEvent(new Event('change'));
     }
 
