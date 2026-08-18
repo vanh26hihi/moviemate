@@ -172,6 +172,7 @@ final class CounterSaleController extends Controller
             $expiration->expire((int) $booking->id);
             $booking->refresh();
         }
+        $booking->loadMissing('promotionUsage');
         $availability = $payments->availability();
 
         return view('staff.counter.review', [
@@ -181,6 +182,29 @@ final class CounterSaleController extends Controller
                 'payos' => $availability['payos'],
             ],
         ]);
+    }
+
+    public function applyPromotion(
+        Request $request,
+        Booking $booking,
+        CounterBookingService $counter,
+    ): RedirectResponse {
+        $validated = $request->validate([
+            'promotion_code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
+            'promotion_discount_amount' => ['prohibited'],
+            'total_amount' => ['prohibited'],
+        ], [
+            'promotion_code.regex' => 'Mã khuyến mãi chỉ gồm chữ, số, dấu gạch ngang hoặc gạch dưới.',
+        ]);
+
+        $booking = $counter->applyPromotion($request->user(), $booking, $validated['promotion_code']);
+        if ((int) $booking->total_amount === 0) {
+            return redirect()->route('staff.counter.payment-result', $booking)
+                ->with('success', 'Mã khuyến mãi đã giảm toàn bộ giá trị đơn; hệ thống đã xác nhận đơn 0 VNĐ.');
+        }
+
+        return redirect()->route('staff.counter.review', $booking)
+            ->with('success', 'Đã áp dụng mã khuyến mãi.');
     }
 
     public function cash(

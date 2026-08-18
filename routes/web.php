@@ -616,6 +616,8 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('booking')->middleware('permission:counter_sales.create')->name('counter.food.update');
         Route::get('/counter/bookings/{booking}/review', [StaffCounterSaleController::class, 'review'])
             ->whereNumber('booking')->middleware('permission:counter_sales.view')->name('counter.review');
+        Route::post('/counter/bookings/{booking}/promotion', [StaffCounterSaleController::class, 'applyPromotion'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.promotion');
         Route::post('/counter/bookings/{booking}/cash', [StaffCounterSaleController::class, 'cash'])
             ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.cash');
         Route::post('/counter/bookings/{booking}/payments/{provider}', [StaffCounterPaymentController::class, 'initiate'])

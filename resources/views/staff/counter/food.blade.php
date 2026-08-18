@@ -13,7 +13,7 @@
                 <article class="cinema-card p-5"><input type="hidden" name="food_items[{{ $index }}][food_id]" value="{{ $food->id }}"><h2 class="font-extrabold app-heading">{{ $food->name }}</h2><p class="mt-1 text-sm app-muted">{{ number_format((int)$food->price,0,',','.') }} VNĐ</p><label class="cinema-label mt-4 block">Số lượng<input class="cinema-input mt-1" type="number" min="0" max="20" name="food_items[{{ $index }}][quantity]" value="0"></label></article>
             @endforeach
         </div>
-        <div class="flex flex-wrap justify-end gap-3"><button class="btn-secondary" type="submit">Bỏ qua đồ ăn</button><button class="btn-primary" type="submit">Cập nhật và xem lại</button></div>
+        <div class="flex justify-end"><button class="btn-primary" type="submit">Cập nhật và xem lại</button></div>
     </form>
 </div>
 @endsection

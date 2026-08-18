@@ -13,6 +13,7 @@ use App\Models\Cinema;
 use App\Models\FoodItem;
 use App\Models\Movie;
 use App\Models\Payment;
+use App\Models\Promotion;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\RoomType;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Tests\Support\CreatesBookingFixtures;
 use Tests\TestCase;
 
@@ -142,7 +144,12 @@ final class CounterSalesR8Test extends TestCase
             'cinema_id' => $otherCinema->id, 'name' => 'Sai chi nhánh', 'price' => 1000, 'active' => true,
         ]);
 
-        $this->actingAs($staff)->post(route('staff.counter.food.update', $booking), [
+        $this->actingAs($staff)->get(route('staff.counter.food', $booking))
+            ->assertOk()
+            ->assertSee('Cập nhật và xem lại')
+            ->assertDontSee('Bỏ qua đồ ăn');
+
+        $this->post(route('staff.counter.food.update', $booking), [
             'food_items' => [['food_id' => $otherFood->id, 'quantity' => 1]],
         ])->assertSessionHasErrors('food_items');
         $this->post(route('staff.counter.food.update', $booking), [
@@ -159,6 +166,169 @@ final class CounterSalesR8Test extends TestCase
         $this->post(route('staff.counter.food.update', $booking), ['food_items' => []])->assertRedirect();
         $this->assertSame(0, (int) $booking->fresh()->food_subtotal);
         $this->assertNull($booking->fresh()->foodOrder);
+    }
+
+    public function test_food_total_updates_full_authoritative_snapshot_before_provider_payment(): void
+    {
+        $this->configureVnpay();
+        [$booking, , $staff] = $this->counterHold();
+        $food = FoodItem::query()->create(['name' => 'Combo quầy', 'price' => 40_000, 'active' => true]);
+
+        $this->actingAs($staff)->post(route('staff.counter.food.update', $booking), [
+            'food_items' => [['food_id' => $food->id, 'quantity' => 2]],
+        ])->assertRedirect(route('staff.counter.review', $booking));
+
+        $booking->refresh();
+        $this->assertSame(130_000, (int) $booking->gross_amount);
+        $this->assertSame(130_000, (int) $booking->total_amount);
+        $this->post(route('staff.counter.payments.initiate', [$booking, 'vnpay']))
+            ->assertRedirectContains('sandbox.vnpayment.vn/paymentv2/vpcpay.html');
+        $this->assertSame(130_000, $booking->payments()->sole()->amount);
+    }
+
+    public function test_food_total_is_forwarded_unchanged_to_payos_checkout(): void
+    {
+        $this->configurePayOs();
+        Http::fake(function (Request $request) {
+            $payload = $request->data();
+            $data = [
+                'orderCode' => $payload['orderCode'], 'amount' => $payload['amount'], 'currency' => 'VND',
+                'paymentLinkId' => 'foodPayOsCheckout1234567890', 'status' => 'PENDING',
+                'checkoutUrl' => 'https://pay.payos.vn/web/foodPayOsCheckout1234567890',
+            ];
+
+            return Http::response([
+                'code' => '00', 'data' => $data,
+                'signature' => app(PayOsSigner::class)->signData($data, 'payos-counter-checksum-key'),
+            ]);
+        });
+        [$booking, , $staff] = $this->counterHold();
+        $food = FoodItem::query()->create(['name' => 'Bắp payOS', 'price' => 40_000, 'active' => true]);
+        $this->actingAs($staff)->post(route('staff.counter.food.update', $booking), [
+            'food_items' => [['food_id' => $food->id, 'quantity' => 2]],
+        ])->assertRedirect();
+
+        $this->post(route('staff.counter.payments.initiate', [$booking, 'payos']))
+            ->assertRedirect('https://pay.payos.vn/web/foodPayOsCheckout1234567890');
+        $this->assertSame(130_000, $booking->payments()->sole()->amount);
+        Http::assertSent(fn (Request $request): bool => (int) $request['amount'] === 130_000);
+    }
+
+    public function test_counter_applies_one_authoritative_promotion_and_redeems_it_on_cash_settlement(): void
+    {
+        [$booking, , $staff] = $this->counterHold();
+        Promotion::query()->create([
+            'code' => 'COUNTER10', 'name' => 'Counter 10K', 'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 10_000, 'discount_percent' => null, 'maximum_discount_vnd' => null,
+            'minimum_order_vnd' => 0, 'is_active' => true, 'registered_users_only' => false,
+            'first_order_only' => false,
+        ]);
+
+        $this->actingAs($staff)->post(route('staff.counter.promotion', $booking), [
+            'promotion_code' => 'counter10', 'total_amount' => 1,
+        ])->assertSessionHasErrors('total_amount');
+        $this->post(route('staff.counter.promotion', $booking), [
+            'promotion_code' => 'counter10',
+        ])->assertRedirect(route('staff.counter.review', $booking));
+
+        $booking->refresh();
+        $this->assertSame(50_000, (int) $booking->gross_amount);
+        $this->assertSame(10_000, (int) $booking->promotion_discount_amount);
+        $this->assertSame(40_000, (int) $booking->total_amount);
+        $this->assertDatabaseHas('booking_promotions', [
+            'booking_id' => $booking->id, 'code_snapshot' => 'COUNTER10', 'status' => 'reserved',
+        ]);
+        $this->post(route('staff.counter.promotion', $booking), ['promotion_code' => 'COUNTER10'])
+            ->assertSessionHasErrors('promotion_code');
+        $this->post(route('staff.counter.food.update', $booking), ['food_items' => []])
+            ->assertSessionHasErrors('booking');
+
+        $this->post(route('staff.counter.cash', $booking))->assertRedirect();
+        $this->assertSame(40_000, Payment::query()->sole()->amount);
+        $this->assertDatabaseHas('booking_promotions', [
+            'booking_id' => $booking->id, 'status' => 'redeemed',
+        ]);
+    }
+
+    public function test_invalid_counter_promotion_does_not_change_authoritative_totals(): void
+    {
+        [$booking, , $staff] = $this->counterHold();
+
+        $this->actingAs($staff)
+            ->from(route('staff.counter.review', $booking))
+            ->post(route('staff.counter.promotion', $booking), ['promotion_code' => 'UNKNOWN'])
+            ->assertRedirect(route('staff.counter.review', $booking))
+            ->assertSessionHasErrors('promotion_code');
+
+        $booking->refresh();
+        $this->assertSame(50_000, (int) $booking->gross_amount);
+        $this->assertSame(0, (int) $booking->promotion_discount_amount);
+        $this->assertSame(50_000, (int) $booking->total_amount);
+        $this->assertNull($booking->promotionUsage);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    public function test_exact_zero_counter_total_settles_only_with_internal_zero_and_redeems_promotion(): void
+    {
+        Http::fake();
+        [$booking, , $staff] = $this->counterHold();
+        Promotion::query()->create([
+            'code' => 'COUNTERFREE', 'name' => 'Counter free', 'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 1_000_000, 'discount_percent' => null, 'maximum_discount_vnd' => null,
+            'minimum_order_vnd' => 0, 'is_active' => true, 'registered_users_only' => false,
+            'first_order_only' => false,
+        ]);
+
+        $this->actingAs($staff)->post(route('staff.counter.promotion', $booking), [
+            'promotion_code' => 'COUNTERFREE',
+        ])->assertRedirect(route('staff.counter.payment-result', $booking));
+
+        $booking->refresh();
+        $payment = $booking->payments()->sole();
+        $this->assertSame(50_000, (int) $booking->gross_amount);
+        $this->assertSame(50_000, (int) $booking->promotion_discount_amount);
+        $this->assertSame(0, (int) $booking->total_amount);
+        $this->assertSame('paid', $booking->payment_status);
+        $this->assertSame(Payment::PROVIDER_INTERNAL_ZERO, $payment->provider);
+        $this->assertSame(Payment::STATUS_SUCCESS, $payment->status);
+        $this->assertSame(0, (int) $payment->amount);
+        $this->assertSame('redeemed', $booking->promotionUsage()->value('status'));
+        Http::assertNothingSent();
+    }
+
+    public function test_nonzero_counter_promotion_stays_reserved_during_pending_and_failed_provider_attempts(): void
+    {
+        $this->configureVnpay();
+        [$booking, , $staff] = $this->counterHold();
+        Promotion::query()->create([
+            'code' => 'COUNTERPAY', 'name' => 'Counter provider', 'type' => Promotion::TYPE_FIXED,
+            'discount_amount_vnd' => 10_000, 'discount_percent' => null, 'maximum_discount_vnd' => null,
+            'minimum_order_vnd' => 0, 'is_active' => true, 'registered_users_only' => false,
+            'first_order_only' => false,
+        ]);
+
+        $this->actingAs($staff)->post(route('staff.counter.promotion', $booking), [
+            'promotion_code' => 'COUNTERPAY',
+        ])->assertRedirect(route('staff.counter.review', $booking));
+        $this->post(route('staff.counter.payments.initiate', [$booking, 'vnpay']))
+            ->assertRedirectContains('sandbox.vnpayment.vn/paymentv2/vpcpay.html');
+
+        $payment = $booking->payments()->sole();
+        $this->assertSame(40_000, (int) $payment->amount);
+        $this->assertSame(Payment::STATUS_PENDING, $payment->status);
+        $this->assertSame('reserved', $booking->promotionUsage()->value('status'));
+        $this->assertDatabaseMissing('payments', [
+            'booking_id' => $booking->id,
+            'provider' => Payment::PROVIDER_INTERNAL_ZERO,
+        ]);
+
+        $payment->forceFill([
+            'status' => Payment::STATUS_FAILED,
+            'failed_at' => now(),
+            'failure_reason' => 'provider_rejected',
+        ])->save();
+        $this->assertSame('reserved', $booking->promotionUsage()->value('status'));
+        $this->assertSame('unpaid', $booking->fresh()->payment_status);
     }
 
     public function test_counter_hold_reuses_gap_couple_and_competing_hold_guards(): void
@@ -182,6 +352,19 @@ final class CounterSalesR8Test extends TestCase
             'seat_ids' => [$competitorScenario['seats'][0]->id],
             'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
         ])->assertSessionHasErrors('seat_ids');
+
+        $counterFirstScenario = $this->bookingScenario(false);
+        $this->post(route('staff.counter.hold', $counterFirstScenario['showtime']), [
+            'seat_ids' => [$counterFirstScenario['seats'][0]->id],
+            'checkout_token' => app(BookingTokenService::class)->issueCheckoutToken(),
+        ])->assertRedirect();
+
+        try {
+            $this->reserve($counterFirstScenario, [$counterFirstScenario['seats'][0]->id]);
+            $this->fail('Online checkout must not acquire a seat already held at the counter.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('seat_ids', $exception->errors());
+        }
     }
 
     public function test_cash_settlement_uses_actual_settler_exact_amount_and_is_idempotent_without_http(): void
@@ -317,6 +500,7 @@ final class CounterSalesR8Test extends TestCase
         $booking = Booking::query()->where('sales_channel', 'counter')->sole();
 
         $this->actingAs($staff)->get(route('staff.counter.review', $booking))->assertNotFound();
+        $this->post(route('staff.counter.promotion', $booking), ['promotion_code' => 'ANY'])->assertNotFound();
         $this->post(route('staff.counter.cash', $booking))->assertNotFound();
         $this->post(route('staff.counter.cancel', $booking))->assertNotFound();
         $this->actingAs($admin)->post(route('staff.counter.cash', $booking))->assertRedirect();

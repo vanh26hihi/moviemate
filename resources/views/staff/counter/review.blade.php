@@ -46,6 +46,9 @@
             <dl class="mt-4 space-y-3">
                 <div class="flex justify-between"><dt>Tiền vé</dt><dd class="font-bold">{{ number_format((int) $booking->seat_subtotal, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between"><dt>Đồ ăn</dt><dd class="font-bold">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} VNĐ</dd></div>
+                @if((int) $booking->promotion_discount_amount > 0)
+                    <div class="flex justify-between text-success"><dt>Giảm giá · {{ $booking->promotionUsage?->code_snapshot }}</dt><dd class="font-bold">−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} VNĐ</dd></div>
+                @endif
                 <div class="flex justify-between border-t app-border pt-3 text-xl"><dt class="font-extrabold">Tổng</dt><dd class="font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</dd></div>
             </dl>
             <p class="mt-3 text-sm app-muted">Số tiền do máy chủ xác định và không thể sửa trên trình duyệt.</p>
@@ -76,6 +79,25 @@
                 <p class="mt-2 app-muted">Không có giao dịch nào đang hoạt động. Ghế vẫn được giữ đến {{ $booking->expires_at?->format('H:i:s d/m/Y') }} để nhân viên chọn phương thức khác.</p>
             </section>
         @endif
+        <section class="cinema-card p-6">
+            <h2 class="text-xl font-extrabold app-heading">Mã khuyến mãi</h2>
+            @if($booking->promotionUsage)
+                <div class="mt-4 rounded-xl bg-success/10 p-4">
+                    <p class="font-extrabold text-success">Đã áp dụng {{ $booking->promotionUsage->code_snapshot }}</p>
+                    <p class="mt-1 text-sm app-muted">Giảm {{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} VNĐ. Mỗi đơn chỉ dùng một mã và mã được chốt để đối soát.</p>
+                </div>
+            @else
+                <p class="mt-2 app-muted">Nhập mã khách cung cấp trước khi chọn phương thức thanh toán.</p>
+                <form method="POST" action="{{ route('staff.counter.promotion', $booking) }}" class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start" data-submit-once>
+                    @csrf
+                    <label class="cinema-label flex-1">Mã khuyến mãi
+                        <input class="cinema-input mt-1 uppercase" name="promotion_code" maxlength="50" autocomplete="off" value="{{ old('promotion_code') }}" placeholder="Ví dụ: MOVIEMATE10" required>
+                        <span class="mt-1 block text-xs app-muted">Hệ thống tự kiểm tra thời hạn, chi nhánh, giá trị tối thiểu và lượt sử dụng.</span>
+                    </label>
+                    <button class="btn-secondary sm:mt-6" type="submit">Áp dụng mã</button>
+                </form>
+            @endif
+        </section>
         <section class="cinema-card p-6">
             <h2 class="text-xl font-extrabold app-heading">Phương thức thanh toán</h2>
             <p class="mt-2 app-muted">Chọn đúng phương thức khách sẽ sử dụng. VNPAY/payOS chỉ được ghi nhận sau khi provider xác minh.</p>
