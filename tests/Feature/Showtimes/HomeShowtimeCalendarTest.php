@@ -6,6 +6,7 @@ use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\CinemaContext;
+use App\Services\PublicShowtimeCatalog;
 use Carbon\Carbon;
 use DOMDocument;
 use DOMElement;
@@ -222,6 +223,59 @@ class HomeShowtimeCalendarTest extends TestCase
         $xpath = $this->xpathFor($response->getContent());
         $links = $xpath->query('//*[@data-showtime-panel="2026-08-07"]//a[contains(@href, "/booking/select-seat/")]');
         $this->assertCount(1, $links);
+    }
+
+    public function test_calendar_keeps_playing_showtimes_visible_until_the_authoritative_cutoff(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-05 21:00:00', 'Asia/Ho_Chi_Minh'));
+        $movie = Movie::query()->create([
+            'title' => 'Visible Playing Movie',
+            'slug' => 'visible-playing-movie',
+            'duration' => 180,
+            'status' => 'now_showing',
+        ]);
+        $closedScenario = $this->publicScenario('CLOSED', 'Closed Branch', '2026-08-05', [
+            'movie' => $movie,
+            'show_time' => '20:00:00',
+        ]);
+        $playingScenario = $this->publicScenario('PLAYING', 'Playing Branch', '2026-08-05', [
+            'movie' => $movie,
+            'show_time' => '20:50:00',
+        ]);
+        $openScenario = $this->publicScenario('OPEN', 'Open Branch', '2026-08-05', [
+            'show_time' => '22:00:00',
+        ]);
+
+        $catalog = app(PublicShowtimeCatalog::class);
+        $this->assertFalse($catalog->forDate('2026-08-05')->contains('id', $closedScenario['showtime']->id));
+        $this->assertTrue($catalog->forDate('2026-08-05')->contains('id', $playingScenario['showtime']->id));
+        $this->assertTrue($catalog->forDate('2026-08-05')->contains('id', $openScenario['showtime']->id));
+
+        $response = $this->get(route('home', ['date' => '2026-08-05']));
+
+        $response->assertOk()->assertSee('Movie OPEN');
+
+        $xpath = $this->xpathFor($response->getContent());
+        $playingMovieInCalendar = $xpath->query(
+            '//*[@id="home-showtime-calendar"]//*[self::h3 or self::a][normalize-space()="Visible Playing Movie"]'
+        );
+        $closedBookingLinks = $xpath->query(sprintf(
+            '//a[contains(@href, "/booking/select-seat/%d")]',
+            $closedScenario['showtime']->id,
+        ));
+        $openBookingLinks = $xpath->query(sprintf(
+            '//a[contains(@href, "/booking/select-seat/%d")]',
+            $openScenario['showtime']->id,
+        ));
+        $playingBookingLinks = $xpath->query(sprintf(
+            '//a[contains(@href, "/booking/select-seat/%d")]',
+            $playingScenario['showtime']->id,
+        ));
+
+        $this->assertGreaterThan(0, $playingMovieInCalendar->count());
+        $this->assertCount(0, $closedBookingLinks);
+        $this->assertCount(1, $playingBookingLinks);
+        $this->assertCount(1, $openBookingLinks);
     }
 
     private function xpathFor(string $html): DOMXPath
