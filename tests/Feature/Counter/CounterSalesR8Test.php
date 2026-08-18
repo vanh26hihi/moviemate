@@ -331,10 +331,10 @@ final class CounterSalesR8Test extends TestCase
 
         $this->get(route('staff.counter.payment-result', $booking))
             ->assertOk()->assertSee('Thanh toán thành công')->assertSee('VNPAY')
-            ->assertSee('data-auto-print-start', false);
+            ->assertSee('data-auto-print-all', false);
         $this->get(route('payments.vnpay.return', ['ref' => $payment->order_code]))
             ->assertRedirect(route('staff.counter.payment-result', ['booking' => $booking, 'returned' => 1]));
-        $this->post(route('staff.tickets.print.start', $booking))->assertRedirect();
+        $this->post(route('staff.tickets.print-all', $booking))->assertOk();
         $this->assertSame(1, BookingTicketPrint::query()->sole()->attempts_count);
     }
 
@@ -381,9 +381,57 @@ final class CounterSalesR8Test extends TestCase
         $this->assertSame('paid', $booking->fresh()->booking_status);
         $this->get(route('staff.counter.payment-result', $booking))
             ->assertOk()->assertSee('Thanh toán thành công')->assertSee('payOS')
-            ->assertSee('data-auto-print-start', false);
+            ->assertSee('data-auto-print-all', false);
         $this->get(route('payments.payos.return', ['attempt' => $payment->id]))
             ->assertRedirect(route('staff.counter.payment-result', ['booking' => $booking, 'returned' => 1]));
+    }
+
+    public function test_paid_counter_booking_auto_prints_every_seat_ticket_and_food_voucher(): void
+    {
+        $cinema = Cinema::query()->active()->primary()->firstOrFail();
+        $scenario = $this->normalRowScenario($cinema, 2);
+        $staff = $this->userWithRole('staff');
+        $token = app(BookingTokenService::class)->issueCheckoutToken();
+
+        $this->actingAs($staff)->post(route('staff.counter.hold', $scenario['showtime']), [
+            'seat_ids' => $scenario['seats']->pluck('id')->all(),
+            'checkout_token' => $token,
+        ])->assertRedirect();
+
+        $booking = Booking::query()
+            ->where('checkout_idempotency_key_hash', hash('sha256', $token))
+            ->sole();
+        $food = FoodItem::query()->create([
+            'name' => 'Combo in toàn bộ', 'price' => 35_000, 'active' => true,
+        ]);
+        $this->post(route('staff.counter.food.update', $booking), [
+            'food_items' => [['food_id' => $food->id, 'quantity' => 1]],
+        ])->assertRedirect(route('staff.counter.review', $booking));
+        $this->post(route('staff.counter.cash', $booking))
+            ->assertRedirect(route('staff.counter.payment-result', $booking));
+
+        $booking->refresh();
+        $this->assertSame(2, $booking->admissionTickets()->count());
+        $this->assertSame(1, $booking->foodPickupVoucher()->count());
+
+        $singlePrintAction = 'action="'.route('staff.tickets.print.start', $booking).'"';
+        $printAllAction = 'action="'.route('staff.tickets.print-all', $booking).'"';
+        $this->get(route('staff.counter.payment-result', $booking))
+            ->assertOk()
+            ->assertSee('Đang chuyển sang in toàn bộ')
+            ->assertSee('data-auto-print-all', false)
+            ->assertSee($printAllAction, false)
+            ->assertDontSee('data-auto-print-start', false)
+            ->assertDontSee($singlePrintAction, false);
+
+        $response = $this->post(route('staff.tickets.print-all', $booking))->assertOk();
+        $this->assertSame(2, substr_count($response->getContent(), 'data-print-artifact="ticket"'));
+        $this->assertSame(1, substr_count($response->getContent(), 'data-print-artifact="food-voucher"'));
+        $this->assertSame([1, 1], $booking->admissionTickets()->orderBy('id')->pluck('print_count')->all());
+        $this->assertSame(1, $booking->foodPickupVoucher()->value('print_count'));
+        $this->assertDatabaseCount('booking_ticket_prints', 2);
+        $this->assertDatabaseCount('food_pickup_voucher_print_events', 1);
+        $this->post(route('staff.tickets.print-all', $booking))->assertStatus(409);
     }
 
     public function test_cross_branch_counter_provider_payment_result_resume_and_print_are_denied(): void

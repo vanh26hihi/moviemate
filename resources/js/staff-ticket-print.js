@@ -1,3 +1,5 @@
+import './form-validation';
+
 const printNow = () => {
     window.print();
 };

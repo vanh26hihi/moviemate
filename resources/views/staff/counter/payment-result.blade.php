@@ -38,11 +38,11 @@
     <section class="cinema-card p-6">
         @if($state === 'paid')
             @if($canAutoPrint)
-                <h2 class="text-xl font-extrabold app-heading">Đang chuyển sang in vé</h2>
-                <p class="mt-2 app-muted">MovieMate sẽ bắt đầu đúng một phiên in có kiểm soát. Vé chưa được đánh dấu đã in cho đến khi nhân viên xác nhận.</p>
-                <form method="POST" action="{{ route('staff.tickets.print.start', $booking) }}" class="mt-5" data-auto-print-start data-auto-print-key="{{ $booking->id }}:{{ $authoritative?->id }}" data-submit-once>
+                <h2 class="text-xl font-extrabold app-heading">Đang chuyển sang in toàn bộ</h2>
+                <p class="mt-2 app-muted">MovieMate sẽ in đủ một vé cho mỗi ghế và một phiếu nhận đồ ăn nếu đơn có đồ ăn. Mỗi tài liệu chỉ được ghi nhận một lần in đầu.</p>
+                <form method="POST" action="{{ route('staff.tickets.print-all', $booking) }}" class="mt-5" data-auto-print-all data-auto-print-key="{{ $booking->id }}:{{ $authoritative?->id }}" data-submit-once>
                     @csrf
-                    <button type="submit" class="btn-primary"><i class="ph ph-printer"></i>In vé ngay</button>
+                    <button type="submit" class="btn-primary"><i class="ph ph-printer"></i>In toàn bộ ngay</button>
                 </form>
             @elseif($printState?->status === \App\Models\BookingTicketPrint::STATUS_PRINTING)
                 <h2 class="text-xl font-extrabold app-heading">Phiên in đang chờ xác nhận</h2>
@@ -69,9 +69,9 @@
 </div>
 <script>
     (() => {
-        const form = document.querySelector('[data-auto-print-start]');
+        const form = document.querySelector('[data-auto-print-all]');
         if (!(form instanceof HTMLFormElement)) return;
-        const key = `moviemate:counter-auto-print:${form.dataset.autoPrintKey}`;
+        const key = `moviemate:counter-auto-print-all:${form.dataset.autoPrintKey}`;
         try {
             if (sessionStorage.getItem(key) === 'started') return;
             sessionStorage.setItem(key, 'started');

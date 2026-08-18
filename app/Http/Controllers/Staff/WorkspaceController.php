@@ -12,6 +12,7 @@ use App\Models\Seat;
 use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
 use App\Services\CinemaAccessService;
+use App\Services\Tickets\BookingTicketEligibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -155,8 +156,11 @@ final class WorkspaceController extends Controller
         return view('staff.dashboard', compact('cinema', 'now', 'stats', 'attentionItems', 'showtimes', 'completedShowtimes'));
     }
 
-    public function sales(Request $request, CinemaAccessService $cinemas): View
-    {
+    public function sales(
+        Request $request,
+        CinemaAccessService $cinemas,
+        BookingTicketEligibility $ticketEligibility,
+    ): View {
         $cinema = $cinemas->currentCinema($request->user());
         $timezone = $cinema?->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
         $validated = $request->validate([
@@ -174,9 +178,13 @@ final class WorkspaceController extends Controller
                 ->when($validated['status'] ?? null, fn (Builder $query, string $status) => $query->where('booking_status', $status))
                 ->when($validated['channel'] ?? null, fn (Builder $query, string $channel) => $query->where('sales_channel', $channel))
                 ->with(['showtime.movie:id,title', 'showtime.room:id,name', 'bookingSeats.seat', 'createdByStaff:id,name',
-                    'authoritativePayment.settledBy:id,name', 'admissionTickets.printState'])
+                    'payments', 'authoritativePayment.settledBy:id,name', 'admissionTickets.printState'])
                 ->latest('id')->paginate(20)->withQueryString();
         }
+
+        $bookings->getCollection()->each(
+            fn (Booking $booking) => $booking->setAttribute('can_print', $ticketEligibility->isPrintable($booking)),
+        );
 
         return view('staff.sales.index', compact('cinema', 'date', 'bookings'));
     }
