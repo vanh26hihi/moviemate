@@ -346,6 +346,8 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.copy');
         Route::patch('/price-books/versions/{version}', [AdminPriceBookController::class, 'update'])
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.update');
+        Route::patch('/price-books/versions/{version}/simple-prices', [AdminPriceBookController::class, 'updateSimplePrices'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.simple-prices.update');
         Route::post('/price-books/versions/{version}/adjustments', [AdminPriceBookController::class, 'storeAdjustment'])
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.adjustments.store');
         Route::patch('/price-books/versions/{version}/adjustments/{adjustment}', [AdminPriceBookController::class, 'updateAdjustment'])

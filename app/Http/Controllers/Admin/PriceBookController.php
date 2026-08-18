@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\CopyPriceBookVersionRequest;
 use App\Http\Requests\Admin\PreviewPriceBookRequest;
 use App\Http\Requests\Admin\PriceBookAdjustmentRequest;
 use App\Http\Requests\Admin\UpdatePriceBookVersionRequest;
+use App\Http\Requests\Admin\UpdateSimpleTicketPricesRequest;
 use App\Models\Cinema;
 use App\Models\PriceBookAdjustment;
 use App\Models\PriceBookVersion;
@@ -21,6 +22,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 final class PriceBookController extends Controller
@@ -62,10 +64,13 @@ final class PriceBookController extends Controller
         $this->assertChainVersion($version);
         abort_unless($version->status === PriceBookVersion::STATUS_PUBLISHED, 403);
         try {
+            $effectiveUntil = $request->validated('effective_end_date')
+                ? CarbonImmutable::parse($request->validated('effective_end_date'))->addDay()->toDateString()
+                : $request->validated('effective_until');
             $draft = $this->versions->copyToDraft(
                 $version,
                 $request->validated('effective_from'),
-                $request->validated('effective_until'),
+                $effectiveUntil,
                 $request->user(),
             );
         } catch (PriceBookException $exception) {
@@ -87,6 +92,78 @@ final class PriceBookController extends Controller
         }
 
         return back()->with('success', 'Đã cập nhật giá cơ sở và thời gian hiệu lực của bản nháp.');
+    }
+
+    public function updateSimplePrices(
+        UpdateSimpleTicketPricesRequest $request,
+        PriceBookVersion $version,
+    ): RedirectResponse {
+        $this->access->authorizeManage($request->user());
+        $this->assertMutable($version);
+
+        $seatTypes = SeatType::query()
+            ->where('status', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+        $normalSeatType = $seatTypes->firstWhere('code', 'normal');
+        if (! $normalSeatType) {
+            return back()->withErrors([
+                'ticket_prices' => 'Cần có loại ghế thường đang hoạt động để xác định giá vé cơ bản.',
+            ])->withInput();
+        }
+
+        $validated = $request->validated();
+        $ticketPrices = collect($validated['ticket_prices'])
+            ->mapWithKeys(fn ($price, $seatTypeId): array => [(int) $seatTypeId => (int) $price]);
+        $basePrice = (int) $ticketPrices->get((int) $normalSeatType->id);
+
+        try {
+            DB::transaction(function () use ($request, $version, $seatTypes, $ticketPrices, $basePrice, $validated): void {
+                $locked = PriceBookVersion::query()
+                    ->lockForUpdate()
+                    ->with('adjustments')
+                    ->findOrFail($version->id);
+                $this->assertMutable($locked);
+
+                $activeSeatTypeIds = $seatTypes->pluck('id')->map(fn ($id): int => (int) $id);
+                $existingSeatAdjustments = $locked->adjustments
+                    ->where('dimension', 'seat_type')
+                    ->keyBy(fn (PriceBookAdjustment $adjustment): int => (int) $adjustment->seat_type_id);
+                $definitions = $this->definitions($locked->adjustments->filter(
+                    fn (PriceBookAdjustment $adjustment): bool => $adjustment->dimension !== 'seat_type'
+                        || ! $activeSeatTypeIds->contains((int) $adjustment->seat_type_id),
+                ));
+
+                foreach ($seatTypes as $seatType) {
+                    $amount = (int) $ticketPrices->get((int) $seatType->id) - $basePrice;
+                    if ($amount === 0) {
+                        continue;
+                    }
+
+                    $definitions[] = [
+                        'dimension' => 'seat_type',
+                        'label' => $existingSeatAdjustments->get((int) $seatType->id)?->label
+                            ?? 'Giá '.$seatType->name,
+                        'amount_vnd' => $amount,
+                        'seat_type_id' => (int) $seatType->id,
+                    ];
+                }
+
+                $this->versions->updateDraft($locked, [
+                    'base_price_vnd' => $basePrice,
+                    'effective_from' => $validated['effective_from'],
+                    'effective_until' => isset($validated['effective_end_date'])
+                        ? CarbonImmutable::parse($validated['effective_end_date'])->addDay()->toDateString()
+                        : null,
+                ], $request->user());
+                $this->versions->replaceAdjustments($locked, $definitions);
+            }, 3);
+        } catch (PriceBookException $exception) {
+            return back()->withErrors(['ticket_prices' => $this->message($exception)])->withInput();
+        }
+
+        return back()->with('success', 'Đã lưu giá bán và thời gian áp dụng của bảng giá đang soạn.');
     }
 
     public function storeAdjustment(PriceBookAdjustmentRequest $request, PriceBookVersion $version): RedirectResponse
