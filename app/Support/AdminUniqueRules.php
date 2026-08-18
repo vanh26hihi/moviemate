@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Cinema;
 use App\Models\Genre;
+use App\Models\Movie;
 use App\Models\PresentationFormat;
 use App\Models\Promotion;
 use App\Models\Room;
@@ -32,6 +33,8 @@ final class AdminUniqueRules
 
     public const GENRE_SLUG = 'genre.slug';
 
+    public const MOVIE_SLUG = 'movie.slug';
+
     public const RULES = [
         self::PROMOTION_CODE,
         self::CINEMA_CODE,
@@ -42,6 +45,7 @@ final class AdminUniqueRules
         self::PRESENTATION_FORMAT_NAME,
         self::LAYOUT_TEMPLATE_CODE,
         self::GENRE_SLUG,
+        self::MOVIE_SLUG,
     ];
 
     public static function promotionCode(?Promotion $promotion = null): Unique
@@ -89,5 +93,10 @@ final class AdminUniqueRules
     public static function genreSlug(?Genre $genre = null): Unique
     {
         return Rule::unique('genres', 'slug')->ignore($genre?->getKey());
+    }
+
+    public static function movieSlug(?Movie $movie = null): Unique
+    {
+        return Rule::unique('movies', 'slug')->ignore($movie?->getKey());
     }
 }

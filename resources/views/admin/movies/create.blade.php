@@ -26,16 +26,25 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-7 space-y-5">
             <div>
-                <label class="admin-label">Tiêu đề *</label>
-                <input type="text" name="title" value="{{ old('title') }}" required class="admin-input" placeholder="Tên phim">
+                <label class="admin-label">Tên phim *</label>
+                <input type="text" name="title" value="{{ old('title') }}" required maxlength="255" class="admin-input" placeholder="Nhập đúng tên phát hành">
+                <p class="admin-help">Tên phim có thể trùng; slug bên dưới phân biệt đường dẫn của từng hồ sơ.</p>
+                @error('title')<p class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
             </div>
 
             <div>
+<<<<<<< HEAD
 
                 <label class="admin-label">Slug</label>
 
                 <input type="text" name="slug" value="{{ old('slug') }}" class="admin-input" placeholder="Để trống để tự tạo">
                 <p class="admin-help">Để trống nếu muốn hệ thống tự tạo slug từ tiêu đề.</p>
+=======
+                <label class="admin-label">Đường dẫn rút gọn</label>
+                <input type="text" name="slug" value="{{ old('slug') }}" maxlength="255" class="admin-input" placeholder="Để trống để tự tạo" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="movie.slug">
+                <p class="admin-help">Slug phải duy nhất trên toàn hệ thống. Để trống nếu muốn hệ thống tự tạo từ tên phim.</p>
+                @error('slug')<p class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
+>>>>>>> 9c6c93f (feat(movies): align movie identity validation)
             </div>
 
             <div>
@@ -76,6 +85,10 @@
                 </div>
             </div>
 
+<<<<<<< HEAD
+=======
+            <div><label class="admin-label">Vòng đời ban đầu</label><div class="admin-input">Bản nháp</div><input type="hidden" name="status" value="draft"><p class="admin-help">Phim mới chưa xuất hiện với khách hàng. Sau khi hoàn thiện, quản trị viên mới công bố và xếp lịch theo từng rạp.</p></div>
+>>>>>>> 9c6c93f (feat(movies): align movie identity validation)
 
             <div>
                 <label class="admin-label">Trạng thái *</label>
