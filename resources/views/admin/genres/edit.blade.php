@@ -25,12 +25,12 @@
     <div class="space-y-5">
         <div>
             <label class="admin-label">Tên *</label>
-            <input type="text" name="name" value="{{ old('name', $genre->name) }}" required class="admin-input">
+            <input type="text" name="name" value="{{ old('name', $genre->name) }}" required maxlength="255" class="admin-input">
         </div>
 
         <div>
             <label class="admin-label">Đường dẫn rút gọn</label>
-            <input type="text" name="slug" value="{{ old('slug', $genre->slug) }}" class="admin-input">
+            <input type="text" name="slug" value="{{ old('slug', $genre->slug) }}" maxlength="255" class="admin-input" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="genre.slug" data-validation-record="{{ $genre->getKey() }}">
             <p class="admin-help">Để trống nếu muốn hệ thống tự tạo slug từ tên.</p>
         </div>
 

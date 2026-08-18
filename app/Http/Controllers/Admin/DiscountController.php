@@ -7,6 +7,7 @@ use App\Models\Promotion;
 use App\Services\ActivityLogger;
 use App\Services\Admin\PromotionAdminAccess;
 use App\Services\CinemaAccessService;
+use App\Support\AdminUniqueRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -139,7 +140,7 @@ final class DiscountController extends Controller
         $allowedCinemaIds = $this->promotionAccess->mutationCinemaIds($request->user())->all();
         $request->merge(['code' => mb_strtoupper(trim((string) $request->input('code')))]);
         $data = $request->validate([
-            'code' => ['required', 'string', 'max:50', 'regex:/^[A-Z0-9_-]+$/', Rule::unique('promotions')->ignore($discount?->id)],
+            'code' => ['required', 'string', 'max:50', 'regex:/^[A-Z0-9_-]+$/', AdminUniqueRules::promotionCode($discount)],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'type' => ['required', Rule::in(Promotion::TYPES)],
@@ -156,6 +157,23 @@ final class DiscountController extends Controller
             'first_order_only' => ['nullable', 'boolean'],
             'cinema_ids' => $cinemaScopeRules,
             'cinema_ids.*' => ['integer', 'distinct', Rule::exists('cinemas', 'id'), Rule::in($allowedCinemaIds)],
+        ], [
+            'code.unique' => 'Mã khuyến mãi này đã tồn tại.',
+        ], [
+            'code' => 'mã khuyến mãi',
+            'name' => 'tên chương trình',
+            'description' => 'mô tả khuyến mãi',
+            'type' => 'loại giảm',
+            'discount_amount_vnd' => 'số tiền giảm',
+            'discount_percent' => 'tỷ lệ giảm',
+            'maximum_discount_vnd' => 'mức giảm tối đa',
+            'minimum_order_vnd' => 'giá trị đơn tối thiểu',
+            'starts_at' => 'thời điểm bắt đầu',
+            'ends_at' => 'thời điểm kết thúc',
+            'global_usage_limit' => 'tổng lượt sử dụng',
+            'per_user_usage_limit' => 'lượt sử dụng mỗi tài khoản',
+            'cinema_ids' => 'chi nhánh áp dụng',
+            'cinema_ids.*' => 'chi nhánh áp dụng',
         ]);
 
         if ($data['type'] === Promotion::TYPE_FIXED) {

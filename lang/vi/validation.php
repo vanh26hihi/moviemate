@@ -43,7 +43,6 @@ return [
     'unique' => 'Giá trị :attribute đã tồn tại.',
     'url' => 'Trường :attribute phải là đường dẫn hợp lệ.',
     'attributes' => [
-        'code' => 'mã phòng',
         'room_code' => 'mã phòng',
         'name' => 'tên',
         'room_type' => 'loại phòng',

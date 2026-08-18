@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Models\RoomLayoutTemplate;
 use App\Models\RoomType;
+use App\Support\AdminUniqueRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,10 +30,8 @@ class SaveRoomLayoutTemplateRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('layout_template')?->id;
-
         return [
-            'code' => ['required', 'string', 'max:32', 'regex:/^[A-Z0-9_-]+$/', Rule::unique('room_layout_templates', 'code')->ignore($id)],
+            'code' => ['required', 'string', 'max:32', 'regex:/^[A-Z0-9_-]+$/', AdminUniqueRules::layoutTemplateCode($this->route('layout_template'))],
             'name' => ['required', 'string', 'min:5', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
             'room_type' => [
@@ -44,6 +43,24 @@ class SaveRoomLayoutTemplateRequest extends FormRequest
                 }),
             ],
             'layout' => ['required', 'array'],
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'code' => 'mã mẫu sơ đồ',
+            'name' => 'tên mẫu sơ đồ',
+            'description' => 'mô tả mẫu sơ đồ',
+            'room_type' => 'loại phòng',
+            'layout' => 'lưới bố trí logic',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'code.unique' => 'Mã mẫu sơ đồ này đã tồn tại.',
         ];
     }
 }

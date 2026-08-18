@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Genre;
+use App\Support\AdminUniqueRules;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -39,9 +40,15 @@ class GenreController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:genres,slug',
-            'description' => 'nullable|string',
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255', AdminUniqueRules::genreSlug()],
+            'description' => ['nullable', 'string'],
+        ], [
+            'slug.unique' => 'Đường dẫn thể loại này đã tồn tại.',
+        ], [
+            'name' => 'tên thể loại',
+            'slug' => 'đường dẫn thể loại',
+            'description' => 'mô tả thể loại',
         ]);
 
         // Generate slug if not provided
@@ -85,9 +92,15 @@ class GenreController extends Controller
     public function update(Request $request, Genre $genre)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'slug' => 'nullable|string|max:255|unique:genres,slug,'.$genre->id,
-            'description' => 'nullable|string',
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255', AdminUniqueRules::genreSlug($genre)],
+            'description' => ['nullable', 'string'],
+        ], [
+            'slug.unique' => 'Đường dẫn thể loại này đã tồn tại.',
+        ], [
+            'name' => 'tên thể loại',
+            'slug' => 'đường dẫn thể loại',
+            'description' => 'mô tả thể loại',
         ]);
 
         // Generate slug if not provided

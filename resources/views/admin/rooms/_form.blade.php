@@ -22,7 +22,7 @@
 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
     <div>
         <label for="code" class="cinema-label">{{ __('rooms.fields.code') }} <span aria-hidden="true">*</span></label>
-        <input id="code" type="text" name="code" value="{{ old('code', $room->code ?? '') }}" required maxlength="32" class="cinema-input @error('code') !border-error @enderror" placeholder="Ví dụ: P04" aria-describedby="code-help code-error">
+        <input id="code" type="text" name="code" value="{{ old('code', $room->code ?? '') }}" required maxlength="32" class="cinema-input @error('code') !border-error @enderror" placeholder="Ví dụ: P04" aria-describedby="code-help code-error" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="room.code" data-validation-record="{{ $editing ? $room->getKey() : '' }}" data-validation-cinema-field="cinema_id">
         <p id="code-help" class="mt-1 text-xs app-muted">Mã dùng để nhận diện phòng và không trùng trong cùng cơ sở.</p>
         @error('code')<p id="code-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
     </div>
@@ -42,13 +42,13 @@
     <div class="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2">
         <div>
             <label for="width_m" class="cinema-label">Chiều rộng phòng (m)</label>
-            <input id="width_m" type="number" name="width_m" min="0.001" max="3000000" step="0.001" inputmode="decimal" value="{{ old('width_m', $editing ? $room->widthMetersForInput() : '') }}" class="cinema-input @error('width_mm') !border-error @enderror" placeholder="Ví dụ: 7.5" aria-describedby="width-help width-error">
+            <input id="width_m" type="number" name="width_m" min="0.001" max="3000000" step="0.001" inputmode="decimal" value="{{ old('width_m', $editing ? $room->widthMetersForInput() : '') }}" class="cinema-input @error('width_mm') !border-error @enderror" placeholder="Ví dụ: 7.5" aria-describedby="width-help width-error" data-validation-key="width_mm">
             <p id="width-help" class="mt-1 text-xs app-muted">Dùng dấu chấm cho phần thập phân, tối đa 3 chữ số.</p>
             @error('width_mm')<p id="width-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
         </div>
         <div>
             <label for="length_m" class="cinema-label">Chiều dài phòng (m)</label>
-            <input id="length_m" type="number" name="length_m" min="0.001" max="3000000" step="0.001" inputmode="decimal" value="{{ old('length_m', $editing ? $room->lengthMetersForInput() : '') }}" class="cinema-input @error('length_mm') !border-error @enderror" placeholder="Ví dụ: 10" aria-describedby="length-help length-error">
+            <input id="length_m" type="number" name="length_m" min="0.001" max="3000000" step="0.001" inputmode="decimal" value="{{ old('length_m', $editing ? $room->lengthMetersForInput() : '') }}" class="cinema-input @error('length_mm') !border-error @enderror" placeholder="Ví dụ: 10" aria-describedby="length-help length-error" data-validation-key="length_mm">
             <p id="length-help" class="mt-1 text-xs app-muted">Phòng hoạt động cần đủ cả chiều rộng và chiều dài; phòng ngừng hoạt động có thể để trống cả hai.</p>
             @error('length_mm')<p id="length-error" class="mt-1 text-sm font-semibold text-error" role="alert"><i class="ph-fill ph-warning-circle mr-1" aria-hidden="true"></i>{{ $message }}</p>@enderror
         </div>

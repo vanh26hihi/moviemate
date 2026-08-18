@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentRe
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\PresentationFormatController as AdminPresentationFormatController;
 use App\Http\Controllers\Admin\PriceBookController as AdminPriceBookController;
+use App\Http\Controllers\Admin\RealtimeFieldValidationController as AdminRealtimeFieldValidationController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
@@ -294,6 +295,8 @@ Route::get('/foods/success/{order}', [UserOrderController::class, 'retired'])
 Route::prefix('admin')->name('admin.')
     ->middleware(['auth', 'active', 'permission:admin.access', 'admin.cinema.scope'])
     ->group(function () {
+        Route::post('/validation/field', AdminRealtimeFieldValidationController::class)
+            ->middleware(['permission:dashboard.view', 'throttle:60,1'])->name('validation.field');
         Route::get('/', AdminDashboardController::class)
             ->middleware('permission:dashboard.view')->name('dashboard');
         Route::get('/reports', AdminReportController::class)
