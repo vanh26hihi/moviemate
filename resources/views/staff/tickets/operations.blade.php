@@ -12,6 +12,18 @@
         <p class="mt-2 app-muted">{{ $booking->showtime?->movie?->title }} · {{ $booking->showtime_label }} · {{ $booking->showtime?->cinema?->name }} · {{ $booking->showtime?->room?->name }}</p>
     </header>
 
+    @if($counterPaymentRecoveryRoute)
+        <section class="cinema-card border border-warning/40 bg-warning/5 p-5" aria-labelledby="counter-payment-recovery-title">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 id="counter-payment-recovery-title" class="font-extrabold app-heading">Đơn tại quầy chưa thanh toán xong</h2>
+                    <p class="mt-1 text-sm app-muted">Tiếp tục đúng giao dịch đang chờ, kiểm tra nhà cung cấp, chọn phương thức khác khi lần trước đã thất bại hoặc hủy đơn để giải phóng ghế.</p>
+                </div>
+                <a class="btn-primary shrink-0" href="{{ $counterPaymentRecoveryRoute }}">Tiếp tục xử lý thanh toán</a>
+            </div>
+        </section>
+    @endif
+
     <div class="grid gap-6 lg:grid-cols-2">
         <section class="cinema-card p-6" aria-labelledby="staff-showtime-context-title">
             <h2 id="staff-showtime-context-title" class="text-xl font-extrabold app-heading">Ngữ cảnh trình chiếu</h2>

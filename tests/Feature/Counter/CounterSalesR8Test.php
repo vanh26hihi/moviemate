@@ -4,6 +4,7 @@ namespace Tests\Feature\Counter;
 
 use App\Domain\Payments\PayOsSigner;
 use App\Domain\Payments\VerifiedPaymentData;
+use App\Exceptions\ZaloPayTransportException;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\BookingTicketDelivery;
@@ -20,6 +21,7 @@ use App\Models\Showtime;
 use App\Models\User;
 use App\Services\Admin\AdminPaymentQuery;
 use App\Services\BookingTokenService;
+use App\Services\Payments\PaymentReconciliationService;
 use App\Services\Payments\PayOsPaymentStateService;
 use App\Services\Payments\VerifiedPaymentService;
 use App\Services\Payments\VnpayExplicitCancellationService;
@@ -455,11 +457,61 @@ final class CounterSalesR8Test extends TestCase
 
         $this->actingAs($staff)->post(route('staff.counter.payments.initiate', [$booking, 'vnpay']))->assertNotFound();
         $this->post(route('staff.counter.payment.resume', $booking))->assertNotFound();
+        $this->post(route('staff.counter.payment.reconcile', $booking))->assertNotFound();
+        $this->post(route('staff.counter.payment.cancel-payos-attempt', $booking))->assertNotFound();
         $this->get(route('staff.counter.payment-result', $booking))->assertNotFound();
         $this->post(route('staff.tickets.print.start', $booking))->assertNotFound();
     }
 
-    public function test_authoritative_counter_provider_cancellations_release_seats_while_processing_does_not(): void
+    public function test_foreign_branch_cannot_trigger_counter_expiry_mutation(): void
+    {
+        $other = Cinema::factory()->create([
+            'code' => 'HD-EXPIRY', 'name' => 'Ha Dong Expiry', 'status' => 'active',
+            'archived_at' => null, 'is_primary' => false,
+        ]);
+        $admin = $this->userWithRole('admin');
+        $staff = $this->userWithRole('staff');
+        $booking = $this->counterHoldForScenario($this->normalRowScenario($other, 1), $admin);
+        $booking->forceFill(['expires_at' => now()->subSecond()])->save();
+
+        $this->actingAs($staff)->get(route('staff.counter.review', $booking))->assertNotFound();
+        $this->get(route('staff.counter.payment-result', $booking))->assertNotFound();
+
+        $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+        $this->assertSame(1, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+    }
+
+    public function test_zalopay_reconciliation_transport_failure_keeps_counter_hold_safe(): void
+    {
+        [$booking, , $staff] = $this->counterHold();
+        $payment = Payment::createForProvider('zalopay', [
+            'booking_id' => $booking->id,
+            'payment_method' => 'zalopay',
+            'app_id' => 2554,
+            'app_trans_id' => '260818_COUNTER_RECOVERY',
+            'amount' => (int) $booking->total_amount,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_PENDING,
+            'expires_at' => now()->addMinutes(10),
+            'reconcile_until' => now()->addHour(),
+        ]);
+        $this->mock(PaymentReconciliationService::class, function ($mock): void {
+            $mock->shouldReceive('reconcile')
+                ->once()
+                ->andThrow(new ZaloPayTransportException('Provider unavailable.'));
+        });
+
+        $this->actingAs($staff)
+            ->post(route('staff.counter.payment.reconcile', $booking))
+            ->assertRedirect(route('staff.counter.payment-result', $booking))
+            ->assertSessionHas('warning');
+
+        $this->assertSame(Payment::STATUS_PENDING, $payment->fresh()->status);
+        $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+        $this->assertSame(1, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+    }
+
+    public function test_authoritative_counter_provider_failure_retains_hold_for_retry_while_processing_stays_protected(): void
     {
         $this->configureVnpay();
         [$vnpayBooking] = $this->counterHold();
@@ -479,8 +531,8 @@ final class CounterSalesR8Test extends TestCase
             'vnp_TransactionStatus' => '02',
         ], 'return');
         $this->assertSame(Payment::STATUS_FAILED, $vnpay->fresh()->status);
-        $this->assertSame('cancelled', $vnpayBooking->fresh()->booking_status);
-        $this->assertSame(0, $vnpayBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        $this->assertSame('pending_payment', $vnpayBooking->fresh()->booking_status);
+        $this->assertSame(1, $vnpayBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
 
         [$payOsBooking] = $this->counterHold();
         $payOs = Payment::createForProvider('payos', [
@@ -501,8 +553,8 @@ final class CounterSalesR8Test extends TestCase
         ];
         app(PayOsPaymentStateService::class)->apply($payOs, $cancelled, 'query', hash('sha256', 'cancelled'));
         $this->assertSame(Payment::STATUS_FAILED, $payOs->fresh()->status);
-        $this->assertSame('cancelled', $payOsBooking->fresh()->booking_status);
-        $this->assertSame(0, $payOsBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        $this->assertSame('pending_payment', $payOsBooking->fresh()->booking_status);
+        $this->assertSame(1, $payOsBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
 
         [$processingBooking] = $this->counterHold();
         $processing = Payment::createForProvider('payos', [
@@ -525,6 +577,135 @@ final class CounterSalesR8Test extends TestCase
         $this->assertSame('pending_payment', $processingBooking->fresh()->booking_status);
         $this->assertSame(1, $processingBooking->bookingSeats()->whereNotNull('active_lock_key')->count());
         $this->assertDatabaseCount('booking_ticket_prints', 0);
+    }
+
+    public function test_browser_back_cannot_create_parallel_provider_attempt_and_staff_can_cancel_to_release_seats(): void
+    {
+        $this->configureVnpay();
+        $this->configurePayOs();
+        [$booking, , $staff] = $this->counterHold();
+
+        $this->actingAs($staff)
+            ->post(route('staff.counter.payments.initiate', [$booking, 'vnpay']))
+            ->assertRedirect();
+        $vnpay = $booking->payments()->sole();
+
+        $this->post(route('staff.counter.payments.initiate', [$booking, 'payos']))
+            ->assertRedirect(route('staff.counter.payment-result', $booking))
+            ->assertSessionHas('warning');
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertSame(Payment::STATUS_PENDING, $vnpay->fresh()->status);
+        $this->assertSame(1, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+
+        $this->get(route('staff.counter.payment-result', $booking))
+            ->assertOk()
+            ->assertSee('Tiếp tục thanh toán VNPAY')
+            ->assertSee('Kiểm tra trạng thái với nhà cung cấp')
+            ->assertSee('Hủy đơn và giải phóng ghế')
+            ->assertDontSee('Chọn phương thức thanh toán khác');
+
+        $this->post(route('staff.counter.cancel', $booking))
+            ->assertRedirect(route('staff.counter.index'));
+        $this->assertSame('cancelled', $booking->fresh()->booking_status);
+        $this->assertSame(Payment::STATUS_FAILED, $vnpay->fresh()->status);
+        $this->assertSame(0, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+    }
+
+    public function test_terminal_provider_attempt_can_switch_safely_and_payos_cancel_confirmation_retains_the_hold(): void
+    {
+        $this->configureVnpay();
+        $this->configurePayOs();
+        [$booking, , $staff] = $this->counterHold();
+        $vnpay = Payment::createForProvider('vnpay', [
+            'booking_id' => $booking->id,
+            'payment_method' => 'vnpay',
+            'order_code' => 'MMCOUNTERSWITCHVNPAY',
+            'amount' => (int) $booking->total_amount,
+            'currency' => 'VND',
+            'status' => Payment::STATUS_PENDING,
+        ]);
+        app(VnpayExplicitCancellationService::class)->finalizeVerified($vnpay, [
+            'vnp_TmnCode' => 'MOVIE123',
+            'vnp_TxnRef' => $vnpay->order_code,
+            'vnp_Amount' => (string) ($vnpay->amount * 100),
+            'vnp_ResponseCode' => '24',
+            'vnp_TransactionStatus' => '02',
+        ], 'return');
+
+        Http::fake(function (Request $request) use ($booking) {
+            $requestData = $request->data();
+            if (array_key_exists('cancellationReason', $requestData)) {
+                preg_match('~/v2/payment-requests/([0-9]+)/cancel$~', $request->url(), $matches);
+                $data = [
+                    'orderCode' => (int) ($matches[1] ?? 0),
+                    'amount' => (int) $booking->total_amount,
+                    'currency' => 'VND',
+                    'paymentLinkId' => 'counterSwitchPayOs123',
+                    'status' => 'CANCELLED',
+                ];
+
+                return Http::response([
+                    'code' => '00',
+                    'data' => $data,
+                    'signature' => app(PayOsSigner::class)->signData($data, 'payos-counter-checksum-key'),
+                ]);
+            }
+
+            $data = [
+                'orderCode' => $requestData['orderCode'],
+                'amount' => $requestData['amount'],
+                'currency' => 'VND',
+                'paymentLinkId' => 'counterSwitchPayOs123',
+                'status' => 'PENDING',
+                'checkoutUrl' => 'https://pay.payos.vn/web/counterSwitchPayOs123',
+            ];
+
+            return Http::response([
+                'code' => '00',
+                'data' => $data,
+                'signature' => app(PayOsSigner::class)->signData($data, 'payos-counter-checksum-key'),
+            ]);
+        });
+
+        $this->actingAs($staff)->get(route('staff.counter.review', $booking))
+            ->assertOk()
+            ->assertSee('Lần thanh toán VNPAY trước đã kết thúc không thành công')
+            ->assertSee('Phương thức thanh toán');
+        $this->post(route('staff.counter.payments.initiate', [$booking, 'payos']))
+            ->assertRedirect('https://pay.payos.vn/web/counterSwitchPayOs123');
+
+        $payOs = $booking->payments()->where('provider', 'payos')->sole();
+        $this->assertSame([Payment::STATUS_FAILED, Payment::STATUS_PENDING], $booking->payments()->orderBy('id')->pluck('status')->all());
+        $this->assertSame(1, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        $this->get(route('staff.tickets.operations', $booking))
+            ->assertOk()->assertSee('Tiếp tục xử lý thanh toán');
+
+        $this->post(route('staff.counter.payment.cancel-payos-attempt', $booking))
+            ->assertRedirect(route('staff.counter.review', $booking))
+            ->assertSessionHas('success');
+        $this->assertSame(Payment::STATUS_FAILED, $payOs->fresh()->status);
+        $this->assertSame('pending_payment', $booking->fresh()->booking_status);
+        $this->assertSame(1, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+        $this->assertSame(0, $booking->payments()->whereIn('status', Payment::UNSAFE_RETRY_STATUSES)->count());
+
+        $this->post(route('staff.counter.cancel', $booking))
+            ->assertRedirect(route('staff.counter.index'));
+        $this->assertSame('cancelled', $booking->fresh()->booking_status);
+        $this->assertSame(0, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
+    }
+
+    public function test_opening_counter_payment_result_expires_abandoned_hold_and_releases_seat(): void
+    {
+        [$booking, , $staff] = $this->counterHold();
+        $this->travelTo($booking->expires_at->copy()->addSecond());
+
+        $this->actingAs($staff)->get(route('staff.counter.payment-result', $booking))
+            ->assertOk()
+            ->assertSee('Quay lại quầy bán vé')
+            ->assertDontSee('Tiếp tục xử lý thanh toán');
+
+        $this->assertSame('expired', $booking->fresh()->booking_status);
+        $this->assertSame(0, $booking->bookingSeats()->whereNotNull('active_lock_key')->count());
     }
 
     public function test_counter_payment_and_print_surfaces_have_bounded_query_counts(): void

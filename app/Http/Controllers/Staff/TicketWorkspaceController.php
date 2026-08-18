@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Payment;
 use App\Models\SeatIncidentResolution;
 use App\Services\CinemaAccessService;
 use App\Services\Tickets\BookingLookupCapability;
@@ -48,15 +49,15 @@ final class TicketWorkspaceController extends Controller
             ? $tickets->resolve($capability, $request->user())
             : $tickets->resolveBookingCode($input, $request->user());
 
-        return $this->operationsView($booking);
+        return $this->operationsView($booking, $request);
     }
 
     public function operations(Request $request, Booking $booking, TicketResolutionService $tickets): View
     {
-        return $this->operationsView($tickets->authorizedBooking($booking, $request->user()));
+        return $this->operationsView($tickets->authorizedBooking($booking, $request->user()), $request);
     }
 
-    private function operationsView(Booking $booking): View
+    private function operationsView(Booking $booking, Request $request): View
     {
         $booking->loadMissing(['showtime.presentationFormat', 'showtime.room.roomType', 'payments']);
         $authoritativePayment = $booking->payments
@@ -65,6 +66,18 @@ final class TicketWorkspaceController extends Controller
             ->first();
         $verified = $authoritativePayment !== null;
         $canPrint = $this->ticketEligibility->isPrintable($booking);
+        $hasActivePaymentAttempt = $booking->payments->contains(
+            fn (Payment $payment): bool => in_array($payment->status, Payment::UNSAFE_RETRY_STATUSES, true),
+        );
+        $counterPaymentRecoveryRoute = $booking->sales_channel === Booking::SALES_CHANNEL_COUNTER
+            && $booking->booking_status === 'pending_payment'
+            && $booking->payment_status === 'unpaid'
+            && $booking->expires_at?->isFuture() === true
+            && $request->user()->hasPermission('counter_sales.settle')
+                ? ($hasActivePaymentAttempt
+                    ? route('staff.counter.payment-result', $booking)
+                    : route('staff.counter.review', $booking))
+                : null;
         $eligibility = match (true) {
             $booking->payment_status === 'refunded' => 'Vé đã được hoàn tiền và không còn hiệu lực.',
             $booking->booking_status === 'cancelled' => 'Đơn đã hủy.',
@@ -87,6 +100,7 @@ final class TicketWorkspaceController extends Controller
             'incidentReprints' => $incidentReprints,
             'authoritativePayment' => $authoritativePayment,
             'canPrint' => $canPrint,
+            'counterPaymentRecoveryRoute' => $counterPaymentRecoveryRoute,
         ]);
     }
 }
