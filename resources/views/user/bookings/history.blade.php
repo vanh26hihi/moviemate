@@ -36,13 +36,13 @@
                 </div>
 
                 <form method="GET" action="{{ route('user.bookings.history') }}" class="flex gap-2">
-                    <select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
+                    <label><span class="sr-only">Lọc đơn theo trạng thái</span><select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
                         <option value="">Tất cả</option>
                         <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Chờ thanh toán</option>
                         <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Đã thanh toán</option>
                         <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Đã hủy</option>
                         <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Hết hạn</option>
-                    </select>
+                    </select></label>
                     <button type="submit" class="px-4 py-2 bg-brand-start text-white text-sm font-bold rounded-xl">Lọc</button>
                 </form>
             </div>

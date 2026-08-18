@@ -87,7 +87,7 @@
                 </div>
             @endif
 
-            <div class="flex-grow overflow-y-auto p-5 space-y-5 scroll-smooth" id="chat-messages">
+            <div class="flex-grow overflow-y-auto p-5 space-y-5 scroll-smooth" id="chat-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false" aria-label="Cuộc trò chuyện với MovieMate AI">
                 <div class="flex gap-3 max-w-[88%]">
                     <div class="w-8 h-8 rounded-full bg-gradient-to-br from-ai-start to-ai-end shrink-0 flex items-center justify-center mt-1">
                         <i class="ph-fill ph-robot text-white text-sm"></i>
@@ -143,13 +143,14 @@
                 <form action="{{ route('user.ai.chatbot.submit') }}" method="POST" class="flex items-end gap-2">
                     @csrf
                     <div class="relative flex-grow">
+                        <label class="sr-only" for="chat-input">Câu hỏi gửi đến MovieMate AI</label>
                         <textarea id="chat-input" name="message" rows="1" required
-                            class="app-input w-full border app-border rounded-2xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:border-ai-start transition-colors resize-none hide-scrollbar"
+                            class="app-input w-full border app-border rounded-2xl py-3 pl-4 pr-4 text-sm focus:outline-none focus:border-ai-start focus-visible:ring-2 focus-visible:ring-ai-start focus-visible:ring-offset-2 transition-colors resize-none hide-scrollbar"
                             placeholder="Nhập câu hỏi về phim, lịch chiếu, rạp..."
                             style="min-height: 46px; max-height: 120px;">{{ old('message') }}</textarea>
                     </div>
-                    <button type="submit" class="p-2.5 bg-ai-start hover:bg-ai-end text-white rounded-xl transition-colors shrink-0" title="Gửi">
-                        <i class="ph-fill ph-paper-plane-right text-xl"></i>
+                    <button type="submit" class="p-2.5 bg-ai-start hover:bg-ai-end text-white rounded-xl transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ai-start focus-visible:ring-offset-2" title="Gửi" aria-label="Gửi câu hỏi cho MovieMate AI">
+                        <i class="ph-fill ph-paper-plane-right text-xl" aria-hidden="true"></i>
                     </button>
                 </form>
                 <p class="text-[10px] text-center app-muted mt-2">AI có thể mắc lỗi. Vui lòng kiểm tra lại thông tin quan trọng trước khi đặt vé.</p>

@@ -15,6 +15,7 @@
     </script>
 </head>
 <body class="user-app app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden @yield('body_class')">
+    <a href="#main-content" class="sr-only focus:not-sr-only fixed left-4 top-4 z-[100] rounded-xl bg-brand-start px-4 py-3 font-bold text-white shadow-xl focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-brand-start">Bỏ qua điều hướng, đến nội dung chính</a>
     <header class="app-header fixed w-full top-0 z-50 backdrop-blur-xl border-b app-border transition-all duration-300">
         <div class="mx-auto max-w-[1680px] px-4 sm:px-6 lg:px-8">
             <div class="flex h-16 items-center gap-2 md:h-20 2xl:gap-4">
@@ -119,7 +120,7 @@
         </div>
     </header>
 
-    <main class="flex-grow pt-16 md:pt-20 min-w-0">
+    <main id="main-content" class="flex-grow pt-16 md:pt-20 min-w-0" tabindex="-1">
         <x-flash-messages class="mx-auto max-w-7xl px-4 pt-5 sm:px-6 lg:px-8" :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
         @yield('content')
     </main>
