@@ -25,13 +25,21 @@
                         @elseif($cell->cell_type==='blocked')<span class="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-500 bg-slate-800 text-slate-200" aria-label="Vật cản cố định hàng {{ chr(64 + $y) }}, cột {{ $x }}, vị trí cấu trúc không bố trí ghế"><i class="ph ph-bricks" aria-hidden="true"></i></span>
                         @else
                             <label class="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border app-border text-xs font-extrabold has-[:checked]:border-brand-start has-[:checked]:bg-brand-start has-[:checked]:text-white {{ $disabled ? 'cursor-not-allowed opacity-35' : '' }}" title="{{ $seat->seat_code }} · {{ number_format($seatPrices[$seat->type]->finalAmount,0,',','.') }} VNĐ">
-                                <input class="sr-only counter-seat" type="checkbox" name="seat_ids[]" value="{{ $seat->id }}" data-pair="{{ $seat->pair_code }}" @disabled($disabled)>
+                                <input class="sr-only counter-seat" type="checkbox" name="seat_ids[]" value="{{ $seat->id }}"
+                                    data-pair="{{ $seat->pair_code }}"
+                                    data-unit-key="{{ $seat->type === 'couple' ? 'couple:'.$seat->pair_code : 'seat:'.$seat->id }}"
+                                    data-unit-price="{{ $seatPrices[$seat->type]->finalAmount }}"
+                                    data-seat-label="{{ $seat->seat_code }}"
+                                    data-seat-type="{{ $seat->type }}"
+                                    @checked(in_array((int) $seat->id, array_map('intval', old('seat_ids', [])), true))
+                                    @disabled($disabled)>
                                 {{ $seat->seat_code }}
                             </label>
                         @endif
                     @endfor
                 @endfor
             </div>
+            <p class="mx-auto mt-4 max-w-xl text-center text-sm font-bold text-error" role="alert" data-validation-error-for="seat_ids" @if(!$errors->has('seat_ids')) hidden @endif>{{ $errors->first('seat_ids') }}</p>
             <p class="mt-5 text-center text-sm app-muted">Máy chủ sẽ kiểm tra lại ghế giữ, ghế đôi, khoảng trống một ghế và giá chính thức.</p>
         </section>
 
@@ -41,7 +49,20 @@
                 <label class="cinema-label mt-3 block">Điện thoại<input class="cinema-input mt-1" name="customer_phone" maxlength="30" value="{{ old('customer_phone') }}"></label>
                 <label class="cinema-label mt-3 block">Email<input class="cinema-input mt-1" type="email" name="customer_email" maxlength="255" value="{{ old('customer_email') }}"><span class="mt-1 block text-xs app-muted">Chỉ gửi tài liệu nhận vé khi có email.</span></label>
             </section>
-            <section class="cinema-card p-5"><h2 class="font-extrabold app-heading">Bảng giá</h2>@foreach($seatPrices as $type=>$price)<div class="mt-2 flex justify-between text-sm"><span>{{ \App\Support\StatusLabel::for('seat_type',$type) }}</span><strong>{{ number_format($price->finalAmount,0,',','.') }} VNĐ</strong></div>@endforeach<button class="btn-primary mt-5 w-full" type="submit">Giữ ghế tại quầy</button></section>
+            <section class="cinema-card p-5">
+                <h2 class="font-extrabold app-heading">Ghế đã chọn</h2>
+                <p id="counter-selected-seats" class="mt-2 text-sm app-muted" aria-live="polite">Chưa chọn ghế.</p>
+                <div class="mt-4 flex items-end justify-between border-t app-border pt-4">
+                    <span class="text-sm app-muted">Tạm tính</span>
+                    <strong id="counter-selected-total" class="text-xl text-brand-start">0 VNĐ</strong>
+                </div>
+                <p class="mt-2 text-xs app-muted">Ghế đôi gồm 2 chỗ ngồi nhưng chỉ tính giá một cặp.</p>
+                <details class="mt-4">
+                    <summary class="cursor-pointer text-sm font-bold">Xem bảng giá</summary>
+                    @foreach($seatPrices as $type=>$price)<div class="mt-2 flex justify-between text-sm"><span>{{ \App\Support\StatusLabel::for('seat_type',$type) }}</span><strong>{{ number_format($price->finalAmount,0,',','.') }} VNĐ</strong></div>@endforeach
+                </details>
+                <button class="btn-primary mt-5 w-full" type="submit">Giữ ghế tại quầy</button>
+            </section>
         </aside>
     </form>
 </div>
@@ -49,11 +70,34 @@
 
 @push('scripts')
 <script>
-document.querySelectorAll('.counter-seat[data-pair]').forEach(function (seat) {
+const counterSeats = Array.from(document.querySelectorAll('.counter-seat'));
+const selectedSeats = document.getElementById('counter-selected-seats');
+const selectedTotal = document.getElementById('counter-selected-total');
+
+function refreshCounterSeatSummary() {
+    const checked = counterSeats.filter(function (seat) { return seat.checked; });
+    const units = new Map();
+    checked.forEach(function (seat) {
+        if (!units.has(seat.dataset.unitKey)) {
+            units.set(seat.dataset.unitKey, Number(seat.dataset.unitPrice || 0));
+        }
+    });
+    selectedSeats.textContent = checked.length
+        ? checked.map(function (seat) { return seat.dataset.seatLabel; }).join(', ') + ' · ' + checked.length + ' chỗ ngồi'
+        : 'Chưa chọn ghế.';
+    const total = Array.from(units.values()).reduce(function (sum, price) { return sum + price; }, 0);
+    selectedTotal.textContent = new Intl.NumberFormat('vi-VN').format(total) + ' VNĐ';
+}
+
+counterSeats.filter(function (seat) { return seat.dataset.pair; }).forEach(function (seat) {
     seat.addEventListener('change', function () {
-        if (!seat.dataset.pair) return;
         document.querySelectorAll('.counter-seat[data-pair="' + CSS.escape(seat.dataset.pair) + '"]').forEach(function (member) { if (!member.disabled) member.checked = seat.checked; });
+        refreshCounterSeatSummary();
     });
 });
+counterSeats.filter(function (seat) { return !seat.dataset.pair; }).forEach(function (seat) {
+    seat.addEventListener('change', refreshCounterSeatSummary);
+});
+refreshCounterSeatSummary();
 </script>
 @endpush

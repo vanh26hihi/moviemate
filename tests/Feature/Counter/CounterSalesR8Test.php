@@ -74,6 +74,27 @@ final class CounterSalesR8Test extends TestCase
         $this->actingAs($staff->fresh())->get(route('staff.counter.index'))->assertRedirect(route('login'));
     }
 
+    public function test_counter_seat_summary_groups_a_couple_pair_as_one_pricing_unit(): void
+    {
+        $scenario = $this->bookingScenario(true);
+        $staff = $this->userWithRole('staff');
+
+        $response = $this->actingAs($staff)
+            ->get(route('staff.counter.seats', $scenario['showtime']))
+            ->assertOk()
+            ->assertSee('Ghế đã chọn')
+            ->assertSee('Ghế đôi gồm 2 chỗ ngồi nhưng chỉ tính giá một cặp.')
+            ->assertSee('aria-live="polite"', false)
+            ->assertSee('data-unit-key="seat:'.$scenario['seats'][0]->id.'"', false)
+            ->assertSee('data-unit-key="couple:B-PAIR-1"', false)
+            ->assertSee('data-seat-label="B1"', false)
+            ->assertSee('data-seat-label="B2"', false)
+            ->assertSee('Máy chủ sẽ kiểm tra lại ghế giữ, ghế đôi, khoảng trống một ghế và giá chính thức.');
+
+        $this->assertSame(2, substr_count($response->getContent(), 'data-unit-key="couple:B-PAIR-1"'));
+        $this->assertDatabaseCount('bookings', 0);
+    }
+
     public function test_hold_derives_channel_creator_and_totals_and_rejects_forged_authority(): void
     {
         $scenario = $this->bookingScenario(false);
