@@ -129,7 +129,7 @@ final class CounterBookingService
     {
         $this->assertPermission($actor, 'counter_sales.cancel');
         $this->authorized($actor, $booking);
-        $result = $this->cancellations->cancel(
+        $result = $this->cancellations->cancelCustomer(
             (int) $booking->id,
             'counter_customer_walkaway',
             'counter.booking_cancelled',

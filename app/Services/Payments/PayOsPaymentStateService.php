@@ -195,7 +195,8 @@ final class PayOsPaymentStateService
             return Payment::STATUS_FAILED;
         });
 
-        if ($status === Payment::STATUS_FAILED) {
+        if ($status === Payment::STATUS_FAILED
+            && $payment->booking()->value('sales_channel') !== Booking::SALES_CHANNEL_COUNTER) {
             $this->cancellations->cancel($payment->booking_id);
         }
 

@@ -56,14 +56,47 @@
                 <p class="mt-2 app-muted">Không tự động tạo lượt in mới khi lần trước đã lỗi; nhân viên phải ghi lý do trước khi in lại.</p>
                 <a class="btn-primary mt-5" href="{{ route('staff.tickets.operations', $booking) }}">Mở vận hành vé</a>
             @endif
-        @elseif($canResume)
-            <h2 class="text-xl font-extrabold app-heading">Tiếp tục giao dịch hiện tại</h2>
-            <p class="mt-2 app-muted">Chỉ mở lại đúng lần thanh toán đang chờ; không tạo attempt mới.</p>
-            <form method="POST" action="{{ route('staff.counter.payment.resume', $booking) }}" class="mt-5" data-submit-once>@csrf
-                <button type="submit" class="btn-primary">Tiếp tục thanh toán {{ $payment?->provider === 'vnpay' ? 'VNPAY' : 'payOS' }}</button>
-            </form>
         @else
-            <a class="btn-secondary" href="{{ route('staff.counter.index') }}">Quay lại quầy bán vé</a>
+            <h2 class="text-xl font-extrabold app-heading">Xử lý đơn an toàn</h2>
+            @if($canResume)
+                <p class="mt-2 app-muted">Nút Quay lại của trình duyệt không có nghĩa là nhà cung cấp đã hủy. Hãy mở lại đúng giao dịch hiện tại hoặc kiểm tra trạng thái trước khi đổi phương thức.</p>
+                <form method="POST" action="{{ route('staff.counter.payment.resume', $booking) }}" class="mt-5" data-submit-once>
+                    @csrf
+                    <button type="submit" class="btn-primary">Tiếp tục thanh toán {{ $payment?->provider === 'vnpay' ? 'VNPAY' : 'payOS' }}</button>
+                </form>
+            @endif
+
+            @if($canReconcile)
+                <form method="POST" action="{{ route('staff.counter.payment.reconcile', $booking) }}" class="mt-3" data-submit-once>
+                    @csrf
+                    <button type="submit" class="btn-secondary"><i class="ph ph-arrows-clockwise"></i>Kiểm tra trạng thái với nhà cung cấp</button>
+                </form>
+            @endif
+
+            @if($canCancelPayOsAttempt)
+                <form method="POST" action="{{ route('staff.counter.payment.cancel-payos-attempt', $booking) }}" class="mt-3" data-submit-once>
+                    @csrf
+                    <button type="submit" class="btn-secondary">Hủy giao dịch payOS và chọn phương thức khác</button>
+                    <p class="mt-2 text-sm app-muted">Chỉ cho đổi phương thức sau khi payOS xác nhận liên kết thanh toán đã hủy.</p>
+                </form>
+            @endif
+
+            @if($canChooseAnotherMethod)
+                <a class="btn-primary mt-5" href="{{ route('staff.counter.review', $booking) }}">Chọn phương thức thanh toán khác</a>
+            @endif
+
+            @if($canCancelOrder)
+                @can('counter_sales.cancel')
+                    <form method="POST" action="{{ route('staff.counter.cancel', $booking) }}" class="mt-3" data-submit-once>
+                        @csrf
+                        <button type="submit" class="btn-secondary">Hủy đơn và giải phóng ghế</button>
+                    </form>
+                @endcan
+            @endif
+
+            @unless($canResume || $canReconcile || $canCancelPayOsAttempt || $canChooseAnotherMethod || $canCancelOrder)
+                <a class="btn-secondary mt-5" href="{{ route('staff.counter.index') }}">Quay lại quầy bán vé</a>
+            @endunless
         @endif
     </section>
 </div>

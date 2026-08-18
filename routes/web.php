@@ -613,6 +613,10 @@ Route::prefix('staff')->name('staff.')
             ->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payments.initiate');
         Route::post('/counter/bookings/{booking}/payment/resume', [StaffCounterPaymentController::class, 'resume'])
             ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payment.resume');
+        Route::post('/counter/bookings/{booking}/payment/reconcile', [StaffCounterPaymentController::class, 'reconcile'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payment.reconcile');
+        Route::post('/counter/bookings/{booking}/payment/cancel-payos-attempt', [StaffCounterPaymentController::class, 'cancelPayOsAttempt'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payment.cancel-payos-attempt');
         Route::get('/counter/bookings/{booking}/payment-result', [StaffCounterPaymentController::class, 'result'])
             ->whereNumber('booking')->middleware('permission:counter_sales.view')->name('counter.payment-result');
         Route::post('/counter/bookings/{booking}/cancel', [StaffCounterSaleController::class, 'cancel'])

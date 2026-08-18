@@ -3,9 +3,14 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Exceptions\FoodSelectionValidationException;
+use App\Exceptions\PaymentConfigurationException;
+use App\Exceptions\PaymentInitiationException;
+use App\Exceptions\PayOsResponseException;
+use App\Exceptions\PayOsTransportException;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\FoodItem;
+use App\Models\Payment;
 use App\Models\Showtime;
 use App\Services\BookingExpirationService;
 use App\Services\BookingTokenService;
@@ -13,6 +18,7 @@ use App\Services\CinemaAccessService;
 use App\Services\Counter\CounterBookingService;
 use App\Services\Counter\CounterCashPaymentService;
 use App\Services\Payments\PaymentInitiationService;
+use App\Services\Payments\PayOsCancellationService;
 use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
 use App\Services\Seats\SeatAvailabilitySnapshot;
@@ -157,8 +163,15 @@ final class CounterSaleController extends Controller
         Booking $booking,
         CounterBookingService $counter,
         PaymentInitiationService $payments,
+        BookingExpirationService $expiration,
     ): View {
         $booking = $counter->authorized($request->user(), $booking);
+        if ($booking->booking_status === 'pending_payment'
+            && $booking->payment_status === 'unpaid'
+            && $booking->expires_at?->isPast() === true) {
+            $expiration->expire((int) $booking->id);
+            $booking->refresh();
+        }
         $availability = $payments->availability();
 
         return view('staff.counter.review', [
@@ -188,13 +201,39 @@ final class CounterSaleController extends Controller
             ->with('success', 'Đã xác nhận thu tiền mặt.');
     }
 
-    public function cancel(Request $request, Booking $booking, CounterBookingService $counter): RedirectResponse
-    {
+    public function cancel(
+        Request $request,
+        Booking $booking,
+        CounterBookingService $counter,
+    ): RedirectResponse {
         $request->validate([
             'staff_id' => ['prohibited'],
             'created_by_staff_id' => ['prohibited'],
         ]);
-        $counter->cancel($request->user(), $booking);
+        $booking = $counter->authorized($request->user(), $booking);
+        $activeAttempts = $booking->payments
+            ->filter(fn (Payment $attempt): bool => in_array($attempt->status, Payment::UNSAFE_RETRY_STATUSES, true))
+            ->values();
+        if ($activeAttempts->count() > 1) {
+            throw ValidationException::withMessages(['booking' => 'Đơn có nhiều giao dịch đang cần đối soát; chưa thể tự động hủy.']);
+        }
+
+        /** @var Payment|null $activeAttempt */
+        $activeAttempt = $activeAttempts->first();
+        if ($activeAttempt?->provider === 'payos') {
+            try {
+                $status = app(PayOsCancellationService::class)->cancel($activeAttempt);
+            } catch (PaymentConfigurationException|PaymentInitiationException|PayOsResponseException|PayOsTransportException) {
+                return redirect()->route('staff.counter.payment-result', $booking)
+                    ->with('warning', 'payOS chưa xác nhận hủy. Đơn và ghế vẫn được giữ an toàn; vui lòng thử xác minh lại.');
+            }
+            if ($status !== Payment::STATUS_FAILED) {
+                return redirect()->route('staff.counter.payment-result', $booking)
+                    ->with('warning', 'payOS chưa trả trạng thái hủy cuối cùng. Đơn và ghế chưa được giải phóng.');
+            }
+        }
+
+        $counter->cancel($request->user(), $booking->fresh());
 
         return redirect()->route('staff.counter.index')
             ->with('success', 'Đã hủy đơn tại quầy và giải phóng ghế.');

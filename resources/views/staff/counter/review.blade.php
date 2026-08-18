@@ -7,6 +7,10 @@
 @php
     $authoritativePayment = $booking->payments->filter(fn($payment) => $payment->hasAuthoritativeSuccessEvidence())->sortByDesc('id')->first();
     $latestPayment = $booking->payments->sortByDesc('id')->first();
+    $activePayment = $booking->payments
+        ->filter(fn($payment) => in_array($payment->status, \App\Models\Payment::UNSAFE_RETRY_STATUSES, true))
+        ->sortByDesc('id')
+        ->first();
 @endphp
 <div class="mx-auto max-w-5xl space-y-6">
     <header>
@@ -53,13 +57,25 @@
             <p class="font-extrabold text-success">Thanh toán thành công bằng {{ \App\Support\PaymentPresentation::providerLabel($authoritativePayment->provider) }}.</p>
             <a class="btn-primary mt-5" href="{{ route('staff.counter.payment-result', $booking) }}"><i class="ph ph-printer"></i>Tiếp tục in vé</a>
         </section>
-    @elseif($latestPayment)
+    @elseif($booking->booking_status !== 'pending_payment' || $booking->payment_status !== 'unpaid' || !$booking->expires_at?->isFuture())
         <section class="cinema-card border border-warning/40 p-6">
-            <p class="font-extrabold text-warning">Đơn đã có giao dịch {{ \App\Support\PaymentPresentation::providerLabel($latestPayment->provider) }} đang được bảo vệ.</p>
+            <p class="font-extrabold text-warning">Đơn không còn trong thời hạn giữ ghế để thanh toán.</p>
+            <p class="mt-2 app-muted">Hãy quay lại quầy bán vé để chọn ghế còn trống và tạo đơn mới.</p>
+            <a class="btn-secondary mt-5" href="{{ route('staff.counter.index') }}">Quay lại quầy bán vé</a>
+        </section>
+    @elseif($activePayment)
+        <section class="cinema-card border border-warning/40 p-6">
+            <p class="font-extrabold text-warning">Đơn đã có giao dịch {{ \App\Support\PaymentPresentation::providerLabel($activePayment->provider) }} đang được bảo vệ.</p>
             <p class="mt-2 app-muted">Không tạo thêm lần thanh toán mới cho đến khi trạng thái hiện tại được xác minh.</p>
             <a class="btn-primary mt-5" href="{{ route('staff.counter.payment-result', $booking) }}">Xem hoặc tiếp tục giao dịch</a>
         </section>
     @else
+        @if($latestPayment && in_array($latestPayment->status, [\App\Models\Payment::STATUS_FAILED, \App\Models\Payment::STATUS_EXPIRED], true))
+            <section class="cinema-card border border-success/40 bg-success/5 p-6">
+                <p class="font-extrabold text-success">Lần thanh toán {{ \App\Support\PaymentPresentation::providerLabel($latestPayment->provider) }} trước đã kết thúc không thành công.</p>
+                <p class="mt-2 app-muted">Không có giao dịch nào đang hoạt động. Ghế vẫn được giữ đến {{ $booking->expires_at?->format('H:i:s d/m/Y') }} để nhân viên chọn phương thức khác.</p>
+            </section>
+        @endif
         <section class="cinema-card p-6">
             <h2 class="text-xl font-extrabold app-heading">Phương thức thanh toán</h2>
             <p class="mt-2 app-muted">Chọn đúng phương thức khách sẽ sử dụng. VNPAY/payOS chỉ được ghi nhận sau khi provider xác minh.</p>
