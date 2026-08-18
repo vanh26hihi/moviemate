@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Models\Movie;
 use App\Models\PresentationFormat;
+use App\Support\AdminUniqueRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
@@ -11,6 +12,17 @@ use Illuminate\Validation\Validator;
 
 class SaveMovieRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $title = preg_replace('/\s+/u', ' ', trim((string) $this->input('title', ''))) ?: '';
+
+        $this->merge([
+            'title' => $title,
+            'slug' => filled($this->input('slug')) ? trim((string) $this->input('slug')) : null,
+            'country' => filled($this->input('country')) ? trim((string) $this->input('country')) : null,
+        ]);
+    }
+
     public function authorize(): bool
     {
         $permission = $this->route('movie') instanceof Movie
@@ -29,7 +41,7 @@ class SaveMovieRequest extends FormRequest
 
         return [
             'title' => ['required', 'string', 'max:255'],
-            'slug' => ['nullable', 'string', 'max:255', Rule::unique('movies', 'slug')->ignore($movie instanceof Movie ? $movie->id : null)],
+            'slug' => ['nullable', 'string', 'max:255', AdminUniqueRules::movieSlug($movie instanceof Movie ? $movie : null)],
             'description' => ['nullable', 'string'],
             'poster' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max(4 * 1024)],
             'cover_image' => ['nullable', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max(8 * 1024)],
@@ -80,8 +92,22 @@ class SaveMovieRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'title' => 'tên phim',
+            'slug' => 'đường dẫn phim',
+            'description' => 'mô tả phim',
+            'duration' => 'thời lượng phim',
+            'release_date' => 'ngày khởi chiếu',
+            'status' => 'trạng thái phim',
             'presentation_format_ids' => 'định dạng hỗ trợ',
             'presentation_format_ids.*' => 'định dạng hỗ trợ',
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'slug.unique' => 'Đường dẫn phim này đã tồn tại.',
         ];
     }
 }

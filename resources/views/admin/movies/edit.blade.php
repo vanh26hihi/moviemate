@@ -31,14 +31,17 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-7 space-y-5">
             <div>
-                <label class="admin-label">Tiêu đề *</label>
-                <input type="text" name="title" value="{{ old('title', $movie->title) }}" required class="admin-input">
+                <label class="admin-label">Tên phim *</label>
+                <input type="text" name="title" value="{{ old('title', $movie->title) }}" required maxlength="255" class="admin-input">
+                <p class="admin-help">Tên phim có thể trùng; slug bên dưới phân biệt đường dẫn của từng hồ sơ.</p>
+                @error('title')<p class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
             </div>
 
             <div>
                 <label class="admin-label">Đường dẫn rút gọn</label>
-                <input type="text" name="slug" value="{{ old('slug', $movie->slug) }}" class="admin-input">
-                <p class="admin-help">Để trống nếu muốn hệ thống tự tạo slug từ tiêu đề.</p>
+                <input type="text" name="slug" value="{{ old('slug', $movie->slug) }}" maxlength="255" class="admin-input" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="movie.slug" data-validation-record="{{ $movie->getKey() }}">
+                <p class="admin-help">Slug phải duy nhất trên toàn hệ thống. Để trống nếu muốn hệ thống tự tạo từ tên phim.</p>
+                @error('slug')<p class="mt-1 text-sm font-semibold text-error">{{ $message }}</p>@enderror
             </div>
 
             <div>

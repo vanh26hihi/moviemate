@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Cinema;
 use App\Models\Genre;
+use App\Models\Movie;
 use App\Models\PresentationFormat;
 use App\Models\Promotion;
 use App\Models\Room;
@@ -72,6 +73,7 @@ final class RealtimeFieldValidationController extends Controller
             AdminUniqueRules::PRESENTATION_FORMAT_NAME => $this->presentationFormatName($request, $value, $recordId),
             AdminUniqueRules::LAYOUT_TEMPLATE_CODE => $this->layoutTemplateCode($request, $value, $recordId),
             AdminUniqueRules::GENRE_SLUG => $this->genreSlug($request, $value, $recordId),
+            AdminUniqueRules::MOVIE_SLUG => $this->movieSlug($request, $value, $recordId),
         };
     }
 
@@ -193,6 +195,14 @@ final class RealtimeFieldValidationController extends Controller
         $genre = $this->record(Genre::class, $recordId);
 
         return [trim($value), 'đường dẫn thể loại', ['required', 'string', 'max:255', AdminUniqueRules::genreSlug($genre)], 'Đường dẫn thể loại này đã tồn tại.'];
+    }
+
+    private function movieSlug(Request $request, string $value, ?int $recordId): array
+    {
+        $this->authorizePermission($request, $recordId ? 'movies.update' : 'movies.create', true);
+        $movie = $this->record(Movie::class, $recordId);
+
+        return [trim($value), 'đường dẫn phim', ['required', 'string', 'max:255', AdminUniqueRules::movieSlug($movie)], 'Đường dẫn phim này đã tồn tại.'];
     }
 
     private function authorizePermission(Request $request, string $permission, bool $adminOnly = false): void
