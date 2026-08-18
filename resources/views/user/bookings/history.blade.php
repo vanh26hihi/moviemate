@@ -5,319 +5,763 @@
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+
+        {{-- SIDEBAR --}}
         <aside class="lg:col-span-1">
             <div class="app-card border app-border rounded-3xl p-6 flex flex-col items-center text-center sticky top-24">
+
                 <div class="w-20 h-20 rounded-full overflow-hidden mb-3 border-2 border-brand-start/30">
-                    <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=FF3D57&color=fff&size=128" alt="Avatar" class="w-full h-full object-cover">
+                    <img
+                        src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()->name) }}&background=FF3D57&color=fff&size=128"
+                        alt="Avatar"
+                        class="w-full h-full object-cover"
+                    >
                 </div>
-                <h2 class="font-bold app-text mb-1">{{ Auth::user()->name }}</h2>
-                <p class="text-xs text-ai-start font-bold mb-5">Hạng {{ Auth::user()->role?->display_name ?? 'Khách hàng' }}</p>
+
+                <h2 class="font-bold app-text mb-1">
+                    {{ Auth::user()->name }}
+                </h2>
+
+                <p class="text-xs text-ai-start font-bold mb-5">
+                    Hạng {{ Auth::user()->role?->display_name ?? 'Khách hàng' }}
+                </p>
 
                 <div class="w-full rounded-2xl border border-ai-start/30 bg-ai-start/10 px-4 py-3 mb-4 text-left">
-                    <p class="text-xs app-muted">Thành viên {{ Auth::user()->membership_tier }}</p>
-                    <p class="text-2xl font-extrabold text-ai-start">{{ number_format(Auth::user()->loyalty_points, 0, ',', '.') }}</p>
-                    <p class="text-xs app-muted">điểm khả dụng</p>
+                    <p class="text-xs app-muted">
+                        Thành viên {{ Auth::user()->membership_tier }}
+                    </p>
+
+                    <p class="text-2xl font-extrabold text-ai-start">
+                        {{ number_format(Auth::user()->loyalty_points, 0, ',', '.') }}
+                    </p>
+
+                    <p class="text-xs app-muted">
+                        điểm khả dụng
+                    </p>
                 </div>
 
                 <div class="w-full space-y-1 text-left">
-                    <a href="{{ route('user.profile') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
-                        <i class="ph ph-user text-lg"></i> Thông tin cá nhân
+
+                    <a
+                        href="{{ route('user.profile') }}"
+                        class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm"
+                    >
+                        <i class="ph ph-user text-lg"></i>
+                        Thông tin cá nhân
                     </a>
-                    <a href="{{ route('user.bookings.history') }}" class="flex items-center gap-3 px-4 py-2.5 bg-brand-start/10 text-brand-start rounded-xl font-bold border border-brand-start/20 text-sm">
-                        <i class="ph-fill ph-ticket text-lg"></i> Lịch sử đặt vé
+
+                    <a
+                        href="{{ route('user.bookings.history') }}"
+                        class="flex items-center gap-3 px-4 py-2.5 bg-brand-start/10 text-brand-start rounded-xl font-bold border border-brand-start/20 text-sm"
+                    >
+                        <i class="ph-fill ph-ticket text-lg"></i>
+                        Lịch sử đặt vé
                     </a>
+
                     @if(Route::has('user.loyalty.history'))
-                        <a href="{{ route('user.loyalty.history') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
-                            <i class="ph ph-coins text-lg"></i> Lịch sử điểm
+                        <a
+                            href="{{ route('user.loyalty.history') }}"
+                            class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm"
+                        >
+                            <i class="ph ph-coins text-lg"></i>
+                            Lịch sử điểm
                         </a>
                     @endif
-                    <a href="{{ route('user.reviews.index') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
-                        <i class="ph ph-star text-lg"></i> Đánh giá của tôi
+
+                    <a
+                        href="{{ route('user.reviews.index') }}"
+                        class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm"
+                    >
+                        <i class="ph ph-star text-lg"></i>
+                        Đánh giá của tôi
                     </a>
+
                 </div>
             </div>
         </aside>
 
+
+        {{-- MAIN CONTENT --}}
         <section class="lg:col-span-3">
+
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+
                 <div>
-                    <h1 class="text-3xl font-bold app-text">Lịch sử đặt vé</h1>
-                    <p class="app-muted mt-1">Theo dõi vé đã đặt và mã QR của bạn.</p>
+                    <h1 class="text-3xl font-bold app-text">
+                        Lịch sử đặt vé
+                    </h1>
+
+                    <p class="app-muted mt-1">
+                        Theo dõi vé đã đặt, trạng thái thanh toán và mã QR của bạn.
+                    </p>
                 </div>
 
-                <form method="GET" action="{{ route('user.bookings.history') }}" class="flex gap-2">
-                    <select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
-                        <option value="">Tất cả</option>
-                        <option value="pending_payment" {{ request('status') == 'pending_payment' ? 'selected' : '' }}>
+
+                {{-- BỘ LỌC TRẠNG THÁI --}}
+                <form
+                    method="GET"
+                    action="{{ route('user.bookings.history') }}"
+                    class="flex gap-2"
+                >
+
+                    <select
+                        name="status"
+                        class="app-input border app-border rounded-xl text-sm px-3 py-2"
+                    >
+
+                        <option value="">
+                            Tất cả
+                        </option>
+
+                        <option
+                            value="pending_payment"
+                            {{ request('status') === 'pending_payment' ? 'selected' : '' }}
+                        >
                             Chờ thanh toán
                         </option>
-                        <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Chưa sử dụng</option>
-                        <option value="used" {{ request('status') == 'used' ? 'selected' : '' }}>Đã sử dụng</option>
-                        <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Đã hủy</option>
-                        <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Hết hạn</option>
+
+                        <option
+                            value="paid"
+                            {{ request('status') === 'paid' ? 'selected' : '' }}
+                        >
+                            Đã thanh toán
+                        </option>
+
+                        <option
+                            value="used"
+                            {{ request('status') === 'used' ? 'selected' : '' }}
+                        >
+                            Đã sử dụng
+                        </option>
+
+                        <option
+                            value="cancelled"
+                            {{ request('status') === 'cancelled' ? 'selected' : '' }}
+                        >
+                            Đã hủy
+                        </option>
+
+                        <option
+                            value="expired"
+                            {{ request('status') === 'expired' ? 'selected' : '' }}
+                        >
+                            Hết hạn
+                        </option>
+
                     </select>
-                    <button type="submit" class="px-4 py-2 bg-brand-start text-white text-sm font-bold rounded-xl">Lọc</button>
+
+                    <button
+                        type="submit"
+                        class="px-4 py-2 bg-brand-start text-white text-sm font-bold rounded-xl"
+                    >
+                        Lọc
+                    </button>
+
                 </form>
+
             </div>
 
-            <x-validation-summary class="mb-5" :errors="$errors" />
+
+            <x-validation-summary
+                class="mb-5"
+                :errors="$errors"
+            />
+
 
             <div class="space-y-5">
+
                 @forelse($bookings as $booking)
+
                     @php
                         $actions = $bookingActions[$booking->id];
+
                         $poster = $booking->showtime->movie->poster_url;
-                        $canUseTicket = in_array($booking->id, $ticketableBookingIds, true);
+
+                        $canUseTicket = in_array(
+                            $booking->id,
+                            $ticketableBookingIds,
+                            true
+                        );
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Thông tin trạng thái vé
+                        |--------------------------------------------------------------------------
+                        */
+
                         $statusMeta = [
-    'pending_payment' => [
-        'label' => 'Chờ thanh toán',
-        'class' => 'bg-warning/10 text-warning border border-warning/20',
-    ],
-    'paid' => [
-        'label' => 'Đã thanh toán',
-        'class' => 'bg-success/10 text-success border border-success/20',
-    ],
-    'used' => [
-        'label' => 'Đã sử dụng',
-        'class' => 'bg-ai-start/10 text-ai-start border border-ai-start/20',
-    ],
-    'cancelled' => [
-        'label' => 'Đã hủy',
-        'class' => 'bg-error/10 text-error border border-error/20',
-    ],
-    'expired' => [
-        'label' => 'Hết hạn',
-        'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
-    ],
-];
 
-$ticketStatus = $statusMeta[$booking->booking_status] ?? [
-    'label' => $booking->status_label,
-    'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
-];
-                    @endphp
-                    @php
-                    $statusMeta = [
-                        'pending_payment' => [
-                            'label' => 'Chờ thanh toán',
-                            'class' => 'bg-warning/10 text-warning border border-warning/20',
-                        ],
-                        'paid' => [
-                            'label' => 'Đã thanh toán',
-                            'class' => 'bg-success/10 text-success border border-success/20',
-                        ],
-                        'used' => [
-                            'label' => 'Đã sử dụng',
-                            'class' => 'bg-ai-start/10 text-ai-start border border-ai-start/20',
-                        ],
-                        'cancelled' => [
-                            'label' => 'Đã hủy',
-                            'class' => 'bg-error/10 text-error border border-error/20',
-                        ],
-                        'expired' => [
-                            'label' => 'Hết hạn',
+                            'pending_payment' => [
+                                'label' => 'Chờ thanh toán',
+                                'description' => 'Đơn vé đang chờ hoàn tất thanh toán.',
+                                'icon' => 'ph-clock-countdown',
+                                'class' => 'bg-warning/10 text-warning border border-warning/20',
+                            ],
+
+                            'paid' => [
+                                'label' => 'Đã thanh toán',
+                                'description' => 'Vé đã thanh toán thành công và sẵn sàng sử dụng.',
+                                'icon' => 'ph-check-circle',
+                                'class' => 'bg-success/10 text-success border border-success/20',
+                            ],
+
+                            'used' => [
+                                'label' => 'Đã sử dụng',
+                                'description' => 'Vé đã được kiểm tra và sử dụng tại rạp.',
+                                'icon' => 'ph-ticket',
+                                'class' => 'bg-ai-start/10 text-ai-start border border-ai-start/20',
+                            ],
+
+                            'cancelled' => [
+                                'label' => 'Đã hủy',
+                                'description' => 'Đơn đặt vé này đã được hủy.',
+                                'icon' => 'ph-x-circle',
+                                'class' => 'bg-error/10 text-error border border-error/20',
+                            ],
+
+                            'expired' => [
+                                'label' => 'Hết hạn',
+                                'description' => 'Thời gian thanh toán hoặc sử dụng vé đã hết.',
+                                'icon' => 'ph-warning-circle',
+                                'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
+                            ],
+
+                        ];
+
+                        $ticketStatus = $statusMeta[$booking->booking_status] ?? [
+                            'label' => $booking->status_label,
+                            'description' => 'Trạng thái vé đang được cập nhật.',
+                            'icon' => 'ph-info',
                             'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
-                        ],
-                    ];
-                
-                    $ticketStatus = $statusMeta[$booking->booking_status] ?? [
-                        'label' => $booking->status_label,
-                        'class' => 'bg-slate-500/10 text-slate-400 border border-slate-500/20',
-                        
-                    ];
-                    <div class="mb-4 rounded-xl border app-border bg-white/5 px-4 py-3">
-    <div class="flex items-start gap-2">
-        <i class="ph ph-info mt-0.5 text-brand-start"></i>
-        <div>
-            <p class="text-xs font-bold app-text">
-                Trạng thái hiện tại
-            </p>
+                        ];
+                    @endphp
 
-            <p class="mt-1 text-xs app-muted leading-relaxed">
-                {{ $ticketStatus['description'] }}
-            </p>
-        </div>
-    </div>
-</div>
-                @endphp
+
                     <article class="app-card border border-brand-start/20 rounded-3xl p-4 sm:p-6 hover:border-brand-start/60 transition-colors relative overflow-hidden">
+
+                        {{-- BADGE GÓC PHẢI --}}
                         <div class="absolute top-0 right-0 {{ $actions['badge_class'] }} text-xs font-bold px-3 py-1.5 rounded-bl-xl">
                             {{ $actions['badge_label'] }}
                         </div>
 
+
                         <div class="flex flex-col sm:flex-row gap-5">
+
+                            {{-- POSTER --}}
                             <div class="w-28 shrink-0">
+
                                 <div class="poster-frame rounded-2xl">
+
                                     @if($poster)
-                                        <img src="{{ $poster }}" alt="{{ $booking->showtime->movie->title }}" loading="lazy">
+
+                                        <img
+                                            src="{{ $poster }}"
+                                            alt="{{ $booking->showtime->movie->title }}"
+                                            loading="lazy"
+                                        >
+
                                     @else
+
                                         <div class="fallback-poster">
+
                                             <i class="ph-fill ph-film-slate"></i>
-                                            <strong class="text-sm">MovieMate</strong>
+
+                                            <strong class="text-sm">
+                                                MovieMate
+                                            </strong>
+
                                         </div>
+
                                     @endif
+
                                 </div>
+
                             </div>
 
+
+                            {{-- THÔNG TIN VÉ --}}
                             <div class="flex-grow min-w-0">
-                                <h2 class="text-xl font-bold app-text mb-1 pr-20">{{ $booking->showtime->movie->title }}</h2>
-                                <p class="app-muted text-xs mb-4">Mã vé: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
-                                <div class="mb-4">
-                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $ticketStatus['class'] }}">
-                                        {{ $ticketStatus['label'] }}
-                                    </span>
-                                </div>
-                                <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
 
-                                    @if($booking->paid_at)
-                                        <div class="rounded-xl border border-success/20 bg-success/5 px-3 py-2">
-                                            <p class="text-[11px] font-bold uppercase tracking-wide text-success">
-                                                Đã thanh toán
-                                            </p>
-                                
-                                            <p class="mt-1 text-xs app-text font-semibold">
-                                                {{ $booking->paid_at->format('H:i d/m/Y') }}
-                                            </p>
-                                        </div>
-                                    @endif
-                                
-                                    @if($booking->used_at)
-                                        <div class="rounded-xl border border-ai-start/20 bg-ai-start/5 px-3 py-2">
-                                            <p class="text-[11px] font-bold uppercase tracking-wide text-ai-start">
-                                                Đã sử dụng
-                                            </p>
-                                
-                                            <p class="mt-1 text-xs app-text font-semibold">
-                                                {{ $booking->used_at->format('H:i d/m/Y') }}
-                                            </p>
-                                        </div>
-                                    @endif
-                                
-                                    @if(
-                                        $booking->booking_status === 'pending_payment'
-                                        && $booking->expires_at
-                                    )
-                                        <div class="rounded-xl border border-warning/20 bg-warning/5 px-3 py-2">
-                                            <p class="text-[11px] font-bold uppercase tracking-wide text-warning">
-                                                Hạn thanh toán
-                                            </p>
-                                
-                                            <p class="mt-1 text-xs app-text font-semibold">
-                                                {{ $booking->expires_at->format('H:i d/m/Y') }}
-                                            </p>
-                                        </div>
-                                    @endif
-                                
-                                </div>
-                                <div class="mb-4 flex flex-wrap items-center gap-2">
-                                    <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold {{ $ticketStatus['class'] }}">
-                                        {{ $ticketStatus['label'] }}
-                                    </span>
-                                
-                                    @if($booking->paid_at)
-                                        <span class="text-xs app-muted">
-                                            Thanh toán lúc {{ $booking->paid_at->format('H:i d/m/Y') }}
-                                        </span>
-                                    @endif
-                                
-                                    @if($booking->used_at)
-                                        <span class="text-xs app-muted">
-                                            Sử dụng lúc {{ $booking->used_at->format('H:i d/m/Y') }}
-                                        </span>
-                                    @endif
-                                
-                                    @if($booking->booking_status === 'pending_payment' && $booking->expires_at)
-                                        <span class="text-xs text-warning font-semibold">
-                                            Hết hạn thanh toán lúc {{ $booking->expires_at->format('H:i d/m/Y') }}
-                                        </span>
-                                    @endif
-                                </div>
-                                <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mb-4">
-                                    <div><p class="app-muted mb-0.5">Thời gian</p><p class="app-text font-semibold">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }} - {{ $booking->showtime?->show_date ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y') : 'Đang cập nhật' }}</p></div>
-                                    <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->seat_codes }}</p></div>
-                                    <div><p class="app-muted mb-0.5">Rạp</p><p class="app-text font-semibold">{{ $booking->showtime->cinema->name }}</p></div>
-                                    <div><p class="app-muted mb-0.5">Phòng</p><p class="app-text font-semibold">{{ $booking->showtime->room->name }}</p></div>
-                                </div>
+                                <h2 class="text-xl font-bold app-text mb-1 pr-20">
+                                    {{ $booking->showtime->movie->title }}
+                                </h2>
 
-                                <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
-                                    <div>
-                                        <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
-                                        <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
-                                        @if($booking->promotion_discount_amount > 0)
-                                            <p class="text-xs text-success">Mã {{ $booking->discountCodeRedemptions->pluck('code_snapshot')->join(', ') }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
+                                <p class="app-muted text-xs mb-3">
+                                    Mã vé:
+                                    <span class="app-text font-mono font-bold">
+                                        {{ $booking->booking_code }}
+                                    </span>
+                                </p>
+
+
+                                {{-- TRẠNG THÁI CHI TIẾT --}}
+                                <div class="mb-4 rounded-2xl border app-border app-card-soft p-4">
+
+                                    <div class="flex flex-wrap items-center gap-2">
+
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold {{ $ticketStatus['class'] }}">
+
+                                            <i class="ph {{ $ticketStatus['icon'] }}"></i>
+
+                                            {{ $ticketStatus['label'] }}
+
+                                        </span>
+
+
+                                        @if($booking->payment_status)
+
+                                            <span class="inline-flex items-center rounded-full border app-border px-3 py-1 text-xs font-semibold app-muted">
+
+                                                Thanh toán:
+                                                {{ $booking->payment_status_label }}
+
+                                            </span>
+
                                         @endif
-                                        @if($booking->pointRedemption)
-                                            <p class="text-xs text-ai-start">Đã dùng {{ number_format($booking->pointRedemption->points,0,',','.') }} điểm: −{{ number_format((int)$booking->points_discount_amount,0,',','.') }} VNĐ</p>
-                                        @endif
-                                        @if($booking->loyalty_points_earned > 0)
-                                            <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
-                                        @endif
+
                                     </div>
+
+
+                                    <p class="mt-2 text-xs app-muted">
+                                        {{ $ticketStatus['description'] }}
+                                    </p>
+
+
+                                    {{-- THỜI GIAN LIÊN QUAN ĐẾN TRẠNG THÁI --}}
+                                    <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs">
+
+                                        @if($booking->paid_at)
+
+                                            <div class="flex items-center gap-1.5 text-success">
+
+                                                <i class="ph ph-credit-card"></i>
+
+                                                <span>
+                                                    Thanh toán:
+                                                    {{ $booking->paid_at->format('H:i d/m/Y') }}
+                                                </span>
+
+                                            </div>
+
+                                        @endif
+
+
+                                        @if($booking->used_at)
+
+                                            <div class="flex items-center gap-1.5 text-ai-start">
+
+                                                <i class="ph ph-ticket"></i>
+
+                                                <span>
+                                                    Sử dụng:
+                                                    {{ $booking->used_at->format('H:i d/m/Y') }}
+                                                </span>
+
+                                            </div>
+
+                                        @endif
+
+
+                                        @if(
+                                            $booking->booking_status === 'pending_payment'
+                                            && $booking->expires_at
+                                        )
+
+                                            <div class="flex items-center gap-1.5 text-warning font-semibold">
+
+                                                <i class="ph ph-clock-countdown"></i>
+
+                                                <span>
+                                                    Hạn thanh toán:
+                                                    {{ $booking->expires_at->format('H:i d/m/Y') }}
+                                                </span>
+
+                                            </div>
+
+                                        @endif
+
+                                    </div>
+
+                                </div>
+
+
+                                {{-- THÔNG TIN SUẤT CHIẾU --}}
+                                <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mb-4">
+
+                                    <div>
+
+                                        <p class="app-muted mb-0.5">
+                                            Thời gian
+                                        </p>
+
+                                        <p class="app-text font-semibold">
+
+                                            {{
+                                                $booking->showtime?->show_time
+                                                    ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i')
+                                                    : '--:--'
+                                            }}
+
+                                            -
+
+                                            {{
+                                                $booking->showtime?->show_date
+                                                    ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y')
+                                                    : 'Đang cập nhật'
+                                            }}
+
+                                        </p>
+
+                                    </div>
+
+
+                                    <div>
+
+                                        <p class="app-muted mb-0.5">
+                                            Ghế
+                                        </p>
+
+                                        <p class="text-brand-start font-bold text-sm">
+                                            {{ $booking->seat_codes }}
+                                        </p>
+
+                                    </div>
+
+
+                                    <div>
+
+                                        <p class="app-muted mb-0.5">
+                                            Rạp
+                                        </p>
+
+                                        <p class="app-text font-semibold">
+                                            {{ $booking->showtime->cinema->name }}
+                                        </p>
+
+                                    </div>
+
+
+                                    <div>
+
+                                        <p class="app-muted mb-0.5">
+                                            Phòng
+                                        </p>
+
+                                        <p class="app-text font-semibold">
+                                            {{ $booking->showtime->room->name }}
+                                        </p>
+
+                                    </div>
+
+                                </div>
+
+
+                                {{-- TỔNG TIỀN + ACTION --}}
+                                <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
+
+                                    <div>
+
+                                        <p class="text-xs app-muted mb-0.5">
+                                            Tổng tiền
+                                        </p>
+
+                                        <p class="app-text font-bold text-lg">
+                                            {{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ
+                                        </p>
+
+
+                                        @if($booking->promotion_discount_amount > 0)
+
+                                            <p class="text-xs text-success">
+
+                                                Mã
+                                                {{ $booking->discountCodeRedemptions->pluck('code_snapshot')->join(', ') }}
+
+                                                :
+                                                −{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }}
+                                                VNĐ
+
+                                            </p>
+
+                                        @endif
+
+
+                                        @if($booking->pointRedemption)
+
+                                            <p class="text-xs text-ai-start">
+
+                                                Đã dùng
+                                                {{ number_format($booking->pointRedemption->points, 0, ',', '.') }}
+                                                điểm:
+
+                                                −{{ number_format((int) $booking->points_discount_amount, 0, ',', '.') }}
+                                                VNĐ
+
+                                            </p>
+
+                                        @endif
+
+
+                                        @if($booking->loyalty_points_earned > 0)
+
+                                            <p class="text-xs text-ai-start font-semibold">
+
+                                                +{{ number_format($booking->loyalty_points_earned, 0, ',', '.') }}
+                                                điểm
+
+                                            </p>
+
+                                        @endif
+
+                                    </div>
+
+
                                     <div class="flex flex-wrap gap-2">
+
+                                        {{-- TIẾP TỤC THANH TOÁN --}}
                                         @if($actions['can_resume'])
-                                            <form method="POST" action="{{ route('payments.resume', $booking) }}" class="inline" data-submit-once>
+
+                                            <form
+                                                method="POST"
+                                                action="{{ route('payments.resume', $booking) }}"
+                                                class="inline"
+                                                data-submit-once
+                                            >
+
                                                 @csrf
-                                                <button type="submit" data-loading-label="Đang chuyển đến cổng thanh toán…" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
+
+                                                <button
+                                                    type="submit"
+                                                    data-loading-label="Đang chuyển đến cổng thanh toán…"
+                                                    class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all"
+                                                >
                                                     Tiếp tục thanh toán
                                                 </button>
+
                                             </form>
+
                                         @endif
 
+
+                                        {{-- XEM VÉ --}}
                                         @if($canUseTicket)
-                                            <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
+
+                                            <a
+                                                href="{{ route('user.bookings.ticket', $booking) }}"
+                                                class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all"
+                                            >
                                                 Xem vé QR
                                             </a>
-                                            <form method="POST" action="{{ route('user.bookings.ticket-email.resend', $booking) }}" class="inline" data-submit-once>
+
+
+                                            <form
+                                                method="POST"
+                                                action="{{ route('user.bookings.ticket-email.resend', $booking) }}"
+                                                class="inline"
+                                                data-submit-once
+                                            >
+
                                                 @csrf
-                                                <button type="submit" data-loading-label="Đang gửi…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors">
+
+                                                <button
+                                                    type="submit"
+                                                    data-loading-label="Đang gửi…"
+                                                    class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors"
+                                                >
                                                     Gửi lại email vé
                                                 </button>
+
                                             </form>
+
                                         @endif
 
+
+                                        {{-- HỦY VÉ --}}
                                         @if($actions['can_cancel_local'])
-                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" data-modal-open="cancel-booking-{{ $booking->id }}" aria-haspopup="dialog" aria-controls="cancel-booking-{{ $booking->id }}">
+
+                                            <button
+                                                type="button"
+                                                class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors"
+                                                data-modal-open="cancel-booking-{{ $booking->id }}"
+                                                aria-haspopup="dialog"
+                                                aria-controls="cancel-booking-{{ $booking->id }}"
+                                            >
                                                 Hủy đơn
                                             </button>
+
                                         @elseif($actions['can_cancel_payos'])
-                                            <button type="button" class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors" data-modal-open="cancel-booking-{{ $booking->id }}" aria-haspopup="dialog" aria-controls="cancel-booking-{{ $booking->id }}">
+
+                                            <button
+                                                type="button"
+                                                class="px-3 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-xs font-semibold transition-colors"
+                                                data-modal-open="cancel-booking-{{ $booking->id }}"
+                                                aria-haspopup="dialog"
+                                                aria-controls="cancel-booking-{{ $booking->id }}"
+                                            >
                                                 Hủy đơn
                                             </button>
+
                                         @endif
+
                                     </div>
+
                                 </div>
+
                             </div>
+
                         </div>
 
-                        @if($actions['can_cancel_local'] || $actions['can_cancel_payos'])
-                            <x-ui.modal id="cancel-booking-{{ $booking->id }}" title="Hủy đơn đặt vé?" description-id="cancel-booking-{{ $booking->id }}-description">
-                                    <p id="cancel-booking-{{ $booking->id }}-description" class="app-muted text-sm">Nếu tiếp tục, các ghế đang giữ sẽ được giải phóng và đơn này không thể tiếp tục thanh toán.</p>
-                                    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                                        <button type="button" data-modal-close="cancel-booking-{{ $booking->id }}" data-modal-initial-focus class="px-4 py-2 border app-border app-muted hover:app-text rounded-xl text-sm font-semibold transition-colors">Giữ đơn</button>
-                                        <form method="POST" action="{{ $actions['can_cancel_payos'] ? route('payments.payos.cancel-attempt', $booking) : route('user.bookings.cancel', $booking) }}" data-submit-once>
-                                            @csrf
-                                            @unless($actions['can_cancel_payos'])
-                                                @method('DELETE')
-                                            @endunless
-                                            <button type="submit" data-loading-label="Đang xác minh hủy…" class="w-full px-4 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-sm font-bold transition-colors">Hủy đơn</button>
-                                        </form>
+
+                        {{-- MODAL HỦY VÉ --}}
+                        @if(
+                            $actions['can_cancel_local']
+                            || $actions['can_cancel_payos']
+                        )
+
+                            <x-ui.modal
+                                id="cancel-booking-{{ $booking->id }}"
+                                title="Hủy đơn đặt vé?"
+                                description-id="cancel-booking-{{ $booking->id }}-description"
+                            >
+
+                                <div class="space-y-4">
+
+                                    <div class="rounded-2xl border border-error/20 bg-error/5 p-4">
+
+                                        <div class="flex gap-3">
+
+                                            <div class="mt-0.5 text-error">
+                                                <i class="ph ph-warning-circle text-xl"></i>
+                                            </div>
+
+                                            <div>
+
+                                                <p class="font-bold app-text text-sm">
+                                                    Xác nhận hủy vé
+                                                </p>
+
+                                                <p
+                                                    id="cancel-booking-{{ $booking->id }}-description"
+                                                    class="app-muted text-sm mt-1"
+                                                >
+                                                    Nếu tiếp tục, các ghế đang giữ sẽ được giải phóng và đơn này không thể tiếp tục thanh toán.
+                                                </p>
+
+                                            </div>
+
+                                        </div>
+
                                     </div>
+
+
+                                    <div class="rounded-2xl border app-border p-4">
+
+                                        <div class="grid grid-cols-2 gap-3 text-xs">
+
+                                            <div>
+
+                                                <p class="app-muted">
+                                                    Mã vé
+                                                </p>
+
+                                                <p class="app-text font-bold font-mono">
+                                                    {{ $booking->booking_code }}
+                                                </p>
+
+                                            </div>
+
+                                            <div>
+
+                                                <p class="app-muted">
+                                                    Tổng tiền
+                                                </p>
+
+                                                <p class="app-text font-bold">
+                                                    {{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ
+                                                </p>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+
+                                    <button
+                                        type="button"
+                                        data-modal-close="cancel-booking-{{ $booking->id }}"
+                                        data-modal-initial-focus
+                                        class="px-4 py-2 border app-border app-muted hover:app-text rounded-xl text-sm font-semibold transition-colors"
+                                    >
+                                        Giữ đơn
+                                    </button>
+
+
+                                    <form
+                                        method="POST"
+                                        action="{{
+                                            $actions['can_cancel_payos']
+                                                ? route('payments.payos.cancel-attempt', $booking)
+                                                : route('user.bookings.cancel', $booking)
+                                        }}"
+                                        data-submit-once
+                                    >
+
+                                        @csrf
+
+                                        @unless($actions['can_cancel_payos'])
+                                            @method('DELETE')
+                                        @endunless
+
+                                        <button
+                                            type="submit"
+                                            data-loading-label="Đang xác minh hủy…"
+                                            class="w-full px-4 py-2 border border-error/40 text-error hover:bg-error/10 rounded-xl text-sm font-bold transition-colors"
+                                        >
+                                            Hủy đơn
+                                        </button>
+
+                                    </form>
+
+                                </div>
+
                             </x-ui.modal>
+
                         @endif
+
                     </article>
+
+
                 @empty
+
                     <div class="app-card border app-border rounded-3xl p-10 text-center">
+
                         <div class="w-16 h-16 rounded-2xl bg-brand-start/10 text-brand-start flex items-center justify-center mx-auto mb-4">
                             <i class="ph ph-ticket text-3xl"></i>
                         </div>
-                        <p class="app-muted">Bạn chưa có vé nào.</p>
+
+                        <p class="app-muted">
+                            Bạn chưa có vé nào.
+                        </p>
+
                     </div>
+
                 @endforelse
 
+
                 {{ $bookings->withQueryString()->links() }}
+
             </div>
+
         </section>
+
     </div>
+
 </div>
 @endsection
