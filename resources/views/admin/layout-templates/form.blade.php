@@ -72,14 +72,14 @@
     <section class="app-card overflow-hidden rounded-3xl border app-border" aria-labelledby="seat-layout-editor-title">
         <div class="border-b app-border p-5 sm:p-6">
             <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thiết kế mẫu lưới logic</p>
-            <h2 id="seat-layout-editor-title" class="mt-2 text-xl font-extrabold app-text">Bố trí từng vị trí logic trong mẫu</h2>
-            <p id="seat-layout-editor-help" class="mt-2 max-w-3xl text-sm leading-relaxed app-muted">Hàng × cột là lưới logic, không phải kích thước phòng theo mét. Chọn công cụ rồi nhấn vào ô để bố trí; ghế đôi sử dụng hai ô liền kề.</p>
+            <h2 id="seat-layout-editor-title" class="mt-2 text-xl font-extrabold app-text">Vẽ sơ đồ phòng theo 2 bước</h2>
+            <p id="seat-layout-editor-help" class="mt-2 max-w-4xl text-sm leading-relaxed app-muted">Hàng × cột là lưới logic, không phải kích thước phòng theo mét. Chọn kích thước lưới, chọn loại vị trí rồi nhấn vào sơ đồ; ghế đôi sử dụng hai ô liền kề.</p>
         </div>
 
         <div class="layout-template-toolbar border-b app-border p-5 sm:p-6 lg:sticky lg:top-0 lg:z-20">
             <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.55fr)] xl:items-end">
                 <fieldset>
-                    <legend class="mb-3 text-sm font-extrabold app-text">Cấu hình lưới</legend>
+                    <legend class="mb-3 flex items-center gap-2 text-sm font-extrabold app-text"><span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-start text-xs text-white">1</span>Chọn kích thước phòng</legend>
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <label class="block">
                             <span class="mb-1.5 block text-xs font-bold app-muted">Hàng</span>
@@ -100,7 +100,7 @@
                 </fieldset>
 
                 <fieldset>
-                    <legend class="mb-3 text-sm font-extrabold app-text">Công cụ bố trí</legend>
+                    <legend class="mb-3 flex items-center gap-2 text-sm font-extrabold app-text"><span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-start text-xs text-white">2</span>Chọn loại vị trí muốn vẽ</legend>
                     <div data-layout-tools class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" role="toolbar" aria-label="Công cụ bố trí sơ đồ ghế">
                         @foreach($tools as $key => $tool)
                             <button type="button" data-layout-tool="{{ $key }}" aria-pressed="{{ $key === 'normal' ? 'true' : 'false' }}" class="layout-template-tool {{ $key === 'normal' ? 'is-active' : '' }} {{ $key === 'empty' ? 'is-danger' : '' }}">
@@ -112,6 +112,7 @@
                     </div>
                 </fieldset>
             </div>
+
             <p data-layout-editor-message class="mt-3 hidden rounded-xl border border-warning/35 bg-warning/10 px-4 py-3 text-sm text-warning" role="status" aria-live="polite"></p>
         </div>
 
