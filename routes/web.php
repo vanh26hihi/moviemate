@@ -336,6 +336,8 @@ Route::prefix('admin')->name('admin.')
 
         Route::get('/price-books', [AdminPriceBookController::class, 'index'])
             ->middleware('permission:pricing.view')->name('price-books.index');
+        Route::get('/price-books/preview', [AdminPriceBookController::class, 'previewRedirect'])
+            ->middleware('permission:pricing.view')->name('price-books.preview.redirect');
         Route::post('/price-books/preview', [AdminPriceBookController::class, 'preview'])
             ->middleware(['permission:pricing.view', 'throttle:60,1'])->name('price-books.preview');
         Route::get('/price-books/versions/{version}', [AdminPriceBookController::class, 'show'])
