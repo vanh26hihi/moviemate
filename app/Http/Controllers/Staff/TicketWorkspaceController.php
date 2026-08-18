@@ -8,6 +8,7 @@ use App\Models\SeatIncidentResolution;
 use App\Services\CinemaAccessService;
 use App\Services\Tickets\BookingLookupCapability;
 use App\Services\Tickets\BookingQrPayload;
+use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\TicketResolutionService;
 use App\Support\PrivacyMask;
 use Illuminate\Http\Request;
@@ -16,6 +17,8 @@ use Illuminate\View\View;
 
 final class TicketWorkspaceController extends Controller
 {
+    public function __construct(private readonly BookingTicketEligibility $ticketEligibility) {}
+
     public function index(Request $request, CinemaAccessService $cinemas): View
     {
         return view('staff.tickets.index', ['cinema' => $cinemas->currentCinema($request->user())]);
@@ -27,7 +30,13 @@ final class TicketWorkspaceController extends Controller
         BookingQrPayload $payloads,
         TicketResolutionService $tickets,
     ): View {
-        $validated = $request->validate(['ticket' => ['required', 'string', 'max:512']]);
+        $validated = $request->validate([
+            'ticket' => ['required', 'string', 'max:512'],
+        ], [
+            'ticket.required' => 'Vui lòng nhập mã đơn đặt vé hoặc QR đơn đặt vé.',
+        ], [
+            'ticket' => 'mã đơn đặt vé hoặc QR đơn đặt vé',
+        ]);
         $input = strtoupper(trim($validated['ticket']));
         $capability = $payloads->capabilityFrom($validated['ticket']);
         $bookingId = $capabilities->bookingId($capability);
@@ -49,12 +58,13 @@ final class TicketWorkspaceController extends Controller
 
     private function operationsView(Booking $booking): View
     {
-        $booking->loadMissing(['showtime.presentationFormat', 'showtime.room.roomType']);
+        $booking->loadMissing(['showtime.presentationFormat', 'showtime.room.roomType', 'payments']);
         $authoritativePayment = $booking->payments
             ->filter(fn ($payment): bool => $payment->hasAuthoritativeSuccessEvidence())
             ->sortByDesc('id')
             ->first();
         $verified = $authoritativePayment !== null;
+        $canPrint = $this->ticketEligibility->isPrintable($booking);
         $eligibility = match (true) {
             $booking->payment_status === 'refunded' => 'Vé đã được hoàn tiền và không còn hiệu lực.',
             $booking->booking_status === 'cancelled' => 'Đơn đã hủy.',
@@ -76,6 +86,7 @@ final class TicketWorkspaceController extends Controller
             'eligibilityMessage' => $eligibility,
             'incidentReprints' => $incidentReprints,
             'authoritativePayment' => $authoritativePayment,
+            'canPrint' => $canPrint,
         ]);
     }
 }

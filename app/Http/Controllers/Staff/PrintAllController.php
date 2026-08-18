@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Staff;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Services\Tickets\BookingPrintAmountAllocator;
+use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\FoodPickupVoucherPrintService;
 use App\Services\Tickets\TicketPrintService;
 use App\Services\Tickets\TicketResolutionService;
@@ -23,14 +24,22 @@ final class PrintAllController extends Controller
         TicketPrintService $ticketPrints,
         FoodPickupVoucherPrintService $voucherPrints,
         BookingPrintAmountAllocator $amounts,
+        BookingTicketEligibility $eligibility,
     ): Response {
-        $tickets->authorizedBooking($booking, $request->user());
+        $booking = $tickets->authorizedBooking($booking, $request->user());
+        if (! $eligibility->isPrintable($booking)) {
+            throw new HttpException(409, 'Chỉ đơn đã thanh toán với bằng chứng quyết toán hợp lệ mới được in.');
+        }
 
-        [$booking, $printAmounts] = DB::transaction(function () use ($booking, $request, $ticketPrints, $voucherPrints, $amounts): array {
+        [$booking, $printAmounts] = DB::transaction(function () use ($booking, $request, $ticketPrints, $voucherPrints, $amounts, $eligibility): array {
             $booking = Booking::query()
                 ->with(['payments', 'admissionTickets.printState', 'foodPickupVoucher', 'foodOrder.items'])
                 ->lockForUpdate()
                 ->findOrFail($booking->id);
+
+            if (! $eligibility->isPrintable($booking)) {
+                throw new HttpException(409, 'Trạng thái đơn đã thay đổi; không thể phát hành tài liệu in.');
+            }
 
             if ($booking->admissionTickets->isEmpty()
                 || $booking->admissionTickets->contains(fn ($ticket) => $ticket->printState !== null || $ticket->print_count > 0)

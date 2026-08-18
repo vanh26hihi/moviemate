@@ -28,6 +28,8 @@
     .paper-footer{margin-top:3mm;text-align:center;color:#475569;font-size:8.5px}
     .print-controls{width:min(80mm,calc(100% - 24px));margin:20px auto;padding:18px;border-radius:14px;background:#fff}
     .print-controls form{margin-top:14px}
+    [data-inline-validation] [aria-invalid="true"]{border-color:#ef4444!important;box-shadow:0 0 0 3px rgb(239 68 68/.16)!important}
+    .form-validation-error{margin-top:4px;color:#b91c1c;font-size:12px;font-weight:700}.form-validation-error[hidden]{display:none}
     @page{size:80mm auto;margin:0}
     @media(max-width:360px){.paper{width:58mm;min-height:100mm;padding:4mm;font-size:9px}.paper-brand{font-size:18px}.paper-title{font-size:10px}.paper-movie{font-size:14px}.paper-fact{grid-template-columns:16mm minmax(0,1fr)}.paper-seat-box strong{font-size:21px}.paper-price strong{font-size:14px}}
     @media print{html,body{width:80mm;background:#fff}.paper{width:80mm;margin:0;padding:4mm 5mm 5mm}.paper::before,.paper::after{background:#fff}.print-controls{display:none!important}}
