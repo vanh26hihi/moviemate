@@ -16,13 +16,13 @@
 </head>
 <body class="user-app app-page font-sans antialiased flex flex-col min-h-screen overflow-x-hidden @yield('body_class')">
     <header class="app-header fixed w-full top-0 z-50 backdrop-blur-xl border-b app-border transition-all duration-300">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16 md:h-20">
+        <div class="mx-auto max-w-[1680px] px-4 sm:px-6 lg:px-8">
+            <div class="flex h-16 items-center gap-2 md:h-20 2xl:gap-4">
                 <a href="{{ route('home') }}" class="flex shrink-0 items-center" aria-label="MovieMate - Trang chủ">
                     <x-brand.logo class="brand-logo--customer-header" />
                 </a>
 
-                <nav class="hidden md:flex items-center gap-1 rounded-full app-card border app-border p-1">
+                <nav data-customer-desktop-nav aria-label="Điều hướng chính" class="hidden min-w-0 flex-1 items-center justify-between gap-1 rounded-full border app-border app-card p-1 2xl:flex">
                     <a href="{{ route('home') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('home')]) @if(request()->routeIs('home')) aria-current="page" @endif>Trang chủ</a>
                     <a href="{{ route('user.movies.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.movies.*')]) @if(request()->routeIs('user.movies.*')) aria-current="page" @endif>Phim</a>
                     <a href="{{ route('cinemas.index') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('cinemas.*')]) @if(request()->routeIs('cinemas.*')) aria-current="page" @endif>Rạp</a>
@@ -34,7 +34,7 @@
                     <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Đơn đặt vé của tôi</a>
                 </nav>
 
-                <details id="customer-cinema-selector" class="relative ml-auto md:ml-0">
+                <details id="customer-cinema-selector" class="relative ml-auto hidden shrink-0 sm:block 2xl:ml-0">
                     <summary class="flex max-w-44 cursor-pointer list-none items-center gap-2 rounded-xl border app-border app-card px-3 py-2 text-sm font-bold app-text" aria-label="Chọn rạp ưu tiên"><i class="ph-fill ph-map-pin text-brand-start" aria-hidden="true"></i><span class="truncate">{{ $customerPreferredCinema?->name ?? 'Tất cả rạp' }}</span><i class="ph ph-caret-down text-xs" aria-hidden="true"></i></summary>
                     <div class="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border app-border app-card p-2 shadow-2xl">
                         <form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="all"><button type="submit" class="user-dropdown-link w-full text-left" @if(!$customerPreferredCinema) aria-current="true" @endif>Tất cả rạp</button></form>
@@ -42,7 +42,7 @@
                     </div>
                 </details>
 
-                <div class="hidden md:flex items-center gap-3">
+                <div class="hidden shrink-0 items-center gap-3 2xl:flex">
                     <button data-theme-toggle type="button"
                         class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border hover:border-brand-start transition-all text-sm app-muted hover:app-text"
                         title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối" aria-pressed="false">
@@ -74,7 +74,7 @@
                     @endauth
                 </div>
 
-                <div class="md:hidden flex items-center gap-2">
+                <div class="flex shrink-0 items-center gap-2 2xl:hidden">
                     <button data-theme-toggle type="button"
                         class="inline-flex items-center gap-1 px-2.5 py-2 rounded-lg app-card border app-border text-sm app-muted"
                         aria-label="Đổi giao diện sáng/tối" aria-pressed="false">
@@ -87,8 +87,8 @@
             </div>
         </div>
 
-        <div id="mobile-menu" class="hidden md:hidden app-secondary border-b app-border">
-            <div class="px-4 pt-2 pb-4 space-y-1">
+        <div id="mobile-menu" data-customer-mobile-nav class="hidden border-b app-border app-secondary 2xl:hidden">
+            <div class="mx-auto max-w-[1680px] space-y-1 px-4 pb-4 pt-2 sm:px-6 lg:px-8">
                 <a href="{{ route('home') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('home')])>Trang chủ</a>
                 <a href="{{ route('user.movies.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.movies.*')])>Phim</a>
                 <a href="{{ route('cinemas.index') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('cinemas.*')])>Rạp</a>
@@ -98,6 +98,11 @@
                     <i class="ph-fill ph-sparkle"></i> AI Gợi ý
                 </a>
                 <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')])>Đơn đặt vé của tôi</a>
+                <div class="mt-3 border-t app-border pt-3 sm:hidden">
+                    <p class="px-3 pb-2 text-xs font-bold uppercase tracking-wider app-muted">Rạp ưu tiên</p>
+                    <form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="all"><button type="submit" class="user-mobile-link w-full text-left" @if(!$customerPreferredCinema) aria-current="true" @endif><i class="ph ph-map-pin"></i>Tất cả rạp</button></form>
+                    @foreach($customerCinemas as $contextCinema)<form method="POST" action="{{ route('cinema-context.update') }}">@csrf<input type="hidden" name="cinema" value="{{ $contextCinema->code }}"><button type="submit" class="user-mobile-link w-full text-left" @if($customerPreferredCinema?->is($contextCinema)) aria-current="true" @endif><i class="ph ph-buildings"></i>{{ $contextCinema->name }}</button></form>@endforeach
+                </div>
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
                         <a href="{{ route('user.profile') }}" class="user-mobile-link"><i class="ph ph-user mr-2"></i>Hồ sơ</a>
