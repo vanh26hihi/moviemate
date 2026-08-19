@@ -53,4 +53,6 @@ php artisan test
 npm run build
 ```
 
+The default automated test environment uses an in-memory SQLite database. Enable the PHP `pdo_sqlite` extension before running database-backed tests.
+
 See [`docs/TEAM_SETUP.md`](docs/TEAM_SETUP.md) for team environment rules, payment sandbox configuration, and demo setup details.
