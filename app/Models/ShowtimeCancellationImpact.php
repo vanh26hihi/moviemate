@@ -12,6 +12,8 @@ final class ShowtimeCancellationImpact extends Model
 
     public const OUTCOME_REFUND_REQUIRED = 'refund_required';
 
+    public const OUTCOME_ALREADY_TERMINAL = 'already_terminal';
+
     protected $fillable = ['showtime_cancellation_id', 'booking_id', 'outcome', 'booking_status_before', 'payment_status_before', 'authoritative_amount', 'currency', 'seat_count', 'audit_snapshot'];
 
     protected function casts(): array
