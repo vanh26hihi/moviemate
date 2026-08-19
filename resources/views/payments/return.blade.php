@@ -21,6 +21,10 @@
         && $stateStatus === \App\Models\Payment::STATUS_FAILED) {
         $stateStatus = \App\Models\Payment::STATUS_PENDING;
     }
+    if ($booking->booking_status === 'expired'
+        && $payment->failure_reason === 'vnpay_terminal_expired') {
+        $stateStatus = \App\Models\Payment::STATUS_EXPIRED;
+    }
     $states = [
         \App\Models\Payment::STATUS_PENDING => [
             'title' => 'Đang xác minh kết quả thanh toán',
