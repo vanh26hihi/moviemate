@@ -6,6 +6,7 @@ use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Showtime extends Model
 {
@@ -64,6 +65,11 @@ class Showtime extends Model
     public function ticketPrices(): HasMany
     {
         return $this->hasMany(ShowtimeTicketPrice::class);
+    }
+
+    public function cancellation(): HasOne
+    {
+        return $this->hasOne(ShowtimeCancellation::class);
     }
 
     public function getStatusLabelAttribute(): string
