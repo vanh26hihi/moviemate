@@ -181,11 +181,10 @@
                                     @endcan
                                     @can('showtimes.delete')
                                         @if($showtime->status === 'active' && in_array($lifecycle['state'] ?? null, ['upcoming', 'playing'], true))
-                                            <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" data-showtime-cancel-action onsubmit="return confirm('Bạn có chắc muốn hủy suất chiếu này? Suất đã có đơn đặt vé sẽ không thể hủy trực tiếp.');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="admin-btn-danger w-full !justify-start whitespace-nowrap" aria-label="Hủy suất chiếu {{ $showtime->movie->title }}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i>Hủy suất</button>
-                                            </form>
+                                            <a href="{{ route('admin.showtimes.cancellation', $showtime) }}" data-showtime-cancel-action class="admin-btn-danger w-full !justify-start whitespace-nowrap" aria-label="Xem tác động hủy suất chiếu {{ $showtime->movie->title }}">
+                                                <i class="ph-bold ph-x-circle" aria-hidden="true"></i>{{ $showtime->bookings_exists ? 'Xử lý hủy' : 'Hủy suất' }}
+                                            </a>
+                                            @if($showtime->bookings_exists)<span class="px-1 text-[11px] app-muted">{{ $showtime->pending_bookings_count }} chờ · {{ $showtime->paid_bookings_count }} đã trả</span>@endif
                                         @endif
                                     @endcan
                                 </div>
@@ -264,11 +263,8 @@
                         @endcan
                         @can('showtimes.delete')
                             @if($showtime->status === 'active' && in_array($lifecycle['state'] ?? null, ['upcoming', 'playing'], true))
-                                <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" class="sm:col-span-2" data-showtime-cancel-action onsubmit="return confirm('Bạn có chắc muốn hủy suất chiếu này? Suất đã có đơn đặt vé sẽ không thể hủy trực tiếp.');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="admin-btn-danger w-full" aria-label="Hủy suất chiếu {{ $showtime->movie->title }}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i>Hủy suất</button>
-                                </form>
+                                <a href="{{ route('admin.showtimes.cancellation', $showtime) }}" class="admin-btn-danger sm:col-span-2" data-showtime-cancel-action aria-label="Xem tác động hủy suất chiếu {{ $showtime->movie->title }}"><i class="ph-bold ph-x-circle" aria-hidden="true"></i>{{ $showtime->bookings_exists ? 'Xử lý hủy' : 'Hủy suất' }}</a>
+                                @if($showtime->bookings_exists)<p class="text-center text-xs app-muted sm:col-span-2">{{ $showtime->pending_bookings_count }} đơn chờ · {{ $showtime->paid_bookings_count }} đơn đã trả</p>@endif
                             @endif
                         @endcan
                     </div>

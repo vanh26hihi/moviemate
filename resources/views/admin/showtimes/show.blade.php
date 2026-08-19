@@ -35,11 +35,7 @@
             @endcan
             @can('showtimes.delete')
                 @if($canCancel)
-                    <form method="POST" action="{{ route('admin.showtimes.destroy', $showtime) }}" onsubmit="return confirm('Bạn có chắc muốn hủy suất chiếu này?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn-secondary text-error"><i class="ph ph-x-circle" aria-hidden="true"></i>Hủy suất chiếu</button>
-                    </form>
+                    <a href="{{ route('admin.showtimes.cancellation', $showtime) }}" class="btn-secondary text-error"><i class="ph ph-x-circle" aria-hidden="true"></i>{{ $hasBookingHistory ? 'Xử lý hủy' : 'Hủy suất chiếu' }}</a>
                 @endif
             @endcan
         </div>
@@ -50,6 +46,19 @@
             <p class="font-bold app-text">Suất chiếu đã có lịch sử đặt vé.</p>
             <p class="mt-1 app-muted">Tác vụ thay đổi cấu trúc lịch không được hiển thị để bảo toàn lịch sử.</p>
         </div>
+    @endif
+
+    @if($showtime->cancellation)
+        <section class="rounded-2xl border border-error/30 bg-error/10 p-5" aria-labelledby="showtime-cancellation-history-title">
+            <h2 id="showtime-cancellation-history-title" class="font-extrabold app-heading">Suất chiếu đã bị rạp hủy</h2>
+            <p class="mt-2 text-sm app-text">{{ \App\Models\ShowtimeCancellation::REASONS[$showtime->cancellation->reason_code] ?? 'Lý do vận hành' }}@if($showtime->cancellation->reason_note) · {{ $showtime->cancellation->reason_note }}@endif</p>
+            <p class="mt-1 text-xs app-muted">{{ $showtime->cancellation->cancelled_at->format('d/m/Y H:i') }} · {{ $showtime->cancellation->cancelledBy?->name ?? 'Hệ thống' }}</p>
+            @can('refunds.view')
+                @if($showtime->cancellation->refundCases->isNotEmpty())
+                    <a href="{{ route('admin.refunds.index') }}" class="admin-btn-secondary mt-4">Mở hàng đợi hoàn tiền</a>
+                @endif
+            @endcan
+        </section>
     @endif
 
     <section class="grid gap-4 md:grid-cols-3" aria-label="Tổng quan suất chiếu">

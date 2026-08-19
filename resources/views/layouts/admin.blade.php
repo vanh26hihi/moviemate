@@ -53,6 +53,7 @@
                 'foods' => ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
                 'reviews' => ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
                 'payments' => ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
+                'refunds' => ['route' => 'admin.refunds.index', 'active' => 'admin.refunds.*', 'permission' => 'refunds.view', 'label' => 'Hoàn tiền cần xử lý', 'icon' => 'ph-arrow-u-down-left'],
                 'reports' => ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
                 'roomTypes' => ['route' => 'admin.room-types.index', 'active' => 'admin.room-types.*', 'permission' => 'room_types.view', 'label' => 'Loại phòng', 'icon' => 'ph-stack'],
                 'layoutTemplates' => ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ', 'icon' => 'ph-grid-four'],
@@ -67,13 +68,14 @@
                 ['label' => 'Vận hành', 'items' => [$navItems['cinemas'], $navItems['showtimes'], $navItems['rooms'], $navItems['bookings'], $navItems['foodOrders']]],
                 ['label' => 'Kinh doanh', 'items' => [$navItems['movies'], $navItems['priceBooks'], $navItems['discounts'], $navItems['foods']]],
                 ['label' => 'Khách hàng', 'items' => [$navItems['reviews']]],
-                ['label' => 'Tài chính', 'items' => [$navItems['payments'], $navItems['reports']]],
+                ['label' => 'Tài chính', 'items' => [$navItems['payments'], $navItems['refunds'], $navItems['reports']]],
                 ['label' => 'Cấu hình', 'items' => [$navItems['roomTypes'], $navItems['layoutTemplates'], $navItems['presentationFormats'], $navItems['users'], $navItems['roles'], $navItems['activityLogs']]],
             ] : [
                 ['label' => 'Tổng quan chi nhánh', 'items' => [[...$navItems['dashboard'], 'label' => 'Tổng quan chi nhánh']]],
                 ['label' => 'Vận hành', 'items' => [
                     $navItems['showtimes'], $navItems['rooms'], $navItems['bookings'],
                     [...$navItems['payments'], 'label' => 'Thanh toán chi nhánh'],
+                    $navItems['refunds'],
                     $navItems['foodOrders'],
                     [...$navItems['users'], 'label' => 'Nhân sự chi nhánh'],
                 ]],

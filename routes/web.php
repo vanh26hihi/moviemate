@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewCont
 use App\Http\Controllers\Admin\PresentationFormatController as AdminPresentationFormatController;
 use App\Http\Controllers\Admin\PriceBookController as AdminPriceBookController;
 use App\Http\Controllers\Admin\RealtimeFieldValidationController as AdminRealtimeFieldValidationController;
+use App\Http\Controllers\Admin\RefundCaseController as AdminRefundCaseController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
@@ -494,6 +495,9 @@ Route::prefix('admin')->name('admin.')
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.bulk.store');
 
+        Route::get('/showtimes/{showtime}/cancellation', [AdminShowtimeController::class, 'cancellation'])
+            ->whereNumber('showtime')->middleware('permission:showtimes.delete')->name('showtimes.cancellation');
+
         Route::resource('showtimes', AdminShowtimeController::class)
             ->middlewareFor(['index', 'show'], 'permission:showtimes.view')
             ->middlewareFor(['create', 'store'], 'permission:showtimes.create')
@@ -510,6 +514,10 @@ Route::prefix('admin')->name('admin.')
         Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])
             ->whereNumber('payment')
             ->middleware('permission:payments.view')->name('payments.show');
+        Route::get('/refunds', [AdminRefundCaseController::class, 'index'])
+            ->middleware('permission:refunds.view')->name('refunds.index');
+        Route::patch('/refunds/{refundCase}', [AdminRefundCaseController::class, 'update'])
+            ->whereNumber('refundCase')->middleware(['permission:refunds.resolve', 'throttle:12,1'])->name('refunds.update');
         Route::get('/payment-reconciliation', [AdminPaymentReconciliationController::class, 'index'])
             ->middleware('permission:payments.reconcile')->name('payment-reconciliation.index');
         Route::post('/payments/{payment}/query-provider', [AdminPaymentReconciliationController::class, 'queryProvider'])
