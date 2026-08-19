@@ -63,6 +63,17 @@ final class ShowtimeCancellationService
                 ->selectRaw('booking_id, COUNT(*) AS aggregate')
                 ->groupBy('booking_id')
                 ->pluck('aggregate', 'booking_id');
+            $ticketCounts = DB::table('admission_tickets')
+                ->whereIn('booking_id', $bookings->modelKeys())
+                ->selectRaw('booking_id, COUNT(*) AS ticket_count, SUM(CASE WHEN print_count > 0 THEN 1 ELSE 0 END) AS printed_count')
+                ->groupBy('booking_id')
+                ->get()
+                ->keyBy('booking_id');
+            $foodBookings = DB::table('orders')->whereIn('booking_id', $bookings->modelKeys())->pluck('id', 'booking_id');
+            $vouchers = DB::table('food_pickup_vouchers')
+                ->whereIn('booking_id', $bookings->modelKeys())
+                ->get(['booking_id', 'id', 'print_count'])
+                ->keyBy('booking_id');
             $now = now();
             $cancellation = ShowtimeCancellation::query()->create([
                 'showtime_id' => $lockedShowtime->id,
@@ -97,7 +108,14 @@ final class ShowtimeCancellationService
                     'authoritative_amount' => $amount,
                     'currency' => strtoupper((string) ($authoritative?->currency ?? $booking->currency ?? 'VND')),
                     'seat_count' => (int) ($seatCounts->get($booking->id) ?? 0),
-                    'audit_snapshot' => $this->impactSnapshot($booking, $bookingPayments, $authoritative),
+                    'audit_snapshot' => $this->impactSnapshot(
+                        $booking,
+                        $bookingPayments,
+                        $authoritative,
+                        $ticketCounts->get($booking->id),
+                        $foodBookings->has($booking->id),
+                        $vouchers->get($booking->id),
+                    ),
                 ]);
 
                 if (! $alreadyTerminal) {
@@ -124,7 +142,9 @@ final class ShowtimeCancellationService
                     'showtime_id' => $lockedShowtime->id,
                     'cinema_id' => $lockedShowtime->cinema_id,
                     'booking_count' => $bookings->count(),
+                    'booking_ids' => $bookings->modelKeys(),
                     'refund_case_count' => $cancellation->refundCases()->count(),
+                    'refund_case_ids' => $cancellation->refundCases()->orderBy('id')->pluck('id')->all(),
                     'reason_code' => $reasonCode,
                 ],
             );
@@ -192,8 +212,14 @@ final class ShowtimeCancellationService
     }
 
     /** @param Collection<int, Payment> $payments */
-    private function impactSnapshot(Booking $booking, Collection $payments, ?Payment $authoritative): array
-    {
+    private function impactSnapshot(
+        Booking $booking,
+        Collection $payments,
+        ?Payment $authoritative,
+        mixed $ticketCounts,
+        bool $hadFood,
+        mixed $voucher,
+    ): array {
         return [
             'booking_id' => $booking->id,
             'booking_code' => $booking->booking_code,
@@ -203,6 +229,11 @@ final class ShowtimeCancellationService
             'total_amount' => (int) $booking->total_amount,
             'currency' => strtoupper((string) ($booking->currency ?? 'VND')),
             'authoritative_payment_id' => $authoritative?->id,
+            'had_food' => $hadFood,
+            'admission_ticket_count' => (int) ($ticketCounts?->ticket_count ?? 0),
+            'printed_ticket_count' => (int) ($ticketCounts?->printed_count ?? 0),
+            'food_pickup_voucher_id' => $voucher?->id,
+            'food_pickup_voucher_print_count' => (int) ($voucher?->print_count ?? 0),
             'payment_attempts' => $payments->map(fn (Payment $payment): array => [
                 'id' => $payment->id,
                 'provider' => $payment->provider,

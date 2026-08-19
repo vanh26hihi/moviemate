@@ -96,7 +96,7 @@
                                             <p class="mt-1 text-xs app-muted">Rạp đang xử lý nghĩa vụ {{ number_format($booking->refundCase->required_amount, 0, ',', '.') }} {{ $booking->refundCase->currency === 'VND' ? 'VNĐ' : $booking->refundCase->currency }}. Payment gốc vẫn được giữ trong lịch sử.</p>
                                         @elseif($booking->refundCase?->status === \App\Models\RefundCase::STATUS_RESOLVED)
                                             <p class="mt-1 text-sm font-bold text-success">Đã ghi nhận hoàn tiền</p>
-                                            <p class="mt-1 text-xs app-muted">Rạp đã ghi nhận hoàn tiền bên ngoài hệ thống lúc {{ $booking->refundCase->resolved_at?->format('d/m/Y H:i') }}.</p>
+                                            <p class="mt-1 text-xs app-muted">Rạp đã ghi nhận hoàn tiền bên ngoài hệ thống lúc {{ $booking->refundCase->resolved_at?->format('d/m/Y H:i') }} · {{ \App\Models\RefundCase::RESOLUTION_METHODS[$booking->refundCase->resolution_method] ?? $booking->refundCase->resolution_method }} · tham chiếu {{ $booking->refundCase->resolution_reference }}.</p>
                                         @else
                                             <p class="mt-1 text-sm app-text">Bạn chưa có khoản thanh toán cần hoàn.</p>
                                         @endif

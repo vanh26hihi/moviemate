@@ -12,10 +12,10 @@ final class RefundCase extends Model
     public const STATUS_RESOLVED = 'resolved';
 
     public const RESOLUTION_METHODS = [
+        'provider_manual' => 'Qua cổng thanh toán (thủ công)',
         'bank_transfer' => 'Chuyển khoản ngân hàng',
         'cash' => 'Tiền mặt',
-        'e_wallet' => 'Ví điện tử',
-        'other' => 'Phương thức khác',
+        'other_manual' => 'Phương thức thủ công khác',
     ];
 
     protected $fillable = ['showtime_cancellation_id', 'showtime_cancellation_impact_id', 'cinema_id', 'booking_id', 'payment_id', 'status', 'required_amount', 'currency', 'resolution_method', 'resolution_reference', 'resolution_note', 'resolved_by_user_id', 'resolved_at'];

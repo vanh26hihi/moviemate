@@ -31,6 +31,9 @@
             <div class="rounded-xl app-secondary p-4"><dt class="text-sm app-muted">Đơn đã thanh toán</dt><dd class="mt-1 text-2xl font-extrabold text-error">{{ $impact['paid_count'] }}</dd></div>
             <div class="rounded-xl app-secondary p-4"><dt class="text-sm app-muted">Ghế lịch sử</dt><dd class="mt-1 text-2xl font-extrabold app-text">{{ $impact['seat_count'] }}</dd></div>
             <div class="rounded-xl border border-error/30 bg-error/10 p-4 sm:col-span-2 xl:col-span-1"><dt class="text-sm text-error">Dự kiến cần hoàn</dt><dd class="mt-1 text-xl font-extrabold text-error">{{ number_format($impact['refund_amount'], 0, ',', '.') }} VNĐ</dd></div>
+            <div class="rounded-xl app-secondary p-4"><dt class="text-sm app-muted">Vé đã tạo / đã in</dt><dd class="mt-1 text-xl font-extrabold app-text">{{ $impact['admission_ticket_count'] }} / {{ $impact['printed_ticket_count'] }}</dd></div>
+            <div class="rounded-xl app-secondary p-4"><dt class="text-sm app-muted">Đơn có đồ ăn</dt><dd class="mt-1 text-xl font-extrabold app-text">{{ $impact['food_booking_count'] }}</dd></div>
+            <div class="rounded-xl app-secondary p-4"><dt class="text-sm app-muted">Phiếu đồ ăn / đã in</dt><dd class="mt-1 text-xl font-extrabold app-text">{{ $impact['voucher_count'] }} / {{ $impact['printed_voucher_count'] }}</dd></div>
         </dl>
         <div class="mt-5 grid gap-3 md:grid-cols-2">
             <p class="rounded-xl bg-warning/10 p-4 text-sm app-text"><strong>Đơn chưa thanh toán:</strong> bị hủy, khóa ghế được giải phóng, không phát sinh hoàn tiền.</p>

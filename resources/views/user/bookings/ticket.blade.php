@@ -22,6 +22,7 @@
                 <p class="mt-2 font-extrabold app-text">Cần xử lý hoàn tiền</p>
             @elseif($booking->refundCase?->status === \App\Models\RefundCase::STATUS_RESOLVED)
                 <p class="mt-2 font-extrabold text-success">Đã ghi nhận hoàn tiền</p>
+                <p class="mt-1 text-sm app-muted">{{ \App\Models\RefundCase::RESOLUTION_METHODS[$booking->refundCase->resolution_method] ?? $booking->refundCase->resolution_method }} · tham chiếu {{ $booking->refundCase->resolution_reference }} · {{ $booking->refundCase->resolved_at?->format('d/m/Y H:i') }}</p>
             @else
                 <p class="mt-2 app-text">Bạn chưa có khoản thanh toán cần hoàn.</p>
             @endif

@@ -95,6 +95,12 @@ final class ShowtimeCancellationAdminWorkflowTest extends TestCase
         $this->assertSame(RefundCase::STATUS_REQUIRED, $case->fresh()->status);
 
         $evidence['resolved_amount'] = $case->required_amount;
+        $evidence['resolution_reference'] = '';
+        $this->actingAs($manager)->patch(route('admin.refunds.update', $case), $evidence)
+            ->assertSessionHasErrors('resolution_reference');
+        $this->assertSame(RefundCase::STATUS_REQUIRED, $case->fresh()->status);
+
+        $evidence['resolution_reference'] = 'BANK-REF-20260819-001';
         $this->actingAs($manager)->patch(route('admin.refunds.update', $case), $evidence)
             ->assertRedirect(route('admin.refunds.index'))
             ->assertSessionHas('success');
@@ -113,6 +119,10 @@ final class ShowtimeCancellationAdminWorkflowTest extends TestCase
     {
         $scenario = $this->bookingScenario(false);
         $staff = $this->userWithRole('staff');
+        $admin = $this->userWithRole('admin');
+        $booking = $this->reserve($scenario, [$scenario['seats'][0]->id], $staff->id)->booking;
+        $booking->forceFill(['booking_status' => 'paid', 'payment_status' => 'paid', 'paid_at' => now()])->save();
+        $this->successfulPayment($booking);
 
         $this->actingAs($staff)->get(route('admin.showtimes.cancellation', $scenario['showtime']))->assertForbidden();
         $this->actingAs($staff)->delete(route('admin.showtimes.destroy', $scenario['showtime']), [
@@ -121,6 +131,18 @@ final class ShowtimeCancellationAdminWorkflowTest extends TestCase
         ])->assertForbidden();
         $this->actingAs($staff)->get(route('admin.refunds.index'))->assertForbidden();
         $this->assertSame('active', $scenario['showtime']->fresh()->status);
+        $this->actingAs($admin)->delete(route('admin.showtimes.destroy', $scenario['showtime']), [
+            'reason_code' => 'technical_issue',
+            'confirm_cancellation' => '1',
+        ])->assertRedirect();
+        $case = RefundCase::query()->sole();
+        $this->actingAs($staff)->patch(route('admin.refunds.update', $case), [
+            'resolved_amount' => $case->required_amount,
+            'resolution_method' => 'cash',
+            'resolution_reference' => 'STAFF-MUST-NOT-RESOLVE',
+            'confirm_resolution' => '1',
+        ])->assertForbidden();
+        $this->assertSame(RefundCase::STATUS_REQUIRED, $case->fresh()->status);
     }
 
     public function test_customer_history_and_detail_show_honest_refund_states_without_a_usable_qr(): void
@@ -145,6 +167,8 @@ final class ShowtimeCancellationAdminWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('chỉ dùng để tra cứu')
             ->assertSee('QR đơn đặt vé đã chuyển sang trạng thái lịch sử')
+            ->assertDontSee('Nhà cung cấp đã xác minh hoàn tiền')
+            ->assertDontSee('Refund thành công')
             ->assertDontSee('data-qr-value', false);
         $this->actingAs($customer)->get(route('user.bookings.success', $booking))
             ->assertOk()
