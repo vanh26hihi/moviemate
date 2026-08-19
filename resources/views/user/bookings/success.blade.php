@@ -7,6 +7,8 @@
     $bookingStatus = $booking?->booking_status ?? 'paid';
     $isUsed = $bookingStatus === 'used';
     $isCancelled = $bookingStatus === 'cancelled';
+    $isCinemaCancelled = $booking?->showtimeCancellationImpact !== null;
+    $refundCase = $booking?->refundCase;
     $isExpired = $bookingStatus === 'expired' || $paymentState === \App\Models\Payment::STATUS_EXPIRED;
     $isPaid = $isUsable ?? ($hasBooking ? true : false);
     $paymentAction = $paymentAction ?? ['can_resume' => false];
@@ -70,11 +72,17 @@
             'badge' => 'Hết hạn',
         ],
         'cancelled' => [
-            'title' => 'Thanh toán đã được hủy',
-            'message' => 'Các ghế đã giữ cho đơn này đã được giải phóng.',
+            'title' => $isCinemaCancelled ? 'Suất chiếu đã bị rạp hủy' : 'Thanh toán đã được hủy',
+            'message' => $isCinemaCancelled
+                ? match($refundCase?->status) {
+                    \App\Models\RefundCase::STATUS_REQUIRED => 'Cần xử lý hoàn tiền. Rạp đã lưu nghĩa vụ hoàn tiền và sẽ thực hiện bên ngoài MovieMate.',
+                    \App\Models\RefundCase::STATUS_RESOLVED => 'Đã ghi nhận hoàn tiền. Payment gốc và lịch sử đơn vẫn được giữ nguyên.',
+                    default => 'Bạn chưa có khoản thanh toán cần hoàn.',
+                }
+                : 'Các ghế đã giữ cho đơn này đã được giải phóng.',
             'icon' => 'ph-prohibit',
             'colour' => 'text-error',
-            'badge' => 'Đã hủy',
+            'badge' => $isCinemaCancelled ? 'Rạp đã hủy suất' : 'Đã hủy',
         ],
     ];
     $state = $states[$stateKey];

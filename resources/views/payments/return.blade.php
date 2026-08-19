@@ -13,6 +13,7 @@
         && $payment->verified_at !== null
         && $booking->payment_status === 'paid'
         && $booking->booking_status === 'paid';
+    $isCinemaCancelled = $booking->booking_status === 'cancelled' && $booking->showtimeCancellationImpact !== null;
     $stateStatus = $payment->status === \App\Models\Payment::STATUS_SUCCESS && ! $isVerifiedPaid
         ? \App\Models\Payment::STATUS_REVIEW
         : $payment->status;
@@ -73,6 +74,19 @@
             'message' => 'Ghế của bạn vẫn được giữ tạm thời để tránh mất vé trong khi hệ thống xác minh trạng thái giao dịch.',
             'icon' => 'ph-hourglass-medium',
             'colour' => 'text-warning',
+        ];
+    }
+    if ($isCinemaCancelled) {
+        $stateStatus = 'showtime_cancelled';
+        $states[$stateStatus] = [
+            'title' => 'Suất chiếu đã bị rạp hủy',
+            'message' => match($booking->refundCase?->status) {
+                \App\Models\RefundCase::STATUS_REQUIRED => 'Thanh toán đã được xác minh. Cần xử lý hoàn tiền; đơn vẫn bị hủy và không phát hành QR hoặc vé sử dụng.',
+                \App\Models\RefundCase::STATUS_RESOLVED => 'Thanh toán đã được giữ trong lịch sử và rạp đã ghi nhận hoàn tiền.',
+                default => 'Bạn chưa có khoản thanh toán cần hoàn.',
+            },
+            'icon' => 'ph-calendar-x',
+            'colour' => 'text-error',
         ];
     }
     $state = $states[$stateStatus] ?? [

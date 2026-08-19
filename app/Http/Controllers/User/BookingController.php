@@ -193,6 +193,8 @@ class BookingController extends Controller
             'admissionTickets.bookingSeat.seat',
             'foodOrder.items',
             'foodPickupVoucher',
+            'showtimeCancellationImpact.cancellation',
+            'refundCase',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
@@ -226,6 +228,8 @@ class BookingController extends Controller
             'admissionTickets.bookingSeat.seat',
             'foodOrder.items',
             'foodPickupVoucher',
+            'showtimeCancellationImpact.cancellation',
+            'refundCase',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);

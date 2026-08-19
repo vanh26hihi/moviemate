@@ -14,6 +14,20 @@
 <div class="mx-auto max-w-3xl space-y-6">
     <div><a href="{{ $backUrl }}" class="font-bold text-brand-start"><i class="ph-bold ph-arrow-left"></i>{{ $backLabel }}</a></div>
 
+    @if($booking->showtimeCancellationImpact)
+        <section class="rounded-2xl border border-error/30 bg-error/10 p-5" role="status" aria-labelledby="cancelled-ticket-title">
+            <h1 id="cancelled-ticket-title" class="text-xl font-extrabold text-error">Suất chiếu đã bị rạp hủy</h1>
+            <p class="mt-2 app-text">Mã đơn, ghế, Payment và lịch sử in bên dưới chỉ dùng để tra cứu. QR/vé/phiếu nhận đồ không còn quyền sử dụng tại rạp.</p>
+            @if($booking->refundCase?->status === \App\Models\RefundCase::STATUS_REQUIRED)
+                <p class="mt-2 font-extrabold app-text">Cần xử lý hoàn tiền</p>
+            @elseif($booking->refundCase?->status === \App\Models\RefundCase::STATUS_RESOLVED)
+                <p class="mt-2 font-extrabold text-success">Đã ghi nhận hoàn tiền</p>
+            @else
+                <p class="mt-2 app-text">Bạn chưa có khoản thanh toán cần hoàn.</p>
+            @endif
+        </section>
+    @endif
+
     <article class="cinema-card overflow-hidden" data-booking-ticket data-ticket-state="{{ $ticketState }}">
         <header class="bg-slate-950 p-6 text-center text-white">
             <p class="text-xs font-bold tracking-[.25em]">ĐƠN ĐẶT VÉ</p>
@@ -73,6 +87,8 @@
 
     @if($bookingQrPayload)
         <p class="rounded-2xl bg-brand-start/10 p-4 text-center font-bold text-brand-start">Vui lòng xuất trình mã đơn hoặc QR đơn đặt vé tại quầy để nhận vé.</p>
+    @elseif($booking->showtimeCancellationImpact)
+        <p class="rounded-2xl bg-error/10 p-4 text-center font-bold text-error">QR đơn đặt vé đã chuyển sang trạng thái lịch sử và không còn dùng để vào rạp hoặc nhận đồ ăn.</p>
     @else
         <p class="rounded-2xl bg-warning/10 p-4 text-center font-bold text-warning">Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.</p>
     @endif

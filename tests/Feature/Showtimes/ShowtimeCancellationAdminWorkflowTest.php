@@ -123,6 +123,56 @@ final class ShowtimeCancellationAdminWorkflowTest extends TestCase
         $this->assertSame('active', $scenario['showtime']->fresh()->status);
     }
 
+    public function test_customer_history_and_detail_show_honest_refund_states_without_a_usable_qr(): void
+    {
+        $scenario = $this->bookingScenario(false);
+        $customer = $this->userWithRole('user');
+        $manager = $this->userWithRole('manager');
+        $booking = $this->reserve($scenario, [$scenario['seats'][0]->id], $customer->id)->booking;
+        $booking->forceFill(['booking_status' => 'paid', 'payment_status' => 'paid', 'paid_at' => now()])->save();
+        $this->successfulPayment($booking);
+        $this->actingAs($manager)->delete(route('admin.showtimes.destroy', $scenario['showtime']), [
+            'reason_code' => 'facility_issue',
+            'confirm_cancellation' => '1',
+        ])->assertRedirect();
+
+        $this->actingAs($customer)->get(route('user.bookings.history'))
+            ->assertOk()
+            ->assertSee('Suất chiếu đã bị rạp hủy')
+            ->assertSee('Cần xử lý hoàn tiền')
+            ->assertSee('Xem lịch sử đơn');
+        $this->actingAs($customer)->get(route('user.bookings.ticket', $booking))
+            ->assertOk()
+            ->assertSee('chỉ dùng để tra cứu')
+            ->assertSee('QR đơn đặt vé đã chuyển sang trạng thái lịch sử')
+            ->assertDontSee('data-qr-value', false);
+        $this->actingAs($customer)->get(route('user.bookings.success', $booking))
+            ->assertOk()
+            ->assertSee('Suất chiếu đã bị rạp hủy')
+            ->assertSee('Cần xử lý hoàn tiền');
+
+        $case = RefundCase::query()->sole();
+        $this->actingAs($manager)->patch(route('admin.refunds.update', $case), [
+            'resolved_amount' => $case->required_amount,
+            'resolution_method' => 'bank_transfer',
+            'resolution_reference' => 'BANK-CUSTOMER-STATE-001',
+            'confirm_resolution' => '1',
+        ])->assertSessionHas('success');
+        $this->actingAs($customer)->get(route('user.bookings.history'))
+            ->assertOk()
+            ->assertSee('Đã ghi nhận hoàn tiền');
+
+        $unpaidScenario = $this->bookingScenario(false);
+        $unpaid = $this->reserve($unpaidScenario, [$unpaidScenario['seats'][0]->id], $customer->id)->booking;
+        $this->actingAs($manager)->delete(route('admin.showtimes.destroy', $unpaidScenario['showtime']), [
+            'reason_code' => 'schedule_change',
+            'confirm_cancellation' => '1',
+        ])->assertRedirect();
+        $this->actingAs($customer)->get(route('user.bookings.ticket', $unpaid))
+            ->assertOk()
+            ->assertSee('Bạn chưa có khoản thanh toán cần hoàn.');
+    }
+
     private function successfulPayment($booking): Payment
     {
         return Payment::createForProvider('vnpay', [

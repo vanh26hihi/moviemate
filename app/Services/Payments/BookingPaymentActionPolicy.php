@@ -58,6 +58,13 @@ final class BookingPaymentActionPolicy
     private function badge(Booking $booking, ?Payment $active): array
     {
         if ($booking->booking_status !== 'pending_payment') {
+            if ($booking->booking_status === 'cancelled'
+                && ($booking->relationLoaded('showtimeCancellationImpact')
+                    ? $booking->showtimeCancellationImpact !== null
+                    : $booking->showtimeCancellationImpact()->exists())) {
+                return ['Suất chiếu bị rạp hủy', 'bg-red-100 text-red-700'];
+            }
+
             return [$booking->status_label, match ($booking->booking_status) {
                 'paid' => 'bg-brand-start text-white',
                 'used' => 'bg-blue-100 text-blue-700',
