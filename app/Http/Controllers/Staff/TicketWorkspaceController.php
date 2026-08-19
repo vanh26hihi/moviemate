@@ -80,6 +80,7 @@ final class TicketWorkspaceController extends Controller
                 : null;
         $eligibility = match (true) {
             $booking->payment_status === 'refunded' => 'Vé đã được hoàn tiền và không còn hiệu lực.',
+            $booking->booking_status === 'cancelled' && $booking->showtimeCancellationImpact !== null => 'Suất chiếu đã bị rạp hủy. Mã đơn và lịch sử in chỉ còn giá trị tra cứu; không được dùng để vào rạp hoặc nhận đồ ăn.',
             $booking->booking_status === 'cancelled' => 'Đơn đã hủy.',
             $booking->booking_status === 'expired' => 'Đơn đã hết hạn.',
             $booking->payment_status !== 'paid' || ! $verified => 'Vé chưa có thanh toán được xác minh.',

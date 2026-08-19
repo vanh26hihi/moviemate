@@ -10,6 +10,7 @@ use App\Models\ShowtimeCancellation;
 use App\Models\ShowtimeCancellationImpact;
 use App\Services\Payments\VerifiedPaymentService;
 use App\Services\ShowtimeCancellationService;
+use App\Services\Tickets\BookingTicketEligibility;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\CreatesBookingFixtures;
 use Tests\TestCase;
@@ -34,6 +35,8 @@ final class ShowtimeCancellationDomainTest extends TestCase
         $paid = $this->reserve($scenario, [$scenario['seats'][2]->id, $scenario['seats'][3]->id], $manager->id)->booking;
         $paid->forceFill(['booking_status' => 'paid', 'payment_status' => 'paid', 'paid_at' => now()])->save();
         $successfulPayment = $this->payment($paid, Payment::STATUS_SUCCESS, ['verified_at' => now(), 'paid_at' => now()]);
+        $printedTicket = $paid->admissionTickets()->oldest('id')->firstOrFail();
+        $printedTicket->forceFill(['print_count' => 2, 'last_printed_at' => now()])->save();
 
         $this->actingAs($manager);
         $cancellation = app(ShowtimeCancellationService::class)->cancel(
@@ -62,6 +65,9 @@ final class ShowtimeCancellationDomainTest extends TestCase
         $this->assertSame('cancelled', $paid->fresh()->booking_status);
         $this->assertSame('paid', $paid->fresh()->payment_status);
         $this->assertSame(Payment::STATUS_SUCCESS, $successfulPayment->fresh()->status);
+        $this->assertSame(2, $printedTicket->fresh()->print_count);
+        $this->assertFalse(app(BookingTicketEligibility::class)->isUsable($paid->fresh(['payments'])));
+        $this->assertFalse(app(BookingTicketEligibility::class)->isPrintable($paid->fresh(['payments'])));
         $this->assertSame(0, BookingSeat::query()->whereIn('booking_id', [$unpaid->id, $paid->id])->whereNotNull('active_lock_key')->count());
         $refund = RefundCase::query()->sole();
         $this->assertSame($paid->id, $refund->booking_id);
