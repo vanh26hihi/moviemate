@@ -60,8 +60,7 @@ final class BookingPaymentActionPolicy
         if ($booking->booking_status !== 'pending_payment') {
             if ($booking->booking_status === 'cancelled'
                 && ($booking->relationLoaded('showtimeCancellationImpact')
-                    ? $booking->showtimeCancellationImpact !== null
-                    : $booking->showtimeCancellationImpact()->exists())) {
+                    && $booking->showtimeCancellationImpact !== null)) {
                 return ['Suất chiếu bị rạp hủy', 'bg-red-100 text-red-700'];
             }
 

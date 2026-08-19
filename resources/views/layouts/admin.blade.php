@@ -53,7 +53,7 @@
                 'foods' => ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
                 'reviews' => ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
                 'payments' => ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
-                'refunds' => ['route' => 'admin.refunds.index', 'active' => 'admin.refunds.*', 'permission' => 'refunds.view', 'label' => 'Hoàn tiền cần xử lý', 'icon' => 'ph-arrow-u-down-left'],
+                'refunds' => ['route' => 'admin.refunds.index', 'active' => 'admin.refunds.*', 'permission' => 'refunds.view', 'label' => 'Nghĩa vụ cần xử lý', 'icon' => 'ph-arrow-u-down-left'],
                 'reports' => ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
                 'roomTypes' => ['route' => 'admin.room-types.index', 'active' => 'admin.room-types.*', 'permission' => 'room_types.view', 'label' => 'Loại phòng', 'icon' => 'ph-stack'],
                 'layoutTemplates' => ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ', 'icon' => 'ph-grid-four'],

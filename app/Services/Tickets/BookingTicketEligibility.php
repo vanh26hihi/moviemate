@@ -72,10 +72,10 @@ final class BookingTicketEligibility
     {
         $showtimeCancelled = $booking->relationLoaded('showtime')
             ? $booking->showtime?->status === 'cancelled'
-            : $booking->showtime()->where('status', 'cancelled')->exists();
+            : false;
         $hasImpact = $booking->relationLoaded('showtimeCancellationImpact')
             ? $booking->showtimeCancellationImpact !== null
-            : $booking->showtimeCancellationImpact()->exists();
+            : false;
 
         return $showtimeCancelled || $hasImpact;
     }

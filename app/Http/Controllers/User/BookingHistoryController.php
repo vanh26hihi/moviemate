@@ -36,8 +36,6 @@ final class BookingHistoryController extends Controller
                 'bookingSeats.seat',
                 'payments',
                 'promotionUsage',
-                'showtimeCancellationImpact.cancellation',
-                'refundCase',
             ])
             ->when(
                 isset($statusFilters[$status]),
@@ -45,6 +43,15 @@ final class BookingHistoryController extends Controller
             )
             ->latest()
             ->paginate(10);
+
+        $bookings->getCollection()->each(function ($booking): void {
+            $booking->setRelation('showtimeCancellationImpact', null);
+            $booking->setRelation('refundCase', null);
+        });
+        $cancelledBookings = $bookings->getCollection()->where('booking_status', 'cancelled')->values();
+        if ($cancelledBookings->isNotEmpty()) {
+            $cancelledBookings->load(['showtimeCancellationImpact.cancellation', 'refundCase']);
+        }
 
         $bookingActions = $bookings->getCollection()->mapWithKeys(
             fn ($booking): array => [$booking->id => $paymentActions->evaluate($booking)],
