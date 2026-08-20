@@ -4,8 +4,12 @@
     <div class="flex w-full max-w-full gap-2 overflow-x-auto pb-2" role="list">
         @foreach($dates as $date)
             @php($active = $selectedDate === $date['date'])
-            <button type="submit" name="date" value="{{ $date['date'] }}" aria-pressed="{{ $active ? 'true' : 'false' }}"
-                class="shrink-0 min-w-20 rounded-2xl border px-4 py-3 text-center focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-start/30 {{ $active ? 'border-brand-start bg-brand-start text-white' : 'app-border app-secondary app-text' }}">
+            <button type="submit" name="date" value="{{ $date['date'] }}"
+                data-showtime-date-chip
+                aria-pressed="{{ $active ? 'true' : 'false' }}"
+                @if($active) aria-current="date" @endif
+                class="showtime-date-chip relative shrink-0 min-w-20 rounded-2xl border px-4 py-3 text-center">
+                <span class="showtime-date-chip__indicator" aria-hidden="true"><i class="ph-bold ph-check"></i></span>
                 <span class="block text-lg font-black">{{ $date['day'] }}</span>
                 <span class="block text-xs font-bold">{{ $date['label'] }}</span>
             </button>
