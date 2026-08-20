@@ -58,7 +58,9 @@
                 </div>
 
                 <div class="flex flex-wrap gap-3">
-                    <a href="#showtimes" class="btn-primary"><i class="ph-fill ph-ticket"></i> Xem lịch chiếu</a>
+                    @if($bookingAvailable ?? false)
+                        <a data-movie-detail-booking-action href="#showtimes" class="btn-primary"><i class="ph-fill ph-ticket"></i> Xem lịch chiếu</a>
+                    @endif
                     @if($movie->trailer_url)
                         <a href="{{ $movie->trailer_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary"><i class="ph-fill ph-play-circle text-xl"></i> Xem video giới thiệu</a>
                     @endif

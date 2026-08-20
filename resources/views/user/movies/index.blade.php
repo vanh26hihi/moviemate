@@ -219,7 +219,7 @@
 
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
         @forelse($movies as $movie)
-            @include('user.movies._card', ['movie' => $movie])
+            @include('user.movies._card', ['movie' => $movie, 'bookingAvailable' => $movie->allowsCustomerBooking() && (bool) $movie->customer_booking_available])
         @empty
             <div class="col-span-full cinema-card p-10 text-center">
                 <div class="w-16 h-16 rounded-2xl bg-brand-start/10 text-brand-start flex items-center justify-center mx-auto mb-4">

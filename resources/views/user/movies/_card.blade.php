@@ -4,6 +4,7 @@
         : 'Đang cập nhật';
 
     $isNowShowing = $movie->status === 'now_showing';
+    $bookingAvailable = (bool) ($bookingAvailable ?? false);
 
     $genresText = $movie->genres
         ? $movie->genres->pluck('name')->take(2)->join(', ')
@@ -135,7 +136,7 @@
             </span>
         </div>
 
-        <div class="mt-4 grid grid-cols-2 gap-2">
+        <div @class(['mt-4 grid gap-2', 'grid-cols-2' => $bookingAvailable, 'grid-cols-1' => ! $bookingAvailable])>
             <a
                 href="{{ route('user.movies.show', $movie->slug) }}"
                 class="inline-flex items-center justify-center gap-2
@@ -147,17 +148,19 @@
                 Chi tiết
             </a>
 
-            <a
-                data-movie-booking-action
-                href="{{ route('user.movies.show', $movie->slug) }}#showtimes"
-                class="inline-flex items-center justify-center gap-2
-                rounded-xl primary-gradient px-3 py-2
-                text-xs font-bold text-white transition-all
-                hover:shadow-lg hover:shadow-brand-start/25"
-            >
-                <i class="ph-fill ph-ticket"></i>
-                Đặt vé
-            </a>
+            @if($bookingAvailable)
+                <a
+                    data-movie-booking-action
+                    href="{{ route('user.movies.show', $movie->slug) }}#showtimes"
+                    class="inline-flex items-center justify-center gap-2
+                    rounded-xl primary-gradient px-3 py-2
+                    text-xs font-bold text-white transition-all
+                    hover:shadow-lg hover:shadow-brand-start/25"
+                >
+                    <i class="ph-fill ph-ticket"></i>
+                    Đặt vé
+                </a>
+            @endif
         </div>
     </div>
 </article>
