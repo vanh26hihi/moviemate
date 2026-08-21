@@ -5,8 +5,8 @@ namespace Tests\Unit\Services\Mail;
 use App\Exceptions\UnsafeProductionMailConfiguration;
 use App\Providers\ProductionMailServiceProvider;
 use App\Services\Mail\ProductionMailTransportGuard;
-use Aws\Ses\SesClient;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Resend;
 use Tests\TestCase;
 
 class ProductionMailTransportGuardTest extends TestCase
@@ -522,8 +522,8 @@ class ProductionMailTransportGuardTest extends TestCase
 
     public function test_unavailable_optional_transport_dependency_is_rejected(): void
     {
-        $this->assertFalse(class_exists(SesClient::class));
-        $this->configureProduction('ses', ['ses' => ['transport' => 'ses']], 'ses');
+        $this->assertFalse(class_exists(Resend::class));
+        $this->configureProduction('resend', ['resend' => ['transport' => 'resend']], 'resend');
 
         $this->expectException(UnsafeProductionMailConfiguration::class);
         $this->expectExceptionMessage('unknown value');
