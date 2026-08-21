@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Ai\Agents\MovieMateCinemaAssistant;
+use App\Ai\AiStructuredResponseAssembler;
+use App\Ai\AiStructuredResultCollector;
 use App\Ai\MovieMateAiRuntime;
 use App\Ai\MovieMateToolCallGuard;
 use Carbon\Carbon;
@@ -17,19 +19,26 @@ final class AiMovieRecommendationService
         private readonly MovieMateCinemaAssistant $assistant,
         private readonly MovieMateAiRuntime $runtime,
         private readonly MovieMateToolCallGuard $toolGuard,
+        private readonly AiStructuredResultCollector $structuredResults,
+        private readonly AiStructuredResponseAssembler $structuredResponses,
     ) {}
 
     public function recommend(array $preferences, int $limit = 5): array
     {
         $limit = max(1, min(5, $limit));
+        $this->structuredResults->reset();
         $candidates = $this->candidates->candidates($preferences);
 
         if ($candidates->isEmpty()) {
+            $message = 'Hiện chưa có phim đang chiếu với suất chiếu còn hiệu lực.';
+
             return [
                 'source' => 'empty',
                 'recommendations' => [],
                 'available_count' => 0,
-                'message' => 'Hiện chưa có phim đang chiếu với suất chiếu còn hiệu lực.',
+                'message' => $message,
+                'structured_response' => $this->structuredResponses
+                    ->assembleRecommendations($message, [])->toArray(),
             ];
         }
 
@@ -54,16 +63,21 @@ final class AiMovieRecommendationService
                 ->unique('movie_id')->take($limit)->values();
         }
 
+        $message = match (true) {
+            $source !== 'fallback' => null,
+            ! $this->runtime->enabledAndConfigured() => 'AI chưa được bật hoặc chưa có credential. Kết quả được xếp hạng nội bộ từ dữ liệu MovieMate.',
+            $aiFailed => 'Dịch vụ AI tạm thời không phản hồi. MovieMate đã chuyển sang bộ gợi ý nội bộ.',
+            default => 'AI không trả về kết quả hợp lệ. MovieMate đã chuyển sang bộ gợi ý nội bộ.',
+        };
+        $text = $message ?? 'MovieMate đã xếp hạng các phim phù hợp từ dữ liệu suất chiếu hiện tại.';
+
         return [
             'source' => $source,
             'recommendations' => $recommendations->all(),
             'available_count' => $candidates->count(),
-            'message' => match (true) {
-                $source !== 'fallback' => null,
-                ! $this->runtime->enabledAndConfigured() => 'AI chưa được bật hoặc chưa có credential. Kết quả được xếp hạng nội bộ từ dữ liệu MovieMate.',
-                $aiFailed => 'Dịch vụ AI tạm thời không phản hồi. MovieMate đã chuyển sang bộ gợi ý nội bộ.',
-                default => 'AI không trả về kết quả hợp lệ. MovieMate đã chuyển sang bộ gợi ý nội bộ.',
-            },
+            'message' => $message,
+            'structured_response' => $this->structuredResponses
+                ->assembleRecommendations($text, $recommendations->all())->toArray(),
         ];
     }
 

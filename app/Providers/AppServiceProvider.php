@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Ai\Agents\MovieMateCinemaAssistant;
+use App\Ai\AiStructuredResultCollector;
 use App\Ai\MovieMateToolCallGuard;
 use App\Models\AiConversation;
 use App\Models\Booking;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Events\InvokingTool;
+use Laravel\Ai\Events\ToolInvoked;
 use Laravel\Ai\Tools\ToolNameResolver;
 
 class AppServiceProvider extends ServiceProvider
@@ -36,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(CinemaContext::class, fn () => new CinemaContext);
         $this->app->scoped(CinemaAccessService::class, fn () => new CinemaAccessService);
         $this->app->scoped(MovieMateToolCallGuard::class, fn () => new MovieMateToolCallGuard);
+        $this->app->scoped(AiStructuredResultCollector::class, fn () => new AiStructuredResultCollector);
     }
 
     /**
@@ -48,6 +51,14 @@ class AppServiceProvider extends ServiceProvider
                 app(MovieMateToolCallGuard::class)->record(
                     ToolNameResolver::resolve($event->tool),
                     $event->arguments,
+                );
+            }
+        });
+        Event::listen(ToolInvoked::class, function (ToolInvoked $event): void {
+            if ($event->agent instanceof MovieMateCinemaAssistant) {
+                app(AiStructuredResultCollector::class)->record(
+                    ToolNameResolver::resolve($event->tool),
+                    $event->result,
                 );
             }
         });

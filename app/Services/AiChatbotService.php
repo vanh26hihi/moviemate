@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Ai\Agents\MovieMateCinemaAssistant;
+use App\Ai\AiAssistantResponse;
 use App\Ai\AiConversationContext;
+use App\Ai\AiStructuredResponseAssembler;
+use App\Ai\AiStructuredResultCollector;
 use App\Ai\MovieMateAiRuntime;
 use App\Ai\MovieMateToolCallGuard;
 use Illuminate\Http\Client\ConnectionException;
@@ -26,12 +29,15 @@ final class AiChatbotService
         private readonly PublicCinemaReadService $cinemas,
         private readonly PublicFoodReadService $foods,
         private readonly MovieMateToolCallGuard $toolGuard,
+        private readonly AiStructuredResultCollector $structuredResults,
+        private readonly AiStructuredResponseAssembler $structuredResponses,
     ) {}
 
     public function answer(string $message, ?AiConversationContext $context = null, string $audience = 'guest'): array
     {
         $message = trim($message);
         $context ??= AiConversationContext::empty();
+        $this->structuredResults->reset();
 
         if ($this->runtime->enabledAndConfigured()) {
             $startedAt = hrtime(true);
@@ -48,6 +54,8 @@ final class AiChatbotService
                     'message' => null,
                     'assistant_completed' => true,
                     'failure_category' => null,
+                    'structured_response' => $this->structuredResponses
+                        ->assemble($answer, $this->structuredResults)->toArray(),
                 ];
                 $this->logAttempt('info', 'AI chatbot completed.', $audience, $context, $startedAt, null);
 
@@ -56,22 +64,29 @@ final class AiChatbotService
                 $category = $this->failureCategory($exception);
                 $this->logAttempt('warning', 'AI chatbot request failed safely.', $audience, $context, $startedAt, $category);
 
+                $answer = 'MovieMate AI tạm thời không thể trả lời. Vui lòng thử lại sau.';
+
                 return [
-                    'answer' => 'MovieMate AI tạm thời không thể trả lời. Vui lòng thử lại sau.',
+                    'answer' => $answer,
                     'source' => 'unavailable',
                     'message' => 'Dịch vụ trợ lý đang tạm thời không khả dụng.',
                     'assistant_completed' => false,
                     'failure_category' => $category,
+                    'structured_response' => (new AiAssistantResponse($answer))->toArray(),
                 ];
             }
         }
 
+        $answer = $this->fallbackAnswer($message);
+
         return [
-            'answer' => $this->fallbackAnswer($message),
+            'answer' => $answer,
             'source' => 'fallback',
             'message' => 'Đang dùng trợ lý dự phòng từ dữ liệu MovieMate vì AI chưa được bật, chưa cấu hình hoặc tạm thời không phản hồi.',
             'assistant_completed' => true,
             'failure_category' => null,
+            'structured_response' => $this->structuredResponses
+                ->assemble($answer, $this->structuredResults)->toArray(),
         ];
     }
 
@@ -119,6 +134,7 @@ final class AiChatbotService
         }
         if ($this->containsAny($normalized, ['bắp', 'bap', 'nước', 'nuoc', 'đồ ăn', 'do an', 'food', 'combo'])) {
             $catalog = $this->foods->list(limit: 6);
+            $this->structuredResults->record('list_food_items', $catalog);
             if ($catalog['items'] === []) {
                 return 'Hiện MovieMate chưa có món ăn công khai đang hoạt động.';
             }
@@ -132,6 +148,7 @@ final class AiChatbotService
         }
         if ($this->containsAny($normalized, ['rạp', 'rap', 'cinema', 'địa chỉ', 'dia chi', 'ở đâu', 'o dau'])) {
             $cinemas = $this->cinemas->list(limit: 6);
+            $this->structuredResults->record('list_cinemas', ['cinemas' => $cinemas->all()]);
             if ($cinemas->isEmpty()) {
                 return 'Hiện MovieMate chưa có dữ liệu rạp đang hoạt động.';
             }
@@ -141,6 +158,7 @@ final class AiChatbotService
         }
         if ($this->containsAny($normalized, ['lịch', 'lich', 'suất', 'suat', 'giờ', 'gio', 'hôm nay', 'hom nay', 'tối nay', 'toi nay'])) {
             $showtimes = $this->showtimes->find(limit: 8);
+            $this->structuredResults->record('find_showtimes', ['showtimes' => $showtimes->all()]);
             if ($showtimes->isEmpty()) {
                 return 'Hiện chưa có suất chiếu được MovieMate xác nhận là còn nhận đặt vé.';
             }
@@ -150,6 +168,7 @@ final class AiChatbotService
         }
         if ($this->containsAny($normalized, ['giá', 'gia', 'bao nhiêu', 'bao nhieu', 'vé', 've'])) {
             $showtimes = $this->showtimes->find(limit: 6);
+            $this->structuredResults->record('find_showtimes', ['showtimes' => $showtimes->all()]);
             if ($showtimes->isEmpty()) {
                 return 'Hiện chưa có suất chiếu còn nhận đặt vé để kiểm tra giá snapshot.';
             }
@@ -159,6 +178,7 @@ final class AiChatbotService
         }
         if ($this->containsAny($normalized, ['phim', 'hay', 'đang chiếu', 'dang chieu', 'thể loại', 'the loai', 'hành động', 'hanh dong', 'gia đình', 'gia dinh'])) {
             $movies = $this->movies->search(limit: 5);
+            $this->structuredResults->record('search_movies', ['movies' => $movies->all()]);
             if ($movies->isEmpty()) {
                 return 'Hiện MovieMate chưa có phim công khai phù hợp trong hệ thống.';
             }

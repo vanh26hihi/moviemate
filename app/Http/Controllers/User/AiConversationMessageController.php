@@ -75,6 +75,7 @@ class AiConversationMessageController extends Controller
                 'answer' => $result['result']['answer'],
                 'source' => $result['result']['source'],
                 'assistant_completed' => $result['assistant_message'] !== null,
+                'structured_response' => $result['result']['structured_response'],
             ],
         ], $result['assistant_message'] === null ? 503 : 201);
     }

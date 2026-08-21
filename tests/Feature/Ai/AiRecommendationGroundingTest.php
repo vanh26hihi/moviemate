@@ -42,6 +42,12 @@ class AiRecommendationGroundingTest extends TestCase
             $this->assertNotEmpty($recommendation['booking_url']);
             $this->assertTrue(collect($recommendation['showtimes'])->every(fn (array $showtime): bool => $showtime['bookable'] === true));
         }
+        $this->assertCount(2, $result['structured_response']['cards']);
+        $this->assertTrue(collect($result['structured_response']['cards'])->every(
+            fn (array $card): bool => $card['type'] === 'movie'
+                && $card['context'] === 'recommendation'
+                && collect($card['actions'])->contains('type', 'book_showtime'),
+        ));
     }
 
     public function test_provider_ranking_cannot_create_a_movie_or_smuggle_an_unknown_id(): void
