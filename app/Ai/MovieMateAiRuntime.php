@@ -3,6 +3,7 @@
 namespace App\Ai;
 
 use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Responses\StreamableAgentResponse;
 
 final class MovieMateAiRuntime
 {
@@ -43,6 +44,16 @@ final class MovieMateAiRuntime
             model: $this->model(),
             timeout: $this->timeout(),
         )->text);
+    }
+
+    public function stream(Agent $agent, string $prompt, ?AiConversationContext $context = null): StreamableAgentResponse
+    {
+        return $agent->stream(
+            $this->withContext($prompt, $context ?? AiConversationContext::empty()),
+            provider: $this->provider(),
+            model: $this->model(),
+            timeout: $this->timeout(),
+        );
     }
 
     private function withContext(string $currentMessage, AiConversationContext $context): string

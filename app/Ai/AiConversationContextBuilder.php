@@ -12,13 +12,20 @@ final class AiConversationContextBuilder
 {
     public function forConversation(User $user, AiConversation $conversation): AiConversationContext
     {
+        return $this->forConversationBefore($user, $conversation, null);
+    }
+
+    public function forConversationBefore(User $user, AiConversation $conversation, ?int $beforeMessageId): AiConversationContext
+    {
         if ($conversation->user_id !== $user->id) {
             throw new NotFoundHttpException;
         }
 
-        $messages = $conversation->messages()
+        $query = $conversation->messages()
             ->select(['id', 'role', 'content'])
-            ->orderByDesc('id')
+            ->when($beforeMessageId !== null, fn ($query) => $query->where('id', '<', $beforeMessageId));
+
+        $messages = $query->orderByDesc('id')
             ->limit($this->messageLimit())
             ->get()
             ->reverse()

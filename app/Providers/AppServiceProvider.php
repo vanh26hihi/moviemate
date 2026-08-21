@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Ai\Agents\MovieMateCinemaAssistant;
 use App\Ai\AiStructuredResultCollector;
+use App\Ai\Contracts\AiTextStreamer;
+use App\Ai\LaravelAiTextStreamer;
 use App\Ai\MovieMateToolCallGuard;
 use App\Models\AiConversation;
 use App\Models\Booking;
@@ -39,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(CinemaAccessService::class, fn () => new CinemaAccessService);
         $this->app->scoped(MovieMateToolCallGuard::class, fn () => new MovieMateToolCallGuard);
         $this->app->scoped(AiStructuredResultCollector::class, fn () => new AiStructuredResultCollector);
+        $this->app->bind(AiTextStreamer::class, LaravelAiTextStreamer::class);
     }
 
     /**

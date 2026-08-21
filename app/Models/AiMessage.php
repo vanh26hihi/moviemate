@@ -16,6 +16,11 @@ class AiMessage extends Model
         'content',
     ];
 
+    protected function casts(): array
+    {
+        return ['structured_payload' => 'array'];
+    }
+
     public function conversation(): BelongsTo
     {
         return $this->belongsTo(AiConversation::class, 'ai_conversation_id');

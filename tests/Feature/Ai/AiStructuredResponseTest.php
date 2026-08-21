@@ -292,7 +292,7 @@ class AiStructuredResponseTest extends TestCase
         $this->assertSame([], $branch['structured_response']['cards']);
     }
 
-    public function test_live_api_returns_cards_but_history_persists_only_text_without_stale_actions(): void
+    public function test_live_api_returns_actions_but_history_keeps_only_safe_display_snapshot(): void
     {
         $owner = User::factory()->create(['status' => 'active']);
         $conversation = $owner->aiConversations()->create(['title' => 'Structured live response']);
@@ -317,8 +317,13 @@ class AiStructuredResponseTest extends TestCase
         $history = $this->actingAs($owner)->getJson(
             route('user.ai.conversations.messages.index', $conversation->id),
         );
-        $history->assertOk()->assertJsonMissingPath('data.1.structured_response');
-        $this->assertSame(['id', 'role', 'content', 'created_at'], array_keys($history->json('data.1')));
+        $history->assertOk()->assertJsonMissingPath('data.1.structured_response')
+            ->assertJsonPath('data.1.historical_cards.0.id', $movie->id);
+        $historical = $history->json('data.1.historical_cards.0');
+        $this->assertSame(['id', 'role', 'content', 'historical_cards', 'created_at'], array_keys($history->json('data.1')));
+        $this->assertArrayNotHasKey('actions', $historical);
+        $this->assertArrayNotHasKey('details_url', $historical);
+        $this->assertArrayNotHasKey('showtimes_url', $historical);
         $this->assertDatabaseCount('ai_messages', 2);
     }
 

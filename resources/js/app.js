@@ -11,6 +11,10 @@ import './seat-gap-guard';
 import './layout-template-editor';
 import './form-validation';
 
+if (document.querySelector('[data-ai-assistant]')) {
+    import('./ai-chat');
+}
+
 const ticketScannerWorkspaces = document.querySelectorAll('[data-ticket-scanner]');
 if (ticketScannerWorkspaces.length > 0) {
     import('./ticket-scanner').catch(() => {

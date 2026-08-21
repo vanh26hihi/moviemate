@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Ai\AiConversationContextBuilder;
+use App\Ai\AiHistoricalStructuredPayload;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\User;
@@ -10,6 +11,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class AiConversationService
@@ -29,6 +31,7 @@ final class AiConversationService
     public function __construct(
         private readonly AiChatbotService $chatbot,
         private readonly AiConversationContextBuilder $contextBuilder,
+        private readonly AiHistoricalStructuredPayload $historicalPayloads,
     ) {}
 
     public function createForUser(User $user): AiConversation
@@ -88,7 +91,7 @@ final class AiConversationService
         $assistantCompleted = ($result['assistant_completed'] ?? true) && $answer !== '';
         $result['assistant_completed'] = $assistantCompleted;
         $assistantMessage = $assistantCompleted
-            ? $this->appendAssistantMessage($user, $conversation, $answer)
+            ? $this->appendAssistantMessage($user, $conversation, $answer, $result['structured_response'] ?? null)
             : null;
 
         return [
@@ -120,19 +123,41 @@ final class AiConversationService
         });
     }
 
-    public function appendAssistantMessage(User $user, AiConversation $conversation, string $content): AiMessage
-    {
+    public function appendAssistantMessage(
+        User $user,
+        AiConversation $conversation,
+        string $content,
+        mixed $structuredResponse = null,
+    ): AiMessage {
         $this->ensureOwned($user, $conversation);
 
-        return DB::transaction(function () use ($conversation, $content): AiMessage {
+        return DB::transaction(function () use ($conversation, $content, $structuredResponse): AiMessage {
             $message = $conversation->messages()->create([
                 'role' => AiMessage::ROLE_ASSISTANT,
                 'content' => $content,
             ]);
+            $message->forceFill([
+                'structured_payload' => $this->historicalPayloads->forStorage($structuredResponse),
+            ])->save();
             $conversation->update(['last_message_at' => now()]);
 
             return $message;
         });
+    }
+
+    public function retryableUserMessage(User $user, AiConversation $conversation, int $messageId): AiMessage
+    {
+        $this->ensureOwned($user, $conversation);
+        $message = $conversation->messages()->whereKey($messageId)->firstOrFail();
+        $isLast = ! $conversation->messages()->where('id', '>', $message->id)->exists();
+
+        if ($message->role !== AiMessage::ROLE_USER || ! $isLast) {
+            throw ValidationException::withMessages([
+                'message' => 'Chỉ có thể thử lại tin nhắn người dùng mới nhất chưa có phản hồi.',
+            ]);
+        }
+
+        return $message;
     }
 
     public function recentOrderedMessages(AiConversation $conversation): Collection

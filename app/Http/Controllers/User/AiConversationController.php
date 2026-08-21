@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Ai\AiHistoricalMessagePresenter;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
@@ -34,7 +35,7 @@ class AiConversationController extends Controller
         return response()->json(['data' => $this->conversationData($conversation)], 201);
     }
 
-    public function show(Request $request, int $conversation, AiConversationService $conversations): JsonResponse
+    public function show(Request $request, int $conversation, AiConversationService $conversations, AiHistoricalMessagePresenter $messagesPresenter): JsonResponse
     {
         $owned = $conversations->findOwned($request->user(), $conversation);
         Gate::authorize('view', $owned);
@@ -44,7 +45,7 @@ class AiConversationController extends Controller
             'data' => [
                 ...$this->conversationData($owned),
                 'messages' => $messages->getCollection()
-                    ->map(fn (AiMessage $message): array => $this->messageData($message))
+                    ->map(fn (AiMessage $message): array => $messagesPresenter->present($message))
                     ->all(),
                 'messages_pagination' => [
                     'current_page' => $messages->currentPage(),
@@ -102,16 +103,6 @@ class AiConversationController extends Controller
             'last_message_at' => $conversation->last_message_at?->toIso8601String(),
             'created_at' => $conversation->created_at?->toIso8601String(),
             'updated_at' => $conversation->updated_at?->toIso8601String(),
-        ];
-    }
-
-    private function messageData(AiMessage $message): array
-    {
-        return [
-            'id' => $message->id,
-            'role' => $message->role,
-            'content' => $message->content,
-            'created_at' => $message->created_at?->toIso8601String(),
         ];
     }
 }

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'MovieMate - Đặt vé xem phim thông minh cùng AI')</title>
     <meta name="description" content="@yield('meta_description', 'MovieMate - Nền tảng đặt vé xem phim trực tuyến tích hợp AI thông minh.')">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <x-brand.head-icons />
     @vite(['resources/css/app.css', 'resources/css/user.css', 'resources/js/app.js'])
     <script>
@@ -169,9 +170,7 @@
         </div>
     </footer>
 
-    <a href="{{ route('user.ai.chatbot') }}" class="fixed bottom-6 right-6 w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-ai-start to-ai-end rounded-full shadow-lg shadow-ai-start/30 flex items-center justify-center text-white hover:scale-110 transition-transform z-50" title="Trò chuyện với AI">
-        <i class="ph-fill ph-robot text-2xl md:text-3xl"></i>
-    </a>
+    <x-ai-assistant />
 
     @stack('scripts')
 </body>

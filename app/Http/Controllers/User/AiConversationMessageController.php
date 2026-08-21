@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Ai\AiHistoricalMessagePresenter;
 use App\Http\Controllers\Controller;
 use App\Services\AiConversationService;
 use Illuminate\Http\JsonResponse;
@@ -12,17 +13,12 @@ use Throwable;
 
 class AiConversationMessageController extends Controller
 {
-    public function index(Request $request, int $conversation, AiConversationService $conversations): JsonResponse
+    public function index(Request $request, int $conversation, AiConversationService $conversations, AiHistoricalMessagePresenter $presenter): JsonResponse
     {
         $owned = $conversations->findOwned($request->user(), $conversation);
         Gate::authorize('view', $owned);
         $messages = $conversations->paginateMessages($owned);
-        $messages->through(fn ($message): array => [
-            'id' => $message->id,
-            'role' => $message->role,
-            'content' => $message->content,
-            'created_at' => $message->created_at?->toIso8601String(),
-        ]);
+        $messages->through(fn ($message): array => $presenter->present($message));
 
         return response()->json($messages);
     }

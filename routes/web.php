@@ -54,6 +54,7 @@ use App\Http\Controllers\Staff\PrintAllController as StaffPrintAllController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
 use App\Http\Controllers\Staff\WorkspaceController as StaffWorkspaceController;
+use App\Http\Controllers\User\AiChatStreamController;
 use App\Http\Controllers\User\AiController;
 use App\Http\Controllers\User\AiConversationController;
 use App\Http\Controllers\User\AiConversationMessageController;
@@ -283,6 +284,12 @@ Route::middleware(['auth', 'active'])->group(function () {
         ->whereNumber('conversation')
         ->middleware('throttle:ai-chat')
         ->name('user.ai.conversations.messages.store');
+    Route::post('/ai/conversations/{conversation}/messages/stream', [AiChatStreamController::class, 'authenticated'])
+        ->whereNumber('conversation')->middleware('throttle:ai-chat')
+        ->name('user.ai.conversations.messages.stream');
+    Route::post('/ai/conversations/{conversation}/messages/{message}/retry-stream', [AiChatStreamController::class, 'retryAuthenticated'])
+        ->whereNumber('conversation')->whereNumber('message')->middleware('throttle:ai-chat')
+        ->name('user.ai.conversations.messages.retry');
 
     Route::get('/booking-history', BookingHistoryController::class)
         ->name('user.bookings.history');
@@ -305,6 +312,10 @@ Route::post('/ai/recommend', [AiController::class, 'recommendStore'])
 Route::get('/ai/chatbot', [AiController::class, 'chatbot'])->name('user.ai.chatbot');
 Route::post('/ai/chatbot', [AiController::class, 'chatbotStore'])
     ->middleware('throttle:ai-chat')->name('user.ai.chatbot.submit');
+Route::post('/ai/chatbot/stream', [AiChatStreamController::class, 'guest'])
+    ->middleware('throttle:ai-chat')->name('user.ai.chatbot.stream');
+Route::post('/ai/chatbot/stream/retry', [AiChatStreamController::class, 'retryGuest'])
+    ->middleware('throttle:ai-chat')->name('user.ai.chatbot.stream.retry');
 
 Route::get('/admin/rooms/{room}/layout/preview', [AdminSeatController::class, 'preview'])
     ->middleware(['auth', 'active', 'permission:admin.access', 'permission:seats.view'])
