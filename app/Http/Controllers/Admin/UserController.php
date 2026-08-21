@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
+use App\Services\Admin\UserDetailReadModel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +65,25 @@ class UserController extends Controller
             'roles' => Role::query()->orderBy('name')->get(),
             'assignableCinemas' => $this->cinemaAccess->accessibleCinemas(auth()->user()),
         ]);
+    }
+
+    public function show(Request $request, User $user, UserDetailReadModel $readModel): View
+    {
+        Gate::authorize('view', $user);
+
+        $dateToRules = ['nullable', 'date_format:Y-m-d'];
+        if ($request->filled('date_from')) {
+            $dateToRules[] = 'after_or_equal:date_from';
+        }
+
+        $filters = $request->validate([
+            'booking_search' => ['nullable', 'string', 'max:100'],
+            'booking_status' => ['nullable', 'in:'.implode(',', \App\Models\Booking::STATUSES)],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => $dateToRules,
+        ]);
+
+        return view('admin.users.show', $readModel->build($request->user(), $user, $filters));
     }
 
     public function updateRole(Request $request, User $user, ActivityLogger $activityLogger): RedirectResponse
