@@ -130,7 +130,7 @@ return [
         ],
 
         'nine_router' => [
-            'driver' => 'openai',
+            'driver' => 'nine_router',
             'key' => env('NINE_ROUTER_API_KEY'),
             'url' => env('NINE_ROUTER_URL', 'http://127.0.0.1:20128/v1'),
         ],

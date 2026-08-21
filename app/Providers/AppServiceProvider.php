@@ -7,6 +7,7 @@ use App\Ai\AiStructuredResultCollector;
 use App\Ai\Contracts\AiTextStreamer;
 use App\Ai\LaravelAiTextStreamer;
 use App\Ai\MovieMateToolCallGuard;
+use App\Ai\Providers\NineRouterProvider;
 use App\Models\AiConversation;
 use App\Models\Booking;
 use App\Models\Role;
@@ -19,6 +20,7 @@ use App\Services\BookingCheckoutDraftService;
 use App\Services\CinemaAccessService;
 use App\Services\CinemaContext;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -26,6 +28,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Ai\AiManager;
 use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\ToolInvoked;
 use Laravel\Ai\Tools\ToolNameResolver;
@@ -49,6 +52,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        app(AiManager::class)->extend(
+            'nine_router',
+            fn ($app, array $config): NineRouterProvider => new NineRouterProvider(
+                $config,
+                $app->make(Dispatcher::class),
+            ),
+        );
+
         Event::listen(InvokingTool::class, function (InvokingTool $event): void {
             if ($event->agent instanceof MovieMateCinemaAssistant) {
                 app(MovieMateToolCallGuard::class)->record(

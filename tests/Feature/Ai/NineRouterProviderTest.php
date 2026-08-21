@@ -5,9 +5,12 @@ namespace Tests\Feature\Ai;
 use App\Ai\Agents\MovieMateCinemaAssistant;
 use App\Ai\AiConversationContext;
 use App\Ai\Contracts\AiTextStreamer;
+use App\Ai\Gateways\NineRouterGateway;
 use App\Ai\MovieMateAiRuntime;
+use App\Ai\Providers\NineRouterProvider;
 use App\Models\Movie;
 use App\Services\AiChatbotService;
+use App\Services\AiChatStreamService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -25,7 +28,7 @@ class NineRouterProviderTest extends TestCase
     public function test_nine_router_is_a_server_owned_openai_compatible_provider(): void
     {
         config()->set('ai.providers.nine_router', [
-            'driver' => 'openai',
+            'driver' => 'nine_router',
             'key' => 'test-only-nine-router-key',
             'url' => 'http://127.0.0.1:20128/v1',
         ]);
@@ -39,9 +42,10 @@ class NineRouterProviderTest extends TestCase
         $runtime = app(MovieMateAiRuntime::class);
 
         $this->assertSame(['openai', 'gemini', 'nine_router'], MovieMateAiRuntime::SUPPORTED_PROVIDERS);
-        $this->assertInstanceOf(OpenAiProvider::class, $provider);
+        $this->assertInstanceOf(NineRouterProvider::class, $provider);
+        $this->assertInstanceOf(NineRouterGateway::class, $provider->textGateway());
         $this->assertSame('nine_router', $provider->name());
-        $this->assertSame('openai', $provider->driver());
+        $this->assertSame('nine_router', $provider->driver());
         $this->assertSame('http://127.0.0.1:20128/v1', $provider->additionalConfiguration()['url']);
         $this->assertTrue($runtime->enabledAndConfigured());
         $this->assertSame('nine_router', $runtime->provider());
@@ -71,20 +75,7 @@ class NineRouterProviderTest extends TestCase
             $requestNumber++;
 
             if ($requestNumber === 1) {
-                return Http::response([
-                    'id' => 'resp_nine_router_tool',
-                    'status' => 'completed',
-                    'model' => 'tool-compatible-model',
-                    'output' => [[
-                        'type' => 'function_call',
-                        'id' => 'fc_nine_router_search',
-                        'call_id' => 'call_nine_router_search',
-                        'name' => 'search_movies',
-                        'arguments' => '{"limit":5}',
-                        'status' => 'completed',
-                    ]],
-                    'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
-                ]);
+                return Http::response($this->toolCallResponse('search_movies', '{"limit":5}'));
             }
 
             if ($requestNumber === 2) {
@@ -105,16 +96,121 @@ class NineRouterProviderTest extends TestCase
 
         $firstBody = $recorded[0][0]->data();
         $this->assertSame('tool-compatible-model', $firstBody['model']);
+        $this->assertFalse($firstBody['stream']);
+        $this->assertTrue($recorded[0][0]->hasHeader('Accept', 'application/json'));
         $this->assertSame(MovieMateCinemaAssistant::TOOL_ALLOWLIST, array_column($firstBody['tools'], 'name'));
         $this->assertArrayNotHasKey('provider', $firstBody);
         $this->assertArrayNotHasKey('url', $firstBody);
         $this->assertArrayNotHasKey('api_key', $firstBody);
 
         $followUpBody = $recorded[1][0]->data();
-        $this->assertSame('resp_nine_router_tool', $followUpBody['previous_response_id']);
-        $this->assertSame('function_call_output', $followUpBody['input'][0]['type']);
-        $this->assertSame('call_nine_router_search', $followUpBody['input'][0]['call_id']);
-        $this->assertStringContainsString('Nine Router Grounded Movie', $followUpBody['input'][0]['output']);
+        $this->assertSame('tool-compatible-model', $followUpBody['model']);
+        $this->assertFalse($followUpBody['stream']);
+        $this->assertArrayNotHasKey('previous_response_id', $followUpBody);
+        $functionCall = collect($followUpBody['input'])->firstWhere('type', 'function_call');
+        $toolOutput = collect($followUpBody['input'])->firstWhere('type', 'function_call_output');
+        $this->assertSame('search_movies', $functionCall['name']);
+        $this->assertSame('call_nine_router_search', $toolOutput['call_id']);
+        $this->assertStringContainsString('Nine Router Grounded Movie', $toolOutput['output']);
+    }
+
+    public function test_nine_router_streaming_transport_stays_explicit_and_executes_tools(): void
+    {
+        Movie::query()->create([
+            'title' => 'Nine Router Stream Movie',
+            'slug' => 'nine-router-stream-movie',
+            'duration' => 99,
+            'status' => 'now_showing',
+        ]);
+        $this->enableNineRouter('stream-compatible-model');
+
+        Http::preventStrayRequests();
+        Http::fake([
+            'http://127.0.0.1:20128/v1/chat/completions' => Http::sequence([
+                Http::response($this->ssePayload([
+                    [
+                        'id' => 'chatcmpl-stream-tool',
+                        'object' => 'chat.completion.chunk',
+                        'model' => 'stream-compatible-model',
+                        'choices' => [[
+                            'index' => 0,
+                            'delta' => [
+                                'role' => 'assistant',
+                                'tool_calls' => [[
+                                    'index' => 0,
+                                    'id' => 'call_stream_search',
+                                    'type' => 'function',
+                                    'function' => ['name' => 'search_movies', 'arguments' => ''],
+                                ]],
+                            ],
+                            'finish_reason' => null,
+                        ]],
+                    ],
+                    [
+                        'id' => 'chatcmpl-stream-tool',
+                        'object' => 'chat.completion.chunk',
+                        'model' => 'stream-compatible-model',
+                        'choices' => [[
+                            'index' => 0,
+                            'delta' => ['tool_calls' => [[
+                                'index' => 0,
+                                'function' => ['arguments' => '{"limit":5}'],
+                            ]]],
+                            'finish_reason' => null,
+                        ]],
+                    ],
+                    [
+                        'id' => 'chatcmpl-stream-tool',
+                        'object' => 'chat.completion.chunk',
+                        'model' => 'stream-compatible-model',
+                        'choices' => [['index' => 0, 'delta' => [], 'finish_reason' => 'tool_calls']],
+                    ],
+                ]), 200, ['Content-Type' => 'text/event-stream']),
+                Http::response($this->ssePayload([
+                    [
+                        'id' => 'chatcmpl-stream-final',
+                        'object' => 'chat.completion.chunk',
+                        'model' => 'stream-compatible-model',
+                        'choices' => [[
+                            'index' => 0,
+                            'delta' => ['role' => 'assistant', 'content' => 'Đã tìm thấy phim đang chiếu.'],
+                            'finish_reason' => null,
+                        ]],
+                    ],
+                    [
+                        'id' => 'chatcmpl-stream-final',
+                        'object' => 'chat.completion.chunk',
+                        'model' => 'stream-compatible-model',
+                        'choices' => [['index' => 0, 'delta' => [], 'finish_reason' => 'stop']],
+                    ],
+                ]), 200, ['Content-Type' => 'text/event-stream']),
+            ]),
+        ]);
+
+        $stream = app(AiChatStreamService::class)->stream(
+            'Phim nào đang chiếu?',
+            AiConversationContext::empty(),
+            'guest',
+        );
+        $deltas = '';
+        foreach ($stream as $delta) {
+            $deltas .= $delta;
+        }
+        $result = $stream->getReturn();
+        $recorded = Http::recorded();
+
+        $this->assertSame('Đã tìm thấy phim đang chiếu.', $deltas);
+        $this->assertSame('nine_router', $result['source']);
+        $this->assertSame('Nine Router Stream Movie', $result['structured_response']['cards'][0]['title']);
+        $this->assertCount(2, $recorded);
+        $this->assertTrue($recorded[0][0]->data()['stream']);
+        $this->assertTrue($recorded[1][0]->data()['stream']);
+        $this->assertSame(
+            MovieMateCinemaAssistant::TOOL_ALLOWLIST,
+            array_column(array_column($recorded[0][0]->data()['tools'], 'function'), 'name'),
+        );
+        $toolMessage = collect($recorded[1][0]->data()['messages'])->firstWhere('role', 'tool');
+        $this->assertStringContainsString('Nine Router Stream Movie', $toolMessage['content']);
     }
 
     public function test_client_cannot_override_any_nine_router_runtime_setting(): void
@@ -203,7 +299,7 @@ class NineRouterProviderTest extends TestCase
         config()->set('moviemate-ai.provider', 'nine_router');
         config()->set('moviemate-ai.model', $model);
         config()->set('ai.providers.nine_router', [
-            'driver' => 'openai',
+            'driver' => 'nine_router',
             'key' => $key,
             'url' => 'http://127.0.0.1:20128/v1',
         ]);
@@ -214,19 +310,47 @@ class NineRouterProviderTest extends TestCase
     private function completedResponse(string $text): array
     {
         return [
-            'id' => 'resp_nine_router_completed',
-            'status' => 'completed',
+            'id' => 'chatcmpl_nine_router_completed',
+            'object' => 'chat.completion',
             'model' => 'tool-compatible-model',
-            'output' => [[
-                'type' => 'message',
-                'status' => 'completed',
-                'role' => 'assistant',
-                'content' => [[
-                    'type' => 'output_text',
-                    'text' => $text,
-                ]],
+            'choices' => [[
+                'index' => 0,
+                'message' => ['role' => 'assistant', 'content' => $text],
+                'finish_reason' => 'stop',
             ]],
-            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 5],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function toolCallResponse(string $name, string $arguments): array
+    {
+        return [
+            'id' => 'chatcmpl_nine_router_tool',
+            'object' => 'chat.completion',
+            'model' => 'provider-normalized-model-without-route-prefix',
+            'choices' => [[
+                'index' => 0,
+                'message' => [
+                    'role' => 'assistant',
+                    'content' => null,
+                    'tool_calls' => [[
+                        'id' => 'call_nine_router_search',
+                        'type' => 'function',
+                        'function' => ['name' => $name, 'arguments' => $arguments],
+                    ]],
+                ],
+                'finish_reason' => 'tool_calls',
+            ]],
+            'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 5],
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $events */
+    private function ssePayload(array $events): string
+    {
+        return collect($events)
+            ->map(fn (array $event): string => 'data: '.json_encode($event, JSON_THROW_ON_ERROR))
+            ->implode("\n\n")."\n\ndata: [DONE]\n\n";
     }
 }
