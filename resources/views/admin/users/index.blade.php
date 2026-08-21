@@ -32,7 +32,7 @@
                 <td>{{ $managedUser->role?->display_name ?? 'Chưa có vai trò' }}</td>
                 <td><span class="font-semibold {{ $managedUser->status === 'active' ? 'text-success' : 'text-error' }}">{{ $managedUser->status_label }}</span></td>
                 <td>{{ $managedUser->created_at?->format('d/m/Y') }}</td>
-                <td class="text-right"><a class="admin-btn-warning" href="{{ route('admin.users.edit', $managedUser) }}">Quản lý</a></td>
+                <td class="text-right"><div class="flex justify-end gap-2"><a class="admin-btn-secondary" href="{{ route('admin.users.show', $managedUser) }}">Chi tiết</a><a class="admin-btn-warning" href="{{ route('admin.users.edit', $managedUser) }}">Quản lý</a></div></td>
             </tr>
         @empty
             <tr><td colspan="5" class="text-center app-muted py-10">Không tìm thấy người dùng.</td></tr>
