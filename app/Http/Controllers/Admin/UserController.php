@@ -8,12 +8,14 @@ use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
 use App\Services\Admin\UserDetailReadModel;
+use App\Services\Admin\UserBookingExportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -84,6 +86,25 @@ class UserController extends Controller
         ]);
 
         return view('admin.users.show', $readModel->build($request->user(), $user, $filters));
+    }
+
+    public function exportBookings(Request $request, User $user, UserBookingExportService $exporter): StreamedResponse
+    {
+        Gate::authorize('view', $user);
+
+        $dateToRules = ['nullable', 'date_format:Y-m-d'];
+        if ($request->filled('date_from')) {
+            $dateToRules[] = 'after_or_equal:date_from';
+        }
+
+        $filters = $request->validate([
+            'booking_search' => ['nullable', 'string', 'max:100'],
+            'booking_status' => ['nullable', 'in:'.implode(',', \App\Models\Booking::STATUSES)],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => $dateToRules,
+        ]);
+
+        return $exporter->download($request->user(), $user, $filters);
     }
 
     public function updateRole(Request $request, User $user, ActivityLogger $activityLogger): RedirectResponse

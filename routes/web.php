@@ -519,6 +519,8 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:users.view')->name('users.index');
         Route::get('/users/{user}', [AdminUserController::class, 'show'])
             ->whereNumber('user')->middleware('permission:users.view')->name('users.show');
+        Route::get('/users/{user}/bookings/export', [AdminUserController::class, 'exportBookings'])
+            ->whereNumber('user')->middleware(['permission:users.view', 'throttle:20,1'])->name('users.bookings.export');
         Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])
             ->middleware('permission:users.view')->name('users.edit');
         Route::patch('/users/{user}/role', [AdminUserController::class, 'updateRole'])
