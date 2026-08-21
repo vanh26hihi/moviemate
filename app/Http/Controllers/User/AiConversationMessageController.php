@@ -45,6 +45,11 @@ class AiConversationMessageController extends Controller
             'steps' => ['prohibited'],
             'timeout' => ['prohibited'],
             'tool_registry' => ['prohibited'],
+            'structured_payload' => ['prohibited'],
+            'cards' => ['prohibited'],
+            'bookable' => ['prohibited'],
+            'booking_url' => ['prohibited'],
+            'actions' => ['prohibited'],
         ]);
 
         $owned = $conversations->findOwned($request->user(), $conversation);
