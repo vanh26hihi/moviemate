@@ -43,6 +43,11 @@ class User extends Authenticatable
         return $this->hasMany(Review::class);
     }
 
+    public function aiConversations(): HasMany
+    {
+        return $this->hasMany(AiConversation::class);
+    }
+
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);

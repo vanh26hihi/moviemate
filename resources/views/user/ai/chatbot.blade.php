@@ -25,6 +25,14 @@
                 <a href="{{ route('user.ai.recommend') }}" class="w-full py-2.5 bg-gradient-to-r from-ai-start to-ai-end text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-ai-start/20 transition-all text-sm">
                     <i class="ph-fill ph-magic-wand"></i> AI gợi ý phim
                 </a>
+                @auth
+                    <form action="{{ route('user.ai.conversations.store') }}" method="POST" class="mt-2">
+                        @csrf
+                        <button type="submit" class="w-full py-2.5 app-card border app-border rounded-xl font-semibold app-text text-sm hover:border-ai-start/50 transition-colors">
+                            <i class="ph ph-plus-circle mr-1"></i> Cuộc trò chuyện mới
+                        </button>
+                    </form>
+                @endauth
             </div>
 
             <div class="p-5 flex-grow overflow-y-auto hide-scrollbar">
@@ -39,19 +47,26 @@
 
                 <h3 class="text-[10px] font-bold app-muted uppercase tracking-wider mb-3 mt-6">Lịch sử chat</h3>
                 <div class="space-y-1">
-                    @forelse($chatHistory->reverse()->take(8) as $chat)
-                        <div class="p-3 rounded-xl hover:app-card text-sm app-muted transition-colors line-clamp-2">
-                            <i class="ph ph-chat-teardrop mr-2"></i>{{ $chat->message }}
-                        </div>
-                    @empty
+                    @auth
+                        @forelse($conversationList as $conversation)
+                            <a href="{{ route('user.ai.chatbot', ['conversation' => $conversation->id]) }}"
+                                class="block p-3 rounded-xl text-sm transition-colors line-clamp-2 {{ optional($currentConversation)->is($conversation) ? 'app-card app-text' : 'app-muted hover:app-card' }}">
+                                <i class="ph ph-chat-teardrop mr-2"></i>{{ $conversation->title }}
+                            </a>
+                        @empty
+                            <p class="text-sm app-muted leading-relaxed">Chưa có lịch sử chat.</p>
+                        @endforelse
+                    @else
+                        @forelse($chatHistory->reverse()->take(8) as $chat)
+                            <div class="p-3 rounded-xl hover:app-card text-sm app-muted transition-colors line-clamp-2">
+                                <i class="ph ph-chat-teardrop mr-2"></i>{{ $chat->message }}
+                            </div>
+                        @empty
                         <p class="text-sm app-muted leading-relaxed">
-                            @auth
-                                Chưa có lịch sử chat.
-                            @else
-                                Đăng nhập để lưu lịch sử chat.
-                            @endauth
+                            Đăng nhập để lưu lịch sử chat.
                         </p>
-                    @endforelse
+                        @endforelse
+                    @endauth
                 </div>
             </div>
         </aside>
@@ -115,15 +130,17 @@
                         </div>
                     </div>
 
-                    <div class="flex gap-3 max-w-[88%]">
-                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-ai-start to-ai-end shrink-0 flex items-center justify-center mt-1">
-                            <i class="ph-fill ph-robot text-white text-sm"></i>
+                    @if($chat->response !== null)
+                        <div class="flex gap-3 max-w-[88%]">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-ai-start to-ai-end shrink-0 flex items-center justify-center mt-1">
+                                <i class="ph-fill ph-robot text-white text-sm"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="app-secondary border app-border rounded-2xl rounded-tl-sm p-4 text-sm app-text leading-relaxed whitespace-pre-line">{{ $chat->response }}</div>
+                                <span class="text-[10px] app-muted mt-1.5 inline-block">MovieMate AI</span>
+                            </div>
                         </div>
-                        <div class="min-w-0">
-                            <div class="app-secondary border app-border rounded-2xl rounded-tl-sm p-4 text-sm app-text leading-relaxed whitespace-pre-line">{{ $chat->response }}</div>
-                            <span class="text-[10px] app-muted mt-1.5 inline-block">MovieMate AI</span>
-                        </div>
-                    </div>
+                    @endif
                 @endforeach
 
                 @if($messages->isEmpty())
@@ -142,6 +159,9 @@
             <div class="p-4 border-t app-border app-secondary shrink-0">
                 <form action="{{ route('user.ai.chatbot.submit') }}" method="POST" class="flex items-end gap-2">
                     @csrf
+                    @if($currentConversation)
+                        <input type="hidden" name="conversation_id" value="{{ $currentConversation->id }}">
+                    @endif
                     <div class="relative flex-grow">
                         <label class="sr-only" for="chat-input">Câu hỏi gửi đến MovieMate AI</label>
                         <textarea id="chat-input" name="message" rows="1" required

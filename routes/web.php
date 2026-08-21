@@ -55,6 +55,8 @@ use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintControll
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
 use App\Http\Controllers\Staff\WorkspaceController as StaffWorkspaceController;
 use App\Http\Controllers\User\AiController;
+use App\Http\Controllers\User\AiConversationController;
+use App\Http\Controllers\User\AiConversationMessageController;
 use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
@@ -258,6 +260,30 @@ Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, '
     ->name('user.bookings.access.exchange');
 
 Route::middleware(['auth', 'active'])->group(function () {
+    Route::get('/ai/conversations', [AiConversationController::class, 'index'])
+        ->name('user.ai.conversations.index');
+    Route::post('/ai/conversations', [AiConversationController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('user.ai.conversations.store');
+    Route::get('/ai/conversations/{conversation}', [AiConversationController::class, 'show'])
+        ->whereNumber('conversation')
+        ->name('user.ai.conversations.show');
+    Route::patch('/ai/conversations/{conversation}', [AiConversationController::class, 'update'])
+        ->whereNumber('conversation')
+        ->middleware('throttle:20,1')
+        ->name('user.ai.conversations.update');
+    Route::delete('/ai/conversations/{conversation}', [AiConversationController::class, 'destroy'])
+        ->whereNumber('conversation')
+        ->middleware('throttle:20,1')
+        ->name('user.ai.conversations.destroy');
+    Route::get('/ai/conversations/{conversation}/messages', [AiConversationMessageController::class, 'index'])
+        ->whereNumber('conversation')
+        ->name('user.ai.conversations.messages.index');
+    Route::post('/ai/conversations/{conversation}/messages', AiConversationMessageController::class)
+        ->whereNumber('conversation')
+        ->middleware('throttle:20,1')
+        ->name('user.ai.conversations.messages.store');
+
     Route::get('/booking-history', BookingHistoryController::class)
         ->name('user.bookings.history');
 

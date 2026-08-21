@@ -21,6 +21,7 @@ final class AiChatbotService
     public function answer(string $message): array
     {
         $message = trim($message);
+        $providerFailed = false;
 
         if ($this->runtime->enabledAndConfigured()) {
             try {
@@ -28,9 +29,11 @@ final class AiChatbotService
                     'answer' => $this->runtime->prompt($this->assistant, $message),
                     'source' => $this->runtime->provider(),
                     'message' => null,
+                    'assistant_completed' => true,
                 ];
             } catch (\Throwable $exception) {
                 Log::warning('AI chatbot failed, using grounded fallback.', ['exception' => $exception::class]);
+                $providerFailed = true;
             }
         }
 
@@ -38,6 +41,7 @@ final class AiChatbotService
             'answer' => $this->fallbackAnswer($message),
             'source' => 'fallback',
             'message' => 'Đang dùng trợ lý dự phòng từ dữ liệu MovieMate vì AI chưa được bật, chưa cấu hình hoặc tạm thời không phản hồi.',
+            'assistant_completed' => ! $providerFailed,
         ];
     }
 

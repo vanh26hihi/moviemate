@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiConversation;
+use App\Models\AiMessage;
 use App\Models\Cinema;
 use App\Models\Genre;
 use App\Services\AiChatbotService;
+use App\Services\AiConversationService;
 use App\Services\AiMovieRecommendationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Throwable;
 
 class AiController extends Controller
 {
@@ -44,22 +50,78 @@ class AiController extends Controller
         return $this->recommendationView($preferences, $result);
     }
 
-    public function chatbot(Request $request): View
+    public function chatbot(Request $request, AiConversationService $conversations): View
     {
-        $history = $this->chatHistory($request);
+        $currentConversation = null;
+        $conversationList = collect();
+
+        if ($request->user()) {
+            $conversationList = $conversations->recentForUser($request->user());
+            if ($request->has('conversation')) {
+                $currentConversation = $conversations->findOwned($request->user(), $request->integer('conversation'));
+                Gate::authorize('view', $currentConversation);
+            } else {
+                $currentConversation = $conversationList->first();
+            }
+
+            $history = $currentConversation
+                ? $this->persistedChatHistory($conversations, $currentConversation)
+                : collect();
+        } else {
+            $history = $this->chatHistory($request);
+        }
 
         return view('user.ai.chatbot', [
             'chatHistory' => $history,
             'currentChat' => $history->last(),
             'chatMeta' => $request->session()->get('ai.chat.meta'),
+            'currentConversation' => $currentConversation,
+            'conversationList' => $conversationList,
         ]);
     }
 
-    public function chatbotStore(Request $request, AiChatbotService $service): RedirectResponse
-    {
+    public function chatbotStore(
+        Request $request,
+        AiChatbotService $service,
+        AiConversationService $conversations,
+    ): RedirectResponse {
         $validated = $request->validate([
-            'message' => ['required', 'string', 'max:1000'],
+            'message' => ['bail', 'required', 'string', 'max:'.AiConversationService::MESSAGE_MAX_LENGTH, 'not_regex:/^\s*$/u'],
+            'conversation_id' => ['nullable', 'integer', 'min:1'],
+            'user_id' => ['prohibited'],
+            'role' => ['prohibited'],
+            'assistant' => ['prohibited'],
+            'system' => ['prohibited'],
+            'provider' => ['prohibited'],
+            'model' => ['prohibited'],
         ]);
+
+        if ($request->user()) {
+            $conversation = isset($validated['conversation_id'])
+                ? $conversations->findOwned($request->user(), (int) $validated['conversation_id'])
+                : $conversations->createForUser($request->user());
+            Gate::authorize('continue', $conversation);
+
+            try {
+                $conversationResult = $conversations->continueOwned(
+                    $request->user(),
+                    $conversation,
+                    $validated['message'],
+                );
+                $request->session()->put('ai.chat.meta', $conversationResult['result']);
+            } catch (Throwable $exception) {
+                Log::warning('Authenticated AI conversation failed after storing the user message.', [
+                    'exception' => $exception::class,
+                    'conversation_id' => $conversation->id,
+                ]);
+                $request->session()->put('ai.chat.meta', [
+                    'source' => 'unavailable',
+                    'message' => 'MovieMate AI tạm thời không thể trả lời. Tin nhắn của bạn đã được lưu để thử lại sau.',
+                ]);
+            }
+
+            return to_route('user.ai.chatbot', ['conversation' => $conversation->id]);
+        }
 
         $result = $service->answer($validated['message']);
         $history = $this->chatHistory($request);
@@ -100,5 +162,28 @@ class AiController extends Controller
                 return (object) $chat;
             })
             ->values();
+    }
+
+    private function persistedChatHistory(
+        AiConversationService $conversations,
+        AiConversation $conversation,
+    ): Collection {
+        $history = collect();
+        $current = null;
+
+        foreach ($conversations->recentOrderedMessages($conversation) as $message) {
+            if ($message->role === AiMessage::ROLE_USER) {
+                $current = (object) [
+                    'message' => $message->content,
+                    'response' => null,
+                    'created_at' => $message->created_at,
+                ];
+                $history->push($current);
+            } elseif ($message->role === AiMessage::ROLE_ASSISTANT && $current !== null) {
+                $current->response = $message->content;
+            }
+        }
+
+        return $history;
     }
 }
