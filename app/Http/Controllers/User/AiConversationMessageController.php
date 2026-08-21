@@ -39,6 +39,8 @@ class AiConversationMessageController extends Controller
             'assistant_history' => ['prohibited'],
             'provider' => ['prohibited'],
             'model' => ['prohibited'],
+            'base_url' => ['prohibited'],
+            'api_key' => ['prohibited'],
             'temperature' => ['prohibited'],
             'max_tokens' => ['prohibited'],
             'max_steps' => ['prohibited'],

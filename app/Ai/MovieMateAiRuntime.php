@@ -8,7 +8,7 @@ use Laravel\Ai\Responses\StreamableAgentResponse;
 final class MovieMateAiRuntime
 {
     /** @var list<string> */
-    public const SUPPORTED_PROVIDERS = ['openai', 'gemini'];
+    public const SUPPORTED_PROVIDERS = ['openai', 'gemini', 'nine_router'];
 
     public function enabledAndConfigured(): bool
     {

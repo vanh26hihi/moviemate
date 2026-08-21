@@ -1,5 +1,10 @@
 <?php
 
+$movieMateProvider = strtolower((string) env('MOVIEMATE_AI_PROVIDER', 'openai'));
+$movieMateProvider = in_array($movieMateProvider, ['openai', 'gemini', 'nine_router'], true)
+    ? $movieMateProvider
+    : 'openai';
+
 return [
 
     /*
@@ -13,7 +18,7 @@ return [
     |
     */
 
-    'default' => env('MOVIEMATE_AI_PROVIDER', 'openai'),
+    'default' => $movieMateProvider,
     'default_for_images' => 'gemini',
     'default_for_audio' => 'openai',
     'default_for_transcription' => 'openai',
@@ -122,6 +127,12 @@ return [
             'driver' => 'openai',
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
+        ],
+
+        'nine_router' => [
+            'driver' => 'openai',
+            'key' => env('NINE_ROUTER_API_KEY'),
+            'url' => env('NINE_ROUTER_URL', 'http://127.0.0.1:20128/v1'),
         ],
 
         'openrouter' => [

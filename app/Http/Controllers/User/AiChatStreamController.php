@@ -235,7 +235,7 @@ final class AiChatStreamController extends Controller
         return collect([
             'conversation_id', 'user_id', 'role', 'assistant', 'system', 'history', 'messages',
             'system_prompt', 'developer_prompt', 'context', 'assistant_history', 'provider', 'model',
-            'temperature', 'max_tokens', 'max_steps', 'steps', 'timeout', 'tool_registry',
+            'base_url', 'api_key', 'temperature', 'max_tokens', 'max_steps', 'steps', 'timeout', 'tool_registry',
             'structured_payload', 'cards', 'bookable', 'booking_url', 'actions',
         ])->mapWithKeys(fn (string $field): array => [$field => ['prohibited']])->all();
     }
