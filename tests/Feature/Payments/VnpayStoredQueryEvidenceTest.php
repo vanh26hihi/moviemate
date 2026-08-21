@@ -22,6 +22,8 @@ use LogicException;
 
 final class VnpayStoredQueryEvidenceTest extends VnpayPaymentTestCase
 {
+    private const EVIDENCE_TXN_REF_PREFIX = 'MM260821143022EVIDENCEB';
+
     public function test_authenticated_stored_expiration_closes_review_and_expired_booking_without_fulfilment(): void
     {
         $payment = $this->storedReviewPayment();
@@ -94,6 +96,19 @@ final class VnpayStoredQueryEvidenceTest extends VnpayPaymentTestCase
         $this->assertSame(1, ActivityLog::query()->where('action', 'booking.payment_cancelled')->count());
     }
 
+    public function test_stored_evidence_fixture_reference_is_deterministic_and_preserved_exactly(): void
+    {
+        $payment = $this->storedReviewPayment();
+        $event = ActivityLog::query()
+            ->where('action', 'payment.vnpay_query_attempted')
+            ->where('subject_id', (string) $payment->id)
+            ->sole();
+
+        $this->assertSame(self::EVIDENCE_TXN_REF_PREFIX.$payment->booking_id, $payment->order_code);
+        $this->assertSame($payment->order_code, $event->context['txn_ref']);
+        $this->assertStringNotContainsString('[số điện thoại đã ẩn]', $event->context['txn_ref']);
+    }
+
     public function test_missing_or_tampered_evidence_is_rejected_without_mutation(): void
     {
         $payment = $this->storedReviewPayment(recordEvidence: false);
@@ -163,6 +178,7 @@ final class VnpayStoredQueryEvidenceTest extends VnpayPaymentTestCase
     ): Payment {
         $booking ??= $this->payableBooking(['expires_at' => now()->subMinute()]);
         $payment = $this->vnpayPayment($booking, [
+            'order_code' => self::EVIDENCE_TXN_REF_PREFIX.$booking->id,
             'status' => Payment::STATUS_REVIEW,
             'response_code' => '00',
             'transaction_status' => $transactionStatus,
