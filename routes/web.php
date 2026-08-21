@@ -517,6 +517,8 @@ Route::prefix('admin')->name('admin.')
 
         Route::get('/users', [AdminUserController::class, 'index'])
             ->middleware('permission:users.view')->name('users.index');
+        Route::get('/users/{user}', [AdminUserController::class, 'show'])
+            ->whereNumber('user')->middleware('permission:users.view')->name('users.show');
         Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])
             ->middleware('permission:users.view')->name('users.edit');
         Route::patch('/users/{user}/role', [AdminUserController::class, 'updateRole'])
