@@ -24,12 +24,12 @@ final class FindShowtimes extends ReadOnlyTool implements Tool
     public function handle(Request $request): string
     {
         $input = $this->validate($request, [
-            'movie_id' => ['sometimes', 'nullable', 'prohibited_with:movie_slug', 'integer', 'min:1'],
-            'movie_slug' => ['sometimes', 'nullable', 'prohibited_with:movie_id', 'string', 'max:191'],
+            'movie_id' => ['sometimes', 'nullable', 'prohibits:movie_slug', 'integer', 'min:1'],
+            'movie_slug' => ['sometimes', 'nullable', 'prohibits:movie_id', 'string', 'max:191'],
             'cinema_code' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'prohibited_with:from,to'],
-            'from' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'prohibited_with:date'],
-            'to' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'prohibited_with:date'],
+            'date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'prohibits:from,to'],
+            'from' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'prohibits:date'],
+            'to' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'prohibits:date'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:'.CustomerShowtimeReadService::MAX_RESULTS],
         ]);
 

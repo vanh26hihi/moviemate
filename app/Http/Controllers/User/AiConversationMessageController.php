@@ -35,8 +35,20 @@ class AiConversationMessageController extends Controller
             'role' => ['prohibited'],
             'assistant' => ['prohibited'],
             'system' => ['prohibited'],
+            'history' => ['prohibited'],
+            'messages' => ['prohibited'],
+            'system_prompt' => ['prohibited'],
+            'developer_prompt' => ['prohibited'],
+            'context' => ['prohibited'],
+            'assistant_history' => ['prohibited'],
             'provider' => ['prohibited'],
             'model' => ['prohibited'],
+            'temperature' => ['prohibited'],
+            'max_tokens' => ['prohibited'],
+            'max_steps' => ['prohibited'],
+            'steps' => ['prohibited'],
+            'timeout' => ['prohibited'],
+            'tool_registry' => ['prohibited'],
         ]);
 
         $owned = $conversations->findOwned($request->user(), $conversation);

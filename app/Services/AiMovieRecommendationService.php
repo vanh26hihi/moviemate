@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Ai\Agents\MovieMateCinemaAssistant;
 use App\Ai\MovieMateAiRuntime;
+use App\Ai\MovieMateToolCallGuard;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +16,7 @@ final class AiMovieRecommendationService
         private readonly RecommendationReadService $candidates,
         private readonly MovieMateCinemaAssistant $assistant,
         private readonly MovieMateAiRuntime $runtime,
+        private readonly MovieMateToolCallGuard $toolGuard,
     ) {}
 
     public function recommend(array $preferences, int $limit = 5): array
@@ -36,6 +38,7 @@ final class AiMovieRecommendationService
         $aiFailed = false;
 
         if ($this->runtime->enabledAndConfigured()) {
+            $this->toolGuard->reset();
             try {
                 $recommendations = $this->requestAiRecommendations($preferences, $candidates, $limit);
                 $source = $recommendations->isNotEmpty() ? $this->runtime->provider() : 'fallback';

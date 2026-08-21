@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Ai\AiConversationContextBuilder;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\User;
@@ -25,7 +26,10 @@ final class AiConversationService
 
     public const UI_MESSAGE_LIMIT = 100;
 
-    public function __construct(private readonly AiChatbotService $chatbot) {}
+    public function __construct(
+        private readonly AiChatbotService $chatbot,
+        private readonly AiConversationContextBuilder $contextBuilder,
+    ) {}
 
     public function createForUser(User $user): AiConversation
     {
@@ -76,10 +80,10 @@ final class AiConversationService
     public function continueOwned(User $user, AiConversation $conversation, string $content): array
     {
         $this->ensureOwned($user, $conversation);
+        $context = $this->contextBuilder->forConversation($user, $conversation);
         $userMessage = $this->appendUserMessage($user, $conversation, $content);
 
-        // The provider call intentionally receives only the current turn in AI-02.
-        $result = $this->chatbot->answer($content);
+        $result = $this->chatbot->answer($content, $context, 'authenticated');
         $answer = trim((string) ($result['answer'] ?? ''));
         $assistantCompleted = ($result['assistant_completed'] ?? true) && $answer !== '';
         $result['assistant_completed'] = $assistantCompleted;

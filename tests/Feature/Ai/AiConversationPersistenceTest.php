@@ -135,14 +135,14 @@ class AiConversationPersistenceTest extends TestCase
             ->assertJsonPath('data.4.id', $messages[54]->id);
     }
 
-    public function test_owner_can_continue_and_only_current_turn_is_sent_to_provider(): void
+    public function test_owner_can_continue_with_server_owned_history_and_current_turn(): void
     {
         $owner = User::factory()->create(['status' => 'active']);
         $other = User::factory()->create(['status' => 'active']);
         $conversation = $this->conversation($owner);
         $conversation->messages()->create([
             'role' => AiMessage::ROLE_USER,
-            'content' => 'Nội dung lịch sử không được gửi',
+            'content' => 'Nội dung lịch sử do máy chủ sở hữu',
         ]);
         $this->fakeAssistant(['Câu trả lời đã hoàn tất.']);
 
@@ -165,7 +165,10 @@ class AiConversationPersistenceTest extends TestCase
             'content' => 'Câu trả lời đã hoàn tất.',
         ]);
         $this->assertNotNull($conversation->refresh()->last_message_at);
-        MovieMateCinemaAssistant::assertPrompted('Tối nay có phim gì?');
+        MovieMateCinemaAssistant::assertPrompted(fn ($prompt): bool => str_contains($prompt->prompt, 'Nội dung lịch sử do máy chủ sở hữu')
+            && str_contains($prompt->prompt, 'CURRENT_USER_MESSAGE_JSON_START')
+            && str_contains($prompt->prompt, 'Tối nay có phim gì?')
+        );
 
         $before = $conversation->messages()->count();
         $this->actingAs($other)->postJson(

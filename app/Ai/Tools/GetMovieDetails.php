@@ -24,8 +24,8 @@ final class GetMovieDetails extends ReadOnlyTool implements Tool
     public function handle(Request $request): string
     {
         $input = $this->validate($request, [
-            'movie_id' => ['required_without:slug', 'prohibited_with:slug', 'integer', 'min:1'],
-            'slug' => ['required_without:movie_id', 'prohibited_with:movie_id', 'string', 'max:191'],
+            'movie_id' => ['required_without:slug', 'prohibits:slug', 'integer', 'min:1'],
+            'slug' => ['required_without:movie_id', 'prohibits:movie_id', 'string', 'max:191'],
         ]);
 
         return $this->json([

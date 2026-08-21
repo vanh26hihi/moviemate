@@ -281,7 +281,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         ->name('user.ai.conversations.messages.index');
     Route::post('/ai/conversations/{conversation}/messages', AiConversationMessageController::class)
         ->whereNumber('conversation')
-        ->middleware('throttle:20,1')
+        ->middleware('throttle:ai-chat')
         ->name('user.ai.conversations.messages.store');
 
     Route::get('/booking-history', BookingHistoryController::class)
@@ -300,11 +300,11 @@ Route::middleware(['auth', 'active'])->group(function () {
 
 Route::get('/ai/recommend', [AiController::class, 'recommend'])->name('user.ai.recommend');
 Route::post('/ai/recommend', [AiController::class, 'recommendStore'])
-    ->middleware('throttle:10,1')->name('user.ai.recommend.submit');
+    ->middleware('throttle:ai-recommendation')->name('user.ai.recommend.submit');
 
 Route::get('/ai/chatbot', [AiController::class, 'chatbot'])->name('user.ai.chatbot');
 Route::post('/ai/chatbot', [AiController::class, 'chatbotStore'])
-    ->middleware('throttle:20,1')->name('user.ai.chatbot.submit');
+    ->middleware('throttle:ai-chat')->name('user.ai.chatbot.submit');
 
 Route::get('/admin/rooms/{room}/layout/preview', [AdminSeatController::class, 'preview'])
     ->middleware(['auth', 'active', 'permission:admin.access', 'permission:seats.view'])

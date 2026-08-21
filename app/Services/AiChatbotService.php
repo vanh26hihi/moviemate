@@ -3,9 +3,18 @@
 namespace App\Services;
 
 use App\Ai\Agents\MovieMateCinemaAssistant;
+use App\Ai\AiConversationContext;
 use App\Ai\MovieMateAiRuntime;
+use App\Ai\MovieMateToolCallGuard;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Laravel\Ai\Exceptions\InsufficientCreditsException;
+use Laravel\Ai\Exceptions\ProviderOverloadedException;
+use Laravel\Ai\Exceptions\RateLimitedException;
+use OverflowException;
+use Throwable;
 
 final class AiChatbotService
 {
@@ -16,24 +25,44 @@ final class AiChatbotService
         private readonly CustomerShowtimeReadService $showtimes,
         private readonly PublicCinemaReadService $cinemas,
         private readonly PublicFoodReadService $foods,
+        private readonly MovieMateToolCallGuard $toolGuard,
     ) {}
 
-    public function answer(string $message): array
+    public function answer(string $message, ?AiConversationContext $context = null, string $audience = 'guest'): array
     {
         $message = trim($message);
-        $providerFailed = false;
+        $context ??= AiConversationContext::empty();
 
         if ($this->runtime->enabledAndConfigured()) {
+            $startedAt = hrtime(true);
+            $this->toolGuard->reset();
             try {
-                return [
-                    'answer' => $this->runtime->prompt($this->assistant, $message),
+                $answer = $this->runtime->prompt($this->assistant, $message, $context);
+                if ($answer === '' || mb_strlen($answer) > max(500, (int) config('moviemate-ai.max_response_characters', 6000))) {
+                    throw new \UnexpectedValueException('Malformed AI response.');
+                }
+
+                $result = [
+                    'answer' => $answer,
                     'source' => $this->runtime->provider(),
                     'message' => null,
                     'assistant_completed' => true,
+                    'failure_category' => null,
                 ];
-            } catch (\Throwable $exception) {
-                Log::warning('AI chatbot failed, using grounded fallback.', ['exception' => $exception::class]);
-                $providerFailed = true;
+                $this->logAttempt('info', 'AI chatbot completed.', $audience, $context, $startedAt, null);
+
+                return $result;
+            } catch (Throwable $exception) {
+                $category = $this->failureCategory($exception);
+                $this->logAttempt('warning', 'AI chatbot request failed safely.', $audience, $context, $startedAt, $category);
+
+                return [
+                    'answer' => 'MovieMate AI tạm thời không thể trả lời. Vui lòng thử lại sau.',
+                    'source' => 'unavailable',
+                    'message' => 'Dịch vụ trợ lý đang tạm thời không khả dụng.',
+                    'assistant_completed' => false,
+                    'failure_category' => $category,
+                ];
             }
         }
 
@@ -41,8 +70,44 @@ final class AiChatbotService
             'answer' => $this->fallbackAnswer($message),
             'source' => 'fallback',
             'message' => 'Đang dùng trợ lý dự phòng từ dữ liệu MovieMate vì AI chưa được bật, chưa cấu hình hoặc tạm thời không phản hồi.',
-            'assistant_completed' => ! $providerFailed,
+            'assistant_completed' => true,
+            'failure_category' => null,
         ];
+    }
+
+    private function failureCategory(Throwable $exception): string
+    {
+        return match (true) {
+            $exception instanceof RateLimitedException => 'rate_limited',
+            $exception instanceof InsufficientCreditsException => 'quota',
+            $exception instanceof ProviderOverloadedException => 'provider_unavailable',
+            $exception instanceof ConnectionException,
+            Str::contains(Str::lower($exception::class.' '.$exception->getMessage()), 'timeout') => 'timeout',
+            $exception instanceof ValidationException => 'tool_failure',
+            $exception instanceof OverflowException => 'step_limit',
+            $exception instanceof \UnexpectedValueException => 'malformed',
+            default => 'provider_unavailable',
+        };
+    }
+
+    private function logAttempt(
+        string $level,
+        string $event,
+        string $audience,
+        AiConversationContext $context,
+        int $startedAt,
+        ?string $failureCategory,
+    ): void {
+        Log::$level($event, [
+            'provider' => $this->runtime->provider(),
+            'model' => $this->runtime->model(),
+            'audience' => $audience === 'authenticated' ? 'authenticated' : 'guest',
+            'duration_ms' => (int) ((hrtime(true) - $startedAt) / 1_000_000),
+            'context_messages' => count($context->messages),
+            'context_characters' => $context->characterCount,
+            'tool_calls' => $this->toolGuard->count(),
+            'failure_category' => $failureCategory,
+        ]);
     }
 
     private function fallbackAnswer(string $message): string

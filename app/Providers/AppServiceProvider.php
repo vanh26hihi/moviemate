@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Ai\Agents\MovieMateCinemaAssistant;
+use App\Ai\MovieMateToolCallGuard;
 use App\Models\AiConversation;
 use App\Models\Booking;
 use App\Models\Role;
@@ -15,11 +17,14 @@ use App\Services\CinemaAccessService;
 use App\Services\CinemaContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Ai\Events\InvokingTool;
+use Laravel\Ai\Tools\ToolNameResolver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -30,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(CinemaContext::class, fn () => new CinemaContext);
         $this->app->scoped(CinemaAccessService::class, fn () => new CinemaAccessService);
+        $this->app->scoped(MovieMateToolCallGuard::class, fn () => new MovieMateToolCallGuard);
     }
 
     /**
@@ -37,6 +43,26 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(InvokingTool::class, function (InvokingTool $event): void {
+            if ($event->agent instanceof MovieMateCinemaAssistant) {
+                app(MovieMateToolCallGuard::class)->record(
+                    ToolNameResolver::resolve($event->tool),
+                    $event->arguments,
+                );
+            }
+        });
+
+        RateLimiter::for('ai-chat', fn (Request $request): array => $this->aiRateLimits(
+            $request,
+            'chat',
+            'Bạn đã gửi quá nhiều yêu cầu cho trợ lý. Vui lòng chờ rồi thử lại.',
+        ));
+        RateLimiter::for('ai-recommendation', fn (Request $request): array => $this->aiRateLimits(
+            $request,
+            'recommend',
+            'Bạn đã yêu cầu quá nhiều gợi ý. Vui lòng chờ rồi thử lại.',
+        ));
+
         RateLimiter::for('booking-hold-creation', function (Request $request): array {
             $keys = app(BookingCheckoutDraftService::class)->holdCreationRateLimitKeys($request);
             $message = 'Bạn đã tạo quá nhiều lượt giữ ghế trong thời gian ngắn. Vui lòng chờ một chút rồi thử lại.';
@@ -126,5 +152,24 @@ class AppServiceProvider extends ServiceProvider
                 'customerPreferredCinema' => $context->preference(),
             ]);
         });
+    }
+
+    /** @return list<Limit> */
+    private function aiRateLimits(Request $request, string $scope, string $message): array
+    {
+        $authenticated = $request->user() !== null;
+        $audience = $authenticated ? 'user' : 'guest';
+        $identity = $authenticated ? 'user:'.$request->user()->getAuthIdentifier() : 'ip:'.hash('sha256', $request->ip());
+        $config = (array) config('moviemate-ai.rate_limits', []);
+        $response = fn (Request $request, array $headers) => $request->expectsJson()
+            ? response()->json(['message' => $message], 429, $headers)
+            : response($message, 429, $headers);
+
+        return [
+            Limit::perMinute(max(1, (int) ($config[$scope.'_'.$audience.'_minute'] ?? 8)))
+                ->by("ai:{$scope}:minute:{$identity}")->response($response),
+            Limit::perHour(max(1, (int) ($config[$scope.'_'.$audience.'_hour'] ?? 40)))
+                ->by("ai:{$scope}:hour:{$identity}")->response($response),
+        ];
     }
 }

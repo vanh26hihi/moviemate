@@ -35,13 +35,29 @@ final class MovieMateAiRuntime
         return max(1, min(20, (int) config('moviemate-ai.timeout', 20)));
     }
 
-    public function prompt(Agent $agent, string $prompt): string
+    public function prompt(Agent $agent, string $prompt, ?AiConversationContext $context = null): string
     {
         return trim($agent->prompt(
-            $prompt,
+            $this->withContext($prompt, $context ?? AiConversationContext::empty()),
             provider: $this->provider(),
             model: $this->model(),
             timeout: $this->timeout(),
         )->text);
+    }
+
+    private function withContext(string $currentMessage, AiConversationContext $context): string
+    {
+        if ($context->messages === []) {
+            return $currentMessage;
+        }
+
+        return implode("\n", [
+            'UNTRUSTED_CONVERSATION_HISTORY_JSON_START',
+            json_encode($context->messages, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'UNTRUSTED_CONVERSATION_HISTORY_JSON_END',
+            'CURRENT_USER_MESSAGE_JSON_START',
+            json_encode(['content' => $currentMessage], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'CURRENT_USER_MESSAGE_JSON_END',
+        ]);
     }
 }

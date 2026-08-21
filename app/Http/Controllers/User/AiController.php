@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Ai\AiConversationContextBuilder;
 use App\Http\Controllers\Controller;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
@@ -37,6 +38,7 @@ class AiController extends Controller
             'companion' => ['required', 'string', 'in:alone,couple,friends,family'],
             'preferred_time' => ['required', 'string', 'in:tonight,tomorrow,weekend,after_21,morning,afternoon'],
             'location' => ['nullable', 'string', 'max:191'],
+            ...$this->prohibitedAiOverrides(),
         ]);
 
         $preferences['genres'] = array_values(array_unique($preferences['genres'] ?? []));
@@ -84,6 +86,7 @@ class AiController extends Controller
         Request $request,
         AiChatbotService $service,
         AiConversationService $conversations,
+        AiConversationContextBuilder $contextBuilder,
     ): RedirectResponse {
         $validated = $request->validate([
             'message' => ['bail', 'required', 'string', 'max:'.AiConversationService::MESSAGE_MAX_LENGTH, 'not_regex:/^\s*$/u'],
@@ -92,8 +95,7 @@ class AiController extends Controller
             'role' => ['prohibited'],
             'assistant' => ['prohibited'],
             'system' => ['prohibited'],
-            'provider' => ['prohibited'],
-            'model' => ['prohibited'],
+            ...$this->prohibitedAiOverrides(),
         ]);
 
         if ($request->user()) {
@@ -123,20 +125,30 @@ class AiController extends Controller
             return to_route('user.ai.chatbot', ['conversation' => $conversation->id]);
         }
 
-        $result = $service->answer($validated['message']);
         $history = $this->chatHistory($request);
+        $context = $contextBuilder->forGuest($request->session()->get('ai.chat.history', []));
+        $result = $service->answer($validated['message'], $context, 'guest');
         $history->push([
             'message' => $validated['message'],
-            'response' => $result['answer'],
+            'response' => ($result['assistant_completed'] ?? false) ? $result['answer'] : null,
             'created_at' => now()->toIso8601String(),
         ]);
 
         $request->session()->put([
-            'ai.chat.history' => $history->take(-20)->values()->all(),
+            'ai.chat.history' => $history->take(-20)->map(fn ($turn): array => (array) $turn)->values()->all(),
             'ai.chat.meta' => $result,
         ]);
 
         return to_route('user.ai.chatbot');
+    }
+
+    /** @return array<string, list<string>> */
+    private function prohibitedAiOverrides(): array
+    {
+        return collect([
+            'history', 'messages', 'system_prompt', 'developer_prompt', 'context', 'assistant_history',
+            'provider', 'model', 'temperature', 'max_tokens', 'max_steps', 'steps', 'timeout', 'tool_registry',
+        ])->mapWithKeys(fn (string $field): array => [$field => ['prohibited']])->all();
     }
 
     private function recommendationView(array $preferences, ?array $result): View
