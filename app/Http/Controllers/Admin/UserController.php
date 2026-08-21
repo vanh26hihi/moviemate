@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\UserBookingHistoryRequest;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogger;
-use App\Services\CinemaAccessService;
-use App\Services\Admin\UserDetailReadModel;
 use App\Services\Admin\UserBookingExportService;
+use App\Services\Admin\UserDetailReadModel;
+use App\Services\CinemaAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -69,42 +70,18 @@ class UserController extends Controller
         ]);
     }
 
-    public function show(Request $request, User $user, UserDetailReadModel $readModel): View
+    public function show(UserBookingHistoryRequest $request, User $user, UserDetailReadModel $readModel): View
     {
         Gate::authorize('view', $user);
 
-        $dateToRules = ['nullable', 'date_format:Y-m-d'];
-        if ($request->filled('date_from')) {
-            $dateToRules[] = 'after_or_equal:date_from';
-        }
-
-        $filters = $request->validate([
-            'booking_search' => ['nullable', 'string', 'max:100'],
-            'booking_status' => ['nullable', 'in:'.implode(',', \App\Models\Booking::STATUSES)],
-            'date_from' => ['nullable', 'date_format:Y-m-d'],
-            'date_to' => $dateToRules,
-        ]);
-
-        return view('admin.users.show', $readModel->build($request->user(), $user, $filters));
+        return view('admin.users.show', $readModel->build($request->user(), $user, $request->validated()));
     }
 
-    public function exportBookings(Request $request, User $user, UserBookingExportService $exporter): StreamedResponse
+    public function exportBookings(UserBookingHistoryRequest $request, User $user, UserBookingExportService $exporter): StreamedResponse
     {
         Gate::authorize('view', $user);
 
-        $dateToRules = ['nullable', 'date_format:Y-m-d'];
-        if ($request->filled('date_from')) {
-            $dateToRules[] = 'after_or_equal:date_from';
-        }
-
-        $filters = $request->validate([
-            'booking_search' => ['nullable', 'string', 'max:100'],
-            'booking_status' => ['nullable', 'in:'.implode(',', \App\Models\Booking::STATUSES)],
-            'date_from' => ['nullable', 'date_format:Y-m-d'],
-            'date_to' => $dateToRules,
-        ]);
-
-        return $exporter->download($request->user(), $user, $filters);
+        return $exporter->download($request->user(), $user, $request->validated());
     }
 
     public function updateRole(Request $request, User $user, ActivityLogger $activityLogger): RedirectResponse
