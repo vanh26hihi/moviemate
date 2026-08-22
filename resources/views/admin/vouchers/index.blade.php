@@ -15,12 +15,6 @@
     </a>
 </div>
 
-@if(session('success'))
-    <div class="mb-5 rounded-2xl border border-success/30 bg-success/10 text-success px-4 py-3 text-sm font-semibold">
-        {{ session('success') }}
-    </div>
-@endif
-
 <div class="admin-toolbar">
     <form method="GET" action="{{ route('admin.vouchers.index') }}" class="grid w-full grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
         <label class="relative">
