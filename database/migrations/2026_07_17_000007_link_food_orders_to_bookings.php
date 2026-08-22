@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('orders', function (Blueprint $table) {
             $table->foreignId('booking_id')->nullable()->unique()->after('id')
-                ->constrained('bookings')->cascadeOnDelete();
+                ->constrained('bookings')->nullOnDelete();
         });
     }
 
