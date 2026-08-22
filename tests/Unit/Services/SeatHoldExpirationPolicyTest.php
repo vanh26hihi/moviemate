@@ -17,7 +17,7 @@ class SeatHoldExpirationPolicyTest extends TestCase
     public function test_it_tracks_warning_and_expiration_for_a_hold(): void
     {
         $scenario = $this->bookingScenario();
-        $user = User::query()->factory()->create();
+        $user = User::factory()->create();
         $policy = app(SeatHoldExpirationPolicy::class);
 
         $hold = SeatHold::query()->create([

@@ -17,8 +17,8 @@ class SeatHoldPolicyTest extends TestCase
     public function test_it_normalizes_and_evaluates_a_selection(): void
     {
         $scenario = $this->bookingScenario();
-        $user = User::query()->factory()->create();
-        $otherUser = User::query()->factory()->create();
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
         $service = app(SeatHoldPolicy::class);
 
         SeatHold::query()->create([
@@ -39,7 +39,7 @@ class SeatHoldPolicyTest extends TestCase
     public function test_it_tracks_active_holds_and_warning_window(): void
     {
         $scenario = $this->bookingScenario();
-        $user = User::query()->factory()->create();
+        $user = User::factory()->create();
         $service = app(SeatHoldPolicy::class);
 
         SeatHold::query()->create([
