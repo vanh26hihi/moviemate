@@ -10,7 +10,6 @@ use App\Models\Showtime;
 use App\Services\Seats\SeatAvailabilitySnapshot;
 use App\Services\Seats\SeatSelectionPolicy;
 use App\Support\SeatPresentation;
-use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +22,7 @@ class BookingCheckoutPreviewService
         private readonly SeatSelectionPolicy $seatSelectionPolicy,
         private readonly BookingTokenService $tokens,
         private readonly BookingExpirationService $expiration,
+        private readonly ShowtimeLifecycleService $lifecycle,
     ) {}
 
     public function preview(array $draft): BookingCheckoutPreview
@@ -30,14 +30,15 @@ class BookingCheckoutPreviewService
         $showtime = Showtime::query()
             ->with(['movie', 'cinema', 'room', 'roomLayout'])
             ->findOrFail((int) $draft['showtime_id']);
-        $this->assertShowtimeAvailable($showtime);
-
         $seatIds = collect($draft['seat_ids'])
             ->map(fn ($seatId): int => (int) $seatId)
             ->unique()
             ->sort()
             ->values();
         $this->expiration->expireStaleForSeats($showtime->id, $seatIds);
+
+        $ownBookingId = $this->ownActiveBookingId($draft, $showtime);
+        $this->assertShowtimeAvailable($showtime, $ownBookingId !== null);
 
         $layout = $this->layouts->resolveForShowtime($showtime);
         $seats = Seat::query()
@@ -48,7 +49,6 @@ class BookingCheckoutPreviewService
             ->orderBy('number')
             ->get();
 
-        $ownBookingId = $this->ownActiveBookingId($draft, $showtime);
         $this->assertSeatsAvailable($showtime, $seats, $seatIds, $layout, $ownBookingId);
         $this->assertLogicalSeatLimit($seats);
         $this->assertNoIsolatedSeat($showtime, $layout, $seatIds, $ownBookingId);
@@ -62,9 +62,8 @@ class BookingCheckoutPreviewService
         return new BookingCheckoutPreview($showtime, $seats, $prices);
     }
 
-    private function assertShowtimeAvailable(Showtime $showtime): void
+    private function assertShowtimeAvailable(Showtime $showtime, bool $hasAuthoritativeHold): void
     {
-        $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time);
         if ($showtime->status !== 'active'
             || $showtime->cinema?->status !== 'active'
             || $showtime->cinema?->archived_at !== null
@@ -72,10 +71,15 @@ class BookingCheckoutPreviewService
             || $showtime->room?->cinema_id !== $showtime->cinema_id
             || ! $showtime->roomLayout
             || $showtime->roomLayout->status !== 'published'
-            || $showtime->roomLayout->room_id !== $showtime->room_id
-            || ! $startsAt->isFuture()) {
+            || $showtime->roomLayout->room_id !== $showtime->room_id) {
             throw ValidationException::withMessages([
                 'showtime' => 'Suất chiếu không còn khả dụng.',
+            ]);
+        }
+
+        if (! $hasAuthoritativeHold && ! $this->lifecycle->isCustomerBookingOpen($showtime)) {
+            throw ValidationException::withMessages([
+                'showtime' => 'Suất chiếu này đã đóng nhận đặt vé.',
             ]);
         }
     }

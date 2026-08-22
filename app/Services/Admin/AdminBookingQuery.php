@@ -55,7 +55,7 @@ final class AdminBookingQuery
             ->withQueryString();
     }
 
-    /** @return array{total:int,revenue:int,seats:int,used:int} */
+    /** @return array{total:int,revenue:int,seats:int} */
     public function summary(array $filters): array
     {
         $row = $this->successful($filters)
@@ -63,7 +63,6 @@ final class AdminBookingQuery
             ->select([])
             ->selectRaw('COUNT(*) AS total')
             ->selectRaw('COALESCE(SUM(successful_payments.amount), 0) AS revenue')
-            ->selectRaw("SUM(CASE WHEN bookings.booking_status = 'used' THEN 1 ELSE 0 END) AS used_count")
             ->selectRaw('COALESCE(SUM((SELECT COUNT(*) FROM booking_seats WHERE booking_seats.booking_id = bookings.id)), 0) AS seat_count')
             ->toBase()
             ->first();
@@ -72,7 +71,6 @@ final class AdminBookingQuery
             'total' => (int) ($row?->total ?? 0),
             'revenue' => (int) ($row?->revenue ?? 0),
             'seats' => (int) ($row?->seat_count ?? 0),
-            'used' => (int) ($row?->used_count ?? 0),
         ];
     }
 
@@ -99,7 +97,7 @@ final class AdminBookingQuery
                 '=',
                 'bookings.id',
             )
-            ->whereIn('bookings.booking_status', ['paid', 'used'])
+            ->where('bookings.booking_status', 'paid')
             ->where('bookings.payment_status', 'paid');
 
         $this->cinemaAccess->scope($query, auth()->user(), 'bookings.cinema_id');
@@ -123,10 +121,6 @@ final class AdminBookingQuery
             ->when(($filters['ticket_status'] ?? null) === 'none', fn (Builder $query) => $query->whereDoesntHave('ticketDelivery'))
             ->when(($filters['ticket_status'] ?? null) && ($filters['ticket_status'] ?? null) !== 'none', fn (Builder $query) => $query
                 ->whereHas('ticketDelivery', fn (Builder $delivery) => $delivery->where('status', $filters['ticket_status'])))
-            ->when(($filters['checkin_status'] ?? null) === 'used', fn (Builder $query) => $query
-                ->where('bookings.booking_status', 'used'))
-            ->when(($filters['checkin_status'] ?? null) === 'not_used', fn (Builder $query) => $query
-                ->where('bookings.booking_status', 'paid'))
             ->when($filters['date_from'] ?? null, fn (Builder $query, string $date) => $query
                 ->whereDate('successful_payments.finance_paid_at', '>=', $date))
             ->when($filters['date_to'] ?? null, fn (Builder $query, string $date) => $query

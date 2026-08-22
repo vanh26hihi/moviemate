@@ -9,22 +9,20 @@ use App\Models\BookingSeat;
 use App\Models\BookingTicketDelivery;
 use App\Models\BookingTicketPrint;
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\FoodItem;
 use App\Models\Movie;
 use App\Models\Payment;
 use App\Models\Room;
 use App\Models\RoomLayout;
+use App\Models\RoomType;
 use App\Models\Seat;
 use App\Models\Showtime;
-use App\Models\TicketCheckinEvent;
 use App\Models\User;
 use App\Services\Admin\AdminPaymentQuery;
 use App\Services\BookingTokenService;
 use App\Services\Payments\PayOsPaymentStateService;
 use App\Services\Payments\VerifiedPaymentService;
 use App\Services\Payments\VnpayExplicitCancellationService;
-use App\Services\Tickets\TicketCheckinCapability;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Collection;
@@ -253,24 +251,20 @@ final class CounterSalesR8Test extends TestCase
         ]);
     }
 
-    public function test_creator_settler_printer_and_checkin_actor_remain_distinct(): void
+    public function test_creator_settler_and_printer_actors_remain_distinct(): void
     {
         [$booking, , $creator] = $this->counterHold();
         $settler = $this->userWithRole('staff');
         $printer = $this->userWithRole('staff');
-        $checker = $this->userWithRole('staff');
 
         $this->actingAs($settler)->post(route('staff.counter.cash', $booking))->assertRedirect();
         $this->actingAs($printer)->post(route('staff.tickets.print.start', $booking))->assertRedirect();
         $this->post(route('staff.tickets.print.succeed', $booking))->assertRedirect();
-        $capability = app(TicketCheckinCapability::class)->issue($booking->fresh());
-        $this->actingAs($checker)->post(route('staff.tickets.consume'), ['ticket' => $capability])->assertRedirect();
 
         $this->assertSame($creator->id, $booking->fresh()->created_by_staff_id);
         $this->assertSame($settler->id, Payment::query()->sole()->settled_by_user_id);
         $this->assertSame($printer->id, BookingTicketPrint::query()->sole()->printed_by_user_id);
-        $this->assertSame($checker->id, TicketCheckinEvent::query()->where('result', 'accepted')->sole()->actor_user_id);
-        $this->assertSame('used', $booking->fresh()->booking_status);
+        $this->assertSame('paid', $booking->fresh()->booking_status);
 
         $creator->forceFill(['status' => 'inactive'])->save();
         $this->assertSame($creator->name, $booking->fresh()->createdByStaff?->name);
@@ -629,9 +623,13 @@ final class CounterSalesR8Test extends TestCase
                 'opens_at' => '08:00:00', 'latest_show_start_at' => '23:00:00', 'is_closed' => false,
             ]);
         }
+        $roomType = RoomType::query()->firstOrCreate(['code' => '2D'], [
+            'name' => '2D', 'slug' => '2d', 'is_active' => true, 'status' => true, 'sort_order' => 1,
+        ]);
         $room = Room::query()->create([
             'cinema_id' => $cinema->id, 'code' => 'R8'.str()->upper(str()->random(6)),
-            'name' => 'R8 room', 'room_type' => '2D', 'total_seats' => $seatCount, 'status' => 'active',
+            'name' => 'R8 room', 'room_type' => '2D', 'room_type_id' => $roomType->id,
+            'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $seats = collect();
         for ($number = 1; $number <= $seatCount; $number++) {
@@ -650,20 +648,20 @@ final class CounterSalesR8Test extends TestCase
                 'cell_type' => 'seat', 'seat_id' => $seat->id,
             ]);
         }
+        $seats->each(fn (Seat $seat) => $this->assignLogicalSeatType($seat));
         $layout->update(['status' => 'published', 'published_at' => now()]);
         $movie = Movie::query()->create([
             'title' => 'R8 movie '.str()->random(5), 'slug' => 'r8-'.str()->lower(str()->random(10)),
             'duration' => 90, 'status' => 'now_showing',
         ]);
-        CinemaPricingRule::query()->create([
-            'cinema_id' => $cinema->id, 'name' => 'R8 base '.str()->random(6),
-            'rule_type' => 'base', 'amount_vnd' => 60000, 'priority' => 2000, 'status' => 'active',
-        ]);
+        $this->ensurePublishedPriceBook(60_000);
         $showtime = Showtime::query()->create([
             'movie_id' => $movie->id, 'cinema_id' => $cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'room_layout_id' => $layout->id, 'show_date' => now()->addDays(3)->toDateString(),
-            'show_time' => '19:00:00', 'price' => 60000, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active',
+            'show_time' => '19:00:00', 'status' => 'active',
         ]);
+        $this->snapshotShowtime($showtime);
 
         return compact('cinema', 'room', 'movie', 'seats', 'layout', 'showtime');
     }

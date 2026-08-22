@@ -1,0 +1,761 @@
+<?php
+
+namespace App\Services\Admin;
+
+use App\Exceptions\ShowtimeScheduleConfigurationException;
+use App\Models\Booking;
+use App\Models\Cinema;
+use App\Models\CinemaOperatingHour;
+use App\Models\Payment;
+use App\Models\Room;
+use App\Models\SeatIncidentImpact;
+use App\Models\SeatIncidentResolution;
+use App\Models\Showtime;
+use App\Models\User;
+use App\Services\CinemaAccessService;
+use App\Services\Reports\AuthoritativePaymentQuery;
+use App\Services\Seats\SeatIncidentImpactClassifier;
+use App\Services\ShowtimeLifecycleService;
+use App\Services\ShowtimeScheduleService;
+use App\Services\Tickets\BookingTicketEligibility;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+
+final class Branch360ReadModel
+{
+    public const PRESENTATION_LIMIT = 8;
+
+    private const PRIORITY_REFUND = 10;
+
+    private const PRIORITY_REPLACEMENT_PRINT = 20;
+
+    private const PRIORITY_PAID_IMPACT = 30;
+
+    private const PRIORITY_PAYMENT = 40;
+
+    private const PRIORITY_UPCOMING_IMPACT = 50;
+
+    private const PRIORITY_INACTIVE_ROOM = 60;
+
+    private const PRIORITY_CLOSED_DAY = 70;
+
+    private const UPCOMING_SOON_MINUTES = 120;
+
+    private const ROOM_STATE_INACTIVE = 'INACTIVE';
+
+    private const ROOM_STATE_SHOWING = 'SHOWING';
+
+    private const ROOM_STATE_CLEANING = 'CLEANING';
+
+    private const ROOM_STATE_READY = 'READY';
+
+    private const ROOM_STATE_LABELS = [
+        self::ROOM_STATE_INACTIVE => 'Ngừng hoạt động',
+        self::ROOM_STATE_SHOWING => 'Đang chiếu',
+        self::ROOM_STATE_CLEANING => 'Đang vệ sinh',
+        self::ROOM_STATE_READY => 'Sẵn sàng theo lịch',
+    ];
+
+    public function __construct(
+        private readonly CinemaAccessService $cinemaAccess,
+        private readonly ShowtimeLifecycleService $lifecycle,
+        private readonly ShowtimeScheduleService $schedule,
+        private readonly SeatIncidentImpactClassifier $incidentClassifier,
+        private readonly BookingTicketEligibility $ticketEligibility,
+        private readonly AuthoritativePaymentQuery $authoritativePayments,
+    ) {}
+
+    /**
+     * @return array{
+     *   header: array<string, mixed>,
+     *   actionQueue: array{items:list<array<string, mixed>>,total:int,remaining:int,limit:int},
+     *   todayOperations: array<string, mixed>,
+     *   playingNow: array{items:list<array<string, mixed>>,total:int},
+     *   upcomingSoon: array{items:list<array<string, mixed>>,untilAt:CarbonImmutable,horizonMinutes:int},
+     *   roomOperations: list<array<string, mixed>>,
+     *   counterOperations: array{
+     *     firstPrintBookingCount:int,
+     *     unprintedTicketCount:int,
+     *     items:list<array<string, mixed>>,
+     *     replacementPrintPendingCount:int,
+     *     replacementPrintActionUrl:?string,
+     *     overflowCount:int,
+     *     limit:int
+     *   },
+     *   finance?: array{localDate:string,collectedAmount:int,paidBookingCount:int,reportUrl:string,generatedAt:CarbonImmutable}
+     * }
+     */
+    public function snapshot(Cinema $cinema, User $actor): array
+    {
+        $this->cinemaAccess->authorizeCinema($actor, (int) $cinema->id);
+
+        $timezone = $this->timezone($cinema);
+        $localNow = CarbonImmutable::now($timezone);
+        $hours = CinemaOperatingHour::query()
+            ->where('cinema_id', $cinema->id)
+            ->where('day_of_week', $localNow->dayOfWeekIso)
+            ->first();
+        $upcoming = $this->upcomingShowtimes($cinema);
+        $operations = $this->operationalSnapshot($cinema, $actor, $localNow);
+        $tasks = [
+            ...$this->incidentTasks($cinema, $actor, $upcoming, $timezone),
+            ...$this->paymentTasks($cinema, $actor, $timezone),
+            ...$this->inactiveRoomTasks($actor, $upcoming),
+            ...$this->closedDayTasks($cinema, $actor, $hours, $localNow),
+        ];
+        usort($tasks, fn (array $left, array $right): int => $this->compareTasks($left, $right));
+
+        $total = count($tasks);
+        $items = array_slice($tasks, 0, self::PRESENTATION_LIMIT);
+        $finance = $actor->hasPermission('reports.view')
+            ? ['finance' => $this->financeContext($cinema, $localNow)]
+            : [];
+
+        return [
+            'header' => [
+                'name' => (string) $cinema->name,
+                'code' => (string) $cinema->code,
+                'localTime' => $localNow,
+                'generatedAt' => $localNow,
+                'timezone' => $timezone,
+                'branchStatus' => $this->branchStatus($cinema),
+                'operatingHours' => $this->operatingHours($hours),
+                'shortAddress' => $this->shortAddress((string) $cinema->address),
+            ],
+            'actionQueue' => [
+                'items' => $items,
+                'total' => $total,
+                'remaining' => max(0, $total - count($items)),
+                'limit' => self::PRESENTATION_LIMIT,
+            ],
+            ...$operations,
+            'counterOperations' => $this->counterOperations($cinema, $actor, $localNow, $tasks),
+            ...$finance,
+        ];
+    }
+
+    /** @return array{localDate:string,collectedAmount:int,paidBookingCount:int,reportUrl:string,generatedAt:CarbonImmutable} */
+    private function financeContext(Cinema $cinema, CarbonImmutable $localNow): array
+    {
+        $localDate = $localNow->toDateString();
+        $start = $localNow->startOfDay()->utc();
+        $nextStart = $localNow->addDay()->startOfDay()->utc();
+        $aggregate = DB::query()
+            ->fromSub($this->authoritativePayments->authoritative(), 'authoritative_payments')
+            ->join('bookings as finance_bookings', 'finance_bookings.id', '=', 'authoritative_payments.booking_id')
+            ->where('finance_bookings.cinema_id', $cinema->id)
+            ->where('authoritative_payments.finance_paid_at', '>=', $start->toDateTimeString())
+            ->where('authoritative_payments.finance_paid_at', '<', $nextStart->toDateTimeString())
+            ->selectRaw('COUNT(*) as paid_booking_count')
+            ->selectRaw('COALESCE(SUM(authoritative_payments.amount), 0) as collected_amount')
+            ->first();
+
+        return [
+            'localDate' => $localDate,
+            'collectedAmount' => (int) ($aggregate?->collected_amount ?? 0),
+            'paidBookingCount' => (int) ($aggregate?->paid_booking_count ?? 0),
+            'reportUrl' => route('admin.reports.index', [
+                'from' => $localDate,
+                'to' => $localDate,
+                'cinema' => $cinema->id,
+            ]),
+            'generatedAt' => $localNow,
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $actionTasks
+     * @return array<string, mixed>
+     */
+    private function counterOperations(Cinema $cinema, User $actor, CarbonImmutable $localNow, array $actionTasks): array
+    {
+        $query = Booking::query()
+            ->where('bookings.cinema_id', $cinema->id)
+            ->whereHas('showtime', fn ($showtimes) => $showtimes
+                ->whereDate('show_date', '>=', $localNow->toDateString())
+                ->where('status', '!=', ShowtimeLifecycleService::CANCELLED))
+            ->whereHas('admissionTickets', fn ($tickets) => $tickets->where('print_count', 0))
+            ->with([
+                'showtime.movie:id,title,duration',
+                'showtime.room:id,cinema_id,code,name,cleaning_buffer_minutes',
+                'showtime.presentationFormat:id,code,name',
+            ])
+            ->withCount([
+                'admissionTickets as total_ticket_count',
+                'admissionTickets as printed_ticket_count' => fn ($tickets) => $tickets->where('print_count', '>', 0),
+                'admissionTickets as unprinted_ticket_count' => fn ($tickets) => $tickets->where('print_count', 0),
+            ])
+            ->orderBy('bookings.id');
+        $this->ticketEligibility->applyPrintableBookingFilter($query);
+
+        $bookings = $query->get()
+            ->filter(function (Booking $booking) use ($cinema, $localNow): bool {
+                $showtime = $booking->showtime;
+                if (! $showtime || ! $showtime->room || ! $showtime->movie) {
+                    return false;
+                }
+                $showtime->setRelation('cinema', $cinema);
+                $showtime->room->setRelation('cinema', $cinema);
+
+                return $this->lifecycle->state($showtime, $localNow) === ShowtimeLifecycleService::UPCOMING;
+            })
+            ->sort(function (Booking $left, Booking $right): int {
+                $leftStart = $this->schedule->windowFor($left->showtime)->start;
+                $rightStart = $this->schedule->windowFor($right->showtime)->start;
+
+                return [$leftStart->getTimestamp(), (int) $left->id]
+                    <=> [$rightStart->getTimestamp(), (int) $right->id];
+            })
+            ->values();
+
+        $total = $bookings->count();
+        $unprinted = $bookings->sum(fn (Booking $booking): int => (int) $booking->unprinted_ticket_count);
+        $replacementTasks = collect($actionTasks)->where('type', 'incident_replacement_print');
+        $replacementTask = $replacementTasks->first();
+        $canOpenTicketOperations = $actor->hasPermission('tickets.lookup');
+        $items = $bookings->take(self::PRESENTATION_LIMIT)->map(function (Booking $booking) use ($canOpenTicketOperations): array {
+            $showtime = $booking->showtime;
+            $startsAt = $this->schedule->windowFor($showtime)->start;
+            $totalTickets = (int) $booking->total_ticket_count;
+            $printedTickets = (int) $booking->printed_ticket_count;
+            $unprintedTickets = (int) $booking->unprinted_ticket_count;
+
+            return [
+                'bookingId' => (int) $booking->id,
+                'bookingCode' => (string) $booking->booking_code,
+                'showtimeId' => (int) $showtime->id,
+                'movieTitle' => (string) $showtime->movie?->title,
+                'presentationFormat' => (string) $showtime->presentationFormat?->name,
+                'roomId' => (int) $showtime->room_id,
+                'roomCode' => (string) $showtime->room?->code,
+                'roomName' => (string) $showtime->room?->name,
+                'startsAt' => $startsAt,
+                'totalTicketCount' => $totalTickets,
+                'printedTicketCount' => $printedTickets,
+                'unprintedTicketCount' => $unprintedTickets,
+                'taskType' => 'first_print_pending',
+                'taskMessage' => "Đơn {$booking->booking_code} còn {$unprintedTickets}/{$totalTickets} vé chưa in.",
+                'actionLabel' => $canOpenTicketOperations ? 'Xử lý vé' : null,
+                'actionUrl' => $canOpenTicketOperations ? route('staff.tickets.operations', $booking) : null,
+                'sortKey' => $startsAt->format('Y-m-d H:i:s').':'.str_pad((string) $booking->id, 20, '0', STR_PAD_LEFT),
+            ];
+        })->all();
+
+        return [
+            'firstPrintBookingCount' => $total,
+            'unprintedTicketCount' => $unprinted,
+            'items' => $items,
+            'replacementPrintPendingCount' => $replacementTasks->count(),
+            'replacementPrintActionUrl' => $replacementTask['actionUrl'] ?? null,
+            'overflowCount' => max(0, $total - count($items)),
+            'limit' => self::PRESENTATION_LIMIT,
+        ];
+    }
+
+    /**
+     * @return array{
+     *   todayOperations: array<string, mixed>,
+     *   playingNow: array{items:list<array<string, mixed>>,total:int},
+     *   upcomingSoon: array{items:list<array<string, mixed>>,untilAt:CarbonImmutable,horizonMinutes:int},
+     *   roomOperations: list<array<string, mixed>>
+     * }
+     */
+    private function operationalSnapshot(Cinema $cinema, User $actor, CarbonImmutable $localNow): array
+    {
+        $rooms = Room::query()
+            ->where('cinema_id', $cinema->id)
+            ->with([
+                'roomType:id,code,name',
+                'latestPublishedLayout' => fn ($query) => $query->select([
+                    'room_layouts.id',
+                    'room_layouts.room_id',
+                    'room_layouts.status',
+                    'room_layouts.version',
+                ]),
+            ])
+            ->withCount(['seatIncidents as open_incident_count' => fn ($query) => $query->where('status', 'open')])
+            ->orderBy('code')
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($rooms as $room) {
+            $room->setRelation('cinema', $cinema);
+        }
+
+        $showtimes = $this->operationalShowtimeCandidates($cinema, $rooms, $localNow);
+        $snapshots = $showtimes->mapWithKeys(fn (Showtime $showtime): array => [
+            $showtime->id => $this->lifecycle->snapshot($showtime, $localNow),
+        ]);
+        $businessDate = $localNow->toDateString();
+        $today = $showtimes->filter(fn (Showtime $showtime): bool => $showtime->show_date->toDateString() === $businessDate);
+        $playing = $showtimes->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::PLAYING)
+            ->sort(fn (Showtime $left, Showtime $right): int => $this->compareShowtimes($left, $right, $snapshots));
+        $untilAt = $localNow->addMinutes(self::UPCOMING_SOON_MINUTES);
+        $upcomingSoon = $showtimes
+            ->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::UPCOMING
+                && $snapshots[$showtime->id]['starts_at']->gt($localNow)
+                && $snapshots[$showtime->id]['starts_at']->lte($untilAt))
+            ->sort(fn (Showtime $left, Showtime $right): int => $this->compareShowtimes($left, $right, $snapshots));
+
+        return [
+            'todayOperations' => [
+                'businessDate' => $businessDate,
+                'counts' => [
+                    'upcoming' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::UPCOMING)->count(),
+                    'playing' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::PLAYING)->count(),
+                    'completed' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::COMPLETED)->count(),
+                    'cancelled' => $today->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::CANCELLED)->count(),
+                ],
+            ],
+            'playingNow' => [
+                'items' => $playing->map(fn (Showtime $showtime): array => $this->showtimeProjection($showtime, $snapshots[$showtime->id], true))->values()->all(),
+                'total' => $playing->count(),
+            ],
+            'upcomingSoon' => [
+                'items' => $upcomingSoon->map(fn (Showtime $showtime): array => $this->showtimeProjection($showtime, $snapshots[$showtime->id]))->values()->all(),
+                'untilAt' => $untilAt,
+                'horizonMinutes' => self::UPCOMING_SOON_MINUTES,
+            ],
+            'roomOperations' => $this->roomOperations($rooms, $showtimes, $snapshots, $actor),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Room>  $rooms
+     * @return Collection<int, Showtime>
+     */
+    private function operationalShowtimeCandidates(Cinema $cinema, Collection $rooms, CarbonImmutable $localNow): Collection
+    {
+        if ($rooms->isEmpty()) {
+            return collect();
+        }
+
+        $lookbackMinutes = ShowtimeScheduleService::MAX_RUNTIME_MINUTES
+            + ShowtimeScheduleService::MAX_CLEANING_BUFFER_MINUTES;
+
+        $showtimes = Showtime::query()
+            ->where('cinema_id', $cinema->id)
+            ->whereIn('room_id', $rooms->pluck('id'))
+            ->whereDate('show_date', '>=', $localNow->subMinutes($lookbackMinutes)->toDateString())
+            ->with(['movie:id,title,duration', 'presentationFormat:id,code,name'])
+            ->orderBy('show_date')
+            ->orderBy('show_time')
+            ->orderBy('room_id')
+            ->orderBy('id')
+            ->get();
+        $roomsById = $rooms->keyBy('id');
+
+        foreach ($showtimes as $showtime) {
+            $showtime->setRelation('room', $roomsById->get($showtime->room_id));
+            $showtime->setRelation('cinema', $cinema);
+        }
+
+        return $showtimes;
+    }
+
+    /**
+     * @param  Collection<int, Room>  $rooms
+     * @param  Collection<int, Showtime>  $showtimes
+     * @param  Collection<int, array<string, mixed>>  $snapshots
+     * @return list<array<string, mixed>>
+     */
+    private function roomOperations(Collection $rooms, Collection $showtimes, Collection $snapshots, User $actor): array
+    {
+        $byRoom = $showtimes->groupBy('room_id');
+
+        return $rooms->map(function (Room $room) use ($byRoom, $snapshots, $actor): array {
+            $roomShowtimes = $byRoom->get($room->id, collect());
+            $active = $roomShowtimes->filter(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] !== ShowtimeLifecycleService::CANCELLED);
+            $current = $active->first(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::PLAYING);
+            $cleaning = $active->first(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::COMPLETED
+                && $snapshots[$showtime->id]['now']->gte($snapshots[$showtime->id]['ends_at'])
+                && $snapshots[$showtime->id]['now']->lt($snapshots[$showtime->id]['room_ready_at']));
+            $next = $active->first(fn (Showtime $showtime): bool => $snapshots[$showtime->id]['state'] === ShowtimeLifecycleService::UPCOMING);
+            $state = match (true) {
+                $room->status === 'inactive' => self::ROOM_STATE_INACTIVE,
+                $current !== null => self::ROOM_STATE_SHOWING,
+                $cleaning !== null => self::ROOM_STATE_CLEANING,
+                default => self::ROOM_STATE_READY,
+            };
+            $layoutWarning = $room->status === 'active' && $room->latestPublishedLayout === null;
+
+            return [
+                'roomId' => (int) $room->id,
+                'code' => (string) $room->code,
+                'name' => (string) $room->name,
+                'roomType' => (string) ($room->roomType?->name ?: $room->room_type),
+                'persistedStatus' => (string) $room->status,
+                'operationalState' => $state,
+                'operationalStateLabel' => self::ROOM_STATE_LABELS[$state],
+                'currentShowtime' => $current ? $this->showtimeProjection($current, $snapshots[$current->id], true) : null,
+                'cleaningReadyAt' => $state === self::ROOM_STATE_CLEANING ? $snapshots[$cleaning->id]['room_ready_at'] : null,
+                'nextShowtime' => $next ? $this->showtimeProjection($next, $snapshots[$next->id]) : null,
+                'openIncidentCount' => (int) $room->open_incident_count,
+                'layoutWarning' => $layoutWarning,
+                'futureShowDrift' => $room->status === 'inactive' && $next !== null,
+                'roomUrl' => $actor->hasPermission('rooms.view') ? route('admin.rooms.show', $room) : null,
+                'incidentUrl' => (int) $room->open_incident_count > 0 && $actor->hasPermission('seats.maintenance.view')
+                    ? route('admin.rooms.seat-maintenance.index', $room)
+                    : null,
+                'layoutUrl' => $layoutWarning && $actor->hasPermission('seats.view')
+                    ? route('admin.rooms.layout.show', $room)
+                    : null,
+            ];
+        })->values()->all();
+    }
+
+    /** @param array<string, mixed> $snapshot @return array<string, mixed> */
+    private function showtimeProjection(Showtime $showtime, array $snapshot, bool $includeEnd = false): array
+    {
+        return [
+            'showtimeId' => (int) $showtime->id,
+            'movieTitle' => (string) $showtime->movie?->title,
+            'formatName' => (string) $showtime->presentationFormat?->name,
+            'roomId' => (int) $showtime->room_id,
+            'roomCode' => (string) $showtime->room?->code,
+            'roomName' => (string) $showtime->room?->name,
+            'startsAt' => $snapshot['starts_at'],
+            'endsAt' => $includeEnd ? $snapshot['ends_at'] : null,
+        ];
+    }
+
+    /** @param Collection<int, array<string, mixed>> $snapshots */
+    private function compareShowtimes(Showtime $left, Showtime $right, Collection $snapshots): int
+    {
+        return [
+            $snapshots[$left->id]['starts_at']->getTimestamp(),
+            (int) $left->room_id,
+            (int) $left->id,
+        ] <=> [
+            $snapshots[$right->id]['starts_at']->getTimestamp(),
+            (int) $right->room_id,
+            (int) $right->id,
+        ];
+    }
+
+    /** @return Collection<int, Showtime> */
+    private function upcomingShowtimes(Cinema $cinema): Collection
+    {
+        $query = Showtime::query()->where('showtimes.cinema_id', $cinema->id);
+        $this->lifecycle->applyFilter($query, ShowtimeLifecycleService::UPCOMING);
+
+        return $query->with([
+            'movie:id,title,duration',
+            'room:id,cinema_id,code,name,status,cleaning_buffer_minutes',
+            'room.cinema:id,timezone,default_cleaning_buffer_minutes,status,archived_at',
+        ])->orderBy('showtimes.show_date')->orderBy('showtimes.show_time')->orderBy('showtimes.id')->get();
+    }
+
+    /**
+     * @param  Collection<int, Showtime>  $upcoming
+     * @return list<array<string, mixed>>
+     */
+    private function incidentTasks(Cinema $cinema, User $actor, Collection $upcoming, string $timezone): array
+    {
+        if (! $actor->hasPermission('seats.maintenance.view') || $upcoming->isEmpty()) {
+            return [];
+        }
+
+        $impacts = SeatIncidentImpact::query()
+            ->where('resolution_status', SeatIncidentImpact::RESOLUTION_UNRESOLVED)
+            ->whereHas('incident', fn ($query) => $query
+                ->where('cinema_id', $cinema->id)
+                ->where('status', 'open'))
+            ->whereHas('bookingSeat', fn ($query) => $query->whereIn('showtime_id', $upcoming->pluck('id')))
+            ->with([
+                'incident:id,cinema_id,room_id,status',
+                'bookingSeat:id,booking_id,showtime_id,seat_id',
+                'bookingSeat.booking:id,booking_code,booking_status,payment_status',
+                'bookingSeat.booking.payments:id,booking_id,provider,status,verified_at,settled_at,settled_by_user_id',
+                'bookingSeat.showtime:id,movie_id,cinema_id,room_id,show_date,show_time,status',
+                'bookingSeat.showtime.movie:id,title,duration',
+                'bookingSeat.showtime.room:id,cinema_id,code,name,cleaning_buffer_minutes',
+                'bookingSeat.showtime.room.cinema:id,timezone,default_cleaning_buffer_minutes,status,archived_at',
+                'resolution',
+            ])
+            ->orderBy('id')
+            ->get();
+
+        $projected = [];
+        foreach ($impacts as $impact) {
+            $bookingSeat = $impact->bookingSeat;
+            $booking = $bookingSeat?->booking;
+            $showtime = $bookingSeat?->showtime;
+            $incident = $impact->incident;
+            if (! $booking || ! $showtime || ! $incident) {
+                continue;
+            }
+
+            $relevantAt = $this->schedule->windowFor($showtime)->start->setTimezone($timezone);
+            $resolution = $impact->resolution;
+            $classification = $this->incidentClassifier->classify($booking);
+            $task = match (true) {
+                $resolution?->resolution_type === SeatIncidentResolution::TYPE_REQUIRES_REFUND => $this->task(
+                    'incident_requires_refund',
+                    self::PRIORITY_REFUND,
+                    'Khẩn cấp',
+                    "Đơn {$booking->booking_code} cần xử lý hoàn tiền do sự cố ghế.",
+                    $relevantAt,
+                    'Xử lý sự cố',
+                    route('admin.rooms.seat-incidents.show', [$incident->room_id, $incident->id]),
+                    $this->incidentContext($impact, $booking, $showtime),
+                ),
+                $resolution?->reprint_required
+                    && $resolution->reprint_satisfied_at === null => $this->task(
+                        'incident_replacement_print',
+                        self::PRIORITY_REPLACEMENT_PRINT,
+                        'Khẩn cấp',
+                        "Đơn {$booking->booking_code} cần in vé thay thế sau chuyển ghế.",
+                        $relevantAt,
+                        'Mở sự cố',
+                        route('admin.rooms.seat-incidents.show', [$incident->room_id, $incident->id]),
+                        $this->incidentContext($impact, $booking, $showtime),
+                    ),
+                $classification === SeatIncidentImpact::PAID => $this->task(
+                    'incident_paid_impact',
+                    self::PRIORITY_PAID_IMPACT,
+                    'Ưu tiên cao',
+                    "Đơn {$booking->booking_code} đã thanh toán có ghế cần bố trí lại.",
+                    $relevantAt,
+                    'Bố trí lại ghế',
+                    route('admin.rooms.seat-incidents.show', [$incident->room_id, $incident->id]),
+                    $this->incidentContext($impact, $booking, $showtime),
+                ),
+                default => $this->task(
+                    'incident_upcoming_impact',
+                    self::PRIORITY_UPCOMING_IMPACT,
+                    'Cần xử lý',
+                    sprintf('Suất %s tại phòng %s có ghế gặp sự cố cần xử lý.', $relevantAt->format('H:i d/m'), $showtime->room?->code),
+                    $relevantAt,
+                    'Mở sự cố',
+                    route('admin.rooms.seat-incidents.show', [$incident->room_id, $incident->id]),
+                    $this->incidentContext($impact, $booking, $showtime),
+                ),
+            };
+
+            $businessKey = $incident->id.':'.$booking->id;
+            if (! isset($projected[$businessKey]) || $this->compareTasks($task, $projected[$businessKey]) < 0) {
+                $projected[$businessKey] = $task;
+            }
+        }
+
+        return array_values($projected);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function paymentTasks(Cinema $cinema, User $actor, string $timezone): array
+    {
+        if (! $actor->hasPermission('payments.reconcile')) {
+            return [];
+        }
+
+        return Payment::query()
+            ->whereIn('status', [Payment::STATUS_UNRESOLVED, Payment::STATUS_REVIEW])
+            ->whereHas('booking', fn ($query) => $query->where('cinema_id', $cinema->id))
+            ->with(['booking:id,cinema_id,showtime_id,booking_code'])
+            ->orderBy('updated_at')
+            ->orderBy('id')
+            ->get()
+            ->map(function (Payment $payment) use ($timezone): array {
+                $type = $payment->status === Payment::STATUS_REVIEW ? 'payment_review' : 'payment_unresolved';
+                $message = $payment->status === Payment::STATUS_REVIEW
+                    ? "Thanh toán của đơn {$payment->booking->booking_code} cần được xem xét."
+                    : "Thanh toán của đơn {$payment->booking->booking_code} đang chờ đối soát.";
+
+                return $this->task(
+                    $type,
+                    self::PRIORITY_PAYMENT,
+                    'Ưu tiên cao',
+                    $message,
+                    CarbonImmutable::instance($payment->updated_at)->setTimezone($timezone),
+                    'Mở đối soát',
+                    route('admin.payment-reconciliation.index'),
+                    [
+                        'paymentId' => (int) $payment->id,
+                        'bookingCode' => (string) $payment->booking->booking_code,
+                    ],
+                );
+            })->all();
+    }
+
+    /**
+     * @param  Collection<int, Showtime>  $upcoming
+     * @return list<array<string, mixed>>
+     */
+    private function inactiveRoomTasks(User $actor, Collection $upcoming): array
+    {
+        if (! $actor->hasPermission('rooms.view')) {
+            return [];
+        }
+
+        return $upcoming->filter(fn (Showtime $showtime): bool => $showtime->room?->status === 'inactive')
+            ->groupBy('room_id')
+            ->map(function (Collection $showtimes): array {
+                /** @var Showtime $showtime */
+                $showtime = $showtimes->sortBy(fn (Showtime $item) => $this->schedule->windowFor($item)->start)->first();
+                $room = $showtime->room;
+                $startsAt = $this->schedule->windowFor($showtime)->start;
+
+                return $this->task(
+                    'inactive_room_future_show',
+                    self::PRIORITY_INACTIVE_ROOM,
+                    'Cần xử lý',
+                    "Phòng {$room->code} đang ngừng hoạt động nhưng còn suất chiếu tương lai.",
+                    $startsAt,
+                    'Mở phòng chiếu',
+                    route('admin.rooms.show', $room->id),
+                    [
+                        'roomId' => (int) $room->id,
+                        'roomCode' => (string) $room->code,
+                        'showtimeId' => (int) $showtime->id,
+                    ],
+                );
+            })->values()->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function closedDayTasks(
+        Cinema $cinema,
+        User $actor,
+        ?CinemaOperatingHour $hours,
+        CarbonImmutable $localNow,
+    ): array {
+        if (! $hours?->is_closed || ! $actor->hasPermission('showtimes.view')) {
+            return [];
+        }
+
+        $showtimes = Showtime::query()
+            ->where('cinema_id', $cinema->id)
+            ->whereDate('show_date', $localNow->toDateString())
+            ->where('status', 'active')
+            ->with(['movie:id,title,duration', 'room:id,cinema_id,code,name,cleaning_buffer_minutes',
+                'room.cinema:id,timezone,default_cleaning_buffer_minutes,status,archived_at'])
+            ->orderBy('show_time')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (Showtime $showtime): bool => in_array(
+                $this->lifecycle->state($showtime, $localNow),
+                [ShowtimeLifecycleService::UPCOMING, ShowtimeLifecycleService::PLAYING],
+                true,
+            ));
+        if ($showtimes->isEmpty()) {
+            return [];
+        }
+
+        /** @var Showtime $nearest */
+        $nearest = $showtimes->first();
+        $relevantAt = $this->schedule->windowFor($nearest)->start;
+
+        return [$this->task(
+            'closed_day_schedule_conflict',
+            self::PRIORITY_CLOSED_DAY,
+            'Cần xử lý',
+            sprintf('Chi nhánh đóng cửa hôm nay nhưng còn %d suất chiếu đang hoặc sắp diễn ra.', $showtimes->count()),
+            $relevantAt,
+            'Mở lịch chiếu',
+            route('admin.showtimes.index', ['show_date' => $localNow->toDateString()]),
+            [
+                'showtimeId' => (int) $nearest->id,
+                'businessDate' => $localNow->toDateString(),
+                'showtimeCount' => $showtimes->count(),
+            ],
+        )];
+    }
+
+    /** @return array<string, string> */
+    private function branchStatus(Cinema $cinema): array
+    {
+        return match (true) {
+            $cinema->archived_at !== null => ['key' => 'archived', 'label' => 'Đã lưu trữ'],
+            $cinema->status === 'active' => ['key' => 'active', 'label' => 'Đang hoạt động'],
+            default => ['key' => 'inactive', 'label' => 'Ngừng hoạt động'],
+        };
+    }
+
+    /** @return array{key:string,label:string,detail:?string} */
+    private function operatingHours(?CinemaOperatingHour $hours): array
+    {
+        if ($hours === null) {
+            return [
+                'key' => 'not_configured',
+                'label' => 'Chưa cấu hình giờ hoạt động',
+                'detail' => null,
+            ];
+        }
+        if ($hours->is_closed) {
+            return ['key' => 'closed', 'label' => 'Đóng cửa hôm nay', 'detail' => null];
+        }
+
+        $opensAt = $hours->opens_at ? substr((string) $hours->opens_at, 0, 5) : '—';
+        $latestStart = $hours->latest_show_start_at ? substr((string) $hours->latest_show_start_at, 0, 5) : '—';
+
+        return [
+            'key' => 'configured',
+            'label' => 'Hoạt động hôm nay',
+            'detail' => "Mở cửa {$opensAt} · Nhận suất chiếu cuối {$latestStart}",
+        ];
+    }
+
+    private function timezone(Cinema $cinema): string
+    {
+        $timezone = $cinema->timezone ?? config('cinema.timezone');
+        if (! is_string($timezone) || trim($timezone) === '' || ! in_array($timezone, timezone_identifiers_list(), true)) {
+            throw new ShowtimeScheduleConfigurationException('Timezone nghiệp vụ của rạp không hợp lệ.');
+        }
+
+        return $timezone;
+    }
+
+    private function shortAddress(string $address): string
+    {
+        return mb_strlen($address) <= 120 ? $address : mb_substr($address, 0, 119).'…';
+    }
+
+    /** @return array<string, int|string|null> */
+    private function incidentContext(SeatIncidentImpact $impact, Booking $booking, Showtime $showtime): array
+    {
+        return [
+            'incidentId' => (int) $impact->seat_incident_id,
+            'impactId' => (int) $impact->id,
+            'bookingCode' => (string) $booking->booking_code,
+            'showtimeId' => (int) $showtime->id,
+            'roomId' => (int) $showtime->room_id,
+            'roomCode' => (string) $showtime->room?->code,
+            'movie' => (string) $showtime->movie?->title,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function task(
+        string $type,
+        int $priorityRank,
+        string $priority,
+        string $message,
+        CarbonImmutable $relevantAt,
+        string $actionLabel,
+        string $actionUrl,
+        array $context,
+    ): array {
+        $entityId = $context['impactId'] ?? $context['paymentId'] ?? $context['roomId'] ?? $context['showtimeId'] ?? 0;
+
+        return [
+            'key' => $type.':'.$entityId,
+            'type' => $type,
+            'priority' => $priority,
+            'priorityRank' => $priorityRank,
+            'message' => $message,
+            'relevantAt' => $relevantAt,
+            'actionLabel' => $actionLabel,
+            'actionUrl' => $actionUrl,
+            'context' => $context,
+        ];
+    }
+
+    private function compareTasks(array $left, array $right): int
+    {
+        return [$left['priorityRank'], $left['relevantAt']->getTimestamp(), $left['key']]
+            <=> [$right['priorityRank'], $right['relevantAt']->getTimestamp(), $right['key']];
+    }
+}

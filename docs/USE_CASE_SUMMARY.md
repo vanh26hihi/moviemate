@@ -1,60 +1,62 @@
-# MovieMate — Tóm tắt actor và use case
+# MovieMate — Tóm tắt actor và use case cuối cùng
 
 ## Ranh giới sản phẩm
 
-MovieMate là hệ thống của **một đơn vị vận hành chuỗi rạp, có nhiều chi nhánh**; không phải marketplace và không phải SaaS đa công ty.
+MovieMate thuộc **một đơn vị vận hành chuỗi rạp có nhiều chi nhánh**. Hệ thống không phải marketplace, cinema aggregator hoặc SaaS đa công ty.
 
-## Actor
-
-Có đúng **5 actor con người**:
+## Năm actor con người
 
 1. Guest
-2. Registered Customer
+2. Customer
 3. Staff
 4. Manager
-5. Global/System Admin
+5. Global Admin
 
-Hệ thống hỗ trợ bên ngoài, không tính là actor con người: **VNPAY, ZaloPay, payOS** và **hạ tầng gửi email**.
-
-Guest và Registered Customer dùng chung luồng khám phá/đặt vé. Registered Customer kế thừa các thao tác công khai và có thêm hồ sơ, lịch sử cùng quyền quản lý đơn thuộc chính mình.
+VNPAY, ZaloPay, PayOS và hạ tầng email là external systems, không phải actor con người.
 
 ## 32 use case ở mức trình bày
 
 | Mã | Use case | Actor |
 |---|---|---|
-| UC01 | Xem danh sách và chi tiết phim | Guest, Registered Customer |
-| UC02 | Xem danh sách và chi tiết chi nhánh | Guest, Registered Customer |
-| UC03 | Lọc suất chiếu theo phim, rạp và ngày | Guest, Registered Customer |
-| UC04 | Chọn suất chiếu hợp lệ | Guest, Registered Customer |
-| UC05 | Chọn ghế và kiểm tra quy tắc khoảng trống/ghế đôi | Guest, Registered Customer |
-| UC06 | Giữ ghế có thời hạn và tạo đơn | Guest, Registered Customer |
-| UC07 | Chọn đồ ăn tùy chọn theo chi nhánh | Guest, Registered Customer |
-| UC08 | Thanh toán online qua provider | Guest, Registered Customer |
-| UC09 | Xem vé điện tử bằng quyền sở hữu/capability | Guest, Registered Customer |
-| UC10 | Đăng ký, đăng nhập và quản lý hồ sơ | Registered Customer |
-| UC11 | Xem lịch sử đặt vé | Registered Customer |
-| UC12 | Hủy đơn đủ điều kiện và yêu cầu gửi lại email vé | Registered Customer |
-| UC13 | Bán vé tại quầy | Staff, Manager, Global/System Admin |
-| UC14 | Tra cứu/giải mã QR vé không làm thay đổi trạng thái | Staff, Manager, Global/System Admin |
-| UC15 | In vé cứng theo quy trình có bằng chứng | Staff, Manager, Global/System Admin |
-| UC16 | Soát vé/check-in | Staff, Manager, Global/System Admin |
-| UC17 | Quản lý phòng trong chi nhánh | Manager, Global/System Admin |
-| UC18 | Quản lý phiên bản sơ đồ và trạng thái ghế | Manager, Global/System Admin |
-| UC19 | Xem/áp dụng mẫu sơ đồ; quản lý vòng đời mẫu theo quyền | Manager, Global/System Admin |
-| UC20 | Quản lý suất chiếu | Manager, Global/System Admin |
-| UC21 | Quản lý bảng giá tập trung | Manager, Global/System Admin |
-| UC22 | Quản lý giờ hoạt động và cleaning buffer | Manager, Global/System Admin |
-| UC23 | Quản lý đồ ăn tại chi nhánh | Manager, Global/System Admin |
-| UC24 | Xem đơn đặt vé và thanh toán trong phạm vi | Manager, Global/System Admin |
-| UC25 | Đối soát và xử lý payment review | Manager, Global/System Admin |
-| UC26 | Cho phép lần thử in bổ sung | Manager, Global/System Admin |
-| UC27 | Xem dashboard/báo cáo theo chi nhánh | Manager, Global/System Admin |
-| UC28 | Quản lý chi nhánh toàn chuỗi | Global/System Admin |
-| UC29 | Quản lý danh mục và lifecycle phim/thể loại theo quyền | Manager, Global/System Admin |
-| UC30 | Xem người dùng/phân công chi nhánh; quản lý vai trò toàn cục theo quyền | Manager, Global/System Admin |
-| UC31 | Xem nhật ký hoạt động và vận hành bảo mật | Global/System Admin |
-| UC32 | Xem báo cáo hợp nhất toàn chuỗi | Global/System Admin |
+| UC01 | Xem danh sách và chi tiết Movie | Guest, Customer |
+| UC02 | Xem danh sách và chi tiết Chi nhánh | Guest, Customer |
+| UC03 | Lọc Showtime theo Movie, Chi nhánh và ngày | Guest, Customer |
+| UC04 | Chọn Showtime hợp lệ và xem Định dạng trình chiếu | Guest, Customer |
+| UC05 | Chọn Seat theo layout và quy tắc seat-gap/Couple | Guest, Customer |
+| UC06 | Giữ Seat có thời hạn phía server | Guest, Customer |
+| UC07 | Chọn Food tùy chọn | Guest, Customer |
+| UC08 | Quote tối đa một Khuyến mãi cho Booking | Guest, Customer |
+| UC09 | Xác nhận Booking với tổng tiền authoritative | Guest, Customer |
+| UC10 | Thanh toán online qua provider hoặc xử lý zero-payable | Guest, Customer |
+| UC11 | Xem booking code và QR đơn đặt vé | Guest, Customer |
+| UC12 | Xem lịch sử, hủy Booking đủ điều kiện và gửi lại email | Customer |
+| UC13 | Đánh giá Movie khi có paid Booking, Movie đã kết thúc và chưa review | Customer |
+| UC14 | Tạo Booking bán tại quầy | Staff, Manager, Global Admin |
+| UC15 | Tra cứu Booking bằng booking code hoặc QR đơn đặt vé | Staff, Manager, Global Admin |
+| UC16 | Xem Payment evidence, RoomType và PresentationFormat tại quầy | Staff, Manager, Global Admin |
+| UC17 | In AdmissionTicket và FoodPickupVoucher bằng Print All | Staff, Manager, Global Admin |
+| UC18 | In lại với reason và print audit | Staff, Manager, Global Admin |
+| UC19 | Xem Branch360 và action queue của chi nhánh | Manager, Global Admin |
+| UC20 | Quản lý Room vật lý trong phạm vi chi nhánh | Manager, Global Admin |
+| UC21 | Tạo draft, áp dụng Template và phát hành RoomLayout | Manager, Global Admin |
+| UC22 | Quản lý Seat maintenance và mở SeatIncident | Manager, Global Admin |
+| UC23 | Xử lý impact và chuyển Seat cùng Booking | Manager, Global Admin |
+| UC24 | Quản lý giờ hoạt động và cleaning buffer | Manager, Global Admin |
+| UC25 | Tạo/cập nhật/hủy Showtime theo validation authoritative | Manager, Global Admin |
+| UC26 | Preview/publish bulk schedule và copy schedule all-or-nothing | Manager, Global Admin |
+| UC27 | Xem Showtime workspace, frozen prices và Booking liên quan | Manager, Global Admin |
+| UC28 | Xem Booking, Payment và báo cáo evidence theo phạm vi | Manager, Global Admin |
+| UC29 | Quản lý Khuyến mãi đúng chi nhánh; global/mixed scope read-only | Manager, Global Admin |
+| UC30 | Quản lý master Movie, Genre và Food toàn chuỗi | Global Admin |
+| UC31 | Quản lý PriceBook, RoomType, PresentationFormat và Layout Template toàn chuỗi | Global Admin |
+| UC32 | Quản lý Chi nhánh, user/assignment/role, audit và báo cáo hợp nhất | Global Admin |
 
-**Số dùng trên slide và sơ đồ use case: 5 actor con người, 32 use case trình bày.** Con số này nhóm các endpoint kỹ thuật thành mục tiêu người dùng; không đếm từng route.
+Các use case trên nhóm endpoint kỹ thuật theo mục tiêu nghiệp vụ. Chúng không thay đổi authorization thực tế: Manager không mutate Movie, Genre, Food hoặc PriceBook master; Manager chỉ quản lý Khuyến mãi thuộc chính xác chi nhánh được phép.
 
-Lưu ý phạm vi quyền: Manager có thể xem/áp dụng layout template và vận hành phân công chi nhánh theo các permission được cấp, nhưng chỉ Global/System Admin quản lý vòng đời template và vai trò toàn cục. Catalog phim/thể loại là dữ liệu dùng chung toàn chuỗi; Manager hiện có các permission nội dung được liệt kê trong RBAC, không phải quyền sở hữu một phim theo chi nhánh.
+## Phân biệt các hiện vật dễ nhầm
+
+- Booking/Đơn đặt vé giữ giao dịch và sold snapshot.
+- QR đơn đặt vé là capability tra cứu toàn Booking tại quầy.
+- AdmissionTicket là vé vào rạp bằng giấy, một hiện vật cho mỗi vị trí ghế vật lý.
+- FoodPickupVoucher là một phiếu giấy cho phần Food của Booking.
+- Couple gồm hai vị trí và hai AdmissionTicket nhưng chỉ một pricing unit.

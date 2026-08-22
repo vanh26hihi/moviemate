@@ -32,12 +32,12 @@ class RoomLayoutServiceTest extends TestCase
         $cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
         $this->room = Room::query()->create([
             'cinema_id' => $cinema->id, 'code' => 'T01', 'name' => 'Test Room',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         foreach ([['normal', false], ['vip', false], ['couple', true]] as [$code, $pair]) {
             DB::table('seat_types')->insert([
                 'name' => ucfirst($code), 'code' => $code, 'slug' => $code,
-                'price_modifier' => 0, 'is_pair' => $pair, 'status' => true,
+                'is_pair' => $pair, 'status' => true,
                 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
@@ -54,7 +54,7 @@ class RoomLayoutServiceTest extends TestCase
         $this->service->createBlankDraft($this->room);
     }
 
-    public function test_save_draft_supports_empty_aisle_normal_vip_and_maintenance(): void
+    public function test_save_draft_supports_empty_aisle_blocked_normal_vip_and_maintenance(): void
     {
         $draft = $this->service->createBlankDraft($this->room, null, 2, 4);
         $saved = $this->service->saveDraft($draft, [
@@ -63,14 +63,91 @@ class RoomLayoutServiceTest extends TestCase
                 ['kind' => 'normal', 'x' => 1, 'y' => 1, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'status' => 'active'],
                 ['kind' => 'aisle', 'x' => 2, 'y' => 1],
                 ['kind' => 'vip', 'x' => 4, 'y' => 1, 'row' => 'A', 'number' => 2, 'seat_code' => 'A2', 'status' => 'maintenance'],
-                ['kind' => 'empty', 'x' => 3, 'y' => 2],
+                ['kind' => 'blocked', 'x' => 3, 'y' => 2],
+                ['kind' => 'empty', 'x' => 4, 'y' => 2],
             ],
         ]);
 
-        $this->assertCount(3, $saved->cells);
+        $this->assertCount(4, $saved->cells);
         $this->assertSame(2, $saved->cells->where('cell_type', 'seat')->count());
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $saved->id, 'x_position' => 3, 'y_position' => 2,
+            'cell_type' => 'blocked', 'seat_id' => null,
+        ]);
         $this->assertDatabaseHas('seats', ['seat_code' => 'A2', 'type' => 'vip', 'status' => 'maintenance']);
-        $this->assertDatabaseMissing('room_layout_cells', ['x_position' => 3, 'y_position' => 2]);
+        $this->assertDatabaseMissing('room_layout_cells', ['room_layout_id' => $saved->id, 'x_position' => 4, 'y_position' => 2]);
+    }
+
+    public function test_draft_structural_cells_convert_without_phantom_seats_and_blocked_can_become_a_new_seat(): void
+    {
+        $draft = $this->service->createBlankDraft($this->room, null, 1, 4);
+        $saved = $this->service->saveDraft($draft, [
+            'rows' => 1, 'columns' => 4, 'screen_position' => 'top',
+            'cells' => [
+                ['kind' => 'normal', 'x' => 1, 'y' => 1, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1'],
+                ['kind' => 'aisle', 'x' => 2, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 4, 'y' => 1],
+            ],
+        ]);
+        $a1 = $saved->cells->firstWhere('seat.seat_code', 'A1')->seat;
+
+        $converted = $this->service->saveDraft($saved, [
+            'rows' => 1, 'columns' => 4, 'screen_position' => 'top',
+            'cells' => [
+                ['kind' => 'blocked', 'x' => 1, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 2, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 3, 'y' => 1],
+                ['kind' => 'aisle', 'x' => 4, 'y' => 1],
+            ],
+        ]);
+
+        $this->assertSame(0, $converted->cells->where('cell_type', 'seat')->count());
+        $this->assertSame(3, $converted->cells->where('cell_type', 'blocked')->count());
+        $this->assertSame(Seat::STATUS_RETIRED, $a1->fresh()->status);
+
+        $final = $this->service->saveDraft($converted, [
+            'rows' => 1, 'columns' => 4, 'screen_position' => 'top',
+            'cells' => [
+                ['kind' => 'normal', 'x' => 2, 'y' => 1, 'row' => 'A', 'number' => 2, 'seat_code' => 'A2'],
+                ['kind' => 'aisle', 'x' => 3, 'y' => 1],
+                ['kind' => 'blocked', 'x' => 4, 'y' => 1],
+            ],
+        ]);
+
+        $this->assertDatabaseMissing('room_layout_cells', [
+            'room_layout_id' => $final->id, 'x_position' => 1, 'y_position' => 1,
+        ]);
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $final->id, 'x_position' => 2, 'y_position' => 1, 'cell_type' => 'seat',
+        ]);
+        $this->assertDatabaseHas('seats', [
+            'room_id' => $this->room->id, 'seat_code' => 'A2', 'x_position' => 2, 'status' => 'active',
+        ]);
+        $this->assertSame(1, $final->cells->where('cell_type', 'seat')->count());
+        $this->assertSame(1, $final->cells->where('cell_type', 'aisle')->count());
+        $this->assertSame(1, $final->cells->where('cell_type', 'blocked')->count());
+    }
+
+    public function test_unknown_or_seat_bearing_structural_cell_payload_is_rejected(): void
+    {
+        $draft = $this->service->createBlankDraft($this->room, null, 1, 2);
+
+        foreach ([
+            [['kind' => 'pillar', 'x' => 1, 'y' => 1]],
+            [['kind' => 'blocked', 'x' => 1, 'y' => 1, 'seat_code' => 'A1']],
+            [['kind' => 'blocked', 'x' => 1, 'y' => 1, 'seat_type' => 'vip']],
+            [['kind' => 'blocked', 'x' => 1, 'y' => 1, 'pair_code' => 'PAIR-1']],
+            [['kind' => 'aisle', 'x' => 1, 'y' => 1, 'status' => 'maintenance']],
+        ] as $cells) {
+            try {
+                $this->service->saveDraft($draft, [
+                    'rows' => 1, 'columns' => 2, 'screen_position' => 'top', 'cells' => $cells,
+                ]);
+                $this->fail('Malformed structural layout payload must be rejected.');
+            } catch (ValidationException) {
+                $this->assertTrue(true);
+            }
+        }
     }
 
     public function test_duplicate_coordinate_duplicate_code_and_out_of_bounds_are_rejected(): void
@@ -147,6 +224,7 @@ class RoomLayoutServiceTest extends TestCase
         ]);
         $showtime = Showtime::query()->create([
             'movie_id' => $movieId, 'cinema_id' => $this->room->cinema_id, 'room_id' => $this->room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movieId, $this->room)->id,
             'room_layout_id' => $draft->id, 'show_date' => now()->addDay()->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);
@@ -177,6 +255,19 @@ class RoomLayoutServiceTest extends TestCase
             $this->assertStringContainsString('Không thể xóa ghế A1', $exception->errors()['cells'][0]);
         }
 
+        try {
+            $this->service->saveDraft($draft->fresh(), [
+                'rows' => 1, 'columns' => 2, 'screen_position' => 'top',
+                'cells' => [
+                    ['kind' => 'blocked', 'x' => 1, 'y' => 1],
+                    ['kind' => 'blocked', 'x' => 2, 'y' => 1],
+                ],
+            ]);
+            $this->fail('BLOCKED must not bypass booked-seat history protection.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('Không thể xóa ghế A1', $exception->errors()['cells'][0]);
+        }
+
         $this->assertDatabaseHas('booking_seats', ['booking_id' => $booking->id, 'seat_id' => $left->id]);
         $this->assertDatabaseHas('seats', ['id' => $left->id, 'type' => 'couple', 'pair_code' => 'A-P1']);
     }
@@ -186,7 +277,7 @@ class RoomLayoutServiceTest extends TestCase
         $published = $this->publishSingleSeatLayout();
         $this->assertSame('published', $published->status);
         $this->assertNotNull($published->published_at);
-        $this->assertSame(1, $this->room->fresh()->total_seats);
+        $this->assertSame(1, $published->cells()->where('cell_type', 'seat')->count());
 
         try {
             $published->update(['name' => 'Changed']);
@@ -210,6 +301,7 @@ class RoomLayoutServiceTest extends TestCase
         ]);
         $showtime = Showtime::query()->create([
             'movie_id' => $movieId, 'cinema_id' => $this->room->cinema_id, 'room_id' => $this->room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movieId, $this->room)->id,
             'room_layout_id' => $v1->id, 'show_date' => now()->addDay()->toDateString(), 'show_time' => '10:00:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
         ]);
@@ -228,7 +320,7 @@ class RoomLayoutServiceTest extends TestCase
         $draft = $this->service->createBlankDraft($this->room, null, 2, 2);
         $other = Room::query()->create([
             'cinema_id' => $this->room->cinema_id, 'code' => 'T02', 'name' => 'Other',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $seat = Seat::query()->create(['room_id' => $other->id, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'type' => 'normal', 'status' => 'active']);
 
@@ -318,7 +410,7 @@ class RoomLayoutServiceTest extends TestCase
         }
     }
 
-    public function test_publish_capacity_counts_only_active_usable_seat_positions(): void
+    public function test_publish_physical_count_includes_all_seat_positions_regardless_of_operational_status(): void
     {
         $draft = $this->service->createBlankDraft($this->room, null, 1, 4);
         $this->service->saveDraft($draft, [
@@ -331,9 +423,11 @@ class RoomLayoutServiceTest extends TestCase
             ],
         ]);
 
-        $this->service->publish($draft->fresh());
+        $published = $this->service->publish($draft->fresh());
 
-        $this->assertSame(1, $this->room->fresh()->total_seats);
+        $this->assertSame(3, $published->cells()->where('cell_type', 'seat')->count());
+        $this->assertSame(1, $published->cells()->where('cell_type', 'seat')
+            ->whereHas('seat', fn ($query) => $query->where('status', 'active'))->count());
     }
 
     public function test_seat_code_must_match_its_logical_row(): void

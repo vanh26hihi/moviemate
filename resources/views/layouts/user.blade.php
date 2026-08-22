@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'MovieMate - Đặt vé xem phim thông minh cùng AI')</title>
     <meta name="description" content="@yield('meta_description', 'MovieMate - Nền tảng đặt vé xem phim trực tuyến tích hợp AI thông minh.')">
+    <x-brand.head-icons />
     @vite(['resources/css/app.css', 'resources/css/user.css', 'resources/js/app.js'])
     <script>
         (function() {
@@ -17,13 +18,8 @@
     <header class="app-header fixed w-full top-0 z-50 backdrop-blur-xl border-b app-border transition-all duration-300">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16 md:h-20">
-                <a href="{{ route('home') }}" class="flex items-center gap-2.5 shrink-0">
-                    <span class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-start to-brand-end text-white flex items-center justify-center shadow-lg shadow-brand-start/25">
-                        <i class="ph-fill ph-film-strip text-2xl"></i>
-                    </span>
-                    <span class="hidden text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end sm:inline md:text-2xl">
-                        MovieMate
-                    </span>
+                <a href="{{ route('home') }}" class="flex shrink-0 items-center" aria-label="MovieMate - Trang chủ">
+                    <x-brand.logo class="brand-logo--customer-header" />
                 </a>
 
                 <nav class="hidden md:flex items-center gap-1 rounded-full app-card border app-border p-1">
@@ -35,7 +31,7 @@
                     <a href="{{ route('user.ai.recommend') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.ai.*')]) @if(request()->routeIs('user.ai.*')) aria-current="page" @endif>
                         <i class="ph-fill ph-sparkle text-ai-start"></i> AI Gợi ý
                     </a>
-                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Vé của tôi</a>
+                    <a href="{{ route('user.bookings.history') }}" @class(['user-nav-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')]) @if(request()->routeIs('user.bookings.history', 'user.bookings.ticket*')) aria-current="page" @endif>Đơn đặt vé của tôi</a>
                 </nav>
 
                 <details id="customer-cinema-selector" class="relative ml-auto md:ml-0">
@@ -101,7 +97,7 @@
                 <a href="{{ route('user.ai.recommend') }}" class="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-ai-start hover:bg-ai-start/10 transition-colors">
                     <i class="ph-fill ph-sparkle"></i> AI Gợi ý
                 </a>
-                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')])>Vé của tôi</a>
+                <a href="{{ route('user.bookings.history') }}" @class(['user-mobile-link', 'is-active' => request()->routeIs('user.bookings.history', 'user.bookings.ticket*')])>Đơn đặt vé của tôi</a>
                 <div class="pt-3 mt-3 border-t app-border flex flex-col gap-2">
                     @auth
                         <a href="{{ route('user.profile') }}" class="user-mobile-link"><i class="ph ph-user mr-2"></i>Hồ sơ</a>
@@ -127,16 +123,13 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
                 <div class="col-span-2 md:col-span-1">
-                    <a href="{{ route('home') }}" class="flex items-center gap-2.5 mb-4">
-                        <span class="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-start to-brand-end text-white flex items-center justify-center">
-                            <i class="ph-fill ph-film-strip text-2xl"></i>
-                        </span>
-                        <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-start to-brand-end">MovieMate</span>
+                    <a href="{{ route('home') }}" class="mb-4 inline-flex items-center" aria-label="MovieMate - Trang chủ">
+                        <x-brand.logo class="brand-logo--footer" />
                     </a>
                     <p class="app-muted text-sm leading-relaxed mb-5">
                         Nền tảng đặt vé xem phim tích hợp AI thông minh, mang đến trải nghiệm điện ảnh tiện lợi và cá nhân hóa.
                     </p>
-                    <div class="flex gap-3" aria-label="MovieMate"><span class="w-9 h-9 rounded-full app-card border app-border flex items-center justify-center text-brand-start"><i class="ph-fill ph-film-strip text-lg"></i></span><span class="app-muted text-sm self-center">Điện ảnh trong tầm tay</span></div>
+                    <div class="flex gap-3"><x-brand.logo variant="mark" alt="" class="brand-logo--footer-mark" /><span class="app-muted text-sm self-center">Điện ảnh trong tầm tay</span></div>
                 </div>
 
                 <div>
@@ -146,12 +139,12 @@
 
                 <div>
                     <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Hỗ trợ</h3>
-                    <ul class="space-y-2.5"><li><a href="{{ route('user.ai.recommend') }}" class="app-muted hover:text-ai-start transition-colors text-sm">AI gợi ý phim</a></li><li><a href="{{ route('user.bookings.history') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Vé của tôi</a></li><li><a href="{{ route('user.profile') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Tài khoản</a></li></ul>
+                    <ul class="space-y-2.5"><li><a href="{{ route('user.ai.recommend') }}" class="app-muted hover:text-ai-start transition-colors text-sm">AI gợi ý phim</a></li><li><a href="{{ route('user.bookings.history') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Đơn đặt vé của tôi</a></li><li><a href="{{ route('user.profile') }}" class="app-muted hover:text-brand-start transition-colors text-sm">Tài khoản</a></li></ul>
                 </div>
 
                 <div>
                     <h3 class="app-text font-semibold mb-4 uppercase tracking-wider text-xs">Trải nghiệm</h3>
-                    <p class="app-muted text-sm mb-4">Tìm phim, chọn suất chiếu, đặt ghế và nhận vé điện tử trong một luồng thống nhất.</p>
+                    <p class="app-muted text-sm mb-4">Tìm phim, chọn suất chiếu, đặt ghế và nhận vé tại quầy trong một luồng thống nhất.</p>
                     <a href="{{ route('user.movies.index', ['status' => 'now_showing']) }}" class="btn-primary text-sm"><i class="ph-fill ph-ticket"></i>Đặt vé ngay</a>
                 </div>
             </div>

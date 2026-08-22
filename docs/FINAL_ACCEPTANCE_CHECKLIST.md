@@ -1,105 +1,96 @@
-# MovieMate — Final acceptance checklist
+# MovieMate — Checklist nghiệm thu và rehearsal bảo vệ
 
-`[x]` nghĩa là đã xác minh bằng source/test/static gate hoặc browser QA được ghi rõ. Các mục phần cứng/provider thật để `[ ]` cho đến khi được thực hiện ngoài môi trường phát triển.
+`[x]` là invariant đã có source/test evidence. `[ ]` là kiểm tra môi trường trình bày phải làm lại ở Phase 8B6; không suy diễn thành công từ môi trường phát triển.
 
-## ENVIRONMENT
+## PRODUCT SCOPE
 
-- [x] Branch `main`, không tạo worktree/branch phụ.
-- [x] `APP_ENV=local`, MySQL loopback, database đúng `moviemate`, không có `DB_URL` override trước mutation demo.
-- [x] Pre-audit Git bundle được verify ngoài repository.
-- [x] Không đọc/ghi `.env` hoặc in secret.
+- [x] Một công ty rạp, nhiều chi nhánh; không marketplace hoặc SaaS đa công ty.
+- [x] Năm actor: Guest, Customer, Staff, Manager, Global Admin.
+- [x] Global Admin quản trị master toàn chuỗi; Manager branch-first.
+- [x] Movie, Genre, Food chỉ Global Admin mutate; Manager read/use.
+- [x] Không có Loyalty, refund ledger, AI pricing hoặc branch-specific Food price.
 
-## DATABASE
+## ROOM / LAYOUT / INCIDENT
 
-- [x] Không migration pending; `migrate --pretend` không có thao tác.
-- [x] FK/index cho booking, seat locks, payment attempts, assignments, ticket operations và templates được audit.
-- [x] 10 truy vấn integrity R10 không phát hiện anomaly.
-- [x] Không chạy fresh/wipe/truncate/rollback/reseed phá dữ liệu.
+- [x] Width/length lưu integer mm và hiển thị mét; area là xấp xỉ hành chính.
+- [x] Rows × columns được gọi là Lưới logic, không phải kích thước phòng.
+- [x] Ghế, Lối đi, Vật cản cố định và Ô trống được phân biệt.
+- [x] Ghế bảo trì vẫn là Seat; SeatIncident không sửa cell thành BLOCKED.
+- [x] Published RoomLayout bất biến; structural change tạo version mới.
+- [x] Template apply tạo bản sao; sửa Template không mutate Room đã áp dụng.
+- [x] Showtime ghim đúng `room_layout_id`.
+- [x] Chuyển ghế giữ Booking, chỉ tương đương/nâng hạng, không thu thêm và Couple atomic.
 
-## CUSTOMER
+## SHOWTIME
 
-- [x] Movie-first và cinema-first dùng showtime/branch phía server.
-- [x] D6 + D8 bị client phản hồi và server policy từ chối; D6+D7+D8 hợp lệ.
-- [x] Aisle, sparse gap và couple pair được test.
-- [x] Đồ ăn là tùy chọn, 0 món hợp lệ, state ghế/đồ ăn được giữ.
-- [x] Browser amount/cinema/food giả không quyết định aggregate.
-- [x] Demo Customer local/testing được seed có chủ ý.
+- [x] Validation server-authoritative gồm Room, layout phát hành, Format, runtime, giờ hoạt động, cleaning và overlap.
+- [x] Bulk publish all-or-nothing; schedule copy re-derives authoritative intent.
+- [x] START, END, CLEANING_START và ROOM_READY là bốn mốc riêng.
+- [x] END là lúc Movie kết thúc; ROOM_READY là sau cleaning.
+- [x] Cross-midnight được hỗ trợ; business date là local START date.
+- [x] Customer booking cutoff chính xác START + 15 phút.
+- [x] RoomType tách PresentationFormat; PresentationFormat price-neutral.
 
-## PAYMENTS
+## PRICEBOOK / PROMOTION
 
-- [x] VNPAY chỉ finalize qua IPN đã xác minh.
-- [x] ZaloPay chỉ finalize qua callback/query có MAC và đối chiếu dữ liệu.
-- [x] payOS webhook/query kiểm tra chữ ký, order, amount, currency và idempotency.
-- [x] Return/cancel browser đơn thuần không đánh dấu paid hoặc giải phóng ghế.
-- [x] Counter cash chỉ dành cho booking quầy và lấy settler từ session.
-- [x] Không có generic manual mark-paid action.
+- [x] PriceBook → PriceBookVersion → ShowtimeTicketPrice → sold snapshot.
+- [x] Mỗi PriceBookVersion có đúng một Giá cơ sở toàn chuỗi.
+- [x] Cinema/Room là adjustment, không phải base price thứ hai.
+- [x] Holiday thay Weekend; không stack hai calendar adjustment.
+- [x] Couple có hai vị trí vật lý, một pricing unit và charge một lần.
+- [x] Giá đã khóa cho suất chiếu không bị version mới viết lại.
+- [x] Tối đa một Khuyến mãi mỗi Booking.
+- [x] Minimum basis là ticket + food gross trước Khuyến mãi.
+- [x] Fixed không có cap; percentage có optional positive cap.
+- [x] Booking confirm giữ quota dưới row lock; quote không tiêu quota.
+- [x] Released không tiêu quota hiện tại nhưng usage vẫn khóa định nghĩa Promotion.
 
-## TICKETS
+## BOOKING / PAYMENT / PRINT
 
-- [x] Outbox tạo một delivery cho success có recipient; không recipient không tạo false failure.
-- [x] Email render có code/rạp/suất/ghế/link/QR và không có secret/print instruction.
-- [x] Capability exact-booking, chống tamper/substitution; used ticket vẫn đọc được.
-- [x] Trang khách không có Print/PDF/Save image/Admin/Staff operation.
-- [x] QR không phải booking code thô.
+- [x] Customer nhận booking code và QR đơn đặt vé cho toàn Booking.
+- [x] QR đơn chỉ phục vụ lookup, không phải AdmissionTicket hoặc credential vào phòng.
+- [x] Mỗi vị trí ghế vật lý tạo một AdmissionTicket; Couple tạo hai vé giấy.
+- [x] Booking có Food tạo một FoodPickupVoucher cho phần đồ ăn.
+- [x] First print không cần reason; reprint cần reason; Print All có audit.
+- [x] Browser return không đánh dấu paid.
+- [x] Provider verification hoặc counter settlement là Payment evidence.
+- [x] Zero-payable dùng `internal_zero` và không gọi provider ngoài.
+- [x] Báo cáo dùng trạng thái/thời gian Đã xác minh hoặc Đã thu tiền.
+- [x] Review eligibility không phụ thuộc attendance: paid Booking, Movie đã END và chưa review.
 
-## STAFF
+## OPERATIONAL HANDOFFS
 
-- [x] Workspace quầy/ticket tách khỏi Admin portal.
-- [x] Counter sale, optional food, cash settlement và cancellation có permission/scope.
-- [x] Resolve preview read-only; manual scanner fallback tồn tại.
-- [x] Print state machine và check-in state machine độc lập.
-- [x] Creator, settler, printer và checker lấy từ authenticated actor.
+- [x] Branch → Room → Showtime.
+- [x] Showtime → Booking.
+- [x] Booking → Payment và Payment → Booking.
+- [x] Booking → Tra cứu & in tại quầy.
+- [x] Room/Booking → exact incident context khi có impact.
+- [x] Showtime detail dùng để quan sát; không cần vào Edit để xem trạng thái vận hành.
 
-## MANAGER
+## DEFENSE DOCUMENT CONTRACT
 
-- [x] Chỉ thấy và thao tác các chi nhánh được gán; hỗ trợ nhiều assignment.
-- [x] Direct foreign branch URL/POST bị từ chối.
-- [x] Report chỉ gồm các chi nhánh được gán.
-- [x] Không quản lý security/global role ngoài quyền.
+- [x] Booking QR và AdmissionTicket được phân biệt trong toàn bộ active defense package.
+- [x] Không có current claim về digital attendance/check-in hoặc used-ticket state.
+- [x] Không còn pricing authority cũ, multi-Promotion stacking hoặc Format surcharge.
+- [x] Không tuyên bố CAD, QCVN certification, occupancy analytics hoặc net revenue after refund.
+- [x] Không dựng phỏng vấn/khảo sát; Product Owner decision tách khỏi repository evidence và desk research.
+- [x] Canonical demo dài 8 phút 30 giây, ba role switches, không nhập URL thủ công.
+- [x] DOCX generator dùng cùng frozen model.
 
-## ADMIN
+## REHEARSAL — PHASE 8B6
 
-- [x] Global Admin thấy toàn chuỗi và báo cáo all-branch.
-- [x] Quản lý chi nhánh, nội dung, user/assignment và audit theo permission.
-- [x] Sidebar có đúng một active destination trên trang đại diện.
-- [x] Hủy showtime là non-destructive và bị chặn khi đã có booking history.
+- [ ] Chạy `migrate:status`, route count, focused/full suite và build trên laptop trình bày.
+- [ ] Revalidate fixture Showtime sắp tới, Booking paid, Payment evidence và print state.
+- [ ] Click toàn bộ demo bằng đúng ba browser profiles; không dùng direct URL.
+- [ ] Kiểm tra responsive trên màn hình/máy chiếu thực.
+- [ ] Nếu dùng camera, kiểm tra QR lookup trên thiết bị thật.
+- [ ] Nếu in thật, xác nhận máy in và trạng thái first print/reprint trước rehearsal.
+- [ ] Nếu demo provider live, xác nhận credential/webhook trước; nếu không, dùng paid fixture ổn định.
+- [ ] Không tuyên bố manual acceptance item đã hoàn tất khi chưa có bằng chứng.
 
-## SECURITY
+## GIT / RELEASE
 
-- [x] Route mutation có web/CSRF trừ callback/webhook exemption chính xác.
-- [x] Auth/active/role/permission và service-level cinema scope được audit.
-- [x] Không secret pattern thực tế trong tracked source; password cứng duy nhất là local demo seeder đã phê duyệt.
-- [x] Activity log sanitizer lọc token, signature, payload và URL nhạy cảm.
-- [x] Không customer PII/capability trong aggregate report hoặc Admin ticket event views.
-
-## REPORTS
-
-- [x] Finance online dùng `verified_at`, counter dùng `settled_at`.
-- [x] Operations dùng ngày bắt đầu suất theo timezone chi nhánh.
-- [x] Một success/booking, logical ticket/physical seat và archived history được kiểm thử.
-- [x] Channel/provider, print/check-in và creator/settler được tách.
-- [x] Query count dashboard/report nằm trong budget.
-
-## HARDWARE/EXTERNAL
-
-- [ ] Quét QR bằng camera vật lý trên thiết bị trình bày.
-- [ ] Mở print dialog và in bằng máy in vật lý.
-- [ ] Kiểm tra QR trong email client thật.
-- [ ] Thanh toán thật bằng payOS test merchant.
-- [ ] Đăng ký và nhận payOS webhook trên public HTTPS endpoint.
-- [ ] Hủy giao dịch ở provider payOS và xác minh seat release.
-
-## GIT
-
-- [x] Chỉ stage file R10 được liệt kê rõ.
-- [x] Không stage `.env`, audit notes, `public/build`, log, upload, database hoặc backup.
-- [x] Không push.
-
-## DEMO
-
-- [x] Có 3 chi nhánh, 3 định dạng phòng, published layouts, pricing, food và future showtimes.
-- [x] Có phòng `DEMO` với D6/D7/D8, aisle và couple pair.
-- [x] Có Admin, Customer, Manager và Staff local/testing accounts.
-- [x] Không seed fake successful VNPAY/ZaloPay/payOS.
-- [x] Có outline 10 slide, use-case count, script 15 phút và talk track.
-- [ ] Tổng duyệt bằng đúng laptop, browser profiles, camera, printer và mạng sẽ dùng khi bảo vệ.
+- [x] Không stage `.env`, protected audit documents, binary DOCX/PDF hoặc build artifacts.
+- [x] Không dùng destructive Git.
+- [x] Không push trong phase documentation alignment.
+- [x] Known debt PayOS selection query budget `20 > 19` được tách khỏi functional payment claims.

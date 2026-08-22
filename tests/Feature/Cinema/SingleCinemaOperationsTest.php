@@ -5,6 +5,7 @@ namespace Tests\Feature\Cinema;
 use App\Models\Cinema;
 use App\Models\FoodItem;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
@@ -96,28 +97,36 @@ class SingleCinemaOperationsTest extends TestCase
         $manager = $this->userWithRole('manager');
         $canonical = app(CinemaContext::class)->current();
         $legacy = Cinema::factory()->legacy()->create();
+        $format = PresentationFormat::query()->create([
+            'code' => '2D_FORMAT', 'name' => '2D Format', 'is_active' => true, 'sort_order' => 10,
+        ]);
 
         $response = $this->actingAs($manager)->post(route('admin.rooms.store'), [
             'cinema_id' => $legacy->id,
             'code' => 'P99',
             'name' => 'Phòng 99',
             'room_type' => '2D',
-            'total_seats' => 20,
+            'width_m' => '7.5',
+            'length_m' => '10',
             'status' => 'active',
+            'presentation_format_ids' => [$format->id],
         ]);
 
         $room = Room::query()->where('code', 'P99')->sole();
         $response->assertRedirect(route('admin.rooms.layout.show', $room));
         $this->assertSame($canonical->id, $room->cinema_id);
-        $this->assertSame(0, $room->total_seats);
+        $this->assertSame(7_500, $room->width_mm);
+        $this->assertSame(10_000, $room->length_mm);
 
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), [
             'cinema_id' => $legacy->id,
             'code' => 'P98',
             'name' => 'phòng 98',
             'room_type' => '3D',
-            'total_seats' => 24,
+            'width_m' => '8',
+            'length_m' => '11',
             'status' => 'active',
+            'presentation_format_ids' => [$format->id],
         ])->assertRedirect(route('admin.rooms.show', $room));
 
         $room->refresh();
@@ -128,8 +137,10 @@ class SingleCinemaOperationsTest extends TestCase
             'code' => 'P97',
             'name' => 'Phòng 98',
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_m' => '8',
+            'length_m' => '11',
             'status' => 'active',
+            'presentation_format_ids' => [$format->id],
         ])->assertSessionHasErrors('name');
     }
 
@@ -147,8 +158,12 @@ class SingleCinemaOperationsTest extends TestCase
         $legacy = Cinema::factory()->legacy()->create();
         $legacyRoom = Room::factory()->create(['cinema_id' => $legacy->id, 'code' => 'LEG-01']);
         $movie = Movie::query()->create(['title' => 'Test Movie', 'slug' => 'test-movie', 'status' => Movie::STATUS_NOW_SHOWING]);
+        $format = PresentationFormat::query()->create([
+            'code' => 'SHOWTIME_2D', 'name' => 'Showtime 2D', 'is_active' => true, 'sort_order' => 10,
+        ]);
         $payload = [
             'movie_id' => $movie->id,
+            'presentation_format_id' => $format->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00',
             'price' => 80000,
@@ -169,11 +184,13 @@ class SingleCinemaOperationsTest extends TestCase
 
         $this->assertDatabaseCount('showtimes', 0);
 
+        $archivedLayout = $this->publishedRoomLayoutFixture($archived);
         $archivedShowtime = Showtime::query()->create([
             ...$payload,
             'show_time' => '20:00:00',
             'cinema_id' => $canonical->id,
             'room_id' => $archived->id,
+            'room_layout_id' => $archivedLayout->id,
         ]);
         $seat = Seat::query()->create([
             'room_id' => $archived->id,

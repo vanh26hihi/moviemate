@@ -154,13 +154,15 @@ class SeatController extends Controller
             'columns' => $layout->columns,
             'used' => $used,
             'empty' => max(0, ($layout->rows * $layout->columns) - $used),
+            'physical_seats' => $seats->count(),
             'normal' => $seats->where('type', 'normal')->count(),
             'vip' => $seats->where('type', 'vip')->count(),
             'couple_pairs' => $seats->where('type', 'couple')->pluck('pair_code')->filter()->unique()->count(),
             'aisles' => $layout->cells->where('cell_type', 'aisle')->count(),
+            'blocked' => $layout->cells->where('cell_type', 'blocked')->count(),
             'maintenance' => $seats->where('status', 'maintenance')->count(),
             'inactive' => $seats->whereIn('status', ['inactive', 'retired'])->count(),
-            'capacity' => $seats->where('status', 'active')->count(),
+            'operational_available' => $seats->where('status', 'active')->count(),
         ];
     }
 }

@@ -3,7 +3,11 @@
 namespace Tests;
 
 use App\Models\Cinema;
+use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Role;
+use App\Models\Room;
+use App\Models\RoomLayout;
 use App\Models\User;
 use App\Models\UserCinemaAssignment;
 use Database\Seeders\PermissionSeeder;
@@ -30,6 +34,37 @@ abstract class TestCase extends BaseTestCase
     protected function seedRbac(): void
     {
         $this->seed([RoleSeeder::class, PermissionSeeder::class, RolePermissionSeeder::class]);
+    }
+
+    protected function presentationFormatFixture(Movie|int $movie, Room|int $room): PresentationFormat
+    {
+        $movie = $movie instanceof Movie ? $movie : Movie::query()->findOrFail($movie);
+        $room = $room instanceof Room ? $room : Room::query()->findOrFail($room);
+        $format = PresentationFormat::query()->firstOrCreate(['code' => 'TEST_2D'], [
+            'name' => 'Test 2D',
+            'is_active' => true,
+            'sort_order' => 10,
+        ]);
+        $movie->supportedPresentationFormats()->syncWithoutDetaching($format);
+        $room->presentationCapabilities()->syncWithoutDetaching($format);
+
+        return $format;
+    }
+
+    protected function publishedRoomLayoutFixture(Room $room): RoomLayout
+    {
+        $version = (int) $room->layouts()->max('version') + 1;
+
+        return RoomLayout::query()->create([
+            'room_id' => $room->id,
+            'version' => $version,
+            'name' => 'Test published layout '.$version,
+            'rows' => 1,
+            'columns' => 1,
+            'screen_position' => 'top',
+            'status' => RoomLayout::STATUS_PUBLISHED,
+            'published_at' => now(),
+        ]);
     }
 
     protected function userWithRole(string $role, array $attributes = []): User

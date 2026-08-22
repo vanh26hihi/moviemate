@@ -112,6 +112,25 @@
 
                     <button type="submit" class="mt-2 w-full rounded-xl bg-gradient-to-r from-brand-start to-brand-end py-3.5 text-sm font-bold text-white transition-all hover:shadow-lg hover:shadow-brand-start/25">Đăng ký</button>
                 </form>
+
+                <div class="mt-6 relative">
+                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t app-border"></div></div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-3 app-bg app-text-muted">Hoặc đăng ký với</span>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    @if ($googleAuthConfigured)
+                        <a href="{{ route('auth.google.redirect') }}" class="flex w-full items-center justify-center gap-2 rounded-xl border app-border app-input py-2.5 text-sm font-semibold app-text transition hover:border-brand-start hover:text-brand-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-start">
+                            <i class="ph-fill ph-google-logo text-lg" aria-hidden="true"></i>
+                            Tiếp tục với Google
+                        </a>
+                    @else
+                        <button type="button" disabled class="flex cursor-not-allowed items-center justify-center gap-2 w-full py-2.5 app-input border app-border rounded-xl app-text-muted opacity-60 text-sm font-medium"><i class="ph-fill ph-google-logo text-lg" aria-hidden="true"></i> Google chưa được cấu hình</button>
+                    @endif
+                </div>
+
                 <p class="mt-6 text-center text-sm app-text-muted">
                     Đã có tài khoản?
                     <a href="{{ route('login') }}" class="font-bold text-brand-start hover:text-brand-end ml-1">Đăng nhập</a>

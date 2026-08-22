@@ -27,8 +27,7 @@ class BookingCheckoutDraftService
             'showtime_id' => $showtimeId,
             'seat_ids' => $this->normalizeSeatIds($seatIds),
             'food_items' => [],
-            'discount_codes' => [],
-            'points_to_use' => 0,
+            'promotion_code' => null,
             'customer_email' => $this->normalizedEmail($request->user()?->email),
             'checkout_token' => $this->tokens->issueCheckoutToken(),
             'actor_identity' => $this->actorIdentity($request),
@@ -47,8 +46,7 @@ class BookingCheckoutDraftService
             || ! is_int($draft['showtime_id'] ?? null)
             || ! is_array($draft['seat_ids'] ?? null)
             || ! is_array($draft['food_items'] ?? null)
-            || ! is_array($draft['discount_codes'] ?? null)
-            || ! is_int($draft['points_to_use'] ?? null)
+            || ! (is_null($draft['promotion_code'] ?? null) || is_string($draft['promotion_code'] ?? null))
             || ! is_string($draft['checkout_token'] ?? null)
             || ! $this->tokens->isValidCheckoutToken($draft['checkout_token'])) {
             throw ValidationException::withMessages([
@@ -92,11 +90,11 @@ class BookingCheckoutDraftService
             && $this->tokens->isValidCheckoutToken($draft['checkout_token']);
     }
 
-    /** @param list<string> $codes */
-    public function updateDiscountCodes(Request $request, array $codes): array
+    public function updatePromotionCode(Request $request, ?string $code): array
     {
         $draft = $this->current($request, true);
-        $draft['discount_codes'] = collect($codes)->map(fn ($code) => mb_strtoupper(trim((string) $code)))->filter()->unique()->values()->all();
+        $normalized = mb_strtoupper(trim((string) $code));
+        $draft['promotion_code'] = $normalized === '' ? null : $normalized;
         $request->session()->put(self::SESSION_KEY, $draft);
 
         return $draft;
@@ -110,18 +108,6 @@ class BookingCheckoutDraftService
             ->where('checkout_idempotency_key_hash', $this->tokens->hash($draft['checkout_token']))
             ->whereHas('payments')
             ->exists();
-    }
-
-    public function updatePoints(Request $request, int $points): array
-    {
-        $draft = $this->current($request, true);
-        if ($this->promotionsAreLocked($request)) {
-            throw ValidationException::withMessages(['points' => 'Điểm đã được khóa cho lần thanh toán hiện tại.']);
-        }
-        $draft['points_to_use'] = max(0, $points);
-        $request->session()->put(self::SESSION_KEY, $draft);
-
-        return $draft;
     }
 
     public function foodMutationRateLimitKey(Request $request): string

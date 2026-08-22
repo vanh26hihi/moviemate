@@ -22,9 +22,9 @@
     </section>
 
     <section class="cinema-card p-6">
-        <h2 class="text-xl font-extrabold app-heading">Thông tin vé</h2>
+        <h2 class="text-xl font-extrabold app-heading">Thông tin đơn đặt vé</h2>
         <dl class="mt-5 grid gap-4 sm:grid-cols-2">
-            <div><dt class="text-sm app-muted">Mã vé</dt><dd class="font-bold">{{ $booking->booking_code }}</dd></div>
+            <div><dt class="text-sm app-muted">Mã đơn</dt><dd class="font-bold">{{ $booking->booking_code }}</dd></div>
             <div><dt class="text-sm app-muted">Phương thức</dt><dd class="font-bold">{{ $provider ? \App\Support\PaymentPresentation::providerLabel($provider) : 'Chưa chọn' }}</dd></div>
             <div><dt class="text-sm app-muted">Phim</dt><dd class="font-bold">{{ $booking->showtime->movie->title }}</dd></div>
             <div><dt class="text-sm app-muted">Suất chiếu</dt><dd class="font-bold">{{ $booking->showtime_label }}</dd></div>

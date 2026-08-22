@@ -1,0 +1,273 @@
+<?php
+
+namespace App\Services;
+
+use App\Domain\Showtimes\BulkShowtimeRowResult;
+use App\Domain\Showtimes\BulkShowtimeValidationResult;
+use App\Domain\Showtimes\ShowtimeScheduleValidationResult;
+use App\Exceptions\BulkShowtimeValidationException;
+use App\Exceptions\ShowtimeScheduleException;
+use App\Models\Movie;
+use App\Models\PresentationFormat;
+use App\Models\Room;
+use App\Models\Showtime;
+use App\Models\User;
+use Carbon\CarbonImmutable;
+use Closure;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+final class BulkShowtimeScheduleService
+{
+    public function __construct(
+        private readonly ShowtimeScheduleService $schedule,
+        private readonly CinemaAccessService $cinemaAccess,
+    ) {}
+
+    /**
+     * @param  list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}>  $rows
+     */
+    public function preview(array $rows, User $user): BulkShowtimeValidationResult
+    {
+        return $this->validateRows($rows, $user);
+    }
+
+    /**
+     * @param  list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}>  $rows
+     * @return list<Showtime>
+     */
+    public function publish(array $rows, User $user, ?Closure $afterPersist = null): array
+    {
+        $this->authorizeBatchRooms($rows, $user);
+
+        return DB::transaction(function () use ($rows, $user, $afterPersist): array {
+            $roomIds = $this->roomIds($rows);
+            $lockedRooms = Room::query()
+                ->whereIn('id', $roomIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $lockedRooms->load(['cinema.operatingHours', 'latestPublishedLayout', 'presentationCapabilities']);
+
+            $lockedMovies = Movie::query()
+                ->whereIn('id', $this->movieIds($rows))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $lockedMovies->load('supportedPresentationFormats');
+
+            $lockedFormats = PresentationFormat::query()
+                ->whereIn('id', $this->formatIds($rows))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $result = $this->validateRows($rows, $user, $lockedRooms, $lockedMovies, $lockedFormats);
+            if (! $result->isValid()) {
+                throw new BulkShowtimeValidationException($result);
+            }
+
+            $created = [];
+            $snapshotItems = [];
+            foreach ($result->rows as $row) {
+                $candidate = $row->candidate->requireValid();
+                $priceSnapshots = $candidate->ticketPriceSnapshots;
+                $showtime = Showtime::query()->create($this->schedule->persistenceData(
+                    $row->movie,
+                    $row->room,
+                    $candidate->layout,
+                    $candidate->window,
+                    $row->presentationFormat,
+                ));
+                $showtime->setRelation('movie', $row->movie);
+                $showtime->setRelation('room', $row->room);
+                $snapshotItems[] = ['showtime' => $showtime, 'snapshots' => $priceSnapshots, 'row_key' => $row->rowKey];
+                $created[] = $showtime;
+            }
+            $this->schedule->persistPriceSnapshotBatch($snapshotItems);
+            foreach ($snapshotItems as $item) {
+                $afterPersist?->__invoke($item['showtime'], $item['row_key']);
+            }
+
+            return $created;
+        }, 3);
+    }
+
+    /**
+     * @param  list<array{row_key: string, movie_id: int, presentation_format_id: int, room_id: int, show_date: string, show_time: string}>  $rows
+     * @param  Collection<int, Room>|null  $resolvedRooms
+     * @param  Collection<int, Movie>|null  $resolvedMovies
+     * @param  Collection<int, PresentationFormat>|null  $resolvedFormats
+     */
+    private function validateRows(
+        array $rows,
+        User $user,
+        ?Collection $resolvedRooms = null,
+        ?Collection $resolvedMovies = null,
+        ?Collection $resolvedFormats = null,
+    ): BulkShowtimeValidationResult {
+        $rooms = $resolvedRooms ?? Room::query()
+            ->whereIn('id', $this->roomIds($rows))
+            ->with(['cinema.operatingHours', 'latestPublishedLayout', 'presentationCapabilities'])
+            ->get()
+            ->keyBy('id');
+        $this->assertAuthorizedSingleCinema($rooms, $user);
+
+        $movies = $resolvedMovies ?? Movie::query()
+            ->whereIn('id', $this->movieIds($rows))
+            ->with('supportedPresentationFormats')
+            ->get()
+            ->keyBy('id');
+        $formats = $resolvedFormats ?? PresentationFormat::query()
+            ->whereIn('id', $this->formatIds($rows))
+            ->get()
+            ->keyBy('id');
+        $cinemaId = $rooms->pluck('cinema_id')->unique()->map(fn ($id): int => (int) $id)->first();
+        $timezone = $rooms->isEmpty()
+            ? $this->schedule->timezone()
+            : $this->schedule->timezone($rooms->first());
+        $authoritativeNow = CarbonImmutable::now($timezone);
+
+        $baseRows = [];
+        foreach ($rows as $row) {
+            $movie = $movies->get((int) $row['movie_id']);
+            $presentationFormat = $formats->get((int) $row['presentation_format_id']);
+            $room = $rooms->get((int) $row['room_id']);
+            $candidate = match (true) {
+                ! $room => ShowtimeScheduleValidationResult::invalid(new ShowtimeScheduleException(
+                    'Phòng chiếu không tồn tại.',
+                    'room_id',
+                    'ROOM_UNAVAILABLE',
+                )),
+                ! $movie => ShowtimeScheduleValidationResult::invalid(new ShowtimeScheduleException(
+                    'Phim không tồn tại hoặc không thể xếp lịch.',
+                    'movie_id',
+                    'MOVIE_UNAVAILABLE',
+                ), $timezone),
+                ! $presentationFormat => ShowtimeScheduleValidationResult::invalid(new ShowtimeScheduleException(
+                    'Định dạng trình chiếu đã chọn hiện không còn hoạt động.',
+                    'presentation_format_id',
+                    'PRESENTATION_FORMAT_INACTIVE',
+                ), $timezone),
+                default => $this->schedule->validateCandidate(
+                    $movie,
+                    $room,
+                    $row['show_date'],
+                    $row['show_time'],
+                    authoritativeNow: $authoritativeNow,
+                    authoritativeLayout: $room->latestPublishedLayout,
+                    presentationFormatId: (int) $row['presentation_format_id'],
+                    authoritativePresentationFormat: $presentationFormat,
+                ),
+            };
+            $baseRows[] = [
+                'intent' => $row,
+                'movie' => $movie,
+                'presentation_format' => $presentationFormat,
+                'room' => $room,
+                'candidate' => $candidate,
+            ];
+        }
+
+        $internalConflicts = $this->internalConflicts($baseRows);
+        $results = array_map(
+            fn (array $row): BulkShowtimeRowResult => new BulkShowtimeRowResult(
+                $row['intent']['row_key'],
+                $row['movie'],
+                $row['presentation_format'],
+                $row['room'],
+                $row['candidate'],
+                $internalConflicts[$row['intent']['row_key']] ?? [],
+            ),
+            $baseRows,
+        );
+
+        return new BulkShowtimeValidationResult($cinemaId, $timezone, $results);
+    }
+
+    /**
+     * @param  list<array{intent: array<string, mixed>, movie: ?Movie, presentation_format: ?PresentationFormat, room: ?Room, candidate: ShowtimeScheduleValidationResult}>  $rows
+     * @return array<string, list<array<string, mixed>>>
+     */
+    private function internalConflicts(array $rows): array
+    {
+        $conflicts = [];
+        $groups = collect($rows)
+            ->filter(fn (array $row): bool => $row['room'] !== null && $row['candidate']->window !== null)
+            ->groupBy(fn (array $row): int => (int) $row['room']->id);
+
+        foreach ($groups as $roomRows) {
+            $sorted = $roomRows->sortBy(fn (array $row): int => $row['candidate']->window->start->getTimestamp())->values();
+            for ($left = 0; $left < $sorted->count(); $left++) {
+                for ($right = $left + 1; $right < $sorted->count(); $right++) {
+                    $first = $sorted[$left];
+                    $second = $sorted[$right];
+                    if (! $first['candidate']->window->overlaps($second['candidate']->window)) {
+                        continue;
+                    }
+
+                    $this->recordInternalConflict($conflicts, $first, $second);
+                    $this->recordInternalConflict($conflicts, $second, $first);
+                }
+            }
+        }
+
+        return $conflicts;
+    }
+
+    /** @param array<string, list<array<string, mixed>>> $conflicts */
+    private function recordInternalConflict(array &$conflicts, array $subject, array $other): void
+    {
+        $otherWindow = $other['candidate']->window;
+        $conflicts[$subject['intent']['row_key']][] = [
+            'source' => 'batch',
+            'row_key' => $other['intent']['row_key'],
+            'movie' => $other['movie']?->title,
+            'room' => $other['room']?->name,
+            'room_code' => $other['room']?->code,
+            'start_display' => $otherWindow->start->format('d/m/Y H:i'),
+            'end_display' => $otherWindow->movieEnd->format('d/m/Y H:i'),
+            'room_ready_display' => $otherWindow->operationalEnd->format('d/m/Y H:i'),
+        ];
+    }
+
+    /** @param list<array{room_id: int}> $rows */
+    private function authorizeBatchRooms(array $rows, User $user): void
+    {
+        $rooms = Room::query()->whereIn('id', $this->roomIds($rows))->get()->keyBy('id');
+        $this->assertAuthorizedSingleCinema($rooms, $user);
+    }
+
+    /** @param Collection<int, Room> $rooms */
+    private function assertAuthorizedSingleCinema(Collection $rooms, User $user): void
+    {
+        $rooms->each(fn (Room $room) => $this->cinemaAccess->authorizeCinema($user, (int) $room->cinema_id));
+        if ($rooms->pluck('cinema_id')->unique()->count() > 1) {
+            throw ValidationException::withMessages([
+                'rows' => 'Mỗi lô suất chiếu chỉ được chứa phòng thuộc một chi nhánh.',
+            ]);
+        }
+    }
+
+    /** @param list<array{room_id: int}> $rows @return list<int> */
+    private function roomIds(array $rows): array
+    {
+        return collect($rows)->pluck('room_id')->map(fn ($id): int => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /** @param list<array{movie_id: int}> $rows @return list<int> */
+    private function movieIds(array $rows): array
+    {
+        return collect($rows)->pluck('movie_id')->map(fn ($id): int => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /** @param list<array{presentation_format_id: int}> $rows @return list<int> */
+    private function formatIds(array $rows): array
+    {
+        return collect($rows)->pluck('presentation_format_id')->map(fn ($id): int => (int) $id)->unique()->sort()->values()->all();
+    }
+}

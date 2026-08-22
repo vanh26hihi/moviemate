@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Services\Seats\SeatAvailabilitySnapshot;
 use App\Services\Seats\SeatSelectionPolicy;
 use App\Support\SeatPresentation;
-use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +33,7 @@ class BookingCheckoutService
         private readonly SeatSelectionPolicy $seatSelectionPolicy,
         private readonly BookingExpirationService $expiration,
         private readonly PromotionService $promotions,
-        private readonly LoyaltyService $loyalty,
+        private readonly ShowtimeLifecycleService $lifecycle,
     ) {}
 
     public function createPendingBooking(
@@ -48,8 +47,7 @@ class BookingCheckoutService
         ?User $counterActor = null,
         ?string $customerName = null,
         ?string $customerPhone = null,
-        array $discountCodes = [],
-        int $pointsToUse = 0,
+        ?string $promotionCode = null,
     ): BookingCheckoutResult {
         if (! in_array($salesChannel, Booking::SALES_CHANNELS, true)) {
             throw new InvalidArgumentException('Unsupported booking sales channel.');
@@ -75,8 +73,7 @@ class BookingCheckoutService
             $foodSelection,
             $salesChannel,
             $counterActor?->getKey(),
-            $discountCodes,
-            $pointsToUse,
+            $promotionCode,
         );
         $existing = Booking::query()
             ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -104,8 +101,7 @@ class BookingCheckoutService
                     $counterActor,
                     $customerName,
                     $customerPhone,
-                    $discountCodes,
-                    $pointsToUse,
+                    $promotionCode,
                 ): Booking {
                     $existing = Booking::query()
                         ->where('checkout_idempotency_key_hash', $checkoutHash)
@@ -117,11 +113,11 @@ class BookingCheckoutService
                     }
 
                     $showtime = Showtime::query()
-                        ->with(['cinema', 'room', 'roomLayout'])
+                        ->with(['movie', 'cinema', 'room.cinema', 'roomLayout'])
                         ->lockForUpdate()
                         ->findOrFail($showtimeId);
 
-                    $this->assertShowtimeCanBeReserved($showtime);
+                    $this->assertShowtimeCanBeReserved($showtime, $salesChannel);
                     $normalizedSeatIds = collect($seatIds)
                         ->map(fn ($id) => (int) $id)
                         ->unique()
@@ -181,19 +177,16 @@ class BookingCheckoutService
                         'food_subtotal' => $priceBreakdown->foodSubtotal,
                         'gross_amount' => $priceBreakdown->grandTotal,
                         'promotion_discount_amount' => 0,
-                        'points_discount_amount' => 0,
                         'currency' => $priceBreakdown->currency,
                         'payment_status' => 'unpaid',
                         'booking_status' => 'pending_payment',
                         'expires_at' => now()->addMinutes(max(1, (int) config('booking.pending_ttl_minutes', 15))),
                     ])->save();
 
-                    $promotionQuote = $this->promotions->reserveForBooking($booking, $discountCodes, $priceBreakdown->grandTotal);
-                    $loyaltyQuote = $this->loyalty->reserveForBooking($booking, $pointsToUse, $promotionQuote->finalAmount);
+                    $promotionQuote = $this->promotions->reserveForBooking($booking, $promotionCode, $priceBreakdown->grandTotal);
                     $booking->forceFill([
                         'promotion_discount_amount' => $promotionQuote->discountAmount,
-                        'points_discount_amount' => $loyaltyQuote->discountAmount,
-                        'total_amount' => $loyaltyQuote->finalAmount,
+                        'total_amount' => $promotionQuote->finalAmount,
                     ])->save();
 
                     $this->seatLocks->acquire(
@@ -299,9 +292,8 @@ class BookingCheckoutService
         );
     }
 
-    private function assertShowtimeCanBeReserved(Showtime $showtime): void
+    private function assertShowtimeCanBeReserved(Showtime $showtime, string $salesChannel): void
     {
-        $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time);
         if ($showtime->status !== 'active'
             || $showtime->cinema?->status !== 'active'
             || $showtime->cinema?->archived_at !== null
@@ -309,10 +301,22 @@ class BookingCheckoutService
             || $showtime->room?->cinema_id !== $showtime->cinema_id
             || ! $showtime->roomLayout
             || $showtime->roomLayout->status !== 'published'
-            || $showtime->roomLayout->room_id !== $showtime->room_id
-            || ! $startsAt->isFuture()) {
+            || $showtime->roomLayout->room_id !== $showtime->room_id) {
             throw ValidationException::withMessages([
                 'showtime' => 'Suất chiếu không còn khả dụng.',
+            ]);
+        }
+
+        $snapshot = $this->lifecycle->snapshot($showtime);
+        $open = $salesChannel === Booking::SALES_CHANNEL_ONLINE
+            ? $this->lifecycle->isCustomerBookingOpen($showtime, $snapshot['now'])
+            : $snapshot['now']->lt($snapshot['starts_at']);
+
+        if (! $open) {
+            throw ValidationException::withMessages([
+                'showtime' => $salesChannel === Booking::SALES_CHANNEL_ONLINE
+                    ? 'Suất chiếu này đã đóng nhận đặt vé.'
+                    : 'Suất chiếu không còn khả dụng.',
             ]);
         }
     }

@@ -41,8 +41,8 @@ class VietnameseInterfaceTest extends TestCase
             ->assertRedirect(route('admin.dashboard'));
         $this->actingAs($this->userWithRole('staff'))->get(route('staff.dashboard'))
             ->assertOk()->assertSee('Bàn làm việc hôm nay');
-        $this->actingAs($this->userWithRole('staff'))->get(route('staff.tickets.check'))
-            ->assertOk()->assertSee('Soát vé');
+        $this->actingAs($this->userWithRole('staff'))->get(route('staff.tickets.index'))
+            ->assertOk()->assertSee('Tra cứu & in đơn');
     }
 
     public function test_framework_translation_and_status_presenter_never_expose_internal_values(): void
@@ -105,8 +105,8 @@ class VietnameseInterfaceTest extends TestCase
             'errors/429.blade.php' => 'Thao tác quá nhanh',
             'errors/500.blade.php' => 'Hệ thống tạm gián đoạn',
             'errors/503.blade.php' => 'Hệ thống đang bảo trì',
-            'emails/booking-ticket.blade.php' => 'Mã vé',
-            'user/bookings/ticket.blade.php' => 'Vé điện tử',
+            'emails/booking-ticket.blade.php' => 'Đơn đặt vé',
+            'user/bookings/ticket.blade.php' => 'Đơn đặt vé',
         ];
 
         foreach ($expectations as $view => $copy) {

@@ -16,7 +16,6 @@ use App\Services\Payments\PaymentInitiationService;
 use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
 use App\Services\Seats\SeatAvailabilitySnapshot;
-use App\Services\TicketPricingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -72,7 +71,6 @@ final class CounterSaleController extends Controller
         CinemaAccessService $cinemas,
         PublicShowtimeCatalog $catalog,
         RoomLayoutService $layouts,
-        TicketPricingService $pricing,
         BookingTokenService $tokens,
         BookingExpirationService $expiration,
     ): View {
@@ -81,7 +79,7 @@ final class CounterSaleController extends Controller
         $layout = $layouts->resolveForShowtime($showtime)->load('cells.seat');
         $expiration->expireStaleForShowtime($showtime->id);
         $snapshot = SeatAvailabilitySnapshot::for($showtime, $layout);
-        $seatPrices = $pricing->calculateSeatTypes($showtime, allowLegacySnapshot: false);
+        $seatPrices = $catalog->pricesFor($showtime);
         $checkoutToken = $tokens->issueCheckoutToken();
         $showtime->loadMissing(['movie', 'cinema', 'room']);
 

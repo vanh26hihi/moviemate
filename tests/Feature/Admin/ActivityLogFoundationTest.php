@@ -216,10 +216,13 @@ class ActivityLogFoundationTest extends TestCase
         $admin = $this->userWithRole('admin');
         $room = Room::factory()->create(['cinema_id' => app(CinemaContext::class)->id(), 'status' => 'active']);
         $movie = Movie::query()->create(['title' => 'Phim audit', 'slug' => 'phim-audit']);
+        $layout = $this->publishedRoomLayoutFixture($room);
         Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00:00',
             'price' => 80000,
@@ -253,8 +256,7 @@ class ActivityLogFoundationTest extends TestCase
             'rows' => 1,
             'columns' => 1,
             'screen_position' => 'top',
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
         RoomLayoutCell::query()->create([
             'room_layout_id' => $layout->id,
@@ -263,6 +265,7 @@ class ActivityLogFoundationTest extends TestCase
             'cell_type' => 'seat',
             'seat_id' => $seat->id,
         ]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
 
         $this->actingAs($admin)
             ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seat]), ['status' => 'maintenance'])

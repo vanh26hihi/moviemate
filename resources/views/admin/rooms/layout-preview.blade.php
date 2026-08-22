@@ -14,10 +14,13 @@
 @endphp
 <div class="space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
-        <div><p class="text-sm font-extrabold uppercase tracking-[0.2em] text-brand-start">{{ $room->code }} — {{ $room->name }}</p><h1 class="mt-2 text-3xl font-extrabold app-text">{{ $layout->display_name }} · phiên bản {{ $layout->version }}</h1><p class="app-muted">{{ $layout->rows }} × {{ $layout->columns }} · {{ $layout->cells->where('cell_type', 'seat')->count() }} ghế · {{ $layout->status_label }}</p></div>
+        <div><p class="text-sm font-extrabold uppercase tracking-[0.2em] text-brand-start">{{ $room->code }} — {{ $room->name }}</p><h1 class="mt-2 break-words text-3xl font-extrabold app-text">{{ $layout->display_name }}</h1><p class="app-muted">Phiên bản sơ đồ {{ $layout->version }} · {{ $layout->status_label }} · Lưới logic: {{ $layout->rows }} hàng × {{ $layout->columns }} cột · Sức chứa vật lý: {{ $layout->cells->where('cell_type', 'seat')->count() }} vị trí</p></div>
         @can('seats.manage') @if($room->status === 'active')<a href="{{ route('admin.rooms.layout.show', $room) }}" class="btn-primary"><i class="ph ph-pencil-ruler" aria-hidden="true"></i>Mở trình thiết kế</a>@endif @endcan
     </div>
-    <div class="cinema-card overflow-x-auto p-6">
+    <div class="cinema-card p-4 sm:p-6">
+        <x-admin.layout-template-legend />
+        <p class="mt-3 text-sm app-muted"><strong class="app-text">Trạng thái vận hành:</strong> Ghế bảo trì vẫn là ghế vật lý tạm thời không khả dụng; Vật cản cố định là ô cấu trúc không bố trí ghế.</p>
+        <div class="mt-5 max-w-full overflow-x-auto overscroll-x-contain" tabindex="0" aria-label="Sơ đồ chỉ đọc, có thể cuộn ngang trên màn hình nhỏ">
         @if($layout->screen_position === 'top')<div class="mx-auto mb-8 h-2 min-w-[30rem] max-w-4xl rounded-t-[100%] bg-brand-start/50" aria-hidden="true"></div>@endif
         <div class="mx-auto grid w-max gap-1.5" style="grid-template-columns: repeat({{ $layout->columns }}, 2.35rem)">
             @for($y=1; $y <= $layout->rows; $y++) @for($x=1; $x <= $layout->columns; $x++)
@@ -32,7 +35,8 @@
                     $available = $seat && $consistentStatus && $groupSeats->every(fn ($member) => $member->status === 'active');
                 @endphp
                 @if(!$cell)<span class="h-9 w-9"></span>
-                @elseif($cell->cell_type === 'aisle')<span class="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed app-border text-xs app-muted" aria-label="Lối đi">│</span>
+                @elseif($cell->cell_type === 'aisle')<span class="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed app-border text-xs app-muted" aria-label="Lối đi"><i class="ph ph-arrows-down-up" aria-hidden="true"></i></span>
+                @elseif($cell->cell_type === 'blocked')<span class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-500 bg-slate-800 text-slate-200" aria-label="Vật cản cố định hàng {{ chr(64 + $y) }}, cột {{ $x }}, vị trí cấu trúc không bố trí ghế"><i class="ph ph-bricks" aria-hidden="true"></i></span>
                 @elseif($isMergedCouple && $seat->id !== $primarySeatId) @continue
                 @else
                     @php
@@ -56,6 +60,7 @@
             @endfor @endfor
         </div>
         @if($layout->screen_position === 'bottom')<div class="mx-auto mt-8 h-2 min-w-[30rem] max-w-4xl rounded-b-[100%] bg-brand-start/50" aria-hidden="true"></div>@endif
+        </div>
     </div>
 </div>
 @endsection

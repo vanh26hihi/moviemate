@@ -6,6 +6,7 @@ use App\Domain\Seats\SeatMaintenanceResult;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
+use App\Models\SeatIncidentSeat;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
 use App\Support\SeatPresentation;
@@ -20,12 +21,18 @@ final class SeatMaintenanceService
     public function __construct(
         private readonly CinemaAccessService $cinemaAccess,
         private readonly SeatMaintenanceProtectionService $protections,
+        private readonly SeatIncidentService $incidents,
         private readonly ActivityLogger $activities,
     ) {}
 
-    public function update(Room $room, Seat $seat, string $status): SeatMaintenanceResult
-    {
-        return $this->transition($room, [$seat->id], $status, false);
+    public function update(
+        Room $room,
+        Seat $seat,
+        string $status,
+        string $reason = 'maintenance_required',
+        ?string $note = null,
+    ): SeatMaintenanceResult {
+        return $this->transition($room, [$seat->id], $status, false, $reason, $note);
     }
 
     /** @param list<int> $seatIds */
@@ -42,13 +49,19 @@ final class SeatMaintenanceService
     }
 
     /** @param list<int> $inputIds */
-    private function transition(Room $room, array $inputIds, string $targetStatus, bool $bulk): SeatMaintenanceResult
-    {
+    private function transition(
+        Room $room,
+        array $inputIds,
+        string $targetStatus,
+        bool $bulk,
+        string $reason = 'maintenance_required',
+        ?string $note = null,
+    ): SeatMaintenanceResult {
         if (! in_array($targetStatus, Seat::OPERATIONAL_STATUSES, true)) {
             throw ValidationException::withMessages(['status' => 'Trạng thái vận hành ghế không hợp lệ.']);
         }
 
-        return DB::transaction(function () use ($room, $inputIds, $targetStatus, $bulk): SeatMaintenanceResult {
+        return DB::transaction(function () use ($room, $inputIds, $targetStatus, $bulk, $reason, $note): SeatMaintenanceResult {
             $lockedRoom = Room::query()->whereKey($room->id)->lockForUpdate()->firstOrFail();
             $this->cinemaAccess->authorizeCinema(auth()->user(), (int) $lockedRoom->cinema_id);
             abort_unless($lockedRoom->status === 'active', 404);
@@ -62,6 +75,11 @@ final class SeatMaintenanceService
                 $allIds = $allIds->merge(Seat::query()->where('room_id', $lockedRoom->id)
                     ->whereIn('pair_code', $pairCodes)->pluck('id'));
             }
+            if ($targetStatus === Seat::STATUS_MAINTENANCE) {
+                // Checkout locks a showtime before its physical seats. Match that global
+                // order so a manager/customer race serializes without an inversion.
+                $this->incidents->lockUpcomingShowtimes($lockedRoom);
+            }
             $lockedSeats = Seat::query()->whereIn('id', $allIds->unique())->orderBy('id')->lockForUpdate()->get();
             $lockedRequested = $lockedSeats->whereIn('id', $inputIds)->values();
             abort_unless($lockedRequested->count() === count($inputIds), 404);
@@ -72,7 +90,24 @@ final class SeatMaintenanceService
             $units = $this->resolveUnits($lockedRequested, $lockedSeats, $inputLookup, $currentLookup);
             $protectionMap = $this->protections->summaries($units->flatMap(fn (array $unit) => $unit['seat_ids'])->all());
 
-            if ($targetStatus !== Seat::STATUS_ACTIVE) {
+            $changed = $units->filter(fn (array $unit): bool => $unit['status'] !== $targetStatus)->values();
+            if ($changed->isEmpty()) {
+                return new SeatMaintenanceResult(false, $units->pluck('label')->all(), $targetStatus);
+            }
+
+            if ($targetStatus === Seat::STATUS_ACTIVE) {
+                $hasOpenIncident = SeatIncidentSeat::query()
+                    ->whereIn('seat_id', $changed->flatMap(fn (array $unit) => $unit['seat_ids']))
+                    ->where('active_lock_key', SeatIncidentSeat::ACTIVE_LOCK_KEY)
+                    ->exists();
+                if ($hasOpenIncident) {
+                    throw ValidationException::withMessages([
+                        $bulk ? 'seat_ids' : 'status' => 'Không thể kích hoạt ghế khi sự cố vẫn đang mở.',
+                    ]);
+                }
+            }
+
+            if ($targetStatus === Seat::STATUS_INACTIVE) {
                 $refusals = $units->map(function (array $unit) use ($protectionMap): ?string {
                     $summaries = collect($unit['seat_ids'])->map(fn (int $id): array => $protectionMap[$id]);
                     if ($summaries->contains('active_hold', true)) {
@@ -91,16 +126,25 @@ final class SeatMaintenanceService
                 }
             }
 
-            $changed = $units->filter(fn (array $unit): bool => $unit['status'] !== $targetStatus)->values();
-            if ($changed->isEmpty()) {
-                return new SeatMaintenanceResult(false, $units->pluck('label')->all(), $targetStatus);
-            }
-
             $changedSeatIds = $changed->flatMap(fn (array $unit) => $unit['seat_ids'])->unique()->values();
-            Seat::query()->whereIn('id', $changedSeatIds)->update([
-                'status' => $targetStatus,
-                'updated_at' => now(),
-            ]);
+            $incident = null;
+            if ($targetStatus === Seat::STATUS_MAINTENANCE) {
+                $changedSeats = $lockedSeats->whereIn('id', $changedSeatIds)->values();
+                if ($bulk && $this->incidents->hasLockedImpacts($lockedRoom, $changedSeats)) {
+                    throw ValidationException::withMessages([
+                        'seat_ids' => 'Thao tác có ghế ảnh hưởng booking sắp tới. Hãy xử lý từng đơn vị ghế để tạo sự cố.',
+                    ]);
+                }
+                if (! $bulk) {
+                    $incident = $this->incidents->createIfImpacted($lockedRoom, $changedSeats, $reason, $note);
+                }
+            }
+            if ($incident === null) {
+                Seat::query()->whereIn('id', $changedSeatIds)->update([
+                    'status' => $targetStatus,
+                    'updated_at' => now(),
+                ]);
+            }
             $labels = $changed->pluck('label')->all();
             $previous = $changed->pluck('status')->unique()->sort()->values()->join(',');
             $context = [
@@ -111,7 +155,8 @@ final class SeatMaintenanceService
                 'count' => $changed->count(),
                 'source' => $bulk ? 'bulk' : 'single',
                 'action_scope' => 'current_published_layout',
-                'protection' => 'unprotected',
+                'protection' => $incident ? 'seat_incident' : 'unprotected',
+                'seat_incident_id' => $incident?->id,
             ];
             if ($bulk) {
                 $this->activities->log(
@@ -132,8 +177,8 @@ final class SeatMaintenanceService
                 );
             }
 
-            return new SeatMaintenanceResult(true, $labels, $targetStatus);
-        });
+            return new SeatMaintenanceResult(true, $labels, $targetStatus, $incident?->id);
+        }, 3);
     }
 
     /**

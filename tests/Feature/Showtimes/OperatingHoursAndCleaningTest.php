@@ -4,6 +4,8 @@ namespace Tests\Feature\Showtimes;
 
 class OperatingHoursAndCleaningTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_operating_hours_reject_before_and_after_latest_start(): void
     {
         $movie = $this->movie(180);

@@ -39,7 +39,6 @@ class RbacSeederTest extends TestCase
             'payments.reconcile',
             'ticket_deliveries.view',
             'ticket_deliveries.retry',
-            'ticket_checkins.view',
             'seats.maintenance.view',
             'seats.maintenance.update',
             'discounts.view',
@@ -54,9 +53,9 @@ class RbacSeederTest extends TestCase
         $this->assertTrue($admin->hasPermission('activity_logs.view'));
         $this->assertFalse($admin->hasPermission('tickets.print.override'));
         $this->assertFalse($manager->hasPermission('tickets.print.override'));
-        $this->assertTrue($staff->hasPermission('ticket_checkins.view'));
+        $this->assertFalse($staff->hasPermission('ticket_checkins.view'));
         $this->assertFalse($staff->hasPermission('activity_logs.view'));
-        $this->assertTrue($staff->hasPermission('tickets.checkin'));
+        $this->assertFalse($staff->hasPermission('tickets.checkin'));
         $this->assertFalse($staff->hasPermission('admin.access'));
         $this->assertFalse($staff->hasPermission('cinemas.view'));
         $this->assertSame(0, $user->permissions()->count());

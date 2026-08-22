@@ -73,9 +73,9 @@ class RoomLayoutService
                 $name ?? "Điều chỉnh từ {$published->display_name}",
             );
 
-            $published->loadMissing('cells');
+            $published->loadMissing('cells.seat');
             foreach ($published->cells as $cell) {
-                $draft->cells()->create($cell->only(['x_position', 'y_position', 'cell_type', 'seat_id']));
+                $this->createCell($draft, $cell->only(['x_position', 'y_position', 'cell_type', 'seat_id']), $cell->seat);
             }
 
             return $draft->load('cells.seat');
@@ -115,11 +115,11 @@ class RoomLayoutService
             $seatTypeIds = $this->seatTypeIds();
 
             foreach ($normalized['cells'] as $cell) {
-                if ($cell['cell_type'] === 'aisle') {
-                    $locked->cells()->create([
+                if ($cell['cell_type'] !== RoomLayoutCell::TYPE_SEAT) {
+                    $this->createCell($locked, [
                         'x_position' => $cell['x_position'],
                         'y_position' => $cell['y_position'],
-                        'cell_type' => 'aisle',
+                        'cell_type' => $cell['cell_type'],
                         'seat_id' => null,
                     ]);
 
@@ -167,12 +167,12 @@ class RoomLayoutService
                     ]);
                 }
 
-                $locked->cells()->create([
+                $this->createCell($locked, [
                     'x_position' => $cell['x_position'],
                     'y_position' => $cell['y_position'],
                     'cell_type' => 'seat',
                     'seat_id' => $seat->id,
-                ]);
+                ], $seat);
             }
 
             Seat::query()->where('room_id', $locked->room_id)
@@ -220,6 +220,11 @@ class RoomLayoutService
                 continue;
             }
 
+            $allowedKinds = ['seat', 'normal', 'vip', 'couple', 'maintenance', 'inactive', RoomLayoutCell::TYPE_AISLE, RoomLayoutCell::TYPE_BLOCKED];
+            if (! in_array($kind, $allowedKinds, true)) {
+                throw ValidationException::withMessages(["cells.{$index}.type" => 'Loại ô sơ đồ không hợp lệ.']);
+            }
+
             $x = filter_var($input['x_position'] ?? $input['x'] ?? null, FILTER_VALIDATE_INT);
             $y = filter_var($input['y_position'] ?? $input['y'] ?? null, FILTER_VALIDATE_INT);
             if (! $x || ! $y || $x > $columns || $y > $rows) {
@@ -231,11 +236,17 @@ class RoomLayoutService
             }
             $coordinates[$coordinate] = true;
 
-            if ($kind === 'aisle') {
+            if (in_array($kind, [RoomLayoutCell::TYPE_AISLE, RoomLayoutCell::TYPE_BLOCKED], true)) {
+                $seatFields = ['seat_id', 'seat_type_id', 'seat_type', 'type', 'seat_code', 'row', 'number', 'pair_code', 'pair_position', 'status'];
+                $contradictory = collect($seatFields)->contains(fn (string $field): bool => array_key_exists($field, $input)
+                    && $input[$field] !== null && $input[$field] !== '');
+                if ($contradictory) {
+                    throw ValidationException::withMessages(["cells.{$index}" => 'Ô cấu trúc không được mang dữ liệu ghế hoặc ghế đôi.']);
+                }
                 $normalized[] = [
                     'x_position' => $x,
                     'y_position' => $y,
-                    'cell_type' => 'aisle',
+                    'cell_type' => $kind,
                 ];
 
                 continue;
@@ -358,11 +369,6 @@ class RoomLayoutService
                 'published_at' => now(),
                 'updated_by' => $userId,
             ]);
-            $usableCapacity = $locked->cells()
-                ->where('cell_type', 'seat')
-                ->whereHas('seat', fn ($query) => $query->where('status', 'active'))
-                ->count();
-            $locked->room()->update(['total_seats' => $usableCapacity]);
             $this->retireSeatsAbsentFromPublishedLayout($locked);
 
             return $locked->fresh(['cells.seat']);
@@ -477,16 +483,17 @@ class RoomLayoutService
         }
 
         $submittedSeatIds = collect($normalized['cells'])->pluck('seat_id')->filter()->map(fn ($id): int => (int) $id);
-        $oldAisles = $layout->cells->where('cell_type', 'aisle')->count();
-        $submittedAisles = collect($normalized['cells'])->where('cell_type', 'aisle')->count();
+        $oldStructural = $layout->cells->whereIn('cell_type', [RoomLayoutCell::TYPE_AISLE, RoomLayoutCell::TYPE_BLOCKED])->count();
+        $submittedStructural = collect($normalized['cells'])->whereIn('cell_type', [RoomLayoutCell::TYPE_AISLE, RoomLayoutCell::TYPE_BLOCKED])->count();
         $lostSeat = $outside->where('cell_type', 'seat')->contains(
             fn (RoomLayoutCell $cell): bool => ! $submittedSeatIds->contains((int) $cell->seat_id)
         );
-        $lostAisle = $outside->where('cell_type', 'aisle')->isNotEmpty() && $submittedAisles < $oldAisles;
+        $lostStructural = $outside->whereIn('cell_type', [RoomLayoutCell::TYPE_AISLE, RoomLayoutCell::TYPE_BLOCKED])->isNotEmpty()
+            && $submittedStructural < $oldStructural;
 
-        if ($lostSeat || $lostAisle) {
+        if ($lostSeat || $lostStructural) {
             throw ValidationException::withMessages([
-                'layout' => 'Không thể thu nhỏ vùng thiết kế vì thao tác sẽ làm mất ghế hoặc lối đi. Hãy di chuyển hoặc xóa rõ ràng rồi lưu trước.',
+                'layout' => 'Không thể thu nhỏ vùng thiết kế vì thao tác sẽ làm mất ghế hoặc ô cấu trúc. Hãy di chuyển hoặc xóa rõ ràng rồi lưu trước.',
             ]);
         }
     }
@@ -557,6 +564,20 @@ class RoomLayoutService
             : 'A'.chr(64 + $index - 26);
     }
 
+    /** @param array<string, mixed> $attributes */
+    private function createCell(RoomLayout $layout, array $attributes, ?Seat $seat = null): RoomLayoutCell
+    {
+        $cell = new RoomLayoutCell($attributes);
+        $cell->room_layout_id = $layout->id;
+        $cell->setRelation('layout', $layout);
+        if ($seat) {
+            $cell->setRelation('seat', $seat);
+        }
+        $cell->save();
+
+        return $cell;
+    }
+
     private function payloadFromLayout(RoomLayout $layout): array
     {
         return [
@@ -567,8 +588,8 @@ class RoomLayoutService
             'columns' => $layout->columns,
             'screen_position' => $layout->screen_position,
             'cells' => $layout->cells->map(function (RoomLayoutCell $cell): array {
-                if ($cell->cell_type === 'aisle') {
-                    return ['kind' => 'aisle', 'x' => $cell->x_position, 'y' => $cell->y_position];
+                if ($cell->cell_type !== RoomLayoutCell::TYPE_SEAT) {
+                    return ['kind' => $cell->cell_type, 'x' => $cell->x_position, 'y' => $cell->y_position];
                 }
 
                 return [

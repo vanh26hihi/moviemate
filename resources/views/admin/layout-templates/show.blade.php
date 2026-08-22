@@ -19,7 +19,8 @@
                 <h1 class="break-words text-3xl font-black app-text sm:text-4xl">{{ $layoutTemplate->name }}</h1>
                 <span class="rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wider {{ $statusClass }}">{{ $layoutTemplate->status_label }}</span>
             </div>
-            <p class="mt-3 max-w-3xl leading-relaxed app-muted">{{ $layoutTemplate->description ?: 'Mẫu bố cục ghế dùng lại khi cấu hình phòng chiếu.' }}</p>
+            <p class="mt-3 max-w-3xl leading-relaxed app-muted">{{ $layoutTemplate->description ?: 'Mẫu lưới bố trí logic dùng lại khi cấu hình phòng chiếu.' }}</p>
+            <p class="mt-3 max-w-3xl rounded-xl border border-info/25 bg-info/5 px-4 py-3 text-sm leading-relaxed app-muted">Áp dụng mẫu sẽ tạo một sơ đồ phòng độc lập. Các thay đổi sau này trên mẫu không làm thay đổi sơ đồ đã áp dụng.</p>
         </div>
 
         @can('layout_templates.manage')
@@ -47,8 +48,8 @@
             @foreach([
                 ['Mã mẫu', $layoutTemplate->code, 'ph-hash'],
                 ['Loại phòng', $roomTypeName ?: 'Mọi loại phòng', 'ph-projector-screen'],
-                ['Kích thước', $layoutTemplate->rows.' × '.$layoutTemplate->columns, 'ph-grid-four'],
-                ['Sức chứa', $statistics['capacity'].' ghế', 'ph-users-three'],
+                ['Lưới logic', $layoutTemplate->rows.' hàng × '.$layoutTemplate->columns.' cột', 'ph-grid-four'],
+                ['Vị trí ghế trong mẫu', $statistics['physical_seats'].' vị trí', 'ph-users-three'],
             ] as [$label, $value, $icon])
                 <div class="min-w-0 rounded-2xl border app-border app-bg p-4">
                     <dt class="flex items-center gap-2 text-xs font-bold app-muted"><i class="ph {{ $icon }} text-brand-start" aria-hidden="true"></i>{{ $label }}</dt>
@@ -65,11 +66,13 @@
         </div>
         <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                ['Sức chứa', $statistics['capacity'], 'ghế logic', 'ph-users-three'],
+                ['Vị trí ghế trong mẫu', $statistics['physical_seats'], 'vị trí', 'ph-users-three'],
+                ['Đơn vị tính giá', $statistics['pricing_units'], 'đơn vị', 'ph-ticket'],
                 ['Ghế thường', $statistics['normal'], 'vị trí', 'ph-armchair'],
                 ['VIP', $statistics['vip'], 'vị trí', 'ph-star'],
                 ['Ghế đôi', $statistics['couple_pairs'], $statistics['couple_positions'].' vị trí', 'ph-heart'],
                 ['Lối đi', $statistics['aisles'], 'ô', 'ph-arrows-down-up'],
+                ['Vật cản cố định', $statistics['blocked'], 'ô', 'ph-bricks'],
                 ['Đang áp dụng', $statistics['usages'], 'phòng/layout', 'ph-buildings'],
             ] as [$label, $value, $note, $icon])
                 <div class="rounded-2xl border app-border app-bg p-4">

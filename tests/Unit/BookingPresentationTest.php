@@ -61,7 +61,7 @@ class BookingPresentationTest extends TestCase
             'currency' => 'VND',
         ]);
 
-        $this->assertSame('Chưa sử dụng', $booking->status_label);
+        $this->assertSame('Đã thanh toán', $booking->status_label);
         $this->assertSame('VNĐ', $booking->currency_label);
         $this->assertSame('150.000 VNĐ', $booking->formatted_seat_subtotal);
         $this->assertSame('30.000 VNĐ', $booking->formatted_food_subtotal);

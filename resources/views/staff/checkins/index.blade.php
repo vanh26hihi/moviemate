@@ -1,7 +1,0 @@
-@extends('layouts.staff')
-@section('title','Lịch sử soát vé - MovieMate')
-@section('page-title','Lịch sử soát vé')
-@section('content')
-<div class="space-y-6"><header class="admin-page-header"><div><h1 class="admin-page-title">Lịch sử soát vé</h1><p class="admin-page-subtitle">{{ $cinema ? 'Các lượt soát thành công tại '.$cinema->name.'. Dữ liệu chỉ đọc.' : 'Bạn chưa được phân công chi nhánh.' }}</p></div></header>
-@if($events->isEmpty())<x-empty-state title="Chưa có lượt soát vé" description="Không có vé nào được soát tại chi nhánh này." icon="ph-qr-code" />@else<div class="space-y-3">@foreach($events as $event)<article class="cinema-card grid gap-3 p-5 md:grid-cols-[1fr_1fr_auto]"><div><a href="{{ route('staff.tickets.operations',$event->booking) }}" class="font-mono font-black text-brand-start">{{ $event->booking?->booking_code }}</a><p class="mt-1 text-sm app-muted">{{ $event->booking?->seat_codes }}</p></div><div><p class="font-bold app-text">{{ $event->booking?->showtime?->movie?->title }}</p><p class="text-sm app-muted">{{ $event->booking?->showtime_label }} · {{ $event->booking?->showtime?->room?->name }}</p></div><div class="md:text-right"><p class="font-bold text-success">{{ $event->scanned_at?->format('d/m/Y H:i:s') }}</p><p class="text-sm app-muted">{{ $event->actor?->name ?? 'Nhân viên' }}</p></div></article>@endforeach</div><div>{{ $events->links() }}</div>@endif</div>
-@endsection

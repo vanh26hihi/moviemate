@@ -19,7 +19,7 @@ class Booking extends Model
 
     public const SALES_CHANNELS = [self::SALES_CHANNEL_ONLINE, self::SALES_CHANNEL_COUNTER];
 
-    public const STATUSES = ['pending_payment', 'paid', 'used', 'cancelled', 'expired'];
+    public const STATUSES = ['pending_payment', 'paid', 'cancelled', 'expired'];
 
     public const PAYMENT_STATUSES = ['unpaid', 'paid', 'failed', 'refunded'];
 
@@ -40,17 +40,14 @@ class Booking extends Model
         'food_subtotal',
         'gross_amount',
         'promotion_discount_amount',
-        'points_discount_amount',
         'currency',
         'payment_status',
         'booking_status',
         'expires_at',
         'paid_at',
-        'used_at',
     ];
 
     protected $casts = [
-        'used_at' => 'datetime',
         'expires_at' => 'datetime',
         'guest_access_expires_at' => 'datetime',
         'ticket_email_token_expires_at' => 'datetime',
@@ -61,7 +58,6 @@ class Booking extends Model
         'food_subtotal' => 'integer',
         'gross_amount' => 'integer',
         'promotion_discount_amount' => 'integer',
-        'points_discount_amount' => 'integer',
     ];
 
     protected $hidden = [
@@ -116,11 +112,22 @@ class Booking extends Model
                 throw new \LogicException('Booking channel and creator attribution are immutable.');
             }
         });
+
     }
 
     public function bookingSeats(): HasMany
     {
         return $this->hasMany(BookingSeat::class);
+    }
+
+    public function admissionTickets(): HasMany
+    {
+        return $this->hasMany(AdmissionTicket::class);
+    }
+
+    public function foodPickupVoucher(): HasOne
+    {
+        return $this->hasOne(FoodPickupVoucher::class);
     }
 
     public function payment(): HasOne
@@ -134,14 +141,9 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
-    public function discountCodeRedemptions(): HasMany
+    public function promotionUsage(): HasOne
     {
-        return $this->hasMany(BookingDiscountCode::class);
-    }
-
-    public function pointRedemption(): HasOne
-    {
-        return $this->hasOne(BookingPointRedemption::class);
+        return $this->hasOne(BookingPromotion::class);
     }
 
     public function authoritativePayment(): HasOne
@@ -161,18 +163,6 @@ class Booking extends Model
     public function ticketPrint(): HasOne
     {
         return $this->hasOne(BookingTicketPrint::class);
-    }
-
-    public function ticketCheckinEvents(): HasMany
-    {
-        return $this->hasMany(TicketCheckinEvent::class);
-    }
-
-    public function acceptedTicketCheckin(): HasOne
-    {
-        return $this->hasOne(TicketCheckinEvent::class)
-            ->where('result', TicketCheckinEvent::RESULT_ACCEPTED)
-            ->oldestOfMany('id');
     }
 
     public function foodOrder(): HasOne

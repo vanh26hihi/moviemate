@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Khu vực nhân viên MovieMate')</title>
+    <x-brand.head-icons />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script>
         (function () {
@@ -16,9 +17,9 @@
     <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden hidden"></div>
     <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 app-sidebar border-r app-border transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col h-full">
         <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0">
-            <a href="{{ route('staff.dashboard') }}" class="flex items-center gap-2">
-                <i class="ph-fill ph-film-strip text-3xl text-ai-start"></i>
-                <div class="leading-tight"><span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-ai-start to-brand-start">MovieMate</span><span class="block text-[10px] uppercase tracking-widest app-muted font-bold">Khu vực nhân viên</span></div>
+            <a href="{{ route('staff.dashboard') }}" class="min-w-0" aria-label="MovieMate - Khu vực nhân viên">
+                <x-brand.logo class="brand-logo--sidebar" />
+                <span class="mt-0.5 block text-[10px] font-bold uppercase tracking-widest app-muted">Khu vực nhân viên</span>
             </a>
         </div>
         <nav class="flex-grow py-6 px-4 space-y-1 overflow-y-auto hide-scrollbar">
@@ -27,10 +28,9 @@
             <p class="px-3 pb-2 pt-5 text-[10px] font-black uppercase tracking-[.18em] app-muted">Bán vé tại quầy</p>
             @can('counter_sales.view')<x-admin.nav-link route-name="staff.counter.index" active-pattern="staff.counter.*" label="Bán vé" icon="ph-storefront" />@endcan
             @can('counter_sales.view')<x-admin.nav-link route-name="staff.sales.index" active-pattern="staff.sales.*" label="Giao dịch hôm nay" icon="ph-receipt" />@endcan
-            <p class="px-3 pb-2 pt-5 text-[10px] font-black uppercase tracking-[.18em] app-muted">Vé &amp; soát vé</p>
-            @can('tickets.lookup')<x-admin.nav-link route-name="staff.tickets.index" active-pattern="staff.tickets.*" label="Quét và tra cứu vé" icon="ph-qr-code" />@endcan
+            <p class="px-3 pb-2 pt-5 text-[10px] font-black uppercase tracking-[.18em] app-muted">Tra cứu &amp; in đơn</p>
+            @can('tickets.lookup')<x-admin.nav-link route-name="staff.tickets.index" active-pattern="staff.tickets.*" label="Tra cứu & in đơn" icon="ph-qr-code" />@endcan
             @can('tickets.print')<x-admin.nav-link route-name="staff.prints.index" active-pattern="staff.prints.*" label="Vé cần in" icon="ph-printer" />@endcan
-            @can('ticket_checkins.view')<x-admin.nav-link route-name="staff.checkins.index" active-pattern="staff.checkins.*" label="Lịch sử soát vé" icon="ph-clock-counter-clockwise" />@endcan
         </nav>
         <div class="p-4 border-t app-border shrink-0">
             <a href="{{ route('home') }}" target="_blank" class="flex items-center justify-center gap-2 w-full py-2.5 app-card border app-border app-muted rounded-xl hover:text-brand-start hover:border-brand-start transition-colors text-sm font-medium"><i class="ph ph-arrow-square-out text-lg"></i> Về trang chính</a>

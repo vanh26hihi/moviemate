@@ -148,7 +148,7 @@ class NotificationRenderingTest extends TestCase
         }
 
         $customer = $this->userWithRole('user');
-        foreach (['Đơn đặt vé đã được hủy.', 'Yêu cầu gửi lại vé đã được ghi nhận.'] as $message) {
+        foreach (['Đơn đặt vé đã được hủy.', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.'] as $message) {
             $response = $this->actingAs($customer)->withSession(['success' => $message])
                 ->get(route('user.bookings.history'))->assertOk();
             $this->assertRenderedOnce($response->getContent(), $message);
@@ -159,9 +159,9 @@ class NotificationRenderingTest extends TestCase
             ->get(route('user.movies.index'))->assertOk();
         $this->assertRenderedOnce($customerResponse->getContent(), $checkoutFailure);
 
-        $staffMessage = 'Kết quả kiểm tra vé đã được ghi nhận.';
+        $staffMessage = 'Kết quả tra cứu đơn đã được ghi nhận.';
         $staffResponse = $this->actingAs($this->userWithRole('staff'))->withSession(['success' => $staffMessage])
-            ->get(route('staff.tickets.check'))->assertOk();
+            ->get(route('staff.tickets.index'))->assertOk();
         $this->assertRenderedOnce($staffResponse->getContent(), $staffMessage);
     }
 

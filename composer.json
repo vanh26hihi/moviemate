@@ -1,14 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "moviemate/application",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Cinema operations and online ticket booking application.",
+    "keywords": ["cinema", "booking", "laravel", "moviemate"],
     "license": "MIT",
     "require": {
         "php": "^8.3",
         "bacon/bacon-qr-code": "3.0",
         "laravel/framework": "^13.8",
+        "laravel/socialite": "^5.29",
         "laravel/tinker": "^3.0"
     },
     "require-dev": {

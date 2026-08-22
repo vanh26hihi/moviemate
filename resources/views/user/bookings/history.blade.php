@@ -14,12 +14,6 @@
                 <h2 class="font-bold app-text mb-1">{{ Auth::user()->name }}</h2>
                 <p class="text-xs text-ai-start font-bold mb-5">Hạng {{ Auth::user()->role?->display_name ?? 'Khách hàng' }}</p>
 
-                <div class="w-full rounded-2xl border border-ai-start/30 bg-ai-start/10 px-4 py-3 mb-4 text-left">
-                    <p class="text-xs app-muted">Thành viên {{ Auth::user()->membership_tier }}</p>
-                    <p class="text-2xl font-extrabold text-ai-start">{{ number_format(Auth::user()->loyalty_points, 0, ',', '.') }}</p>
-                    <p class="text-xs app-muted">điểm khả dụng</p>
-                </div>
-
                 <div class="w-full space-y-1 text-left">
                     <a href="{{ route('user.profile') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
                         <i class="ph ph-user text-lg"></i> Thông tin cá nhân
@@ -27,11 +21,6 @@
                     <a href="{{ route('user.bookings.history') }}" class="flex items-center gap-3 px-4 py-2.5 bg-brand-start/10 text-brand-start rounded-xl font-bold border border-brand-start/20 text-sm">
                         <i class="ph-fill ph-ticket text-lg"></i> Lịch sử đặt vé
                     </a>
-                    @if(Route::has('user.loyalty.history'))
-                        <a href="{{ route('user.loyalty.history') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
-                            <i class="ph ph-coins text-lg"></i> Lịch sử điểm
-                        </a>
-                    @endif
                     <a href="{{ route('user.reviews.index') }}" class="flex items-center gap-3 px-4 py-2.5 app-muted hover:app-text hover:bg-brand-start/5 rounded-xl font-medium transition-colors text-sm">
                         <i class="ph ph-star text-lg"></i> Đánh giá của tôi
                     </a>
@@ -43,15 +32,14 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                     <h1 class="text-3xl font-bold app-text">Lịch sử đặt vé</h1>
-                    <p class="app-muted mt-1">Theo dõi vé đã đặt và mã QR của bạn.</p>
+                    <p class="app-muted mt-1">Theo dõi đơn đặt vé và QR đơn đặt vé của bạn.</p>
                 </div>
 
                 <form method="GET" action="{{ route('user.bookings.history') }}" class="flex gap-2">
                     <select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
                         <option value="">Tất cả</option>
                         <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Chờ thanh toán</option>
-                        <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Chưa sử dụng</option>
-                        <option value="used" {{ request('status') == 'used' ? 'selected' : '' }}>Đã sử dụng</option>
+                        <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Đã thanh toán</option>
                         <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Đã hủy</option>
                         <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Hết hạn</option>
                     </select>
@@ -90,13 +78,14 @@
 
                             <div class="flex-grow min-w-0">
                                 <h2 class="text-xl font-bold app-text mb-1 pr-20">{{ $booking->showtime->movie->title }}</h2>
-                                <p class="app-muted text-xs mb-4">Mã vé: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
+                                <p class="app-muted text-xs mb-4">Mã đơn: <span class="app-text font-mono font-bold">{{ $booking->booking_code }}</span></p>
 
                                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs mb-4">
                                     <div><p class="app-muted mb-0.5">Thời gian</p><p class="app-text font-semibold">{{ $booking->showtime?->show_time ? \Carbon\Carbon::parse($booking->showtime->show_time)->format('H:i') : '--:--' }} - {{ $booking->showtime?->show_date ? \Carbon\Carbon::parse($booking->showtime->show_date)->format('d/m/Y') : 'Đang cập nhật' }}</p></div>
                                     <div><p class="app-muted mb-0.5">Ghế</p><p class="text-brand-start font-bold text-sm">{{ $booking->seat_codes }}</p></div>
                                     <div><p class="app-muted mb-0.5">Rạp</p><p class="app-text font-semibold">{{ $booking->showtime->cinema->name }}</p></div>
                                     <div><p class="app-muted mb-0.5">Phòng</p><p class="app-text font-semibold">{{ $booking->showtime->room->name }}</p></div>
+                                    <div><p class="app-muted mb-0.5">Định dạng trình chiếu</p><p class="app-text font-semibold">{{ $booking->showtime?->presentationFormat?->name ?? 'Không xác định' }}</p></div>
                                 </div>
 
                                 <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
@@ -104,13 +93,7 @@
                                         <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
                                         <p class="app-text font-bold text-lg">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</p>
                                         @if($booking->promotion_discount_amount > 0)
-                                            <p class="text-xs text-success">Mã {{ $booking->discountCodeRedemptions->pluck('code_snapshot')->join(', ') }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
-                                        @endif
-                                        @if($booking->pointRedemption)
-                                            <p class="text-xs text-ai-start">Đã dùng {{ number_format($booking->pointRedemption->points,0,',','.') }} điểm: −{{ number_format((int)$booking->points_discount_amount,0,',','.') }} VNĐ</p>
-                                        @endif
-                                        @if($booking->loyalty_points_earned > 0)
-                                            <p class="text-xs text-ai-start font-semibold">+{{ number_format($booking->loyalty_points_earned,0,',','.') }} điểm</p>
+                                            <p class="text-xs text-success">Khuyến mãi {{ $booking->promotionUsage?->code_snapshot }}: −{{ number_format((int)$booking->promotion_discount_amount,0,',','.') }} VNĐ</p>
                                         @endif
                                     </div>
                                     <div class="flex flex-wrap gap-2">
@@ -125,12 +108,12 @@
 
                                         @if($canUseTicket)
                                             <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-4 py-2 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all">
-                                                Xem vé QR
+                                                Xem đơn đặt vé
                                             </a>
                                             <form method="POST" action="{{ route('user.bookings.ticket-email.resend', $booking) }}" class="inline" data-submit-once>
                                                 @csrf
                                                 <button type="submit" data-loading-label="Đang gửi…" class="px-3 py-2 border app-border app-muted hover:app-text rounded-xl text-xs font-semibold transition-colors">
-                                                    Gửi lại email vé
+                                                    Gửi lại tài liệu nhận vé
                                                 </button>
                                             </form>
                                         @endif
@@ -170,7 +153,9 @@
                         <div class="w-16 h-16 rounded-2xl bg-brand-start/10 text-brand-start flex items-center justify-center mx-auto mb-4">
                             <i class="ph ph-ticket text-3xl"></i>
                         </div>
-                        <p class="app-muted">Bạn chưa có vé nào.</p>
+                        <h2 class="text-lg font-extrabold app-text">Bạn chưa có đơn đặt vé nào</h2>
+                        <p class="mt-2 app-muted">Hãy chọn một phim và suất chiếu phù hợp để bắt đầu đặt vé.</p>
+                        <a href="{{ route('user.movies.index') }}" class="btn-primary mt-5">Tìm suất chiếu</a>
                     </div>
                 @endforelse
 

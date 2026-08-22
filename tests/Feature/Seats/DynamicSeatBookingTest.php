@@ -5,8 +5,9 @@ namespace Tests\Feature\Seats;
 use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
 use App\Models\Room;
+use App\Models\RoomLayout;
+use App\Models\RoomType;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Services\BookingTokenService;
@@ -15,11 +16,12 @@ use App\Services\RoomLayoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\CreatesPriceBookFixtures;
 use Tests\TestCase;
 
 class DynamicSeatBookingTest extends TestCase
 {
-    use RefreshDatabase;
+    use CreatesPriceBookFixtures, RefreshDatabase;
 
     private Cinema $cinema;
 
@@ -33,19 +35,15 @@ class DynamicSeatBookingTest extends TestCase
     {
         parent::setUp();
         $this->cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
-        foreach ([
-            ['name' => 'Dynamic seat base', 'rule_type' => 'base', 'seat_type' => null, 'amount_vnd' => 50000],
-            ['name' => 'Dynamic seat VIP', 'rule_type' => 'seat_type', 'seat_type' => 'vip', 'amount_vnd' => 20000],
-            ['name' => 'Dynamic seat couple', 'rule_type' => 'seat_type', 'seat_type' => 'couple', 'amount_vnd' => 50000],
-        ] as $rule) {
-            CinemaPricingRule::query()->create([
-                ...$rule, 'cinema_id' => $this->cinema->id, 'priority' => 1000, 'status' => 'active',
-            ]);
-        }
+        $this->ensurePublishedPriceBook(50_000);
+        $roomType = RoomType::query()->firstOrCreate(['code' => '2D'], [
+            'name' => '2D', 'slug' => '2d', 'is_active' => true, 'status' => true, 'sort_order' => 1,
+        ]);
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([
                 'cinema_id' => $this->cinema->id, 'code' => $code, 'name' => 'Phòng '.($index + 1),
-                'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+                'room_type' => '2D', 'room_type_id' => $roomType->id,
+                'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             ]);
         }
         $this->artisan('moviemate:rebuild-seat-layouts', ['--initialize-empty' => true])->assertSuccessful();
@@ -57,10 +55,12 @@ class DynamicSeatBookingTest extends TestCase
         $room = $this->rooms['P01'];
         $this->showtime = Showtime::query()->create([
             'movie_id' => $movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movieId, $room)->id,
             'room_layout_id' => $room->latestPublishedLayout()->first()->id,
             'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '10:00:00',
-            'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
+            'status' => 'active',
         ]);
+        $this->snapshotShowtime($this->showtime);
         $this->checkoutToken = app(BookingTokenService::class)->issueCheckoutToken();
     }
 
@@ -116,9 +116,11 @@ class DynamicSeatBookingTest extends TestCase
         $v2 = $service->publish($saved);
         $newShowtime = Showtime::query()->create([
             'movie_id' => $this->showtime->movie_id, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($this->showtime->movie_id, $room)->id,
             'room_layout_id' => $v2->id, 'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '13:00:00',
-            'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
+            'status' => 'active',
         ]);
+        $this->snapshotShowtime($newShowtime);
 
         $this->get(route('user.bookings.selectSeat', $newShowtime))
             ->assertOk()->assertSee('repeat(17', false)
@@ -183,10 +185,12 @@ class DynamicSeatBookingTest extends TestCase
         $maintenance = Seat::query()->where('room_id', $room->id)->where('status', 'maintenance')->firstOrFail();
         $showtime = Showtime::query()->create([
             'movie_id' => $this->showtime->movie_id, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($this->showtime->movie_id, $room)->id,
             'room_layout_id' => $room->latestPublishedLayout()->first()->id,
             'show_date' => now()->addDays(10)->toDateString(), 'show_time' => '12:00:00',
-            'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
+            'status' => 'active',
         ]);
+        $this->snapshotShowtime($showtime);
 
         $this->get(route('user.bookings.selectSeat', $showtime))
             ->assertOk()->assertSee('aria-label="Ghế F6, loại VIP, đang bảo trì', false)->assertSee('disabled', false);
@@ -269,7 +273,7 @@ class DynamicSeatBookingTest extends TestCase
 
     public function test_showtime_without_published_layout_cannot_open_seat_map(): void
     {
-        $this->showtime->update(['room_layout_id' => null]);
+        $this->showtime->roomLayout()->update(['status' => RoomLayout::STATUS_RETIRED]);
         $this->get(route('user.bookings.selectSeat', $this->showtime))
             ->assertRedirect(route('user.movies.show', 'booking-movie'));
     }

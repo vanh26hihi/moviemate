@@ -3,6 +3,7 @@
 namespace Tests\Feature\Rooms;
 
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Seat;
 use App\Models\Showtime;
@@ -14,11 +15,16 @@ class AdminRoomManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    private PresentationFormat $presentationFormat;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seedRbac();
         app()->setLocale('vi');
+        $this->presentationFormat = PresentationFormat::query()->create([
+            'code' => '2D_FORMAT', 'name' => '2D Format', 'is_active' => true, 'sort_order' => 10,
+        ]);
     }
 
     public function test_room_routes_follow_current_authorization_matrix(): void
@@ -80,6 +86,7 @@ class AdminRoomManagementTest extends TestCase
             'name' => 'Phòng đang nhập',
             'room_type' => 'không hợp lệ',
             'status' => 'active',
+            'presentation_format_ids' => [$this->presentationFormat->id],
         ]);
         $response->assertRedirect(route('admin.rooms.create'))
             ->assertSessionHasErrors(['code', 'room_type'])
@@ -94,11 +101,13 @@ class AdminRoomManagementTest extends TestCase
         $manager = $this->userWithRole('manager');
         $response = $this->actingAs($manager)->post(route('admin.rooms.store'), [
             'code' => 'p20', 'name' => 'Phòng Hai Mươi', 'room_type' => '2d',
-            'status' => 'active', 'total_seats' => 999,
+            'status' => 'active', 'width_m' => '7.5', 'length_m' => '10',
+            'presentation_format_ids' => [$this->presentationFormat->id],
         ]);
         $room = Room::query()->where('code', 'P20')->sole();
         $response->assertRedirect(route('admin.rooms.layout.show', $room));
-        $this->assertSame(0, $room->total_seats);
+        $this->assertSame(7_500, $room->width_mm);
+        $this->assertSame(10_000, $room->length_mm);
 
         $seat = Seat::query()->create([
             'room_id' => $room->id, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1',
@@ -106,11 +115,13 @@ class AdminRoomManagementTest extends TestCase
         ]);
         $this->actingAs($manager)->put(route('admin.rooms.update', $room), [
             'code' => 'P20', 'name' => 'Phòng 20', 'room_type' => '3D', 'status' => 'active',
-            'total_seats' => 500, 'layout_id' => 999999,
+            'width_m' => '8', 'length_m' => '11', 'layout_id' => 999999,
+            'presentation_format_ids' => [$this->presentationFormat->id],
         ])->assertRedirect(route('admin.rooms.show', $room));
 
         $this->assertDatabaseHas('seats', ['id' => $seat->id, 'room_id' => $room->id]);
-        $this->assertSame(0, $room->fresh()->total_seats);
+        $this->assertSame(8_000, $room->fresh()->width_mm);
+        $this->assertSame(11_000, $room->fresh()->length_mm);
     }
 
     public function test_deactivation_is_safe_and_reactivation_is_supported(): void
@@ -118,10 +129,13 @@ class AdminRoomManagementTest extends TestCase
         $admin = $this->userWithRole('admin');
         $room = $this->room();
         $movie = Movie::query()->create(['title' => 'Phim thử nghiệm', 'slug' => 'phim-thu-nghiem']);
+        $layout = $this->publishedRoomLayoutFixture($room);
         Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00:00',
             'price' => 80000,
@@ -147,8 +161,11 @@ class AdminRoomManagementTest extends TestCase
         $admin = $this->userWithRole('admin');
         $room = $this->room();
         $movie = Movie::query()->create(['title' => 'Phim lịch sử', 'slug' => 'phim-lich-su']);
+        $layout = $this->publishedRoomLayoutFixture($room);
         Showtime::query()->create([
             'movie_id' => $movie->id, 'cinema_id' => $room->cinema_id, 'room_id' => $room->id,
+            'room_layout_id' => $layout->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->subDay()->toDateString(), 'show_time' => '10:00:00',
             'price' => 70000, 'status' => 'finished',
         ]);
@@ -160,9 +177,12 @@ class AdminRoomManagementTest extends TestCase
     /** @param array<string, mixed> $attributes */
     private function room(array $attributes = []): Room
     {
-        return Room::factory()->create([
+        $room = Room::factory()->create([
             'cinema_id' => app(CinemaContext::class)->id(),
             ...$attributes,
         ]);
+        $room->presentationCapabilities()->attach($this->presentationFormat);
+
+        return $room;
     }
 }

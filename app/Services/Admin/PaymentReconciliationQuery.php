@@ -54,7 +54,7 @@ final class PaymentReconciliationQuery
                 $query->whereColumn('payments.amount', '!=', 'bookings.total_amount')
                     ->orWhere(fn (Builder $query) => $query->where('payments.status', Payment::STATUS_SUCCESS)->whereNull('payments.verified_at'))
                     ->orWhere(fn (Builder $query) => $query->where('payments.status', Payment::STATUS_SUCCESS)->whereNotNull('payments.verified_at')
-                        ->where(fn (Builder $query) => $query->where('bookings.payment_status', '!=', 'paid')->orWhereNotIn('bookings.booking_status', ['paid', 'used'])))
+                        ->where(fn (Builder $query) => $query->where('bookings.payment_status', '!=', 'paid')->orWhere('bookings.booking_status', '!=', 'paid')))
                     ->orWhere(fn (Builder $query) => $query->whereIn('payments.status', [Payment::STATUS_REVIEW, Payment::STATUS_UNRESOLVED]))
                     ->orWhere(fn (Builder $query) => $query->where('payments.status', Payment::STATUS_FAILED)
                         ->where('payments.failure_reason', 'query_failed'))
@@ -87,7 +87,7 @@ final class PaymentReconciliationQuery
             WHEN payments.amount <> bookings.total_amount THEN 'Khẩn cấp'
             WHEN payments.status = 'success' AND payments.verified_at IS NULL THEN 'Khẩn cấp'
             WHEN payments.status = 'success' AND payments.verified_at IS NOT NULL
-                AND (bookings.payment_status <> 'paid' OR bookings.booking_status NOT IN ('paid', 'used')) THEN 'Khẩn cấp'
+                AND (bookings.payment_status <> 'paid' OR bookings.booking_status <> 'paid') THEN 'Khẩn cấp'
             WHEN bookings.payment_status = 'paid' AND NOT EXISTS (
                 SELECT 1 FROM payments verified_payments
                 WHERE verified_payments.booking_id = bookings.id
@@ -106,7 +106,7 @@ final class PaymentReconciliationQuery
             WHEN payments.status = 'success' AND payments.verified_at IS NOT NULL
                 AND bookings.payment_status = 'refunded' THEN 'Đơn đã hoàn tiền; chỉ kiểm tra lịch sử, không tái kích hoạt'
             WHEN payments.status = 'success' AND payments.verified_at IS NOT NULL
-                AND (bookings.payment_status <> 'paid' OR bookings.booking_status NOT IN ('paid', 'used')) THEN 'Giao dịch đã xác minh nhưng đơn chưa đồng bộ'
+                AND (bookings.payment_status <> 'paid' OR bookings.booking_status <> 'paid') THEN 'Giao dịch đã xác minh nhưng đơn chưa đồng bộ'
             WHEN bookings.payment_status = 'paid' AND NOT EXISTS (
                 SELECT 1 FROM payments verified_payments
                 WHERE verified_payments.booking_id = bookings.id

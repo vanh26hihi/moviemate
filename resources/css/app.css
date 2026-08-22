@@ -158,6 +158,105 @@ html.light {
 .hover\:app-text:hover { color: var(--app-text); }
 .hover\:app-heading:hover { color: var(--app-heading); }
 
+/* Official MovieMate brand assets. Theme switching follows the app's html.light state. */
+.brand-logo {
+    display: inline-grid;
+    flex: 0 0 auto;
+    width: auto;
+    height: 2.5rem;
+    aspect-ratio: 1055 / 215;
+    line-height: 0;
+    vertical-align: middle;
+}
+
+.brand-logo__image {
+    display: block;
+    grid-area: 1 / 1;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.brand-logo__image--light,
+.brand-logo__image--compact {
+    display: none;
+}
+
+html.light .brand-logo--theme .brand-logo__image--dark {
+    display: none;
+}
+
+html.light .brand-logo--theme .brand-logo__image--light {
+    display: block;
+}
+
+.brand-logo--mark {
+    aspect-ratio: 1;
+}
+
+.brand-logo--white {
+    aspect-ratio: 835 / 177;
+}
+
+.brand-logo--dark-static {
+    aspect-ratio: 978 / 211;
+}
+
+.brand-logo--customer-header {
+    height: 2.5rem;
+}
+
+.brand-logo--footer {
+    height: 2.375rem;
+}
+
+.brand-logo--footer-mark {
+    width: 2.25rem;
+    height: 2.25rem;
+}
+
+.brand-logo--sidebar {
+    height: 2.25rem;
+    max-width: 100%;
+}
+
+.brand-logo--auth {
+    height: 3.5rem;
+    max-width: 100%;
+}
+
+.brand-logo--ticket {
+    height: 2rem;
+    max-width: 10rem;
+    margin-bottom: 0.4rem;
+}
+
+@media (min-width: 1024px) {
+    .brand-logo--sidebar {
+        height: 2.5rem;
+    }
+}
+
+@media (max-width: 419px) {
+    .brand-logo--customer-header {
+        height: 2rem;
+        aspect-ratio: 1;
+    }
+
+    .brand-logo--customer-header .brand-logo__image--dark,
+    .brand-logo--customer-header .brand-logo__image--light {
+        display: none;
+    }
+
+    .brand-logo--customer-header .brand-logo__image--compact {
+        display: block;
+    }
+
+    .brand-logo--auth {
+        height: 3rem;
+    }
+}
+
 @layer base {
     html {
         scroll-behavior: smooth;
@@ -469,6 +568,12 @@ button.layout-template-seat:hover {
     background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--app-text-muted) 12%, transparent) 0 5px, transparent 5px 10px);
     color: var(--app-text-muted);
     box-shadow: none;
+}
+
+.layout-template-seat.is-blocked {
+    border-color: rgb(100 116 139 / 0.85);
+    background: repeating-linear-gradient(135deg, rgb(30 41 59 / 0.95) 0 5px, rgb(71 85 105 / 0.9) 5px 10px);
+    color: rgb(226 232 240);
 }
 
 .layout-template-seat.is-empty {

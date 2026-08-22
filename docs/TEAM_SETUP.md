@@ -38,24 +38,13 @@ Tạo database UTF-8:
 CREATE DATABASE moviemate CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Chọn một trong hai cách sau.
-
-### Cách A — nhập database demo đã làm sạch
-
-File `database/demo/moviemate_demo.sql` được dựng từ migrations và seeders trong database tạm. File chỉ chứa master/demo data tổng hợp; các bảng booking, payment, session, token, cache, job và nhật ký runtime không có dữ liệu.
+Migrations và seeders là authority duy nhất cho schema/demo data. Không dùng SQL dump tĩnh vì dump có thể lệch khỏi business invariants đã được freeze.
 
 ```bash
-mysql -u root -p moviemate < database/demo/moviemate_demo.sql
+php artisan migrate:fresh --seed
 ```
 
 Điền host, port, username và password tương ứng vào `.env` nếu MySQL của bạn không dùng cấu hình mặc định.
-
-### Cách B — migrations và seeders
-
-```bash
-php artisan migrate
-php artisan db:seed
-```
 
 Seeder demo chỉ được phép chạy khi `APP_ENV=local` hoặc `testing`. Danh sách tài khoản và mật khẩu demo cố ý công khai nằm tại `docs/DEMO_ACCOUNTS.md`; không dùng các tài khoản này trong production.
 

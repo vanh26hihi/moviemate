@@ -7,15 +7,14 @@
 <div class="space-y-6">
     <header>
         <h1 class="text-2xl font-extrabold app-heading sm:text-3xl">Đơn đặt vé</h1>
-        <p class="mt-2 app-muted">Quản lý các đơn đã thanh toán và trạng thái sử dụng vé.</p>
+        <p class="mt-2 app-muted">Quản lý các đơn đã thanh toán, gửi email và in tài liệu tại quầy.</p>
     </header>
 
-    <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tổng hợp đơn thành công">
+    <section class="grid gap-3 sm:grid-cols-3" aria-label="Tổng hợp đơn thành công">
         @foreach([
             ['Đơn thành công', number_format($summary['total']), 'ph-check-circle', 'text-success'],
             ['Doanh thu', number_format($summary['revenue'], 0, ',', '.').' VNĐ', 'ph-trend-up', 'text-brand-start'],
             ['Chỗ đã bán', number_format($summary['seats']), 'ph-armchair', 'text-ai-start'],
-            ['Đã soát vé', number_format($summary['used']), 'ph-qr-code', 'text-warning'],
         ] as [$label, $value, $icon, $color])
             <article class="cinema-card flex items-center gap-4 p-4 sm:p-5">
                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-current/10 {{ $color }}"><i class="ph {{ $icon }} text-xl" aria-hidden="true"></i></span>
@@ -40,9 +39,6 @@
             <label class="cinema-label">Trạng thái vé
                 <select class="cinema-input mt-1" name="ticket_status"><option value="">Tất cả</option><option value="sent" @selected(($filters['ticket_status'] ?? '') === 'sent')>Đã gửi</option><option value="pending" @selected(($filters['ticket_status'] ?? '') === 'pending')>Đang chờ gửi</option><option value="processing" @selected(($filters['ticket_status'] ?? '') === 'processing')>Đang gửi</option><option value="failed" @selected(($filters['ticket_status'] ?? '') === 'failed')>Gửi lỗi</option><option value="none" @selected(($filters['ticket_status'] ?? '') === 'none')>Không có email</option></select>
             </label>
-            <label class="cinema-label">Trạng thái soát vé
-                <select class="cinema-input mt-1" name="checkin_status"><option value="">Tất cả</option><option value="used" @selected(($filters['checkin_status'] ?? '') === 'used')>Đã soát vé</option><option value="not_used" @selected(($filters['checkin_status'] ?? '') === 'not_used')>Chưa soát vé</option></select>
-            </label>
         </div>
         <details class="mt-3 rounded-xl border app-border px-4 py-3" @if(isset($filters['sort']) || isset($filters['direction']) || isset($filters['per_page'])) open @endif>
             <summary class="cursor-pointer text-sm font-bold app-text">Bộ lọc nâng cao</summary>
@@ -58,7 +54,7 @@
     <div class="cinema-card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table min-w-[64rem]">
-                <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Phim / Suất chiếu</th><th>Chi nhánh / Phòng</th><th>Ghế</th><th>Kênh bán</th><th class="text-right">Tổng tiền</th><th>Vé / Soát vé</th><th class="text-right">Thao tác</th></tr></thead>
+                <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Phim / Suất chiếu</th><th>Chi nhánh / Phòng</th><th>Ghế</th><th>Kênh bán</th><th class="text-right">Tổng tiền</th><th>Vé</th><th class="text-right">Thao tác</th></tr></thead>
                 <tbody>
                     @forelse($bookings as $booking)
                         <tr>
@@ -69,7 +65,7 @@
                             <td class="max-w-52">{{ $booking->seat_codes ?: '—' }}</td>
                             <td><span class="status-badge {{ $booking->sales_channel === 'counter' ? 'bg-ai-start/10 text-ai-start' : 'bg-success/10 text-success' }}">{{ $booking->sales_channel === 'counter' ? 'Tại quầy' : 'Online' }}</span></td>
                             <td class="text-right whitespace-nowrap"><span class="font-extrabold app-text">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</span><span class="mt-1 block text-xs text-success">Đã thanh toán</span></td>
-                            <td><span class="block font-bold app-text">{{ $booking->ticketPrint?->status === 'printed' ? 'Đã in' : 'Chưa in' }} · {{ $booking->ticketDelivery?->status === 'sent' ? 'Đã gửi email' : ($booking->ticketDelivery?->status === 'failed' ? 'Gửi email lỗi' : 'Email đang chờ') }}</span><span class="mt-1 block text-xs {{ $booking->booking_status === 'used' ? 'text-success' : 'app-muted' }}">{{ $booking->booking_status === 'used' ? 'Đã soát vé' : 'Chưa soát vé' }}</span></td>
+                            <td><span class="block font-bold app-text">{{ $booking->ticketPrint?->status === 'printed' ? 'Đã in' : 'Chưa in' }} · {{ $booking->ticketDelivery?->status === 'sent' ? 'Đã gửi email' : ($booking->ticketDelivery?->status === 'failed' ? 'Gửi email lỗi' : 'Email đang chờ') }}</span></td>
                             <td class="text-right"><a class="btn-secondary !px-3 !py-2 text-xs" href="{{ route('admin.bookings.show', $booking) }}">Xem chi tiết</a></td>
                         </tr>
                     @empty

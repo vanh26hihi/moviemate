@@ -18,6 +18,7 @@
         'vip' => ['label' => 'VIP', 'icon' => 'ph-star'],
         'couple' => ['label' => 'Ghế đôi', 'icon' => 'ph-heart'],
         'aisle' => ['label' => 'Lối đi', 'icon' => 'ph-arrows-down-up'],
+        'blocked' => ['label' => 'Vật cản cố định', 'icon' => 'ph-bricks'],
         'empty' => ['label' => 'Xóa ô', 'icon' => 'ph-eraser'],
     ];
 @endphp
@@ -70,9 +71,9 @@
 
     <section class="app-card overflow-hidden rounded-3xl border app-border" aria-labelledby="seat-layout-editor-title">
         <div class="border-b app-border p-5 sm:p-6">
-            <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thiết kế sơ đồ ghế</p>
-            <h2 id="seat-layout-editor-title" class="mt-2 text-xl font-extrabold app-text">Bố trí từng vị trí trong phòng chiếu</h2>
-            <p id="seat-layout-editor-help" class="mt-2 max-w-3xl text-sm leading-relaxed app-muted">Chọn một công cụ rồi nhấn vào ô trên sơ đồ để bố trí ghế. Ghế đôi sử dụng hai ô liền kề và mã ghế được tạo tự động theo hàng.</p>
+            <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thiết kế mẫu lưới logic</p>
+            <h2 id="seat-layout-editor-title" class="mt-2 text-xl font-extrabold app-text">Bố trí từng vị trí logic trong mẫu</h2>
+            <p id="seat-layout-editor-help" class="mt-2 max-w-3xl text-sm leading-relaxed app-muted">Hàng × cột là lưới logic, không phải kích thước phòng theo mét. Chọn công cụ rồi nhấn vào ô để bố trí; ghế đôi sử dụng hai ô liền kề.</p>
         </div>
 
         <div class="layout-template-toolbar border-b app-border p-5 sm:p-6 lg:sticky lg:top-0 lg:z-20">
@@ -100,7 +101,7 @@
 
                 <fieldset>
                     <legend class="mb-3 text-sm font-extrabold app-text">Công cụ bố trí</legend>
-                    <div data-layout-tools class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5" role="toolbar" aria-label="Công cụ bố trí sơ đồ ghế">
+                    <div data-layout-tools class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6" role="toolbar" aria-label="Công cụ bố trí sơ đồ ghế">
                         @foreach($tools as $key => $tool)
                             <button type="button" data-layout-tool="{{ $key }}" aria-pressed="{{ $key === 'normal' ? 'true' : 'false' }}" class="layout-template-tool {{ $key === 'normal' ? 'is-active' : '' }} {{ $key === 'empty' ? 'is-danger' : '' }}">
                                 <i class="ph {{ $tool['icon'] }} text-lg" aria-hidden="true"></i>
@@ -137,21 +138,24 @@
     <section class="app-card rounded-3xl border app-border p-5 sm:p-6" aria-labelledby="layout-statistics-title">
         <div class="mb-5">
             <p class="text-xs font-black uppercase tracking-[0.18em] text-brand-start">Thống kê</p>
-            <h2 id="layout-statistics-title" class="mt-2 text-xl font-extrabold app-text">Sức chứa logic của mẫu</h2>
+            <h2 id="layout-statistics-title" class="mt-2 text-xl font-extrabold app-text">Cấu trúc lưới và đơn vị tính giá của mẫu</h2>
         </div>
         <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             @foreach([
-                'capacity' => ['Sức chứa', 'ph-users-three'],
+                'physical_seats' => ['Vị trí ghế trong mẫu', 'ph-users-three'],
+                'pricing_units' => ['Đơn vị tính giá', 'ph-ticket'],
                 'normal' => ['Ghế thường', 'ph-armchair'],
                 'vip' => ['VIP', 'ph-star'],
                 'couple' => ['Ghế đôi', 'ph-heart'],
                 'aisle' => ['Lối đi', 'ph-arrows-down-up'],
-                'dimensions' => ['Hàng × cột', 'ph-grid-four'],
+                'blocked' => ['Vật cản cố định', 'ph-bricks'],
+                'dimensions' => ['Lưới logic', 'ph-grid-four'],
             ] as $key => [$label, $icon])
                 <div class="rounded-2xl border app-border app-bg p-4">
                     <div class="flex items-center gap-2 text-xs font-bold app-muted"><i class="ph {{ $icon }} text-brand-start" aria-hidden="true"></i>{{ $label }}</div>
                     <p data-layout-stat="{{ $key }}" class="mt-2 text-xl font-black app-text">0</p>
-                    @if($key === 'capacity')<p class="mt-1 text-xs app-muted">ghế logic</p>@endif
+                    @if($key === 'physical_seats')<p class="mt-1 text-xs app-muted">vị trí</p>@endif
+                    @if($key === 'pricing_units')<p class="mt-1 text-xs app-muted">đơn vị</p>@endif
                     @if($key === 'couple')<p data-layout-couple-positions class="mt-1 text-xs app-muted">0 vị trí</p>@endif
                 </div>
             @endforeach

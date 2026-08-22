@@ -158,9 +158,9 @@ class RebuildSeatLayouts extends Command
     private function ensureSeatTypes(): void
     {
         $definitions = [
-            'normal' => ['aliases' => ['normal', 'regular', 'standard'], 'name' => 'Normal', 'modifier' => 0, 'pair' => false],
-            'vip' => ['aliases' => ['vip'], 'name' => 'VIP', 'modifier' => 20000, 'pair' => false],
-            'couple' => ['aliases' => ['couple', 'sweetbox', 'double'], 'name' => 'Couple', 'modifier' => 40000, 'pair' => true],
+            'normal' => ['aliases' => ['normal', 'regular', 'standard'], 'name' => 'Normal', 'pair' => false],
+            'vip' => ['aliases' => ['vip'], 'name' => 'VIP', 'pair' => false],
+            'couple' => ['aliases' => ['couple', 'sweetbox', 'double'], 'name' => 'Couple', 'pair' => true],
         ];
 
         foreach ($definitions as $code => $definition) {
@@ -179,7 +179,7 @@ class RebuildSeatLayouts extends Command
             DB::table('seat_types')->insert([
                 'name' => $definition['name'], 'code' => $code, 'slug' => $code,
                 'description' => null, 'image_path' => null, 'color' => null, 'text_color' => null,
-                'price_modifier' => $definition['modifier'], 'is_pair' => $definition['pair'],
+                'is_pair' => $definition['pair'],
                 'status' => true, 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now(),
             ]);
         }

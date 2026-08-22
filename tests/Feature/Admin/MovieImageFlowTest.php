@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -14,19 +15,24 @@ class MovieImageFlowTest extends TestCase
 {
     use RefreshDatabase;
 
+    private PresentationFormat $presentationFormat;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->withoutVite();
         $this->seedRbac();
         Storage::fake('public');
+        $this->presentationFormat = PresentationFormat::query()->create([
+            'code' => '2D', 'name' => '2D', 'is_active' => true, 'sort_order' => 10,
+        ]);
     }
 
-    public function test_manager_can_upload_poster_and_banner_to_canonical_paths(): void
+    public function test_admin_can_upload_poster_and_banner_to_canonical_paths(): void
     {
-        $manager = $this->userWithRole('manager');
+        $admin = $this->userWithRole('admin');
 
-        $this->actingAs($manager)->post(route('admin.movies.store'), $this->validPayload([
+        $this->actingAs($admin)->post(route('admin.movies.store'), $this->validPayload([
             'poster' => UploadedFile::fake()->image('../../unsafe poster.jpg', 600, 900),
             'cover_image' => UploadedFile::fake()->image('banner.png', 1600, 900),
         ]))->assertRedirect(route('admin.movies.index'));
@@ -73,7 +79,7 @@ class MovieImageFlowTest extends TestCase
         Storage::disk('public')->put($movie->poster, 'poster');
         Storage::disk('public')->put($movie->cover_image, 'banner');
 
-        $this->actingAs($this->userWithRole('manager'))->put(route('admin.movies.update', $movie), $this->validPayload([
+        $this->actingAs($this->userWithRole('admin'))->put(route('admin.movies.update', $movie), $this->validPayload([
             'title' => 'Updated title',
             'slug' => $movie->slug,
         ]))->assertRedirect(route('admin.movies.index'));
@@ -219,7 +225,7 @@ class MovieImageFlowTest extends TestCase
             ->assertSee('src="/storage/movies/posters/visible.jpg"', false)
             ->assertDontSee('http://', false);
 
-        $this->actingAs($this->userWithRole('manager'))->get(route('admin.movies.edit', $visible))
+        $this->actingAs($this->userWithRole('admin'))->get(route('admin.movies.edit', $visible))
             ->assertOk()
             ->assertSee('src="/storage/movies/posters/visible.jpg"', false)
             ->assertSee('src="/storage/movies/banners/visible.jpg"', false);
@@ -261,6 +267,7 @@ class MovieImageFlowTest extends TestCase
             'release_date' => '2026-08-05',
             'status' => 'now_showing',
             'genres' => [],
+            'presentation_format_ids' => [$this->presentationFormat->id],
             ...$overrides,
         ];
     }
@@ -268,7 +275,7 @@ class MovieImageFlowTest extends TestCase
     /** @param array<string, mixed> $overrides */
     private function movie(array $overrides = []): Movie
     {
-        return Movie::query()->create([
+        $movie = Movie::query()->create([
             'title' => 'Test movie',
             'slug' => 'test-movie',
             'duration' => 100,
@@ -276,5 +283,8 @@ class MovieImageFlowTest extends TestCase
             'status' => 'now_showing',
             ...$overrides,
         ]);
+        $movie->supportedPresentationFormats()->attach($this->presentationFormat);
+
+        return $movie;
     }
 }

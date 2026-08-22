@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
-use App\Models\BookingTicketPrintEvent;
+use App\Models\SeatIncidentResolution;
 use App\Services\CinemaAccessService;
-use App\Services\Tickets\TicketCheckinCapability;
-use App\Services\Tickets\TicketQrPayload;
+use App\Services\Tickets\BookingLookupCapability;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\TicketResolutionService;
 use App\Support\PrivacyMask;
 use Illuminate\Http\Request;
@@ -23,8 +23,8 @@ final class TicketWorkspaceController extends Controller
 
     public function resolve(
         Request $request,
-        TicketCheckinCapability $capabilities,
-        TicketQrPayload $payloads,
+        BookingLookupCapability $capabilities,
+        BookingQrPayload $payloads,
         TicketResolutionService $tickets,
     ): View {
         $validated = $request->validate(['ticket' => ['required', 'string', 'max:512']]);
@@ -49,30 +49,33 @@ final class TicketWorkspaceController extends Controller
 
     private function operationsView(Booking $booking): View
     {
-        $verified = $booking->payments->contains(
-            fn ($payment): bool => $payment->hasAuthoritativeSuccessEvidence()
-        );
+        $booking->loadMissing(['showtime.presentationFormat', 'showtime.room.roomType']);
+        $authoritativePayment = $booking->payments
+            ->filter(fn ($payment): bool => $payment->hasAuthoritativeSuccessEvidence())
+            ->sortByDesc('id')
+            ->first();
+        $verified = $authoritativePayment !== null;
         $eligibility = match (true) {
             $booking->payment_status === 'refunded' => 'Vé đã được hoàn tiền và không còn hiệu lực.',
             $booking->booking_status === 'cancelled' => 'Đơn đã hủy.',
             $booking->booking_status === 'expired' => 'Đơn đã hết hạn.',
-            $booking->booking_status === 'used' => 'Vé đã được sử dụng.',
             $booking->payment_status !== 'paid' || ! $verified => 'Vé chưa có thanh toán được xác minh.',
             default => 'Vé hợp lệ và đã thanh toán.',
         };
-        $printEvents = $booking->ticketPrint
-            ? BookingTicketPrintEvent::query()->with('actor:id,name')
-                ->where('booking_id', $booking->id)->latest('id')->get()
-            : collect();
+        $incidentReprints = SeatIncidentResolution::query()
+            ->where('reprint_required', true)->whereNull('reprint_satisfied_at')
+            ->whereHas('impact', fn ($query) => $query->where('resolution_status', 'unresolved')
+                ->whereHas('incident', fn ($incident) => $incident->where('status', 'open'))
+                ->whereHas('bookingSeat', fn ($seat) => $seat->where('booking_id', $booking->id)))
+            ->with('impact:id,booking_seat_id')->get()->keyBy('impact.booking_seat_id');
 
         return view('staff.tickets.operations', [
             'booking' => $booking,
             'customerName' => PrivacyMask::name($booking->customer_name ?: $booking->user?->name),
             'customerEmail' => PrivacyMask::email($booking->recipient_email),
             'eligibilityMessage' => $eligibility,
-            'printState' => $booking->ticketPrint,
-            'printEvents' => $printEvents,
-            'checkinEvent' => $booking->acceptedTicketCheckin,
+            'incidentReprints' => $incidentReprints,
+            'authoritativePayment' => $authoritativePayment,
         ]);
     }
 }

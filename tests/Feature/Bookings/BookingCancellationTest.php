@@ -216,12 +216,11 @@ class BookingCancellationTest extends TestCase
         }
     }
 
-    public function test_paid_used_expired_and_past_due_bookings_refuse_cancellation(): void
+    public function test_paid_expired_and_past_due_bookings_refuse_cancellation(): void
     {
         $owner = $this->userWithRole('user');
         $states = [
             ['booking_status' => 'paid', 'payment_status' => 'paid'],
-            ['booking_status' => 'used', 'payment_status' => 'paid'],
             ['booking_status' => 'expired', 'payment_status' => 'unpaid'],
             ['booking_status' => 'pending_payment', 'payment_status' => 'unpaid', 'expires_at' => now()->subMinute()],
         ];

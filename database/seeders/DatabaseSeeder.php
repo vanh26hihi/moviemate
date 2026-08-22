@@ -21,15 +21,17 @@ class DatabaseSeeder extends Seeder
             GenreSeeder::class,
             CinemaSeeder::class,
             RoomTypeSeeder::class,
+            PresentationFormatSeeder::class,
             RoomSeeder::class,
             RoomLayoutTemplateSeeder::class,
             MovieSeeder::class,
             DemoCinemaLayoutSeeder::class,
-            PricingRuleSeeder::class,
+            PriceBookSeeder::class,
             ShowtimeSeeder::class,
             DemoUserSeeder::class,
             FoodItemSeeder::class,
-            DiscountCodeSeeder::class,
+            PromotionSeeder::class,
+            Phase1TicketOperationsSeeder::class,
         ]);
     }
 }

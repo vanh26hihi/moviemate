@@ -95,6 +95,7 @@ final class PaymentPresentation
     {
         return match ($provider) {
             Payment::PROVIDER_COUNTER_CASH => 'Tiền mặt tại quầy',
+            Payment::PROVIDER_INTERNAL_ZERO => 'Khuyến mãi toàn phần',
             'vnpay' => 'VNPAY',
             'zalopay' => 'ZaloPay',
             'payos' => 'payOS',

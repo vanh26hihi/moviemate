@@ -2,6 +2,23 @@
 @section('title','Vé cần in - MovieMate')
 @section('page-title','Vé cần in')
 @section('content')
-<div class="space-y-6"><header class="admin-page-header"><div><h1 class="admin-page-title">Vé cần in</h1><p class="admin-page-subtitle">{{ $cinema ? 'Vé đã thanh toán, chưa soát và chưa hoàn tất in tại '.$cinema->name.'.' : 'Bạn chưa được phân công chi nhánh.' }}</p></div></header>
-@if($bookings->isEmpty())<x-empty-state title="Không có vé chờ in" description="Mọi vé đủ điều kiện đã được xử lý hoặc hiện chưa có giao dịch mới." icon="ph-printer" />@else<div class="space-y-3">@foreach($bookings as $booking)<article class="cinema-card grid gap-4 p-5 lg:grid-cols-[1fr_1fr_auto] lg:items-center"><div><p class="font-mono text-lg font-black text-brand-start">{{ $booking->booking_code }}</p><p class="text-sm app-muted">{{ $booking->ticketPrint?->status_label ?? 'Chưa in' }} · {{ $booking->ticketPrint?->attempts_count ?? 0 }} lần in @if(($booking->ticketPrint?->attempts_count ?? 0) > 1)· In lại {{ $booking->ticketPrint->attempts_count - 1 }} lần @endif</p></div><div><p class="font-bold app-text">{{ $booking->showtime?->movie?->title }}</p><p class="text-sm app-muted">{{ $booking->showtime_label }} · {{ $booking->showtime?->room?->name }} · {{ $booking->seat_codes }}</p>@if($booking->ticketPrint?->last_failure_code)<p class="mt-1 text-xs text-warning">Lỗi gần nhất: {{ \App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$booking->ticketPrint->last_failure_code] ?? 'Lỗi in' }} · {{ $booking->ticketPrint->lastFailedBy?->name }}</p>@endif</div><a class="btn-secondary" href="{{ route('staff.tickets.operations',$booking) }}">Mở vận hành vé</a></article>@endforeach</div><div>{{ $bookings->links() }}</div>@endif</div>
+<div class="space-y-6">
+    <header class="admin-page-header"><div><h1 class="admin-page-title">Vé cần in</h1><p class="admin-page-subtitle">{{ $cinema ? 'Các vé xem phim theo ghế chưa hoàn tất in tại '.$cinema->name.'.' : 'Bạn chưa được phân công chi nhánh.' }}</p></div></header>
+    @if($bookings->isEmpty())
+        <x-empty-state title="Không có vé chờ in" description="Mọi vé đủ điều kiện đã được xử lý hoặc hiện chưa có giao dịch mới." icon="ph-printer" />
+    @else
+        <div class="space-y-3">
+            @foreach($bookings as $booking)
+                <article class="cinema-card p-5">
+                    <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+                        <div><p class="font-mono text-lg font-black text-brand-start">{{ $booking->booking_code }}</p><p class="font-bold app-text">{{ $booking->showtime?->movie?->title }}</p><p class="text-sm app-muted">{{ $booking->showtime_label }} · {{ $booking->showtime?->room?->name }}</p></div>
+                        <a class="btn-secondary" href="{{ route('staff.tickets.operations',$booking) }}">Mở vận hành vé</a>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">@foreach($booking->admissionTickets as $ticket)<span class="status-badge {{ $incidentReprintSeatIds->has($ticket->booking_seat_id) || $ticket->print_count === 0 ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success' }}">Ghế {{ $ticket->seat_code }} · {{ $incidentReprintSeatIds->has($ticket->booking_seat_id) ? 'Cần in lại do đổi ghế' : ($ticket->print_count > 0 ? 'Đã in '.$ticket->print_count.' lần' : 'Chưa in') }}</span>@endforeach</div>
+                </article>
+            @endforeach
+        </div>
+        <div>{{ $bookings->links() }}</div>
+    @endif
+</div>
 @endsection

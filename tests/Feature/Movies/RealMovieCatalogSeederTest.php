@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Movies;
 
-use App\Models\LoyaltyTransaction;
 use App\Models\Movie;
 use App\Models\Review;
 use Database\Seeders\GenreSeeder;
 use Database\Seeders\MovieSeeder;
+use Database\Seeders\PresentationFormatSeeder;
 use Database\Seeders\Support\RealMovieCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -40,7 +40,7 @@ final class RealMovieCatalogSeederTest extends TestCase
 
     public function test_seeder_preserves_fictional_ids_without_real_media_and_starts_real_ratings_at_zero(): void
     {
-        $this->seed([GenreSeeder::class, MovieSeeder::class]);
+        $this->seed([GenreSeeder::class, PresentationFormatSeeder::class, MovieSeeder::class]);
 
         $fictionalTitles = [
             'The Great Adventure', 'Love in Spring', 'Laugh Out Loud', 'Space Odyssey',
@@ -48,7 +48,7 @@ final class RealMovieCatalogSeederTest extends TestCase
         ];
         $fictionalIds = Movie::query()->whereIn('title', $fictionalTitles)->pluck('id', 'slug')->all();
 
-        $this->seed([GenreSeeder::class, MovieSeeder::class]);
+        $this->seed([GenreSeeder::class, PresentationFormatSeeder::class, MovieSeeder::class]);
 
         $this->assertSame(31, Movie::query()->count());
         $this->assertSame($fictionalIds, Movie::query()->whereIn('title', $fictionalTitles)->pluck('id', 'slug')->all());
@@ -65,6 +65,5 @@ final class RealMovieCatalogSeederTest extends TestCase
         }
 
         $this->assertSame(0, Review::query()->count());
-        $this->assertSame(0, LoyaltyTransaction::query()->where('type', 'review_reward')->count());
     }
 }

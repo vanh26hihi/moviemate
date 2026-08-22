@@ -7,8 +7,8 @@ use App\Mail\BookingTicketMail;
 use App\Models\ActivityLog;
 use App\Models\BookingTicketDelivery;
 use App\Services\BookingTokenService;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\TicketQrCode;
-use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Mail\PendingMail;
 use Illuminate\Support\Facades\File;
@@ -67,7 +67,7 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
             $this->assertStringContainsString('&destination=ticket', $mail->ticketAccessUrl);
             $this->assertStringNotContainsString('guest_token=', $mail->ticketAccessUrl);
             $this->assertNull(parse_url($mail->ticketAccessUrl, PHP_URL_QUERY));
-            $expectedPayload = app(TicketQrPayload::class)->url($payment->booking->fresh());
+            $expectedPayload = app(BookingQrPayload::class)->value($payment->booking->fresh());
             $this->assertSame(app(TicketQrCode::class)->png($expectedPayload), $mail->ticketQrPng);
 
             return true;
@@ -118,16 +118,14 @@ class TicketDeliveryOutboxTest extends PaymentTestCase
         $this->assertSame('paid', $payment->booking->fresh()->payment_status);
     }
 
-    public function test_used_booking_can_receive_existing_ticket_without_reactivating_qr(): void
+    public function test_paid_booking_can_receive_existing_booking_qr(): void
     {
         Mail::fake();
         $payment = $this->verifiedPayment();
-        $payment->booking->forceFill(['booking_status' => 'used', 'used_at' => now()])->save();
-
         $this->artisan('bookings:send-pending-tickets')->assertSuccessful();
 
         $this->assertSame(BookingTicketDelivery::STATUS_SENT, BookingTicketDelivery::query()->sole()->status);
-        $this->assertSame('used', $payment->booking->fresh()->booking_status);
+        $this->assertSame('paid', $payment->booking->fresh()->booking_status);
         Mail::assertSent(BookingTicketMail::class, 1);
     }
 

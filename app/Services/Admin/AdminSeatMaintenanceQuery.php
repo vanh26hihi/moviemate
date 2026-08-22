@@ -5,8 +5,10 @@ namespace App\Services\Admin;
 use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
+use App\Models\SeatIncident;
 use App\Services\CinemaAccessService;
-use App\Services\Seats\SeatMaintenanceProtectionService;
+use App\Services\Seats\SeatIncidentImpactClassifier;
+use App\Services\Seats\SeatIncidentImpactQuery;
 use App\Support\SeatPresentation;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
@@ -16,7 +18,8 @@ final class AdminSeatMaintenanceQuery
 {
     public function __construct(
         private readonly CinemaAccessService $cinemaAccess,
-        private readonly SeatMaintenanceProtectionService $protections,
+        private readonly SeatIncidentImpactQuery $incidentImpacts,
+        private readonly SeatIncidentImpactClassifier $classifier,
     ) {}
 
     /** @return array<string, mixed> */
@@ -29,14 +32,22 @@ final class AdminSeatMaintenanceQuery
         $seats = Seat::query()->where('room_id', $room->id)
             ->whereHas('layoutCells', fn ($query) => $query->where('room_layout_id', $layout->id)->where('cell_type', 'seat'))
             ->orderBy('row')->orderBy('number')->orderBy('id')->get();
-        $protectionMap = $this->protections->summaries($seats->pluck('id')->all());
-        $units = SeatPresentation::groups($seats)->map(function (array $group) use ($layout, $protectionMap): array {
+        $impactRows = $this->incidentImpacts->get($room, $seats->pluck('id')->map(fn ($id): int => (int) $id)->all());
+        $units = SeatPresentation::groups($seats)->map(function (array $group) use ($layout, $impactRows): array {
             $members = $group['seats'];
-            $memberProtections = $members->map(fn (Seat $seat): array => $protectionMap[$seat->id]);
             $statuses = $members->pluck('status')->unique()->values();
             $canonical = $group['is_couple']
                 ? $members->firstWhere('pair_position', 'left')
                 : $members->first();
+            $unitImpacts = $impactRows->filter(fn ($row): bool => $members->contains('id', $row->seat_id));
+            $bookings = $unitImpacts->groupBy('booking_id')->map(fn ($rows) => $rows->first()->booking);
+            $classifications = $bookings->map(fn ($booking): string => $this->classifier->classify($booking));
+            $ordinaryCount = $classifications->filter(fn (string $value): bool => $value === 'ordinary_hold')->count();
+            $retainedCount = $classifications->filter(fn (string $value): bool => $value === 'retained_payment')->count();
+            $paidCount = $classifications->filter(fn (string $value): bool => $value === 'paid')->count();
+            $printed = $unitImpacts->contains(fn ($row): bool => (int) ($row->admissionTicket?->print_count ?? 0) > 0);
+            $issued = $bookings->contains(fn ($booking): bool => $booking->ticket_emailed_at !== null
+                || $booking->ticketDelivery?->status === 'sent');
 
             return $group + [
                 'unit_id' => $canonical?->id,
@@ -44,10 +55,15 @@ final class AdminSeatMaintenanceQuery
                 'status' => $statuses->count() === 1 ? (string) $statuses->first() : 'inconsistent',
                 'updated_at' => $members->max('updated_at'),
                 'layout_version' => $layout->version,
-                'active_hold' => $memberProtections->contains('active_hold', true),
-                'future_sold' => $memberProtections->contains('future_sold', true),
-                'issued_ticket' => $memberProtections->contains('issued_ticket', true),
-                'protected' => $memberProtections->contains('protected', true),
+                'active_hold' => $ordinaryCount > 0,
+                'future_sold' => $paidCount > 0,
+                'issued_ticket' => $issued,
+                'protected' => $bookings->isNotEmpty(),
+                'impact_total' => $bookings->count(),
+                'impact_ordinary_hold' => $ordinaryCount,
+                'impact_retained_payment' => $retainedCount,
+                'impact_paid' => $paidCount,
+                'has_printed_ticket' => $printed,
             ];
         })->values();
         $filtered = $this->filter($units, $filters);
@@ -80,12 +96,16 @@ final class AdminSeatMaintenanceQuery
                 'active' => $seats->where('status', Seat::STATUS_ACTIVE)->count(),
                 'maintenance' => $seats->where('status', Seat::STATUS_MAINTENANCE)->count(),
                 'inactive' => $seats->where('status', Seat::STATUS_INACTIVE)->count(),
-                'protected' => $seats->filter(fn (Seat $seat): bool => $protectionMap[$seat->id]['protected'])->count(),
+                'protected' => $impactRows->pluck('seat_id')->unique()->count(),
             ],
             'historicalOnlyCount' => Seat::query()->where('room_id', $room->id)
                 ->whereHas('layoutCells.layout', fn ($query) => $query->where('status', 'published')->whereKeyNot($layout->id))
                 ->whereDoesntHave('layoutCells', fn ($query) => $query->where('room_layout_id', $layout->id))
                 ->count(),
+            'incidents' => SeatIncident::query()->where('room_id', $room->id)
+                ->with(['incidentSeats.seat:id,seat_code'])
+                ->withCount(['impacts', 'impacts as unresolved_impacts_count' => fn ($query) => $query->where('resolution_status', 'unresolved')])
+                ->latest('id')->limit(10)->get(),
         ];
     }
 

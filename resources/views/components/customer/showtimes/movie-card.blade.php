@@ -18,7 +18,7 @@
             </div>
             <div class="mt-4 space-y-4">
                 @foreach($entries->groupBy('room_type') as $roomType => $typeEntries)
-                    <div><h4 class="mb-2 text-sm font-black uppercase tracking-wider app-text">{{ $roomType }}</h4>
+                    <div><h4 class="mb-2 text-sm font-black uppercase tracking-wider app-text">Loại phòng: {{ $roomType }}</h4>
                         <div class="flex flex-wrap gap-2">@foreach($typeEntries as $showtime)<x-customer.showtimes.time-chip :showtime="$showtime" />@endforeach</div>
                     </div>
                 @endforeach

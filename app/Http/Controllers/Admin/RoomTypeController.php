@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveRoomTypeRequest;
-use App\Models\CinemaPricingRule;
 use App\Models\RoomType;
 use App\Services\ActivityLogger;
 use Illuminate\Http\JsonResponse;
@@ -83,7 +82,7 @@ final class RoomTypeController extends Controller
     {
         $data = $request->validated();
         if ($data['code'] !== $roomType->code
-            && ($roomType->rooms()->exists() || CinemaPricingRule::query()->where('room_type', $roomType->code)->exists())) {
+            && $roomType->rooms()->exists()) {
             throw ValidationException::withMessages([
                 'code' => 'Không thể đổi mã loại phòng đã được sử dụng. Bạn có thể cập nhật tên hiển thị hoặc ngừng sử dụng loại phòng này.',
             ]);

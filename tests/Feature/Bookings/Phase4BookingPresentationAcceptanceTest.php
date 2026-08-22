@@ -3,7 +3,7 @@
 namespace Tests\Feature\Bookings;
 
 use App\Models\Payment;
-use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\BookingQrPayload;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Payments\PaymentTestCase;
 
@@ -30,7 +30,7 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
         $this->actingAs($owner)
             ->get(route('user.bookings.ticket', $booking))
             ->assertOk()
-            ->assertSee('data-qr-value="'.route('tickets.verify', ['capability' => app(TicketCheckinCapability::class)->issue($booking)]).'"', false)
+            ->assertSee('data-qr-value="'.app(BookingQrPayload::class)->value($booking).'"', false)
             ->assertDontSee('data-print-ticket', false)
             ->assertDontSee('Lưu PDF');
     }
@@ -47,8 +47,7 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
         $booking = $this->reserve($scenario, [$scenario['seats'][0]->id], $owner->id)->booking;
         $booking->forceFill([
             'booking_status' => $bookingStatus,
-            'payment_status' => $bookingStatus === 'used' ? 'paid' : 'unpaid',
-            'used_at' => $bookingStatus === 'used' ? now() : null,
+            'payment_status' => 'unpaid',
         ])->save();
         $this->pendingPayment($booking, ['status' => $paymentStatus]);
 
@@ -63,10 +62,9 @@ class Phase4BookingPresentationAcceptanceTest extends PaymentTestCase
     public static function nonUsableBookingStates(): array
     {
         return [
-            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'VÉ KHÔNG CÒN HIỆU LỰC'],
-            'expired' => ['expired', Payment::STATUS_EXPIRED, 'VÉ KHÔNG CÒN HIỆU LỰC'],
-            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'VÉ KHÔNG CÒN HIỆU LỰC'],
-            'used' => ['used', Payment::STATUS_SUCCESS, 'VÉ ĐÃ ĐƯỢC SỬ DỤNG'],
+            'payment review' => ['pending_payment', Payment::STATUS_REVIEW, 'Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.'],
+            'expired' => ['expired', Payment::STATUS_EXPIRED, 'Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.'],
+            'cancelled' => ['cancelled', Payment::STATUS_FAILED, 'Đơn chưa đủ điều kiện phát hành QR đơn đặt vé.'],
         ];
     }
 }

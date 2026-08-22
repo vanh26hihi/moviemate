@@ -8,6 +8,7 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\FoodItem;
 use App\Models\Seat;
+use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
 use App\Services\BookingCheckoutDraftService;
 use App\Services\BookingCheckoutPreviewService;
@@ -17,8 +18,8 @@ use App\Services\Mail\TicketMailConfigurationInspector;
 use App\Services\Payments\BookingPaymentActionPolicy;
 use App\Services\PublicShowtimeCatalog;
 use App\Services\RoomLayoutService;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\BookingTicketEligibility;
-use App\Services\Tickets\TicketQrPayload;
 use App\Support\SeatPresentation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,7 +34,7 @@ class BookingController extends Controller
         private readonly BookingCheckoutDraftService $drafts,
         private readonly BookingCheckoutPreviewService $previews,
         private readonly BookingTicketEligibility $ticketEligibility,
-        private readonly TicketQrPayload $ticketQrPayloads,
+        private readonly BookingQrPayload $bookingQrPayloads,
         private readonly TicketMailConfigurationInspector $mailConfiguration,
         private readonly PublicShowtimeCatalog $showtimeCatalog,
         private readonly BookingExpirationService $expiration,
@@ -45,13 +46,13 @@ class BookingController extends Controller
      */
     public function selectSeat(Request $request, Showtime $showtime)
     {
-        $showtime->load(['movie', 'cinema', 'room', 'roomLayout.cells.seat']);
+        $showtime->load(['movie', 'cinema', 'room', 'presentationFormat', 'roomLayout.cells.seat']);
         $this->assertExpectedCinema($request, $showtime);
 
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
                 ->route('user.movies.show', $showtime->movie->slug)
-                ->with('error', 'Suất chiếu này đã qua giờ hoặc không còn khả dụng.');
+                ->with('error', 'Suất chiếu này đã đóng nhận đặt vé.');
         }
 
         $layout = $this->layouts->resolveForShowtime($showtime);
@@ -94,7 +95,6 @@ class BookingController extends Controller
             'seatPrices',
         ));
     }
-    
 
     /**
      * Show checkout page for selected seats.
@@ -107,7 +107,7 @@ class BookingController extends Controller
         if (! $this->isShowtimeAvailable($showtime)) {
             return redirect()
                 ->route('user.movies.show', $showtime->movie->slug)
-                ->with('error', 'Suất chiếu này đã qua giờ hoặc không còn khả dụng.');
+                ->with('error', 'Suất chiếu này đã đóng nhận đặt vé.');
         }
 
         $seatIds = $this->parseSeatIds($request->query('selected_seats', ''));
@@ -188,9 +188,11 @@ class BookingController extends Controller
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
+            'showtime.presentationFormat',
             'bookingSeats.seat',
+            'admissionTickets.bookingSeat.seat',
             'foodOrder.items',
-            'acceptedTicketCheckin',
+            'foodPickupVoucher',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
@@ -205,13 +207,6 @@ class BookingController extends Controller
             'mailDeliveryReady',
             'paymentAction',
         ));
-       
-
-    
-
-   
-
-   
 
     }
 
@@ -226,26 +221,32 @@ class BookingController extends Controller
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
+            'showtime.presentationFormat',
             'bookingSeats.seat',
+            'admissionTickets.bookingSeat.seat',
             'foodOrder.items',
-            'acceptedTicketCheckin',
+            'foodPickupVoucher',
         ]);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $isDeliverable = $this->ticketEligibility->isDeliverable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
-        $ticketQrPayload = $isDeliverable ? $this->ticketQrPayloads->url($booking) : null;
+        $bookingQrPayload = $isDeliverable ? $this->bookingQrPayloads->value($booking) : null;
         $ticketState = match (true) {
             $booking->payment_status === 'refunded' => 'refunded',
             $booking->booking_status === 'cancelled' => 'cancelled',
             $booking->booking_status === 'expired' => 'expired',
-            $booking->booking_status === 'used' => 'used',
             $isUsable => 'valid',
             default => 'invalid',
         };
+        $relocations = SeatIncidentResolution::query()
+            ->whereIn('resolution_type', [SeatIncidentResolution::TYPE_EQUIVALENT, SeatIncidentResolution::TYPE_UPGRADE])
+            ->whereHas('impact.bookingSeat', fn ($query) => $query->where('booking_id', $booking->id))
+            ->with(['originalSeat:id,seat_code', 'replacementSeat:id,seat_code'])
+            ->oldest('id')->get();
 
         return response()->view('user.bookings.ticket', compact(
-            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'ticketQrPayload', 'ticketState'
+            'booking', 'isUsable', 'isDeliverable', 'verifiedPayment', 'bookingQrPayload', 'ticketState', 'relocations'
         ))->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
             ->header('Pragma', 'no-cache');
     }
@@ -283,7 +284,7 @@ class BookingController extends Controller
      */
     protected function isShowtimeAvailable(Showtime $showtime): bool
     {
-        return $this->showtimeCatalog->isSellable($showtime);
+        return $this->showtimeCatalog->isCustomerSellable($showtime);
     }
 
     private function assertExpectedCinema(Request $request, Showtime $showtime): void

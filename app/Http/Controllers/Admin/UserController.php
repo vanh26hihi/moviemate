@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\UserBookingHistoryRequest;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ActivityLogger;
+use App\Services\Admin\UserBookingExportService;
+use App\Services\Admin\UserDetailReadModel;
 use App\Services\CinemaAccessService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class UserController extends Controller
 {
@@ -64,6 +68,20 @@ class UserController extends Controller
             'roles' => Role::query()->orderBy('name')->get(),
             'assignableCinemas' => $this->cinemaAccess->accessibleCinemas(auth()->user()),
         ]);
+    }
+
+    public function show(UserBookingHistoryRequest $request, User $user, UserDetailReadModel $readModel): View
+    {
+        Gate::authorize('view', $user);
+
+        return view('admin.users.show', $readModel->build($request->user(), $user, $request->validated()));
+    }
+
+    public function exportBookings(UserBookingHistoryRequest $request, User $user, UserBookingExportService $exporter): StreamedResponse
+    {
+        Gate::authorize('view', $user);
+
+        return $exporter->download($request->user(), $user, $request->validated());
     }
 
     public function updateRole(Request $request, User $user, ActivityLogger $activityLogger): RedirectResponse

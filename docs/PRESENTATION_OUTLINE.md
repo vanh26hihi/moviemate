@@ -1,66 +1,85 @@
-# MovieMate — Dàn ý thuyết trình
+# MovieMate — Dàn ý thuyết trình 10 slide
 
-## Slide 1 — Đề tài, người dùng, phạm vi, actor
+## Slide 1 — Bài toán và phạm vi
 
-- **MovieMate — Hệ thống quản lý và đặt vé cho chuỗi rạp chiếu phim**
-- Người dùng mục tiêu: 16–40 tuổi, ở gần các chi nhánh MovieMate, cần tra cứu phim/suất/ghế và đặt vé online.
-- Phạm vi: một chủ chuỗi rạp, nhiều chi nhánh; không phải marketplace hoặc SaaS đa công ty.
-- 5 actor con người: Guest, Registered Customer, Staff, Manager, Global/System Admin.
-- 32 use case ở mức trình bày.
-- Hệ thống ngoài: VNPAY, ZaloPay, payOS và hạ tầng email.
+- MovieMate phục vụ **một công ty rạp chiếu phim, nhiều chi nhánh**.
+- Năm actor: Guest, Customer, Staff, Manager, Global Admin.
+- Không phải marketplace, multi-company SaaS hoặc cinema aggregator.
+- Mục tiêu: kết nối cấu hình toàn chuỗi với vận hành chi nhánh và trải nghiệm đặt vé có bằng chứng.
 
-## Slide 2 — Kiến trúc và đa chi nhánh
+## Slide 2 — Mental model vai trò
 
-- Browser → Laravel route/controller → validation/policy → domain service → MySQL.
-- Cinema → Room → Layout → Showtime → Booking → Payment → Ticket operations.
-- Global Admin thấy toàn chuỗi; Manager/Staff bị giới hạn theo phân công; lựa chọn rạp của khách chỉ là preference.
+- Global Admin: governance/configuration toàn chuỗi.
+- Manager: branch-first operations.
+- Staff: tra cứu Booking, bằng chứng Payment và in hiện vật giấy tại quầy.
+- Customer/Guest: khám phá, đặt vé, thanh toán và review.
+- Movie, Genre, Food là master toàn chuỗi; Manager chỉ read/use.
 
-## Slide 3 — Hai luồng đặt vé khách hàng
+## Slide 3 — Từ Branch đến Payment
 
-- Movie-first: Phim → Rạp → Ngày/suất → Ghế → Đồ ăn → Thanh toán → Vé.
-- Cinema-first: Rạp → Phim → Suất → Ghế → Đồ ăn → Thanh toán → Vé.
-- Server khóa chi nhánh theo suất chiếu, không tin `cinema_id` từ browser.
+```text
+Branch → Room → Showtime → Booking → Payment
+Booking → Counter / Print
+Room / Booking → SeatIncident context
+```
 
-## Slide 4 — Đúng đắn ghế và giá
+- Branch360, Showtime detail và handoff liên domain biến hệ thống thành workspace theo tác vụ.
+- Detail dùng để quan sát; Edit chỉ dành cho thay đổi được phép.
 
-- Seat hold phía server, idempotency, không để lại một ghế lẻ.
-- Demo D6 + D8 bị chặn vì bỏ D7; aisle/sparse gap và ghế đôi được xử lý riêng.
-- Giá nguyên VND: base + loại ghế + định dạng phòng + khung giờ + cuối tuần/ngày lễ + điều chỉnh rạp/phòng.
-- Snapshot giá giữ nguyên lịch sử; ghế đôi tính một đơn vị giá cho hai ghế vật lý.
+## Slide 4 — Room và lịch sử cấu trúc
 
-## Slide 5 — Thanh toán và vé điện tử
+- Kích thước vật lý lưu integer mm, hiển thị mét; diện tích là xấp xỉ hình chữ nhật hành chính.
+- Rows × columns là **Lưới logic**, không phải kích thước mét.
+- Taxonomy: Ghế, Lối đi, Vật cản cố định, Ô trống.
+- Published RoomLayout bất biến; Template apply tạo bản sao độc lập.
+- Ghế bảo trì vẫn là Seat; incident không sửa structural layout.
 
-- VNPAY/ZaloPay/payOS chỉ thành công sau xác minh có thẩm quyền; return URL không tự đánh dấu paid.
-- Pending giữ ghế; thất bại/hủy đã xác minh mới giải phóng ghế; trường hợp bất thường vào review.
-- Vé điện tử dùng capability/QR không phải booking code thô; email qua outbox idempotent.
+## Slide 5 — Showtime đúng đắn
 
-## Slide 6 — Staff tại quầy
+- Movie + Room + pinned RoomLayout + PresentationFormat + runtime + operating constraints.
+- Validation phía server; bulk publish all-or-nothing; copy re-derives authoritative intent.
+- START → END → CLEANING_START → ROOM_READY.
+- Cross-midnight hợp lệ; business date là local START date.
+- RoomType và PresentationFormat tách biệt; PresentationFormat không tạo phụ thu.
 
-- Bán vé quầy → đồ ăn tùy chọn → thu tiền mặt → in tùy chọn → check-in sau.
-- Tra QR chỉ đọc; in và check-in là hai state machine độc lập.
-- Creator, settler, printer và checker lấy từ người dùng đang đăng nhập.
+## Slide 6 — Giá và Khuyến mãi deterministic
 
-## Slide 7 — Manager và Admin
+```text
+PriceBook → PriceBookVersion → ShowtimeTicketPrice
+          → Booking/BookingSeat sold snapshot → Payment
+```
 
-- Manager vận hành chi nhánh được gán: phòng, lịch, giá, giờ mở cửa, báo cáo; đồng thời có các permission catalog phim/thể loại dùng chung đã được RBAC cấp.
-- Global Admin quản lý toàn chuỗi, nội dung, người dùng/phân quyền và báo cáo hợp nhất.
-- Layout phát hành bất biến; phim dùng lifecycle thay vì hard-delete.
+- Mỗi version có một Giá cơ sở toàn chuỗi.
+- Adjustment: SeatType, RoomType, Time, Weekend/Holiday, Cinema, Room; Holiday thay Weekend.
+- Couple: hai vị trí vật lý, một pricing unit, charge một lần.
+- Tối đa một Khuyến mãi mỗi Booking; quota được giữ khi confirm dưới row lock.
 
-## Slide 8 — Dashboard và báo cáo
+## Slide 7 — Booking, QR và hiện vật giấy
 
-- Doanh thu online theo `verified_at`; tiền mặt theo `settled_at`.
-- Vận hành theo ngày bắt đầu suất chiếu tại múi giờ chi nhánh.
-- Tách logical ticket/physical seat, provider/channel, print/check-in và creator/settler.
+- Customer nhận booking code và **QR đơn đặt vé** cho toàn Booking để tra cứu tại quầy.
+- QR đơn không phải AdmissionTicket hoặc credential vào phòng.
+- Mỗi vị trí ghế vật lý tạo một AdmissionTicket; Couple tạo hai vé giấy.
+- Booking có Food tạo một FoodPickupVoucher cho phần đồ ăn.
+- First print không cần reason; reprint cần reason; Print All có audit.
 
-## Slide 9 — Bảo mật và toàn vẹn dữ liệu
+## Slide 8 — Payment và báo cáo
 
-- Middleware + permission + service-level cinema scope; direct URL/forged POST đều được test.
-- Server-authoritative price/actor/branch/amount.
-- Capability được băm/ký, log được lọc, webhook kiểm tra chữ ký và idempotency.
-- FK, unique guard, immutable snapshots và append-only event bảo vệ lịch sử.
+- Browser return không đánh dấu paid.
+- Provider callback/query đã xác minh hoặc counter settlement mới là evidence.
+- Zero-payable dùng `internal_zero`, không gọi provider ngoài.
+- Báo cáo dựa trên Đã xác minh/Đã thu tiền và timestamp evidence.
+- Showtime business date không đồng nhất với payment settlement time.
 
-## Slide 10 — Demo và kết luận
+## Slide 9 — Incident và bảo toàn lịch sử
 
-- Ba cửa sổ riêng: Customer, Manager/Admin, Staff.
-- Trình diễn đặt vé, seat gap, quầy, in/check-in, vận hành và báo cáo.
-- Kết luận: đúng phạm vi chuỗi rạp, phân quyền theo chi nhánh, thanh toán an toàn và sẵn sàng bảo vệ; các hạng mục provider/hardware thật nằm trong checklist acceptance.
+- Seat maintenance + SeatIncident mô tả ngoại lệ vận hành, không biến Seat thành BLOCKED.
+- Booking bị ảnh hưởng có thể chuyển ghế tương đương/nâng hạng, không downgrade, không thu thêm.
+- Couple chuyển nguyên tử; giữ nguyên Booking identity và có thể in thay thế.
+- Snapshot RoomLayout, Showtime price, sold amount và Payment evidence không bị cấu hình mới viết lại.
+
+## Slide 10 — Demo, bằng chứng và giới hạn
+
+- Demo 8 phút 30 giây: Manager → Customer → Staff → Manager, ba lần chuyển role.
+- Bằng chứng: runtime UI, automated tests và handoff trực tiếp; không nhập URL thủ công.
+- Không tuyên bố digital attendance/check-in, refund ledger, Loyalty, AI pricing, CAD/QCVN automation, branch Food pricing hoặc Format surcharge.
+- Kết luận: thẩm quyền rõ, invariant phía server, concurrency có kiểm soát và lịch sử bất biến.
