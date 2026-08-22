@@ -23,13 +23,18 @@ function safeMediaUrl(value) {
     } catch { return null; }
 }
 
+function vietnameseDate(value) {
+    const match = typeof value === 'string' ? value.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null;
+    return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
+
 function titleFor(card) {
     return card.type === 'showtime' ? card.movie_title : (card.title || card.name || 'MovieMate');
 }
 
 function factsFor(card) {
     if (card.type === 'movie') return [card.genres?.join(', '), card.duration_minutes ? `${card.duration_minutes} phút` : null, card.age_rating];
-    if (card.type === 'showtime') return [`${card.date || ''} · ${card.time || ''}`, card.cinema?.name, card.starting_price_vnd !== undefined ? `Từ ${money.format(card.starting_price_vnd)} VNĐ` : null];
+    if (card.type === 'showtime') return [`${vietnameseDate(card.date) || ''} • ${card.time || ''}`, card.cinema?.name, card.starting_price_vnd !== undefined ? `Từ ${money.format(card.starting_price_vnd)} VNĐ` : null];
     if (card.type === 'cinema') return [card.address, [card.district, card.city].filter(Boolean).join(', '), card.phone];
     if (card.type === 'food') return [card.price_vnd !== undefined ? `${money.format(card.price_vnd)} VNĐ` : null, card.description];
     return [];
@@ -59,7 +64,10 @@ export function renderCards(cards, {historical = false} = {}) {
                 image.loading = 'lazy';
                 image.decoding = 'async';
                 fallback.hidden = true;
-                image.addEventListener('error', () => { image.remove(); fallback.hidden = false; }, {once: true});
+                image.addEventListener('error', () => {
+                    image.remove();
+                    fallback.hidden = false;
+                }, {once: true});
                 media.append(image);
             }
             media.append(fallback);
@@ -67,14 +75,15 @@ export function renderCards(cards, {historical = false} = {}) {
             article.append(media);
         }
 
-        content.append(node('span', 'ai-card-kicker', {movie:'Phim',showtime:'Suất chiếu',cinema:'Rạp',food:'Đồ ăn'}[card.type]), node('h4', '', title));
+        content.append(node('span', 'ai-card-kicker', {movie:'Phim',showtime:'Suất chiếu',cinema:'Rạp',food:'Bắp nước'}[card.type]), node('h4', '', title));
         factsFor(card).filter(Boolean).slice(0, 4).forEach((fact) => content.append(node('p', '', fact)));
         if (card.reason) content.append(node('p', 'ai-card-reason', card.reason));
         if (!historical && Array.isArray(card.actions)) {
             const actions = node('div', 'ai-card-actions');
             card.actions.filter((action) => ['movie_details', 'view_showtimes', 'book_showtime'].includes(action?.type)).slice(0, 3).forEach((action) => {
                 const url = safeUrl(action.url); if (!url) return;
-                const link = node('a', action.type === 'book_showtime' ? 'ai-card-primary' : 'ai-card-link', action.label || 'Xem');
+                const label = {movie_details:'Chi tiết',view_showtimes:'Xem lịch chiếu',book_showtime:'Đặt vé'}[action.type];
+                const link = node('a', action.type === 'book_showtime' ? 'ai-card-primary' : 'ai-card-link', label);
                 link.href = url; actions.append(link);
             });
             if (actions.childElementCount) content.append(actions);

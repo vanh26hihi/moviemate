@@ -628,6 +628,11 @@ html.light .user-app {
 .ai-message { display: flex; margin: .8rem 0; flex-direction: column; align-items: flex-start; gap: .5rem; }
 .ai-message-user { align-items: flex-end; }
 .ai-message-body { max-width: 88%; padding: .75rem .9rem; border: 1px solid var(--mm-border, #334155); border-radius: .25rem 1rem 1rem 1rem; background: var(--mm-card, #1e293b); font-size: .88rem; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
+.ai-message-body p, .ai-formatted-response p { margin: 0; }
+.ai-message-body p + p, .ai-formatted-response p + p { margin-top: .55rem; }
+.ai-message-body ul, .ai-formatted-response ul { margin: .35rem 0; padding-left: 1.15rem; list-style: disc; }
+.ai-message-body li + li, .ai-formatted-response li + li { margin-top: .2rem; }
+.ai-message-body strong, .ai-formatted-response strong { font-weight: 800; }
 .ai-message-user .ai-message-body { border: 0; border-radius: 1rem 1rem .25rem 1rem; background: linear-gradient(135deg, #7c3aed, #db2777); color: #fff; }
 .ai-message.is-error .ai-message-body { border-color: rgb(239 68 68 / .5); background: rgb(239 68 68 / .08); }
 .ai-status { min-height: 1.25rem; margin: 0; padding: 0 1rem; color: var(--mm-muted, #94a3b8); font-size: .72rem; }
@@ -706,7 +711,7 @@ html.light .user-app {
 .ai-card-media-fallback i { font-size: 1.45rem; }
 .ai-card-media-fallback span { color: #cbd5e1; font-size: .58rem; font-weight: 800; letter-spacing: .04em; }
 .ai-card-content { min-width: 0; padding: .85rem; }
-.ai-result-card h4 { margin: .22rem 0 .5rem; color: var(--mm-text, #f8fafc); line-height: 1.3; }
+.ai-result-card h4 { margin: .22rem 0 .5rem; color: var(--mm-text, #f8fafc); line-height: 1.3; overflow-wrap: anywhere; }
 .ai-card-reason { margin-top: .5rem !important; padding-top: .5rem; border-top: 1px solid rgb(148 163 184 / .16); color: #c4b5fd !important; }
 .ai-card-actions { align-items: stretch; gap: .4rem; }
 .ai-card-link, .ai-card-primary { display: inline-flex; min-height: 2.15rem; align-items: center; justify-content: center; transition: border-color .16s ease, background-color .16s ease, filter .16s ease; }
@@ -728,6 +733,12 @@ html.light .user-app {
     .ai-panel { inset: auto 1.25rem 5.5rem auto; width: min(28rem, calc(100vw - 2.5rem)); height: min(46rem, calc(100dvh - 7rem)); border: 1px solid var(--mm-border, #334155); border-radius: 1.35rem; box-shadow: 0 30px 90px rgb(0 0 0 / .45); }
     .ai-overlay { background: rgb(2 6 23 / .28); }
     .ai-panel-open { overflow: auto; }
+}
+
+@media (max-width: 374px) {
+    .ai-result-card.has-media { grid-template-columns: 4.9rem minmax(0, 1fr); }
+    .ai-card-content { padding: .72rem; }
+    .ai-card-actions { display: grid; grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

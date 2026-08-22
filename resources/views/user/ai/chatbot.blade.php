@@ -1,6 +1,6 @@
 @extends('layouts.user')
 
-@section('title', 'AI Chatbot - MovieMate')
+@section('title', 'Trợ lý điện ảnh - MovieMate')
 
 @php
     $quickQuestions = [
@@ -45,7 +45,7 @@
                     @endforeach
                 </div>
 
-                <h3 class="text-[10px] font-bold app-muted uppercase tracking-wider mb-3 mt-6">Lịch sử chat</h3>
+                <h3 class="text-[10px] font-bold app-muted uppercase tracking-wider mb-3 mt-6">Lịch sử trò chuyện</h3>
                 <div class="space-y-1">
                     @auth
                         @forelse($conversationList as $conversation)
@@ -54,7 +54,7 @@
                                 <i class="ph ph-chat-teardrop mr-2"></i>{{ $conversation->title }}
                             </a>
                         @empty
-                            <p class="text-sm app-muted leading-relaxed">Chưa có lịch sử chat.</p>
+                            <p class="text-sm app-muted leading-relaxed">Chưa có lịch sử trò chuyện.</p>
                         @endforelse
                     @else
                         @forelse($chatHistory->reverse()->take(8) as $chat)
@@ -85,7 +85,7 @@
                 </div>
                 @if($chatMeta)
                     <span class="hidden sm:inline-flex px-3 py-1 rounded-full border app-border app-muted text-xs">
-                        Nguồn: {{ $chatMeta['source'] === 'fallback' ? 'Database fallback' : strtoupper($chatMeta['source']) }}
+                        Dữ liệu MovieMate
                     </span>
                 @endif
             </div>
@@ -136,7 +136,7 @@
                                 <i class="ph-fill ph-robot text-white text-sm"></i>
                             </div>
                             <div class="min-w-0">
-                                <div class="app-secondary border app-border rounded-2xl rounded-tl-sm p-4 text-sm app-text leading-relaxed whitespace-pre-line">{{ $chat->response }}</div>
+                                <div data-ai-formatted-response class="ai-formatted-response app-secondary border app-border rounded-2xl rounded-tl-sm p-4 text-sm app-text leading-relaxed">{{ $chat->response }}</div>
                                 <span class="text-[10px] app-muted mt-1.5 inline-block">MovieMate AI</span>
                             </div>
                         </div>

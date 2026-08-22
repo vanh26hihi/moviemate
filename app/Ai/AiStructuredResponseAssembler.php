@@ -14,7 +14,10 @@ final class AiStructuredResponseAssembler
 
     public const FOOD_LIMIT = 6;
 
-    public function __construct(private readonly AiStructuredCardPresenter $presenter) {}
+    public function __construct(
+        private readonly AiStructuredCardPresenter $presenter,
+        private readonly AiCardFirstTextPresenter $cardFirstText,
+    ) {}
 
     public function assemble(string $text, AiStructuredResultCollector $collector): AiAssistantResponse
     {
@@ -59,7 +62,9 @@ final class AiStructuredResponseAssembler
             }
         }
 
-        return new AiAssistantResponse($text, $cards);
+        $cards = $this->presentationCards($cards);
+
+        return new AiAssistantResponse($this->cardFirstText->present($text, $cards), $cards);
     }
 
     /** @param list<array<string, mixed>> $recommendations */
@@ -70,7 +75,7 @@ final class AiStructuredResponseAssembler
             ->map(fn (array $item) => $this->presenter->movie($item, true, is_string($item['reason'] ?? null) ? $item['reason'] : null))
             ->filter()->unique('id')->values()->all();
 
-        return new AiAssistantResponse($text, $cards);
+        return new AiAssistantResponse($this->cardFirstText->present($text, $cards), $cards);
     }
 
     /** @return array{0: list<mixed>, 1: string} */
@@ -102,5 +107,19 @@ final class AiStructuredResponseAssembler
             'cinema' => self::CINEMA_LIMIT,
             'food' => self::FOOD_LIMIT,
         };
+    }
+
+    /** @param list<array<string, mixed>> $cards
+     * @return list<array<string, mixed>>
+     */
+    private function presentationCards(array $cards): array
+    {
+        $types = collect($cards)->pluck('type')->filter()->unique();
+        if ($types->contains('showtime') && $types->every(fn (string $type): bool => in_array($type, ['movie', 'showtime'], true))) {
+            return collect($cards)->reject(fn (array $card): bool => ($card['type'] ?? null) === 'movie')
+                ->values()->all();
+        }
+
+        return $cards;
     }
 }

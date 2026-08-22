@@ -1,5 +1,10 @@
 import {streamPost} from './ai/sse';
 import {renderCards} from './ai/cards';
+import {renderAssistantText} from './ai/format';
+
+document.querySelectorAll('[data-ai-formatted-response]').forEach((response) => {
+    renderAssistantText(response, response.textContent);
+});
 
 const root = document.querySelector('[data-ai-assistant]');
 
@@ -78,6 +83,7 @@ if (root) {
 
     function progressiveText(body) {
         let queued = '';
+        let visible = '';
         let frame = null;
         const waiters = [];
 
@@ -89,8 +95,9 @@ if (root) {
             }
 
             const length = Math.min(48, Math.max(2, Math.ceil(queued.length / 24)));
-            body.append(document.createTextNode(queued.slice(0, length)));
+            visible += queued.slice(0, length);
             queued = queued.slice(length);
+            renderAssistantText(body, visible);
             scrollEnd();
             frame = requestAnimationFrame(draw);
         };
@@ -99,6 +106,14 @@ if (root) {
             append(delta) {
                 queued += delta;
                 if (frame === null) frame = requestAnimationFrame(draw);
+            },
+            replace(text) {
+                queued = '';
+                visible = String(text || '');
+                if (frame !== null) cancelAnimationFrame(frame);
+                frame = null;
+                renderAssistantText(body, visible);
+                waiters.splice(0).forEach((resolve) => resolve());
             },
             finish() {
                 if (!queued && frame === null) return Promise.resolve();
@@ -117,6 +132,7 @@ if (root) {
         welcome.hidden = true;
         const row = el('div', `ai-message ai-message-${role}`);
         const body = el('div', 'ai-message-body', text);
+        if (role === 'assistant') renderAssistantText(body, text);
         row.append(body);
         if (cards.length) row.append(renderCards(cards, {historical}));
         messages.append(row); scrollEnd(true);
@@ -192,6 +208,7 @@ if (root) {
                     }
                     typing.append(delta);
                 } else if (event === 'cards') {
+                    if (typeof data.text === 'string' && data.text.trim()) typing.replace(data.text);
                     assistant.row.querySelector(':scope > .ai-card-grid')?.remove();
                     assistant.row.append(renderCards(data.cards || [])); scrollEnd(true);
                 } else if (event === 'error') {

@@ -65,9 +65,9 @@ final class AiMovieRecommendationService
 
         $message = match (true) {
             $source !== 'fallback' => null,
-            ! $this->runtime->enabledAndConfigured() => 'AI chưa được bật hoặc chưa có credential. Kết quả được xếp hạng nội bộ từ dữ liệu MovieMate.',
-            $aiFailed => 'Dịch vụ AI tạm thời không phản hồi. MovieMate đã chuyển sang bộ gợi ý nội bộ.',
-            default => 'AI không trả về kết quả hợp lệ. MovieMate đã chuyển sang bộ gợi ý nội bộ.',
+            ! $this->runtime->enabledAndConfigured() => 'MovieMate đang dùng bộ gợi ý nội bộ từ dữ liệu hiện có.',
+            $aiFailed => 'MovieMate tạm thời chuyển sang bộ gợi ý nội bộ.',
+            default => 'MovieMate đang dùng bộ gợi ý nội bộ để hoàn tất kết quả.',
         };
         $text = $message ?? 'MovieMate đã xếp hạng các phim phù hợp từ dữ liệu suất chiếu hiện tại.';
 

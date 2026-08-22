@@ -145,7 +145,10 @@ final class AiChatStreamController extends Controller
             );
             $cards = $result['structured_response']['cards'] ?? [];
             if ($cards !== []) {
-                yield $this->event('cards', ['cards' => $cards]);
+                yield $this->event('cards', [
+                    'cards' => $cards,
+                    'text' => $result['structured_response']['text'] ?? $result['answer'],
+                ]);
             }
             yield $this->event('completed', [
                 'conversation_id' => $conversation->id,
@@ -184,7 +187,10 @@ final class AiChatStreamController extends Controller
             }
             $cards = $result['structured_response']['cards'] ?? [];
             if ($emitCards && $cards !== []) {
-                yield $this->event('cards', ['cards' => $cards]);
+                yield $this->event('cards', [
+                    'cards' => $cards,
+                    'text' => $result['structured_response']['text'] ?? $result['answer'],
+                ]);
             }
             if ($emitCompleted) {
                 yield $this->event('completed', ['source' => $result['source']]);

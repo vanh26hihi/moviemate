@@ -2,6 +2,7 @@
 
 namespace App\Ai;
 
+use App\Models\Movie;
 use Illuminate\Support\Str;
 
 final class AiHistoricalStructuredPayload
@@ -10,6 +11,8 @@ final class AiHistoricalStructuredPayload
 
     /** @var list<string> */
     private const CARD_TYPES = ['movie', 'showtime', 'cinema', 'food'];
+
+    public function __construct(private readonly MovieGenreLocalizer $genres) {}
 
     /** @return array{version: int, cards: list<array<string, mixed>>}|null */
     public function forStorage(mixed $structuredResponse): ?array
@@ -73,7 +76,8 @@ final class AiHistoricalStructuredPayload
             'id' => $id,
             'title' => $title,
             'stored_status' => $status,
-            'genres' => $this->textList($card['genres'] ?? [], 8, 100),
+            'poster_url' => Movie::imageUrl($this->text($card['poster_url'] ?? null, 2048)),
+            'genres' => $this->genres->localizeList($this->textList($card['genres'] ?? [], 8, 100)),
             'duration_minutes' => $this->positiveInt($card['duration_minutes'] ?? null),
             'age_rating' => $this->text($card['age_rating'] ?? null, 20),
             'country' => $this->text($card['country'] ?? null, 100),

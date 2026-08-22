@@ -55,14 +55,16 @@ final class AiChatStreamService
             throw new UnexpectedValueException('Malformed AI stream response.');
         }
 
+        $structuredResponse = $this->structuredResponses
+            ->assemble($answer, $this->structuredResults)->toArray();
+
         return [
-            'answer' => $answer,
+            'answer' => $structuredResponse['text'],
             'source' => $this->streamer->source(),
             'message' => null,
             'assistant_completed' => true,
             'failure_category' => null,
-            'structured_response' => $this->structuredResponses
-                ->assemble($answer, $this->structuredResults)->toArray(),
+            'structured_response' => $structuredResponse,
         ];
     }
 

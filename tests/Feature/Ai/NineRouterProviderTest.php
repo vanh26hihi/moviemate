@@ -90,7 +90,7 @@ class NineRouterProviderTest extends TestCase
 
         $this->assertTrue($result['assistant_completed'], json_encode($result));
         $this->assertSame('nine_router', $result['source']);
-        $this->assertSame('Phim này đang chiếu tại MovieMate.', $result['answer']);
+        $this->assertSame('Mình tìm thấy 1 phim trên MovieMate:', $result['answer']);
         $this->assertSame('Nine Router Grounded Movie', $result['structured_response']['cards'][0]['title']);
         $this->assertCount(2, $recorded);
 

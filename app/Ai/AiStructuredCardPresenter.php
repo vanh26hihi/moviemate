@@ -7,6 +7,8 @@ use Illuminate\Support\Str;
 
 final class AiStructuredCardPresenter
 {
+    public function __construct(private readonly MovieGenreLocalizer $genres) {}
+
     /** @return array<string, mixed>|null */
     public function movie(array $movie, bool $recommendation = false, ?string $reason = null): ?array
     {
@@ -33,7 +35,7 @@ final class AiStructuredCardPresenter
             'slug' => $slug,
             'poster_url' => $this->publicUrl($movie['poster_url'] ?? $movie['poster'] ?? null, 2048),
             'stored_status' => $status,
-            'genres' => $this->plainList($movie['genres'] ?? [], 8, 100),
+            'genres' => $this->genres->localizeList($this->plainList($movie['genres'] ?? [], 8, 100)),
             'duration_minutes' => $this->positiveInt($movie['duration_minutes'] ?? $movie['duration'] ?? null),
             'age_rating' => $this->plain($movie['age_rating'] ?? null, 20),
             'country' => $this->plain($movie['country'] ?? null, 100),

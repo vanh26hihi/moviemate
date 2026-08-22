@@ -48,14 +48,15 @@ final class AiChatbotService
                     throw new \UnexpectedValueException('Malformed AI response.');
                 }
 
+                $structuredResponse = $this->structuredResponses
+                    ->assemble($answer, $this->structuredResults)->toArray();
                 $result = [
-                    'answer' => $answer,
+                    'answer' => $structuredResponse['text'],
                     'source' => $this->runtime->provider(),
                     'message' => null,
                     'assistant_completed' => true,
                     'failure_category' => null,
-                    'structured_response' => $this->structuredResponses
-                        ->assemble($answer, $this->structuredResults)->toArray(),
+                    'structured_response' => $structuredResponse,
                 ];
                 $this->logAttempt('info', 'AI chatbot completed.', $audience, $context, $startedAt, null);
 
@@ -78,15 +79,16 @@ final class AiChatbotService
         }
 
         $answer = $this->fallbackAnswer($message);
+        $structuredResponse = $this->structuredResponses
+            ->assemble($answer, $this->structuredResults)->toArray();
 
         return [
-            'answer' => $answer,
+            'answer' => $structuredResponse['text'],
             'source' => 'fallback',
-            'message' => 'Đang dùng trợ lý dự phòng từ dữ liệu MovieMate vì AI chưa được bật, chưa cấu hình hoặc tạm thời không phản hồi.',
+            'message' => 'MovieMate đang dùng chế độ hỗ trợ dự phòng từ dữ liệu hệ thống.',
             'assistant_completed' => true,
             'failure_category' => null,
-            'structured_response' => $this->structuredResponses
-                ->assemble($answer, $this->structuredResults)->toArray(),
+            'structured_response' => $structuredResponse,
         ];
     }
 
@@ -139,9 +141,7 @@ final class AiChatbotService
                 return 'Hiện MovieMate chưa có món ăn công khai đang hoạt động.';
             }
 
-            return "Một số món trong danh mục công khai MovieMate:\n".collect($catalog['items'])
-                ->map(fn (array $food): string => '- '.$food['name'].' — '.number_format($food['price_vnd'], 0, ',', '.').'đ')
-                ->implode("\n")."\nKhả dụng tại từng chi nhánh chỉ được xác nhận trong luồng đặt vé.";
+            return 'Mình tìm thấy một số lựa chọn bắp nước trong danh mục MovieMate.';
         }
         if ($this->containsAny($normalized, ['đặt vé', 'dat ve', 'booking', 'chọn ghế', 'chon ghe', 'thanh toán', 'thanh toan'])) {
             return "Cách đặt vé trên MovieMate:\n1. Chọn phim và một suất chiếu có nút đặt vé do MovieMate xác nhận.\n2. Chọn ghế và kiểm tra thông tin.\n3. Hoàn tất trong luồng thanh toán MovieMate.\n4. Xem kết quả trong Đơn đặt vé của tôi.";
@@ -153,8 +153,7 @@ final class AiChatbotService
                 return 'Hiện MovieMate chưa có dữ liệu rạp đang hoạt động.';
             }
 
-            return "Các rạp MovieMate đang hoạt động:\n".$cinemas->map(fn (array $cinema): string => '- '.$cinema['name'].' — '.$cinema['address'].', '.$cinema['city'].($cinema['phone'] ? ' — '.$cinema['phone'] : '')
-            )->implode("\n");
+            return 'Mình tìm thấy '.$cinemas->count().' rạp MovieMate đang hoạt động.';
         }
         if ($this->containsAny($normalized, ['lịch', 'lich', 'suất', 'suat', 'giờ', 'gio', 'hôm nay', 'hom nay', 'tối nay', 'toi nay'])) {
             $showtimes = $this->showtimes->find(limit: 8);
@@ -163,8 +162,7 @@ final class AiChatbotService
                 return 'Hiện chưa có suất chiếu được MovieMate xác nhận là còn nhận đặt vé.';
             }
 
-            return "Các suất chiếu còn nhận đặt vé:\n".$showtimes->map(fn (array $showtime): string => '- '.$showtime['movie']['title'].' — '.$showtime['date'].' '.$showtime['start_time'].' tại '.$showtime['cinema']['name'].' (từ '.number_format((int) $showtime['starting_price_vnd'], 0, ',', '.').'đ)'
-            )->implode("\n");
+            return 'Mình tìm thấy '.$showtimes->count().' suất chiếu còn nhận đặt vé.';
         }
         if ($this->containsAny($normalized, ['giá', 'gia', 'bao nhiêu', 'bao nhieu', 'vé', 've'])) {
             $showtimes = $this->showtimes->find(limit: 6);
@@ -173,8 +171,7 @@ final class AiChatbotService
                 return 'Hiện chưa có suất chiếu còn nhận đặt vé để kiểm tra giá snapshot.';
             }
 
-            return "Giá khởi điểm theo suất chiếu MovieMate:\n".$showtimes->map(fn (array $showtime): string => '- '.$showtime['movie']['title'].' tại '.$showtime['cinema']['name'].' — từ '.number_format((int) $showtime['starting_price_vnd'], 0, ',', '.').'đ'
-            )->implode("\n")."\nTổng thanh toán cuối cùng do luồng đặt vé xác định.";
+            return 'Mình tìm thấy giá khởi điểm của các suất chiếu phù hợp.';
         }
         if ($this->containsAny($normalized, ['phim', 'hay', 'đang chiếu', 'dang chieu', 'thể loại', 'the loai', 'hành động', 'hanh dong', 'gia đình', 'gia dinh'])) {
             $movies = $this->movies->search(limit: 5);
@@ -183,8 +180,7 @@ final class AiChatbotService
                 return 'Hiện MovieMate chưa có phim công khai phù hợp trong hệ thống.';
             }
 
-            return "Một số phim công khai trên MovieMate:\n".$movies->map(fn (array $movie): string => '- '.$movie['title'].' ('.(implode(', ', $movie['genres']) ?: 'chưa cập nhật thể loại').', '.$movie['duration_minutes'].' phút, '.$movie['age_rating'].', trạng thái '.$movie['status'].')'
-            )->implode("\n");
+            return 'Mình tìm thấy '.$movies->count().' phim công khai trên MovieMate.';
         }
 
         return 'Tôi có thể hỗ trợ về phim, suất chiếu còn nhận đặt vé, rạp, giá snapshot, món ăn công khai và cách đặt vé trên MovieMate.';
