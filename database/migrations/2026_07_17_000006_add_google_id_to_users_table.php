@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('users', 'google_id')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             $table->string('google_id')->nullable()->unique()->after('email');
         });
@@ -15,6 +19,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasColumn('users', 'google_id')) {
+            return;
+        }
+
         Schema::table('users', function (Blueprint $table) {
             $table->dropUnique(['google_id']);
             $table->dropColumn('google_id');
