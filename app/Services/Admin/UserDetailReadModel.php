@@ -45,7 +45,14 @@ final class UserDetailReadModel
                 'showtime:id,movie_id,room_id,show_date,show_time',
                 'showtime.movie:id,title',
                 'showtime.room:id,name',
-                'authoritativePayment:id,booking_id,amount,provider,verified_at,settled_at',
+                'authoritativePayment' => fn ($query) => $query->select([
+                    'payments.id',
+                    'payments.booking_id',
+                    'payments.amount',
+                    'payments.provider',
+                    'payments.verified_at',
+                    'payments.settled_at',
+                ]),
             ]);
 
         return $this->cinemaAccess->scope($query, $actor, 'bookings.cinema_id');
