@@ -17,7 +17,7 @@ class SeatHoldServiceTest extends TestCase
     public function test_it_provides_a_complete_hold_snapshot_for_the_user(): void
     {
         $scenario = $this->bookingScenario();
-        $user = User::query()->factory()->create();
+        $user = User::factory()->create();
 
         $expiresAt = app(SeatHoldService::class)->holdSeats($user, $scenario['showtime'], [$scenario['seats'][0]->id]);
 
@@ -37,7 +37,7 @@ class SeatHoldServiceTest extends TestCase
     public function test_it_expands_hold_count_and_releases_selected_seats_only(): void
     {
         $scenario = $this->bookingScenario();
-        $user = User::query()->factory()->create();
+        $user = User::factory()->create();
         $service = app(SeatHoldService::class);
 
         $service->holdSeats($user, $scenario['showtime'], [$scenario['seats'][0]->id]);

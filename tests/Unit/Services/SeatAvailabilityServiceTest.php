@@ -17,7 +17,7 @@ class SeatAvailabilityServiceTest extends TestCase
     public function test_it_reports_available_and_held_seats_for_a_showtime(): void
     {
         $scenario = $this->bookingScenario();
-        $user = User::query()->factory()->create();
+        $user = User::factory()->create();
         $service = app(SeatAvailabilityService::class);
 
         SeatHold::query()->create([

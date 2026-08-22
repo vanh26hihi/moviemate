@@ -4,6 +4,7 @@ namespace App\Services\Seats;
 
 use App\Models\BookingSeat;
 use App\Models\RoomLayout;
+use App\Models\SeatHold;
 use App\Models\Showtime;
 use Illuminate\Support\Collection;
 
@@ -39,9 +40,18 @@ final class SeatAvailabilityService
             ->values()
             ->all();
 
-        $heldIds = BookingSeat::query()
+        $soldIds = BookingSeat::query()
             ->where('showtime_id', $showtime->id)
             ->where('active_lock_key', BookingSeat::ACTIVE_LOCK_KEY)
+            ->pluck('seat_id')
+            ->map(fn ($seatId): int => (int) $seatId)
+            ->unique()
+            ->values()
+            ->all();
+
+        $heldIds = SeatHold::query()
+            ->where('showtime_id', $showtime->id)
+            ->where('expires_at', '>', now())
             ->pluck('seat_id')
             ->map(fn ($seatId): int => (int) $seatId)
             ->unique()
@@ -60,17 +70,20 @@ final class SeatAvailabilityService
 
         $blockedSet = $this->toIdSet($blockedIds);
         $heldSet = $this->toIdSet($heldIds);
+        $soldSet = $this->toIdSet($soldIds);
         $allSet = $this->toIdSet($seatIds);
 
-        $available = array_values(array_diff(array_keys($allSet), array_keys($blockedSet + $heldSet)));
-        $sold = array_values(array_intersect(array_keys($allSet), array_keys($heldSet)));
+        $available = array_values(array_diff(array_keys($allSet), array_keys($blockedSet + $heldSet + $soldSet)));
+        $sold = array_values(array_diff(array_intersect(array_keys($allSet), array_keys($soldSet)), array_keys($blockedSet)));
         $blocked = array_values(array_keys($blockedSet));
-        $held = array_values(array_diff($sold, $blocked));
+        $held = array_values(array_diff(array_intersect(array_keys($allSet), array_keys($heldSet)), array_keys($blockedSet + $soldSet)));
 
         $statusBySeat = [];
         foreach ($seatIds as $seatId) {
             if (isset($blockedSet[$seatId])) {
                 $statusBySeat[$seatId] = 'blocked';
+            } elseif (isset($soldSet[$seatId])) {
+                $statusBySeat[$seatId] = 'sold';
             } elseif (isset($heldSet[$seatId])) {
                 $statusBySeat[$seatId] = 'held';
             } else {
