@@ -109,7 +109,7 @@ class SendPendingBookingTickets extends Command
     private function claimNext(?int $bookingId = null): ?BookingTicketDelivery
     {
         return DB::transaction(function () use ($bookingId): ?BookingTicketDelivery {
-            $now = now()->startOfSecond();
+            $now = now();
             $leaseSeconds = max(30, (int) config('payment.ticket_delivery.lease_seconds', 300));
             $staleStartedAt = $now->copy()->subSeconds($leaseSeconds);
             $delivery = BookingTicketDelivery::query()

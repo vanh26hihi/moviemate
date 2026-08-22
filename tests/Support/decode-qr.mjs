@@ -1,12 +1,14 @@
 import { PNG } from 'pngjs';
-import {
+import zxing from '@zxing/library';
+
+const {
     BinaryBitmap,
     HybridBinarizer,
     MultiFormatReader,
     RGBLuminanceSource,
     DecodeHintType,
     BarcodeFormat,
-} from '@zxing/library';
+} = zxing;
 
 let encoded = '';
 for await (const chunk of process.stdin) encoded += chunk;
