@@ -6,12 +6,18 @@ use App\Models\Booking;
 use App\Models\LoyaltyPointTransaction;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class LoyaltyPointService
 {
     /** Mỗi điểm dùng thanh toán có giá trị 100đ (tỷ lệ hoàn điểm khoảng 10%). */
     public const VALUE_PER_POINT = 100;
+
+    protected function loyaltyLedgerAvailable(): bool
+    {
+        return class_exists(LoyaltyPointTransaction::class) && Schema::hasTable('loyalty_point_transactions');
+    }
 
     public function calculate(float|int $totalAmount): int
     {
@@ -20,6 +26,10 @@ class LoyaltyPointService
 
     public function awardForBooking(Booking $booking): void
     {
+        if (! $this->loyaltyLedgerAvailable()) {
+            return;
+        }
+
         if ($booking->loyaltyPointTransactions()->where('type', 'earn')->exists()) {
             return;
         }
@@ -53,6 +63,10 @@ class LoyaltyPointService
 
     public function reverseForCancelledBooking(Booking $booking): void
     {
+        if (! $this->loyaltyLedgerAvailable()) {
+            return;
+        }
+
         $points = (int) $booking->loyalty_points_earned;
         $wasAwarded = $booking->loyaltyPointTransactions()->where('type', 'earn')->exists();
 
@@ -85,6 +99,12 @@ class LoyaltyPointService
 
     public function redeemPoints(User $user, int $points, string $description): LoyaltyPointTransaction
     {
+        if (! $this->loyaltyLedgerAvailable()) {
+            throw ValidationException::withMessages([
+                'points' => 'Hệ thống điểm thưởng đã bị vô hiệu hóa.',
+            ]);
+        }
+
         if ($points <= 0) {
             throw ValidationException::withMessages([
                 'points' => 'So diem doi phai lon hon 0.',
@@ -114,6 +134,10 @@ class LoyaltyPointService
 
     public function redeemForBooking(User $user, Booking $booking, int $points): LoyaltyPointTransaction
     {
+        if (! $this->loyaltyLedgerAvailable()) {
+            throw ValidationException::withMessages(['loyalty_points' => 'Hệ thống điểm thưởng đã bị vô hiệu hóa.']);
+        }
+
         if ($points <= 0) {
             throw ValidationException::withMessages(['loyalty_points' => 'Số điểm sử dụng phải lớn hơn 0.']);
         }
@@ -136,6 +160,10 @@ class LoyaltyPointService
 
     public function restoreRedeemedPoints(Booking $booking): void
     {
+        if (! $this->loyaltyLedgerAvailable()) {
+            return;
+        }
+
         $points = (int) $booking->loyalty_points_redeemed;
 
         if ($points <= 0 || $booking->loyaltyPointTransactions()->where('type', 'adjustment')->where('points', $points)->exists()) {
