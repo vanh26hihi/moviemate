@@ -11,9 +11,12 @@
     <div data-ai-overlay class="ai-overlay" hidden></div>
     <section id="ai-assistant-panel" data-ai-panel class="ai-panel" role="dialog" aria-modal="true" aria-labelledby="ai-assistant-title" hidden>
         <header class="ai-panel-header">
-            <div class="min-w-0">
-                <p class="ai-eyebrow"><span aria-hidden="true"></span> Trợ lý điện ảnh</p>
-                <h2 id="ai-assistant-title" data-ai-title>MovieMate AI</h2>
+            <div class="ai-panel-identity min-w-0">
+                <div class="ai-header-mark" aria-hidden="true"><i class="ph-fill ph-robot"></i></div>
+                <div class="min-w-0">
+                    <p class="ai-eyebrow"><span aria-hidden="true"></span> Trợ lý điện ảnh</p>
+                    <h2 id="ai-assistant-title" data-ai-title>MovieMate AI</h2>
+                </div>
             </div>
             <div class="ai-panel-actions">
                 @auth
@@ -53,7 +56,6 @@
                 <textarea id="ai-assistant-message" data-ai-input rows="1" maxlength="1000" placeholder="Hỏi MovieMate về phim, suất chiếu…" required></textarea>
                 <button type="submit" data-ai-send aria-label="Gửi tin nhắn"><i class="ph-fill ph-paper-plane-tilt" aria-hidden="true"></i></button>
             </form>
-            <p class="ai-disclaimer">AI có thể nhầm. Hãy kiểm tra thông tin suất chiếu trước khi đặt vé.</p>
         </div>
 
         @auth

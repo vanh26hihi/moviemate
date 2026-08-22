@@ -141,12 +141,24 @@ class AiStreamingExperienceTest extends TestCase
             ->assertSee('role="log"', false)
             ->assertSee('for="ai-assistant-message"', false)
             ->assertSee('Nhập tin nhắn cho MovieMate AI')
-            ->assertSee(route('user.ai.chatbot.stream'), false);
+            ->assertSee(route('user.ai.chatbot.stream'), false)
+            ->assertDontSee('AI có thể nhầm. Hãy kiểm tra thông tin suất chiếu trước khi đặt vé.')
+            ->assertDontSee('AI có thể mắc lỗi. Vui lòng kiểm tra lại thông tin quan trọng trước khi đặt vé.');
 
         $source = file_get_contents(resource_path('js/ai-chat.js')).file_get_contents(resource_path('js/ai/cards.js'));
         $this->assertStringNotContainsString('innerHTML', $source);
         $this->assertStringNotContainsString('insertAdjacentHTML', $source);
         $this->assertStringContainsString('textContent', $source);
+        $this->assertStringContainsString("event === 'status'", $source);
+        $this->assertStringContainsString('requestAnimationFrame', $source);
+        $this->assertStringContainsString('ai-thinking-dots', $source);
+        $this->assertStringContainsString('card.poster_url', $source);
+        $this->assertStringContainsString("image.loading = 'lazy'", $source);
+        $this->assertStringContainsString("credentials: 'same-origin'", file_get_contents(resource_path('js/ai/sse.js')));
+
+        $styles = file_get_contents(resource_path('css/user.css'));
+        $this->assertStringContainsString('@keyframes ai-thinking-dot', $styles);
+        $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $styles);
     }
 
     private function fakeStreamer(array $deltas, ?\Throwable $failure = null): void

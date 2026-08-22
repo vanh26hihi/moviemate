@@ -8,6 +8,7 @@ use App\Models\Cinema;
 use App\Models\FoodItem;
 use App\Services\AiChatbotService;
 use App\Services\PublicFoodReadService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\Support\Facades\Http;
@@ -102,6 +103,19 @@ class AiToolBoundaryTest extends TestCase
         $this->assertSame('Câu trả lời đã fake.', $result['answer']);
         $this->assertSame('openai', $result['source']);
         MovieMateCinemaAssistant::assertPrompted('Hôm nay có gì?');
+    }
+
+    public function test_assistant_instructions_ground_relative_dates_in_authoritative_server_time(): void
+    {
+        config()->set('app.timezone', 'Asia/Ho_Chi_Minh');
+        $this->travelTo(CarbonImmutable::parse('2026-08-22 14:35:00', 'Asia/Ho_Chi_Minh'));
+
+        $instructions = app(MovieMateCinemaAssistant::class)->instructions();
+
+        $this->assertStringContainsString('2026-08-22 14:35:00 +07:00 (Asia/Ho_Chi_Minh)', $instructions);
+        foreach (['hôm nay', 'tối nay', 'cuối tuần này', 'never guess'] as $groundedPhrase) {
+            $this->assertStringContainsString($groundedPhrase, $instructions);
+        }
     }
 
     public function test_missing_credential_degrades_without_a_provider_request_or_secret_leak(): void

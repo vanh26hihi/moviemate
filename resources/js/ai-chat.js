@@ -36,7 +36,7 @@ if (root) {
 
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || '';
     const json = async (url, options = {}) => {
-        const response = await fetch(url, {headers: {'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf()}, ...options});
+        const response = await fetch(url, {credentials:'same-origin', headers: {'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf()}, ...options});
         if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.message || `HTTP ${response.status}`); }
         return response.status === 204 ? null : response.json();
     };
@@ -46,7 +46,72 @@ if (root) {
         status.textContent = text;
     }
 
-    function scrollEnd() { messages.scrollTop = messages.scrollHeight; }
+    function scrollEnd(smooth = false) {
+        messages.scrollTo({top: messages.scrollHeight, behavior: smooth ? 'smooth' : 'auto'});
+    }
+
+    function thinkingState(assistant, initialText) {
+        const label = el('span', 'ai-thinking-label');
+        const dots = el('span', 'ai-thinking-dots');
+        dots.setAttribute('aria-hidden', 'true');
+        for (let index = 0; index < 3; index += 1) dots.append(el('span'));
+
+        const update = (text) => {
+            const normalized = String(text || 'MovieMate đang suy nghĩ').replace(/[.…]+$/u, '');
+            label.textContent = normalized;
+            assistant.body.setAttribute('aria-label', `${normalized}…`);
+        };
+
+        assistant.row.classList.add('is-thinking');
+        assistant.body.replaceChildren(label, dots);
+        update(initialText);
+
+        return {
+            update,
+            clear() {
+                assistant.row.classList.remove('is-thinking');
+                assistant.body.removeAttribute('aria-label');
+                assistant.body.replaceChildren();
+            },
+        };
+    }
+
+    function progressiveText(body) {
+        let queued = '';
+        let frame = null;
+        const waiters = [];
+
+        const draw = () => {
+            frame = null;
+            if (!queued) {
+                waiters.splice(0).forEach((resolve) => resolve());
+                return;
+            }
+
+            const length = Math.min(48, Math.max(2, Math.ceil(queued.length / 24)));
+            body.append(document.createTextNode(queued.slice(0, length)));
+            queued = queued.slice(length);
+            scrollEnd();
+            frame = requestAnimationFrame(draw);
+        };
+
+        return {
+            append(delta) {
+                queued += delta;
+                if (frame === null) frame = requestAnimationFrame(draw);
+            },
+            finish() {
+                if (!queued && frame === null) return Promise.resolve();
+                return new Promise((resolve) => waiters.push(resolve));
+            },
+            cancel() {
+                queued = '';
+                if (frame !== null) cancelAnimationFrame(frame);
+                frame = null;
+                waiters.splice(0).forEach((resolve) => resolve());
+            },
+        };
+    }
 
     function bubble(role, text, cards = [], historical = false) {
         welcome.hidden = true;
@@ -54,7 +119,7 @@ if (root) {
         const body = el('div', 'ai-message-body', text);
         row.append(body);
         if (cards.length) row.append(renderCards(cards, {historical}));
-        messages.append(row); scrollEnd();
+        messages.append(row); scrollEnd(true);
         return {row, body};
     }
 
@@ -97,10 +162,13 @@ if (root) {
         if (!retryUrl) userRow = bubble('user', message).row;
         const assistant = bubble('assistant', '');
         assistant.row.classList.add('is-streaming');
+        const thinking = thinkingState(assistant, 'MovieMate đang suy nghĩ…');
+        const typing = progressiveText(assistant.body);
         panel.setAttribute('aria-busy', 'true'); send.disabled = true; input.disabled = true;
-        setStatus('MovieMate đang suy nghĩ…');
+        setStatus('');
         controller = new AbortController();
         let streamUrl = retryUrl;
+        let receivedText = false;
         try {
             if (!streamUrl) {
                 if (authenticated && !currentConversation) await createConversation();
@@ -108,26 +176,42 @@ if (root) {
             }
             await streamPost(streamUrl, retryUrl && authenticated ? {} : {message}, controller.signal, (event, envelope) => {
                 const data = envelope?.data || {};
-                if (event === 'conversation') {
+                if (event === 'status') {
+                    if (!receivedText) thinking.update(data.message);
+                } else if (event === 'conversation') {
                     currentConversation = data.conversation_id;
                     q('[data-ai-title]').textContent = data.title || 'MovieMate AI';
                     assistant.row.dataset.retryUrl = data.retry_url || '';
                 } else if (event === 'text_delta') {
-                    assistant.body.append(document.createTextNode(data.delta || '')); scrollEnd();
+                    const delta = typeof data.delta === 'string' ? data.delta : '';
+                    if (!delta) return;
+                    if (!receivedText) {
+                        receivedText = true;
+                        thinking.clear();
+                        assistant.row.classList.add('is-typing');
+                    }
+                    typing.append(delta);
                 } else if (event === 'cards') {
-                    assistant.row.append(renderCards(data.cards || [])); scrollEnd();
+                    assistant.row.querySelector(':scope > .ai-card-grid')?.remove();
+                    assistant.row.append(renderCards(data.cards || [])); scrollEnd(true);
                 } else if (event === 'error') {
                     throw new Error(data.message || 'Không thể nhận phản hồi.');
                 } else if (event === 'completed') {
                     setStatus('Đã nhận phản hồi.', true);
                 }
             });
+            await typing.finish();
             if (!assistant.body.textContent.trim()) throw new Error('Phản hồi bị gián đoạn.');
-            assistant.row.classList.remove('is-streaming');
+            assistant.row.classList.remove('is-streaming', 'is-typing');
+            setStatus('');
         } catch (error) {
+            typing.cancel();
+            thinking.clear();
             if (error.name === 'AbortError') { assistant.row.remove(); return; }
-            assistant.body.textContent = 'MovieMate AI tạm thời không thể trả lời. Vui lòng kiểm tra kết nối và thử lại.';
-            assistant.row.classList.remove('is-streaming'); assistant.row.classList.add('is-error');
+            const errorHeading = el('strong', 'ai-error-title', 'Kết nối bị gián đoạn');
+            const errorMessage = el('span', 'ai-error-message', 'MovieMate chưa thể trả lời lúc này. Vui lòng thử lại.');
+            assistant.body.replaceChildren(errorHeading, errorMessage);
+            assistant.row.classList.remove('is-streaming', 'is-typing'); assistant.row.classList.add('is-error');
             setStatus('Phản hồi bị gián đoạn. Bạn có thể thử lại.', true);
             const authRetry = assistant.row.dataset.retryUrl;
             addRetry(assistant.row, async (button) => {
@@ -187,7 +271,13 @@ if (root) {
     q('[data-ai-new]')?.addEventListener('click', () => { clearChat(); showChat(); input.focus(); });
     more?.addEventListener('click', () => { if (historyPage < historyLastPage) { historyPage += 1; loadHistory().catch(showError); } });
     root.querySelectorAll('[data-ai-prompt]').forEach((button) => button.addEventListener('click', () => sendMessage(button.dataset.aiPrompt)));
-    form.addEventListener('submit', (event) => { event.preventDefault(); const message = input.value.trim(); if (!message) return; input.value = ''; sendMessage(message); });
+    function resizeInput() {
+        input.style.height = 'auto';
+        input.style.height = `${Math.min(input.scrollHeight, 128)}px`;
+    }
+
+    form.addEventListener('submit', (event) => { event.preventDefault(); const message = input.value.trim(); if (!message) return; input.value = ''; resizeInput(); sendMessage(message); });
+    input.addEventListener('input', resizeInput);
     input.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); form.requestSubmit(); } });
     root.querySelectorAll('[data-ai-dialog-cancel]').forEach((button) => button.addEventListener('click', closeDialogs));
     q('[data-ai-rename-form]')?.addEventListener('submit', async (event) => {

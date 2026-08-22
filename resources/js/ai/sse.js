@@ -1,7 +1,7 @@
 export async function streamPost(url, payload, signal, onEvent) {
     const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const response = await fetch(url, {
-        method: 'POST', signal,
+        method: 'POST', signal, credentials: 'same-origin',
         headers: {'Accept': 'text/event-stream', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token},
         body: JSON.stringify(payload),
     });

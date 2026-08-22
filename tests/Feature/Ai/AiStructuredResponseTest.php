@@ -59,6 +59,24 @@ class AiStructuredResponseTest extends TestCase
         $this->assertStringNotContainsString('custom_html', json_encode($response['cards'], JSON_THROW_ON_ERROR));
     }
 
+    public function test_movie_card_preserves_the_authoritative_poster_url_for_frontend_rendering(): void
+    {
+        $collector = app(AiStructuredResultCollector::class);
+        $collector->reset();
+        $collector->record('search_movies', ['movies' => [[
+            'id' => 41,
+            'title' => 'Poster Authority',
+            'slug' => 'poster-authority',
+            'status' => Movie::STATUS_NOW_SHOWING,
+            'poster_url' => 'https://moviemate.test/storage/movies/posters/authority.webp',
+        ]]]);
+
+        $card = collect(app(AiStructuredResponseAssembler::class)->assemble('Có poster', $collector)->toArray()['cards'])->sole();
+
+        $this->assertSame('movie', $card['type']);
+        $this->assertSame('https://moviemate.test/storage/movies/posters/authority.webp', $card['poster_url']);
+    }
+
     public function test_each_card_family_and_bounded_field_obeys_its_server_side_limit(): void
     {
         $movies = collect(range(1, 12))->map(fn (int $id): array => [

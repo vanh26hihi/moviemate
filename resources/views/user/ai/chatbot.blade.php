@@ -173,7 +173,6 @@
                         <i class="ph-fill ph-paper-plane-right text-xl" aria-hidden="true"></i>
                     </button>
                 </form>
-                <p class="text-[10px] text-center app-muted mt-2">AI có thể mắc lỗi. Vui lòng kiểm tra lại thông tin quan trọng trước khi đặt vé.</p>
             </div>
         </section>
     </div>
