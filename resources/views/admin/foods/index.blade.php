@@ -1,13 +1,17 @@
 @extends('layouts.admin')
 
-@section('title', 'Quản lý món ăn - Quản trị MovieMate')
-@section('page-title', 'Quản lý món ăn')
+@php
+    $canManageGlobalCatalog = app(\App\Services\CinemaAccessService::class)->hasGlobalAccess(auth()->user());
+@endphp
+
+@section('title', ($canManageGlobalCatalog ? 'Quản lý món ăn' : 'Danh mục món ăn').' - MovieMate')
+@section('page-title', $canManageGlobalCatalog ? 'Quản lý món ăn' : 'Danh mục món ăn')
 
 @section('content')
 <div class="admin-page-header gap-4 flex-col lg:flex-row lg:items-end">
     <div>
-        <h1 class="admin-page-title">Quản lý món ăn</h1>
-        <p class="admin-page-subtitle">Thêm, sửa và quản lý danh sách đồ ăn phục vụ khách tại rạp.</p>
+        <h1 class="admin-page-title">{{ $canManageGlobalCatalog ? 'Quản lý món ăn' : 'Danh mục món ăn dùng chung' }}</h1>
+        <p class="admin-page-subtitle">{{ $canManageGlobalCatalog ? 'Thêm, sửa và quản lý danh sách đồ ăn phục vụ khách tại rạp.' : 'Danh mục món ăn và giá dùng chung toàn chuỗi. Manager chỉ xem để phục vụ vận hành tại chi nhánh.' }}</p>
     </div>
     <div class="w-full lg:w-auto flex flex-col sm:flex-row items-stretch gap-3">
         <form action="{{ route('admin.foods.index') }}" method="GET" class="flex flex-1 min-w-0 gap-2">
@@ -17,10 +21,10 @@
                 Tìm kiếm
             </button>
         </form>
-        @can('foods.create')<a href="{{ route('admin.foods.create') }}" class="admin-btn-primary whitespace-nowrap">
+        @if($canManageGlobalCatalog)@can('foods.create')<a href="{{ route('admin.foods.create') }}" class="admin-btn-primary whitespace-nowrap">
             <i class="ph-bold ph-plus-circle"></i>
             Thêm món mới
-        </a>@endcan
+        </a>@endcan @endif
     </div>
 </div>
 
@@ -49,23 +53,23 @@
                             </span>
                         </td>
                         <td class="px-5 py-4 text-right space-x-2">
-                            @can('foods.update')<a href="{{ route('admin.foods.edit', $food) }}" class="inline-flex items-center gap-2 rounded-xl border app-border app-muted px-3 py-2 text-sm hover:app-text hover:border-brand-start transition-colors">
+                            @if($canManageGlobalCatalog)@can('foods.update')<a href="{{ route('admin.foods.edit', $food) }}" class="inline-flex items-center gap-2 rounded-xl border app-border app-muted px-3 py-2 text-sm hover:app-text hover:border-brand-start transition-colors">
                                 <i class="ph ph-pencil"></i>
                                 Sửa
-                            </a>@endcan
-                            @can('foods.delete')<form action="{{ route('admin.foods.destroy', $food) }}" method="POST" class="inline-block">
+                            </a>@endcan @endif
+                            @if($canManageGlobalCatalog)@can('foods.delete')<form action="{{ route('admin.foods.destroy', $food) }}" method="POST" class="inline-block">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="inline-flex items-center gap-2 rounded-xl border app-border border-error/20 text-error px-3 py-2 text-sm hover:bg-error/10 transition-colors" onclick="return confirm('Xác nhận xóa món này?')">
                                     <i class="ph ph-trash"></i>
                                     Xóa
                                 </button>
-                            </form>@endcan
+                            </form>@endcan @endif
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="4" class="px-5 py-8 text-center app-muted">Chưa có món ăn nào. Hãy thêm món mới.</td>
+                        <td colspan="4" class="px-5 py-8 text-center app-muted">@if($canManageGlobalCatalog)Chưa có món ăn trong danh mục dùng chung. Hãy thêm món mới để phục vụ các chi nhánh.@else Chưa có món ăn trong danh mục dùng chung. Liên hệ Global Admin để cấu hình danh mục món ăn toàn chuỗi.@endif</td>
                     </tr>
                 @endforelse
             </tbody>

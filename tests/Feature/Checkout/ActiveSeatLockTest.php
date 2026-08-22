@@ -64,11 +64,12 @@ class ActiveSeatLockTest extends TestCase
             'cinema_id' => $scenario['cinema']->id,
             'room_id' => $scenario['room']->id,
             'room_layout_id' => $scenario['layout']->id,
+            'presentation_format_id' => $scenario['showtime']->presentation_format_id,
             'show_date' => now()->addDays(6)->toDateString(),
             'show_time' => '20:00:00',
-            'price' => 50000,
             'status' => 'active',
         ]);
+        $this->snapshotShowtime($secondShowtime);
         $this->reserve($scenario, [$scenario['seats'][0]->id]);
         $scenario['showtime'] = $secondShowtime;
         $this->reserve($scenario, [$scenario['seats'][0]->id]);
@@ -156,7 +157,7 @@ class ActiveSeatLockTest extends TestCase
         $scenario = $this->bookingScenario();
         $booking = $this->reserve($scenario, [$scenario['seats'][0]->id])->booking;
 
-        foreach (['paid', 'used'] as $status) {
+        foreach (['paid'] as $status) {
             $booking->update(['booking_status' => $status]);
             $this->assertSame(0, app(BookingSeatLockService::class)->release($booking));
             $this->assertDatabaseHas('booking_seats', [

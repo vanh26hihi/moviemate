@@ -4,6 +4,7 @@ namespace Tests\Feature\Operations;
 
 use App\Models\Cinema;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomLayoutTemplate;
 use App\Models\RoomType;
@@ -64,6 +65,41 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
         $draft = $applicator->apply($firstRoom, $template, 'Bố trí giữ nguyên cho mùa hè', null, $this->admin);
         $this->assertSame($firstIds->all(), $draft->cells()->where('cell_type', 'seat')->pluck('seat_id')->sort()->values()->all());
         $this->assertSame(4, Seat::query()->count(), 'Applying the same template must not duplicate exact seats.');
+    }
+
+    public function test_blocked_template_cells_copy_without_seats_and_remain_independent(): void
+    {
+        $template = RoomLayoutTemplate::query()->create([
+            'code' => 'STRUCTURAL_COPY', 'name' => 'Mẫu sao chép cấu trúc', 'room_type' => '2D',
+            'rows' => 1, 'columns' => 4, 'screen_position' => 'top', 'status' => RoomLayoutTemplate::STATUS_ACTIVE,
+        ]);
+        $template->cells()->createMany([
+            ['x_position' => 1, 'y_position' => 1, 'cell_type' => 'seat', 'seat_type' => 'normal', 'seat_label' => 'A1', 'seat_unit_key' => 'A1', 'metadata' => ['row' => 'A', 'number' => 1]],
+            ['x_position' => 2, 'y_position' => 1, 'cell_type' => 'aisle'],
+            ['x_position' => 3, 'y_position' => 1, 'cell_type' => 'blocked'],
+        ]);
+
+        $layout = app(ApplyRoomLayoutTemplateService::class)->apply(
+            $this->room('BLOCKED'), $template, 'Bố trí có vật cản cố định', null, $this->admin,
+        );
+
+        $this->assertSame(3, $layout->cells()->count());
+        $this->assertSame(1, $layout->cells()->where('cell_type', 'seat')->count());
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $layout->id, 'x_position' => 2, 'cell_type' => 'aisle', 'seat_id' => null,
+        ]);
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $layout->id, 'x_position' => 3, 'cell_type' => 'blocked', 'seat_id' => null,
+        ]);
+        $this->assertDatabaseMissing('room_layout_cells', [
+            'room_layout_id' => $layout->id, 'x_position' => 4,
+        ]);
+        $this->assertSame(1, Seat::query()->where('room_id', $layout->room_id)->count());
+
+        $template->cells()->where('x_position', 3)->update(['cell_type' => 'aisle']);
+        $this->assertDatabaseHas('room_layout_cells', [
+            'room_layout_id' => $layout->id, 'x_position' => 3, 'cell_type' => 'blocked', 'seat_id' => null,
+        ]);
     }
 
     public function test_conflicting_historical_label_is_rejected_without_mutating_published_seat(): void
@@ -131,6 +167,7 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
                 ['x_position' => 1, 'y_position' => 2, 'cell_type' => 'seat', 'seat_type' => 'couple', 'seat_label' => 'B1', 'pair_key' => 'PAIR-B-1'],
                 ['x_position' => 2, 'y_position' => 2, 'cell_type' => 'seat', 'seat_type' => 'couple', 'seat_label' => 'B2', 'pair_key' => 'PAIR-B-1'],
                 ['x_position' => 3, 'y_position' => 2, 'cell_type' => 'aisle'],
+                ['x_position' => 4, 'y_position' => 2, 'cell_type' => 'blocked'],
             ],
         ];
 
@@ -140,6 +177,7 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
             ->assertSee('data-layout-tool="vip"', false)
             ->assertSee('data-layout-tool="couple"', false)
             ->assertSee('data-layout-tool="aisle"', false)
+            ->assertSee('data-layout-tool="blocked"', false)
             ->assertSee('data-layout-tool="empty"', false)
             ->assertSee('type="button" data-layout-tool', false)
             ->assertSee($roomType->name)
@@ -154,18 +192,26 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
 
         $template = RoomLayoutTemplate::query()->where('code', 'UX_SCREENX')->with('cells')->sole();
         $this->assertSame('bottom', $template->screen_position);
-        $this->assertSame(5, $template->cells->count());
+        $this->assertSame(6, $template->cells->count());
+        $this->assertSame(1, $template->cells->where('cell_type', 'blocked')->count());
+        $this->assertNull($template->cells->firstWhere('cell_type', 'blocked')->seat_type);
+        $this->assertNull($template->cells->firstWhere('cell_type', 'blocked')->pair_key);
         $this->assertSame(2, $template->cells->where('seat_type', 'couple')->count());
         $this->assertSame(1, $template->cells->where('seat_type', 'couple')->pluck('pair_key')->unique()->count());
 
         $show = $this->get(route('admin.layout-templates.show', $template))->assertOk();
         $show->assertSee('Sơ đồ chỉ đọc')
             ->assertSee('Ghế đôi')
+            ->assertSee('Vật cản cố định')
+            ->assertSee('4 vị trí')
             ->assertSee('2 vị trí')
             ->assertSee('ScreenX động')
             ->assertSee('Mẫu này chưa được áp dụng cho phòng chiếu nào.')
             ->assertDontSee('data-layout-template-form', false)
             ->assertDontSee('data-layout-tool=', false);
+        $this->assertSame(4, $show->viewData('statistics')['physical_seats']);
+        $this->assertSame(3, $show->viewData('statistics')['pricing_units']);
+        $this->assertSame(1, $show->viewData('statistics')['blocked']);
 
         $this->get(route('admin.layout-templates.edit', $template))->assertOk()
             ->assertSee('data-layout-template-form', false)
@@ -198,9 +244,42 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
             ->assertOk()->assertDontSee('Chỉnh sửa');
     }
 
+    public function test_direct_http_rejects_malformed_template_couples(): void
+    {
+        $invalidLayouts = [
+            'NON_SEQUENTIAL' => [
+                ['x' => 1, 'y' => 3, 'cell_type' => 'seat', 'seat_type' => 'couple', 'seat_label' => 'C1', 'pair_key' => 'PAIR-1'],
+                ['x' => 2, 'y' => 3, 'cell_type' => 'seat', 'seat_type' => 'couple', 'seat_label' => 'C3', 'pair_key' => 'PAIR-1'],
+            ],
+            'ORPHAN' => [
+                ['x' => 1, 'y' => 3, 'cell_type' => 'seat', 'seat_type' => 'couple', 'seat_label' => 'C1', 'pair_key' => 'PAIR-1'],
+            ],
+            'BLOCKED_MEMBER' => [
+                ['x' => 1, 'y' => 3, 'cell_type' => 'seat', 'seat_type' => 'couple', 'seat_label' => 'C1', 'pair_key' => 'PAIR-1'],
+                ['x' => 2, 'y' => 3, 'cell_type' => 'blocked', 'pair_key' => 'PAIR-1'],
+            ],
+        ];
+
+        foreach ($invalidLayouts as $suffix => $cells) {
+            $this->from(route('admin.layout-templates.create'))->post(route('admin.layout-templates.store'), [
+                'code' => 'INVALID_'.$suffix,
+                'name' => 'Mẫu cặp ghế không hợp lệ '.$suffix,
+                'room_type' => '2D',
+                'layout' => json_encode([
+                    'rows' => 3, 'columns' => 3, 'screen_position' => 'top', 'cells' => $cells,
+                ]),
+            ])->assertRedirect(route('admin.layout-templates.create'))->assertSessionHasErrors('layout');
+
+            $this->assertDatabaseMissing('room_layout_templates', ['code' => 'INVALID_'.$suffix]);
+        }
+    }
+
     public function test_movie_lifecycle_is_authoritative_terminal_and_non_destructive(): void
     {
         $movie = Movie::query()->create(['title' => 'Lifecycle', 'slug' => 'lifecycle', 'duration' => 90, 'status' => Movie::STATUS_DRAFT]);
+        $movie->supportedPresentationFormats()->attach(PresentationFormat::query()->create([
+            'code' => '2D', 'name' => '2D', 'is_active' => true, 'sort_order' => 10,
+        ]));
         $service = app(MovieLifecycleService::class);
         $service->transition($movie, Movie::STATUS_COMING_SOON, $this->admin);
         $service->transition($movie->fresh(), Movie::STATUS_NOW_SHOWING, $this->admin);
@@ -251,7 +330,7 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
         $editQueries = count(DB::getQueryLog());
 
         DB::flushQueryLog();
-        $room = $this->room('Q');
+        $room = $this->room('Q', $template->room_type);
         app(ApplyRoomLayoutTemplateService::class)->apply(
             $room, $template, 'Tiêu chuẩn hiệu năng phòng Q', null, $this->admin, true,
         );
@@ -284,11 +363,49 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
         $this->assertLessThanOrEqual(25, $customerMovieQueries);
     }
 
-    private function room(string $suffix): Room
+    public function test_template_detail_query_count_is_constant_for_one_and_one_hundred_blocked_cells(): void
+    {
+        $template = RoomLayoutTemplate::query()->create([
+            'code' => 'BLOCKED_SCALE', 'name' => 'Mẫu kiểm tra vật cản', 'room_type' => '2D',
+            'rows' => 10, 'columns' => 10, 'screen_position' => 'top', 'status' => RoomLayoutTemplate::STATUS_ACTIVE,
+        ]);
+        $template->cells()->create([
+            'x_position' => 1, 'y_position' => 1, 'cell_type' => 'blocked',
+        ]);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $this->get(route('admin.layout-templates.show', $template))->assertOk();
+        $one = count(DB::getQueryLog());
+
+        $now = now();
+        DB::table('room_layout_template_cells')->insert(collect(range(1, 10))->flatMap(
+            fn (int $y) => collect(range(1, 10))->map(fn (int $x): array => ['x' => $x, 'y' => $y]),
+        )->reject(fn (array $coordinate): bool => $coordinate['x'] === 1 && $coordinate['y'] === 1)
+            ->map(fn (array $coordinate): array => [
+                'room_layout_template_id' => $template->id,
+                'x_position' => $coordinate['x'], 'y_position' => $coordinate['y'],
+                'cell_type' => 'blocked', 'seat_type' => null, 'seat_label' => null,
+                'seat_unit_key' => null, 'pair_key' => null, 'metadata' => null,
+                'created_at' => $now, 'updated_at' => $now,
+            ])->all());
+
+        DB::flushQueryLog();
+        $response = $this->get(route('admin.layout-templates.show', $template))->assertOk();
+        $many = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        fwrite(STDERR, "PHASE6C_TEMPLATE_BLOCKED_QUERIES one={$one} many={$many}".PHP_EOL);
+        $this->assertSame(100, substr_count($response->getContent(), 'aria-label="Vật cản cố định '));
+        $this->assertLessThanOrEqual($one + 1, $many);
+        $this->assertLessThanOrEqual(20, $many);
+    }
+
+    private function room(string $suffix, string $roomType = '2D'): Room
     {
         return Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'R'.$suffix, 'name' => 'Room '.$suffix,
-            'room_type' => '2D', 'status' => 'active', 'total_seats' => 0,
+            'room_type' => $roomType, 'status' => 'active',
         ]);
     }
 

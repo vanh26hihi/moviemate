@@ -3,11 +3,19 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Seat;
+use App\Models\SeatIncident;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class UpdateSeatMaintenanceRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->input('status') === Seat::STATUS_MAINTENANCE && ! $this->filled('reason')) {
+            $this->merge(['reason' => SeatIncident::REASON_MAINTENANCE]);
+        }
+    }
+
     public function authorize(): bool
     {
         return true;
@@ -15,7 +23,11 @@ final class UpdateSeatMaintenanceRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['status' => ['required', Rule::in(Seat::OPERATIONAL_STATUSES)]] + $this->structuralProhibitions();
+        return [
+            'status' => ['required', Rule::in(Seat::OPERATIONAL_STATUSES)],
+            'reason' => ['nullable', Rule::requiredIf($this->input('status') === Seat::STATUS_MAINTENANCE), Rule::in(SeatIncident::REASONS)],
+            'note' => ['nullable', 'string', 'max:500', 'required_if:reason,'.SeatIncident::REASON_OTHER],
+        ] + $this->structuralProhibitions();
     }
 
     /** @return array<string, list<string>> */

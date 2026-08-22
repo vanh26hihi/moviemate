@@ -3,18 +3,20 @@
 namespace Tests\Feature\Seats;
 
 use App\Models\Cinema;
-use App\Models\CinemaPricingRule;
+use App\Models\PresentationFormat;
 use App\Models\Room;
+use App\Models\RoomType;
 use App\Models\Showtime;
 use App\Services\CinemaContext;
 use App\Services\RoomLayoutService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CreatesPriceBookFixtures;
 use Tests\TestCase;
 
 class RoomLayoutAccessAndShowtimeTest extends TestCase
 {
-    use RefreshDatabase;
+    use CreatesPriceBookFixtures, RefreshDatabase;
 
     private Cinema $cinema;
 
@@ -22,17 +24,22 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
 
     private int $movieId;
 
+    private int $presentationFormatId;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seedRbac();
         $this->cinema = Cinema::query()->where('canonical_key', CinemaContext::CANONICAL_KEY)->firstOrFail();
-        CinemaPricingRule::query()->create(['name' => 'Giá cơ bản layout test', 'rule_type' => 'base', 'cinema_id' => $this->cinema->id, 'amount_vnd' => 50_000, 'priority' => 100, 'status' => 'active']);
-        CinemaPricingRule::query()->create(['name' => 'VIP layout test', 'rule_type' => 'seat_type', 'cinema_id' => $this->cinema->id, 'seat_type' => 'vip', 'amount_vnd' => 20_000, 'priority' => 100, 'status' => 'active']);
+        $this->ensurePublishedPriceBook(50_000);
+        $roomType = RoomType::query()->firstOrCreate(['code' => '2D'], [
+            'name' => '2D', 'slug' => '2d', 'is_active' => true, 'status' => true, 'sort_order' => 1,
+        ]);
         foreach (['P01', 'P02', 'P03'] as $index => $code) {
             Room::query()->create([
                 'cinema_id' => $this->cinema->id, 'code' => $code, 'name' => 'Phòng '.($index + 1),
-                'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+                'room_type' => '2D', 'room_type_id' => $roomType->id,
+                'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             ]);
         }
         $this->artisan('moviemate:rebuild-seat-layouts', ['--initialize-empty' => true])->assertSuccessful();
@@ -41,6 +48,17 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
             'title' => 'Dynamic Movie', 'slug' => 'dynamic-movie', 'duration' => 100,
             'age_rating' => 'P', 'status' => 'now_showing', 'created_at' => now(), 'updated_at' => now(),
         ]);
+        $format = PresentationFormat::query()->create([
+            'code' => '2D', 'name' => '2D', 'is_active' => true, 'sort_order' => 10,
+        ]);
+        $this->presentationFormatId = $format->id;
+        DB::table('movie_presentation_formats')->insert([
+            'movie_id' => $this->movieId,
+            'presentation_format_id' => $format->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->rooms->each(fn (Room $room) => $room->presentationCapabilities()->attach($format));
     }
 
     public function test_guest_customer_and_inactive_user_cannot_enter_editor(): void
@@ -57,7 +75,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
         $room = $this->rooms['P01'];
         $staff = $this->userWithRole('staff');
         $this->actingAs($staff)->get(route('staff.rooms.layout.preview', $room))
-            ->assertOk()->assertSee('P01')->assertSee('phiên bản 1');
+            ->assertOk()->assertSee('P01')->assertSee('Phiên bản sơ đồ 1');
         $this->actingAs($staff)->post(route('admin.rooms.layout.draft', $room))->assertForbidden();
         $this->actingAs($staff)->post(route('admin.rooms.layout.publish', $room))->assertForbidden();
     }
@@ -184,6 +202,8 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
             ->assertSee('Thêm hàng phía sau')
             ->assertSee('Hoàn tác thao tác gần nhất')
             ->assertSee('Tách ghế đôi')
+            ->assertSee('data-tool="blocked"', false)
+            ->assertSee('Vật cản cố định')
             ->assertSee('Tóm tắt sơ đồ do máy chủ tính toán')
             ->assertSee('expected_updated_at', false)
             ->assertSee('seat_id', false);
@@ -208,8 +228,9 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
     {
         $room = Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'P04', 'name' => 'No Layout',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
+        $room->presentationCapabilities()->attach($this->presentationFormatId);
         $admin = $this->userWithRole('admin');
         $this->actingAs($admin)->get(route('admin.showtimes.create'))->assertOk()->assertDontSee('P04');
         $this->actingAs($admin)->post(route('admin.showtimes.store'), $this->showtimePayload($room))
@@ -252,7 +273,7 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
     private function showtimePayload(Room $room, array $overrides = []): array
     {
         return [
-            'movie_id' => $this->movieId, 'room_id' => $room->id,
+            'movie_id' => $this->movieId, 'presentation_format_id' => $this->presentationFormatId, 'room_id' => $room->id,
             'show_date' => now()->addDays(5)->toDateString(), 'show_time' => '10:00',
             'price' => 50000, 'vip_price' => 70000, 'status' => 'active', ...$overrides,
         ];
@@ -260,10 +281,14 @@ class RoomLayoutAccessAndShowtimeTest extends TestCase
 
     private function createShowtime(Room $room, int $layoutId): Showtime
     {
-        return Showtime::query()->create([
+        $showtime = Showtime::query()->create([
             'movie_id' => $this->movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
-            'room_layout_id' => $layoutId, 'show_date' => now()->addDays(5)->toDateString(), 'show_time' => '10:00:00',
-            'price' => 50000, 'vip_price' => 70000, 'status' => 'active',
+            'room_layout_id' => $layoutId, 'presentation_format_id' => $this->presentationFormatId,
+            'show_date' => now()->addDays(5)->toDateString(), 'show_time' => '10:00:00',
+            'status' => 'active',
         ]);
+        $this->snapshotShowtime($showtime);
+
+        return $showtime;
     }
 }

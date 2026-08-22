@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schema;
 
 class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
 {
+    protected bool $prepareSingleShowtimeFormats = true;
+
     public function test_schedule_lookup_index_matches_candidate_query_prefix(): void
     {
         $index = collect(Schema::getIndexes('showtimes'))
@@ -47,15 +49,15 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
         $admin = $this->userWithRole('admin');
         $inactive = Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'INACTIVE', 'name' => 'Inactive',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive',
+            'room_type' => '2D', 'status' => 'inactive',
         ]);
         $archive = Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'ARCH-12', 'name' => 'Archive',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive',
+            'room_type' => '2D', 'status' => 'inactive',
         ]);
         $noLayout = Room::query()->create([
             'cinema_id' => $this->cinema->id, 'code' => 'P04', 'name' => 'No layout',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
         $legacyCinema = Cinema::query()->create([
             'canonical_key' => 'legacy-cinema', 'name' => 'Legacy', 'address' => 'Legacy', 'city' => 'HCM',
@@ -63,8 +65,11 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
         ]);
         $legacy = Room::query()->create([
             'cinema_id' => $legacyCinema->id, 'code' => 'LEGACY', 'name' => 'Legacy room',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
         ]);
+        foreach ([$inactive, $archive, $noLayout, $legacy] as $room) {
+            $room->presentationCapabilities()->attach($this->presentationFormat);
+        }
 
         foreach ([$inactive, $archive, $noLayout, $legacy] as $room) {
             $this->actingAs($admin)->post(route('admin.showtimes.store'), $this->payload($movie, $room))
@@ -138,9 +143,9 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
         $this->actingAs($admin)->get(route('admin.showtimes.create'))
             ->assertOk()
             ->assertSee('Phim UI — 120 phút')
-            ->assertSee('Thời lượng phim')
-            ->assertSee('Vệ sinh phòng')
-            ->assertSee('15 phút')
+            ->assertSee('Kiểm tra khung giờ vận hành')
+            ->assertSee('Bắt đầu')
+            ->assertSee('Vệ sinh')
             ->assertSee('Phòng sẵn sàng')
             ->assertSee('Asia/Ho_Chi_Minh')
             ->assertSee('sơ đồ phiên bản 1');
@@ -149,7 +154,7 @@ class ShowtimeValidationUiAndRbacTest extends ShowtimeTestCase
             ->assertOk()
             ->assertSee('value="23:30"', false)
             ->assertSee('Sơ đồ hiện tại: phiên bản 1')
-            ->assertSee('Phim kết thúc');
+            ->assertSee('Kết thúc phim');
 
         $this->actingAs($admin)->get(route('admin.showtimes.index'))
             ->assertOk()

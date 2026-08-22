@@ -70,8 +70,8 @@
 </div>
 
 <section class="app-card mt-6 rounded-2xl border app-border p-5" aria-labelledby="ticket-operations-title">
-    <h2 id="ticket-operations-title" class="text-lg font-black app-text">Vận hành in vé & soát vé</h2><p class="mt-1 text-xs app-muted">Theo ngày bắt đầu suất chiếu; trạng thái in và bằng chứng soát vé được tính độc lập.</p>
-    <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">@foreach([['Chưa in','unprinted'],['Đã in','printed'],['In lỗi','printFailed'],['Chờ/được phép in lại','printWaiting'],['Đã soát','checkedIn'],['Chưa soát','notCheckedIn'],['Tỷ lệ soát','checkinPercent']] as [$label,$key])<div class="rounded-xl app-secondary p-3"><dt class="text-xs app-muted">{{ $label }}</dt><dd class="mt-1 text-xl font-black app-text">{{ $ticketOperations[$key] }}{{ $key === 'checkinPercent' ? '%' : '' }}</dd></div>@endforeach</dl>
+    <h2 id="ticket-operations-title" class="text-lg font-black app-text">Vận hành in vé</h2><p class="mt-1 text-xs app-muted">Theo ngày bắt đầu suất chiếu và trạng thái in tài liệu.</p>
+    <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">@foreach([['Chưa in','unprinted'],['Đã in','printed'],['In lỗi','printFailed'],['Chờ/được phép in lại','printWaiting']] as [$label,$key])<div class="rounded-xl app-secondary p-3"><dt class="text-xs app-muted">{{ $label }}</dt><dd class="mt-1 text-xl font-black app-text">{{ $ticketOperations[$key] }}</dd></div>@endforeach</dl>
 </section>
 
 @if($detailed)

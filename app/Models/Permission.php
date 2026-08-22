@@ -17,8 +17,8 @@ class Permission extends Model
     public function getDisplayNameAttribute(): string
     {
         return str_ireplace(
-            ['dashboard', 'layout', 'booking', 'check-in'],
-            ['tổng quan', 'sơ đồ', 'đơn đặt vé', 'soát'],
+            ['dashboard', 'layout', 'booking'],
+            ['tổng quan', 'sơ đồ', 'đơn đặt vé'],
             $this->name
         );
     }

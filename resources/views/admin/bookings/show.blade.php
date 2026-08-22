@@ -18,11 +18,11 @@
         <div>
             <a href="{{ route('admin.bookings.index') }}" class="mb-3 inline-flex items-center gap-2 text-sm font-bold text-brand-start"><i class="ph ph-arrow-left" aria-hidden="true"></i>Về danh sách đơn</a>
             <h1 class="text-3xl font-extrabold app-heading">{{ $booking->booking_code }}</h1>
-            <p class="mt-2 app-muted">Thông tin vận hành lấy trực tiếp từ booking, giao dịch, vé điện tử và dữ liệu suất chiếu.</p>
+            <p class="mt-2 app-muted">Thông tin vận hành lấy trực tiếp từ đơn đặt vé, giao dịch, tài liệu nhận vé và dữ liệu suất chiếu.</p>
         </div>
         <div class="flex flex-wrap gap-2">
             @can('tickets.print')
-                @if($ticketEligible)<a href="{{ route('staff.tickets.operations', $booking) }}" class="btn-secondary"><i class="ph ph-printer" aria-hidden="true"></i>Vận hành in vé</a>@endif
+                @if($ticketEligible)<a href="{{ route('staff.tickets.operations', $booking) }}" class="btn-secondary"><i class="ph ph-printer" aria-hidden="true"></i>Tra cứu & in tại quầy</a>@endif
             @endcan
             @can('payments.reconcile')
                 @if($hasReconcilablePayment)
@@ -41,11 +41,10 @@
         </div>
     </header>
 
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Tóm tắt đơn">
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" aria-label="Tóm tắt đơn">
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái đặt vé</p><p class="mt-2 font-extrabold app-text">{{ \App\Support\StatusLabel::for('booking_admin', $booking->booking_status) }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái thanh toán</p><p class="mt-2 font-extrabold app-text">{{ $booking->payment_status_label }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái in vé</p><p class="mt-2 font-extrabold app-text">{{ $printState?->status_label ?? 'Chưa có dữ liệu in' }}</p></div>
-        <div class="cinema-card p-5"><p class="text-sm app-muted">Trạng thái soát vé</p><p class="mt-2 font-extrabold app-text">{{ $acceptedCheckin ? 'Đã soát vé' : 'Chưa soát vé' }}</p></div>
         <div class="cinema-card p-5"><p class="text-sm app-muted">Tạo lúc</p><p class="mt-2 font-extrabold app-text">{{ $booking->created_at?->format('d/m/Y H:i:s') ?? '—' }}</p></div>
     </section>
 
@@ -62,8 +61,6 @@
                 <div><dt class="text-sm app-muted">Thời gian thu tiền</dt><dd class="font-bold app-text">{{ $authoritativePayment?->settled_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
                 <div><dt class="text-sm app-muted">Người in vé</dt><dd class="font-bold app-text">{{ $printState?->printedBy?->name ?? '—' }}</dd></div>
                 <div><dt class="text-sm app-muted">Thời gian in</dt><dd class="font-bold app-text">{{ $printState?->printed_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Người soát vé</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->actor?->name ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Thời gian soát</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->scanned_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
             </dl>
         </section>
 
@@ -81,7 +78,7 @@
             @can('ticket_prints.view')
                 @if($printEvents->isNotEmpty())
                     <div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Nhân viên</th><th>Hành động</th><th>Lần in</th><th>Lý do</th><th>Kết quả</th></tr></thead><tbody>
-                        @foreach($printEvents as $event)<tr><td>{{ $event->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $event->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($event->event_type) { 'print_started' => $event->attempt_number === 1 ? 'In lần đầu' : 'Bắt đầu in lại', 'reprint_requested' => 'Yêu cầu in lại', 'print_succeeded' => 'Xác nhận kết quả', 'print_failed' => 'Xác nhận kết quả', 'retry_authorized' => 'Dữ liệu duyệt cũ', 'stale_print_released' => 'Lần in hết hạn', default => 'Sự kiện in' } }}</td><td>#{{ $event->attempt_number }}</td><td>{{ $event->event_type === 'reprint_requested' || ($event->event_type === 'print_started' && $event->attempt_number > 1) ? (\App\Services\Tickets\TicketPrintService::REPRINT_REASONS[$event->failure_code] ?? '—') : ($event->event_type === 'print_failed' ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? '—') : '—') }}@if($event->safe_note)<span class="mt-1 block max-w-md break-words text-xs app-muted">{{ $event->safe_note }}</span>@endif</td><td>{{ match($event->event_type) { 'print_succeeded' => 'Thành công', 'print_failed' => 'Lỗi', 'reprint_requested' => 'Đã ghi nhận lý do', 'print_started' => 'Đang xử lý', 'stale_print_released' => 'Hết hạn', 'retry_authorized' => 'Lịch sử', default => 'Đã ghi nhận' } }}</td></tr>@endforeach
+                        @foreach($printEvents as $event)<tr><td>{{ $event->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $event->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($event->event_type) { 'print_started' => $event->attempt_number === 1 ? 'In lần đầu' : 'Bắt đầu in lại', 'reprint_requested' => 'Yêu cầu in lại', 'incident_reprint_requested' => 'In lại do đổi ghế', 'print_succeeded' => 'Xác nhận kết quả', 'print_failed' => 'Xác nhận kết quả', 'retry_authorized' => 'Dữ liệu duyệt cũ', 'stale_print_released' => 'Lần in hết hạn', default => 'Sự kiện in' } }}</td><td>#{{ $event->attempt_number }}</td><td>{{ $event->failure_code === \App\Services\Tickets\TicketPrintService::INCIDENT_REPRINT_REASON ? 'Đổi ghế do sự cố' : ($event->event_type === 'reprint_requested' || ($event->event_type === 'print_started' && $event->attempt_number > 1) ? (\App\Services\Tickets\TicketPrintService::REPRINT_REASONS[$event->failure_code] ?? '—') : ($event->event_type === 'print_failed' ? (\App\Services\Tickets\TicketPrintService::FAILURE_REASONS[$event->failure_code] ?? '—') : '—')) }}@if($event->safe_note)<span class="mt-1 block max-w-md break-words text-xs app-muted">{{ $event->safe_note }}</span>@endif</td><td>{{ match($event->event_type) { 'print_succeeded' => 'Thành công', 'print_failed' => 'Lỗi', 'reprint_requested', 'incident_reprint_requested' => 'Đã ghi nhận lý do', 'print_started' => 'Đang xử lý', 'stale_print_released' => 'Hết hạn', 'retry_authorized' => 'Lịch sử', default => 'Đã ghi nhận' } }}</td></tr>@endforeach
                     </tbody></table></div>
                 @endif
             @endcan
@@ -92,7 +89,6 @@
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Hết hạn thanh toán</dt><dd class="font-bold app-text">{{ $booking->expires_at?->format('d/m/Y H:i:s') ?? 'Không áp dụng' }}</dd></div>
                 <div><dt class="text-sm app-muted">Thanh toán xác minh</dt><dd class="font-bold app-text">{{ $booking->paid_at?->format('d/m/Y H:i:s') ?? 'Chưa thanh toán' }}</dd></div>
-                <div><dt class="text-sm app-muted">Soát vé</dt><dd class="font-bold app-text">{{ $booking->used_at?->format('d/m/Y H:i:s') ?? 'Chưa soát vé' }}</dd></div>
                 <div><dt class="text-sm app-muted">Cập nhật cuối</dt><dd class="font-bold app-text">{{ $booking->updated_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
             </dl>
         </section>
@@ -150,7 +146,18 @@
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tiền đồ ăn</dt><dd class="font-bold app-text">{{ number_format((int) $booking->food_subtotal, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4"><dt class="app-muted">Tổng trước giảm giá</dt><dd class="font-bold app-text">{{ number_format((int) $booking->gross_amount, 0, ',', '.') }} VNĐ</dd></div>
                 @if($booking->promotion_discount_amount > 0)<div class="flex justify-between gap-4 text-success"><dt>Giảm từ mã khuyến mãi</dt><dd class="font-bold">−{{ number_format((int) $booking->promotion_discount_amount, 0, ',', '.') }} VNĐ</dd></div>@endif
-                @if($booking->points_discount_amount > 0)<div class="flex justify-between gap-4 text-ai-start"><dt>Giảm từ điểm MovieMate</dt><dd class="font-bold">−{{ number_format((int) $booking->points_discount_amount, 0, ',', '.') }} VNĐ</dd></div>@endif
+                @if($booking->promotionUsage)
+                    @php($promotionSnapshot = $booking->promotionUsage)
+                    <div class="rounded-xl border app-border p-3 text-sm">
+                        <dt class="font-semibold app-text">Khuyến mãi lịch sử: {{ $promotionSnapshot->code_snapshot }} — {{ $promotionSnapshot->name_snapshot }}</dt>
+                        <dd class="mt-1 space-y-1 app-muted">
+                            <div>Loại: {{ $promotionSnapshot->type_snapshot === 'fixed' ? 'Cố định' : 'Phần trăm' }} · Giá trị: {{ $promotionSnapshot->type_snapshot === 'fixed' ? number_format((int) $promotionSnapshot->discount_amount_vnd_snapshot, 0, ',', '.').' VNĐ' : $promotionSnapshot->discount_percent_snapshot.'%' }}</div>
+                            <div>Cap: {{ $promotionSnapshot->maximum_discount_vnd_snapshot === null ? 'Không cap' : number_format((int) $promotionSnapshot->maximum_discount_vnd_snapshot, 0, ',', '.').' VNĐ' }} · Đơn tối thiểu: {{ number_format((int) $promotionSnapshot->minimum_order_vnd_snapshot, 0, ',', '.') }} VNĐ</div>
+                            <div>Phạm vi: {{ $promotionSnapshot->scope_kind_snapshot === 'global' ? 'Toàn hệ thống' : $promotionSnapshot->booking_cinema_name_snapshot }} · Gross: {{ number_format((int) $promotionSnapshot->gross_before_vnd, 0, ',', '.') }} VNĐ · Sau giảm: {{ number_format((int) $promotionSnapshot->final_after_vnd, 0, ',', '.') }} VNĐ</div>
+                            <div>Điều kiện: {{ $promotionSnapshot->registered_users_only_snapshot ? 'Khách đăng nhập' : 'Có thể dùng cho khách' }}{{ $promotionSnapshot->first_order_only_snapshot ? ' · Đơn đầu tiên' : '' }} · Trạng thái usage: {{ $promotionSnapshot->status }}</div>
+                        </dd>
+                    </div>
+                @endif
                 <div class="flex justify-between gap-4 border-t app-border pt-3"><dt class="font-extrabold app-text">Tổng cuối cùng</dt><dd class="text-xl font-extrabold text-brand-start">{{ number_format((int) $booking->total_amount, 0, ',', '.') }} VNĐ</dd></div>
                 <div class="flex justify-between gap-4"><dt class="app-muted">Khoản thanh toán đã xác minh</dt><dd class="font-bold app-text">{{ $authoritativePayment ? number_format((int) $authoritativePayment->amount, 0, ',', '.').' VNĐ' : 'Chưa có' }}</dd></div>
             </dl>
@@ -159,22 +166,64 @@
 
     <section class="cinema-card overflow-hidden">
         <div class="border-b app-border p-6"><h2 class="text-xl font-extrabold app-heading">Lịch sử giao dịch</h2><p class="mt-1 app-muted">Không hiển thị chữ ký, URL thanh toán hoặc payload nhà cung cấp.</p></div>
-        <div class="overflow-x-auto"><table class="admin-table min-w-[78rem]"><thead><tr><th>Nhà cung cấp</th><th>Mã tham chiếu</th><th class="text-right">Số tiền</th><th>Trạng thái</th><th>Phân loại an toàn</th><th>Tạo lúc</th><th>Xác minh lúc</th><th>Nhà cung cấp ghi nhận</th></tr></thead><tbody>
+        <div class="overflow-x-auto"><table class="admin-table min-w-[86rem]"><thead><tr><th scope="col">Nhà cung cấp</th><th scope="col">Mã tham chiếu</th><th scope="col" class="text-right">Số tiền</th><th scope="col">Trạng thái</th><th scope="col">Phân loại an toàn</th><th scope="col">Tạo lúc</th><th scope="col">Đã xác minh lúc</th><th scope="col">Thanh toán/thu tiền lúc</th><th scope="col">Tác vụ</th></tr></thead><tbody>
             @forelse($payments as $payment)
                 <tr class="{{ $authoritativePayment?->id === $payment->id ? 'bg-success/5' : '' }}">
                     <td class="font-bold app-text">{{ \App\Support\PaymentPresentation::providerLabel($payment->provider) }}@if($authoritativePayment?->id === $payment->id)<span class="ml-2 status-badge bg-success/10 text-success">Giao dịch xác thực</span>@endif</td>
                     <td class="font-mono text-xs">{{ $payment->provider === 'counter_cash' ? ($payment->transaction_code ?? '—') : ($payment->provider === 'zalopay' ? ($payment->app_trans_id ?? '—') : ($payment->order_code ?? '—')) }}</td>
                     <td class="text-right">{{ number_format((int) $payment->amount, 0, ',', '.') }} VNĐ</td>
                     <td>{{ $payment->status_label }}</td><td>{{ $paymentCategories[$payment->id] }}</td>
-                    <td>{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->verified_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? $payment->paid_at?->format('d/m/Y H:i:s') ?? '—' }}</td>
+                    <td>{{ $payment->created_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->verified_at?->format('d/m/Y H:i:s') ?? '—' }}</td><td>{{ $payment->settled_at?->format('d/m/Y H:i:s') ?? $payment->provider_paid_at?->format('d/m/Y H:i:s') ?? $payment->paid_at?->format('d/m/Y H:i:s') ?? '—' }}</td>
+                    <td>@can('payments.view')<a class="font-bold text-brand-start" href="{{ route('admin.payments.show', $payment) }}">Xem thanh toán #{{ $payment->id }}</a>@else<span class="app-muted">Không có quyền xem</span>@endcan</td>
                 </tr>
-            @empty<tr><td colspan="8" class="py-8 text-center app-muted">Chưa có lần thanh toán.</td></tr>@endforelse
+            @empty<tr><td colspan="9" class="py-8 text-center app-muted">Chưa có bằng chứng thanh toán nào cho đơn này. Trạng thái đơn được hiển thị riêng ở phần tổng quan.</td></tr>@endforelse
         </tbody></table></div>
     </section>
 
+    @if($incidentImpacts->isNotEmpty())
+        <section data-booking-incident-context class="cinema-card overflow-hidden" aria-labelledby="booking-incident-title">
+            <div class="border-b app-border p-6">
+                <h2 id="booking-incident-title" class="text-xl font-extrabold app-heading">Sự cố ghế liên quan</h2>
+                <p class="mt-1 app-muted">Chỉ hiển thị ảnh hưởng được gắn trực tiếp với ghế của đơn này.</p>
+            </div>
+            <div class="grid gap-4 p-6 lg:grid-cols-2">
+                @foreach($incidentImpacts as $impact)
+                    @php($resolution = $impact->resolution)
+                    <article class="rounded-xl border app-border p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <p class="font-extrabold app-text">Ghế {{ $impact->bookingSeat?->seat?->seat_code ?? '—' }} · Sự cố #{{ $impact->incident?->id }}</p>
+                                <p class="mt-1 text-sm app-muted">Trạng thái ảnh hưởng: {{ $impact->resolution_status === 'resolved' ? 'Đã xử lý' : 'Chưa xử lý' }}</p>
+                            </div>
+                            @can('seats.maintenance.view')
+                                @if($impact->incident)
+                                    <a class="font-bold text-brand-start" href="{{ route('admin.rooms.seat-incidents.show', [$impact->incident->room_id, $impact->incident]) }}">Xem xử lý sự cố</a>
+                                @endif
+                            @endcan
+                        </div>
+                        @if($resolution && in_array($resolution->resolution_type, ['equivalent', 'upgrade'], true))
+                            <div class="mt-4 rounded-xl bg-success/10 p-3 text-sm">
+                                <p class="font-extrabold text-success">{{ $resolution->originalSeat?->seat_code ?? '—' }} → {{ $resolution->replacementSeat?->seat_code ?? '—' }}</p>
+                                <p class="mt-1 app-muted">{{ $resolution->resolution_type === 'upgrade' ? 'Chuyển ghế nâng hạng' : 'Chuyển ghế tương đương' }} · Không phát sinh thu thêm.</p>
+                                @if($resolution->reprint_required)<p class="mt-1 app-muted">Vé thay thế: {{ $resolution->reprint_satisfied_at ? 'Đã in' : 'Đang chờ in tại quầy' }}</p>@endif
+                            </div>
+                        @elseif($resolution?->resolution_type === 'requires_refund')
+                            <div class="mt-4 rounded-xl bg-warning/10 p-3 text-sm">
+                                <p class="font-extrabold text-warning">Yêu cầu xử lý hoàn tiền</p>
+                                <p class="mt-1 app-muted">Chức năng hoàn tiền chưa được triển khai; không có số tiền hoặc trạng thái hoàn tiền được suy diễn tại đây.</p>
+                            </div>
+                        @else
+                            <p class="mt-4 rounded-xl bg-warning/10 p-3 text-sm font-bold text-warning">Chưa có kết quả xử lý cuối cùng.</p>
+                        @endif
+                    </article>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     <div class="grid gap-6 xl:grid-cols-2">
         <section class="cinema-card p-6">
-            <h2 class="text-xl font-extrabold app-heading">Vé điện tử</h2>
+            <h2 class="text-xl font-extrabold app-heading">Tài liệu nhận vé</h2>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Người nhận</dt><dd class="font-bold app-text">{{ $customer['email'] }}</dd></div>
                 <div><dt class="text-sm app-muted">Trạng thái gửi email</dt><dd class="font-bold app-text">{{ match($booking->ticketDelivery?->status) { 'sent' => 'Đã gửi', 'pending' => 'Đang chờ gửi', 'processing' => 'Đang gửi', 'failed' => 'Gửi lỗi', default => $booking->recipient_email ? 'Chưa có yêu cầu gửi' : 'Không có email' } }}</dd></div>
@@ -185,32 +234,20 @@
             </dl>
             @can('ticket_deliveries.retry')
                 @if($deliveryRetryAllowed)
-                    <form method="POST" action="{{ route('admin.bookings.ticket-email.resend', $booking) }}" class="mt-5" onsubmit="return confirm('Gửi lại vé tới email đã lưu của đơn này?');">@csrf
-                        <button class="btn-primary" type="submit"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Gửi lại vé</button>
+                    <form method="POST" action="{{ route('admin.bookings.ticket-email.resend', $booking) }}" class="mt-5" onsubmit="return confirm('Gửi lại tài liệu nhận vé tới email đã lưu của đơn này?');">@csrf
+                        <button class="btn-primary" type="submit"><i class="ph ph-envelope-simple" aria-hidden="true"></i>Gửi lại tài liệu nhận vé</button>
                     </form>
                 @endif
             @endcan
         </section>
 
-        <section class="cinema-card p-6">
-            <h2 class="text-xl font-extrabold app-heading">Soát vé</h2>
-            <dl class="mt-4 grid gap-4 sm:grid-cols-2">
-                <div><dt class="text-sm app-muted">Kết quả</dt><dd class="font-bold app-text">{{ $booking->booking_status === 'used' ? 'Đã soát vé' : 'Chưa soát vé' }}</dd></div>
-                <div><dt class="text-sm app-muted">Thời gian chấp nhận</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->scanned_at?->format('d/m/Y H:i:s') ?? $booking->used_at?->format('d/m/Y H:i:s') ?? '—' }}</dd></div>
-                <div><dt class="text-sm app-muted">Nhân viên chấp nhận</dt><dd class="font-bold app-text">{{ $acceptedCheckin?->actor?->name ?? ($booking->booking_status === 'used' ? 'Không có dữ liệu lịch sử' : '—') }}</dd></div>
-                <div><dt class="text-sm app-muted">Lần quét trùng</dt><dd class="font-bold app-text">{{ $duplicateCheckinCount }}</dd></div>
-                <div><dt class="text-sm app-muted">Lần bị từ chối</dt><dd class="font-bold app-text">{{ $rejectedCheckinCount }}</dd></div>
-            </dl>
-            @can('ticket_checkins.view')<a class="mt-4 inline-flex font-bold text-brand-start" href="{{ route('admin.ticket-checkins.index', ['booking_code' => $booking->booking_code]) }}">Xem toàn bộ lịch sử soát vé</a>@endcan
-            @if($checkins->isNotEmpty())<div class="mt-5 overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Kết quả</th><th>Nhân viên</th></tr></thead><tbody>@foreach($checkins as $checkin)<tr><td>{{ $checkin->scanned_at?->format('d/m/Y H:i:s') }}</td><td>{{ \App\Support\StatusLabel::for('ticket_checkin', $checkin->result) }}</td><td>{{ $checkin->actor?->name ?? 'Tài khoản không còn khả dụng' }}</td></tr>@endforeach</tbody></table></div>@endif
-        </section>
     </div>
 
     @if($includeActivity)
         <section class="cinema-card overflow-hidden">
             <div class="border-b app-border p-6"><h2 class="text-xl font-extrabold app-heading">Lịch sử hoạt động</h2></div>
             <div class="overflow-x-auto"><table class="admin-table"><thead><tr><th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Mã yêu cầu</th></tr></thead><tbody>
-                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', 'ticket.reprint_requested' => 'Ghi nhận lý do in lại', 'ticket.print_started' => 'Bắt đầu in vé cứng', 'ticket.print_succeeded' => 'Xác nhận in thành công', 'ticket.print_failed' => 'Ghi nhận in lỗi', 'ticket.print_retry_authorized' => 'Lịch sử cấp quyền in cũ', 'ticket.print_stale_released' => 'Giải phóng lần in hết hạn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
+                @forelse($activities as $activity)<tr><td>{{ $activity->created_at?->format('d/m/Y H:i:s') }}</td><td>{{ $activity->actor?->name ?? 'Hệ thống' }}</td><td>{{ match($activity->action) { 'booking.ticket_resend_requested' => 'Yêu cầu gửi lại tài liệu nhận vé', 'booking.payment_query_requested' => 'Truy vấn nhà cung cấp', 'booking.cancelled' => 'Hủy đơn an toàn', 'ticket.reprint_requested' => 'Ghi nhận lý do in lại', 'ticket.print_started' => 'Bắt đầu in vé cứng', 'ticket.print_succeeded' => 'Xác nhận in thành công', 'ticket.print_failed' => 'Ghi nhận in lỗi', 'ticket.print_retry_authorized' => 'Lịch sử cấp quyền in cũ', 'ticket.print_stale_released' => 'Giải phóng lần in hết hạn', default => 'Hoạt động quản trị' } }}</td><td class="font-mono text-xs">{{ $activity->request_id }}</td></tr>
                 @empty<tr><td colspan="4" class="py-8 text-center app-muted">Chưa có hoạt động quản trị liên quan.</td></tr>@endforelse
             </tbody></table></div>
         </section>

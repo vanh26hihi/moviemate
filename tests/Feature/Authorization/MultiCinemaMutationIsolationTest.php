@@ -3,6 +3,7 @@
 namespace Tests\Feature\Authorization;
 
 use App\Models\Booking;
+use App\Models\BookingSeat;
 use App\Models\BookingTicketDelivery;
 use App\Models\Cinema;
 use App\Models\Movie;
@@ -12,7 +13,6 @@ use App\Models\Room;
 use App\Models\RoomLayout;
 use App\Models\Seat;
 use App\Models\Showtime;
-use App\Models\TicketCheckinEvent;
 use App\Models\UserCinemaAssignment;
 use App\Services\CinemaAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -55,6 +55,18 @@ final class MultiCinemaMutationIsolationTest extends TestCase
         $this->assertSame('active', $foreign['room']->fresh()->status);
 
         $this->actingAs($manager)
+            ->patch(route('admin.rooms.layout.update', $foreign['room']), [
+                'layout' => json_encode([
+                    'rows' => 1, 'columns' => 1, 'screen_position' => 'top',
+                    'cells' => [['kind' => 'blocked', 'x' => 1, 'y' => 1]],
+                ]),
+            ])
+            ->assertNotFound();
+        $this->assertDatabaseMissing('room_layout_cells', [
+            'room_layout_id' => $foreign['layout']->id, 'cell_type' => 'blocked',
+        ]);
+
+        $this->actingAs($manager)
             ->patch(route('admin.rooms.seat-maintenance.update', [$foreign['room'], $foreign['seat']]), [
                 'status' => 'maintenance',
             ])
@@ -82,7 +94,6 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             route('admin.bookings.index'),
             route('admin.payments.index'),
             route('admin.payment-reconciliation.index'),
-            route('admin.ticket-checkins.index'),
             route('admin.food-orders.index'),
         ];
 
@@ -217,7 +228,8 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'code' => 'R'.str()->upper(str()->random(7)),
             'name' => 'Room '.$cinema->code,
             'room_type' => '2D',
-            'total_seats' => 1,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'active',
         ]);
         $seat = Seat::query()->create([
@@ -234,8 +246,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'name' => 'Test',
             'rows' => 1,
             'columns' => 1,
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
         $layout->cells()->create([
             'x_position' => 1,
@@ -243,6 +254,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'cell_type' => 'seat',
             'seat_id' => $seat->id,
         ]);
+        $layout->update(['status' => 'published', 'published_at' => now()]);
         $movie = Movie::query()->create([
             'title' => 'Branch Movie '.$cinema->code,
             'slug' => 'branch-'.str()->lower(str()->random(8)),
@@ -253,6 +265,7 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'room_layout_id' => $layout->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '19:00:00',
@@ -284,13 +297,14 @@ final class MultiCinemaMutationIsolationTest extends TestCase
             'attempts' => 1,
             'available_at' => now(),
         ]);
-        $checkin = TicketCheckinEvent::query()->create([
-            'booking_id' => $booking->id,
-            'showtime_id' => $showtime->id,
-            'result' => TicketCheckinEvent::RESULT_REJECTED,
-            'scanned_at' => now(),
+        $bookingSeat = BookingSeat::query()->create([
+            'booking_id' => $booking->id, 'showtime_id' => $showtime->id, 'seat_id' => $seat->id,
+            'active_lock_key' => BookingSeat::ACTIVE_LOCK_KEY, 'price' => 50000,
+            'pricing_unit_key' => 'seat:'.$seat->id, 'pricing_unit_label' => 'A1',
+            'seat_type_snapshot' => 'normal', 'final_unit_amount' => 50000,
         ]);
+        $bookingSeat->admissionTicket()->firstOrFail();
 
-        return compact('room', 'seat', 'layout', 'movie', 'showtime', 'booking', 'payment', 'delivery', 'checkin');
+        return compact('room', 'seat', 'layout', 'movie', 'showtime', 'booking', 'payment', 'delivery');
     }
 }

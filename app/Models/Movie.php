@@ -162,6 +162,11 @@ class Movie extends Model
         return $this->belongsToMany(Genre::class, 'movie_genre');
     }
 
+    public function supportedPresentationFormats(): BelongsToMany
+    {
+        return $this->belongsToMany(PresentationFormat::class, 'movie_presentation_formats')->withTimestamps();
+    }
+
     public function showtimes(): HasMany
     {
         return $this->hasMany(Showtime::class);

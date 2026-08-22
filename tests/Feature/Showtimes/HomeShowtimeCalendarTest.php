@@ -11,6 +11,7 @@ use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\CreatesPublicDiscoveryFixtures;
 use Tests\TestCase;
 
@@ -70,6 +71,27 @@ class HomeShowtimeCalendarTest extends TestCase
         $this->assertSame(1, $selectedCount);
     }
 
+    public function test_homepage_removes_redundant_nearest_showtimes_without_query_regression(): void
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $response = $this->get(route('home'));
+        $queryCount = count(DB::getQueryLog());
+
+        DB::disableQueryLog();
+
+        $response->assertOk()
+            ->assertDontSee('Lịch chiếu nhanh')
+            ->assertDontSee('Suất chiếu gần nhất')
+            ->assertDontSee('Chưa có suất chiếu gần nhất')
+            ->assertSee('Lịch chiếu MovieMate')
+            ->assertSee('Chọn chi nhánh, ngày và suất chiếu phù hợp')
+            ->assertSee('Gần bạn');
+
+        $this->assertLessThanOrEqual(42, $queryCount, "Homepage query count increased to {$queryCount}.");
+    }
+
     public function test_selected_date_panel_can_render_showtimes_and_other_dates_remain_safe_empty_states(): void
     {
         $cinema = app(CinemaContext::class)->current();
@@ -80,17 +102,19 @@ class HomeShowtimeCalendarTest extends TestCase
             'slug' => 'calendar-regression-movie',
             'status' => 'now_showing',
         ]);
-        Showtime::query()->create([
+        $format = $this->presentationFormatForDiscovery();
+        $movie->supportedPresentationFormats()->attach($format);
+        $showtime = Showtime::query()->create([
             'movie_id' => $movie->id,
             'cinema_id' => $cinema->id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
+            'presentation_format_id' => $format->id,
             'show_date' => '2026-08-07',
             'show_time' => '19:30:00',
-            'price' => 90000,
-            'pricing_version' => 'cinema-pricing-v1',
             'status' => 'active',
         ]);
+        $this->snapshotShowtime($showtime);
 
         $response = $this->get(route('home', ['date' => '2026-08-07']));
 
@@ -151,6 +175,7 @@ class HomeShowtimeCalendarTest extends TestCase
         $activeRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'active']);
         $layout = $this->publishRoomForDiscovery($activeRoom);
         $inactiveRoom = Room::factory()->create(['cinema_id' => $cinema->id, 'status' => 'inactive']);
+        $inactiveLayout = $this->publishedRoomLayoutFixture($inactiveRoom);
         $publicMovie = Movie::query()->create([
             'title' => 'Public calendar movie',
             'slug' => 'public-calendar-movie',
@@ -161,6 +186,10 @@ class HomeShowtimeCalendarTest extends TestCase
             'slug' => 'stopped-calendar-movie',
             'status' => 'stopped',
         ]);
+        $format = $this->presentationFormatForDiscovery();
+        $publicMovie->supportedPresentationFormats()->attach($format);
+        $stoppedMovie->supportedPresentationFormats()->attach($format);
+        $inactiveRoom->presentationCapabilities()->attach($format);
 
         foreach ([
             [$publicMovie, $activeRoom, 'active'],
@@ -168,17 +197,20 @@ class HomeShowtimeCalendarTest extends TestCase
             [$publicMovie, $activeRoom, 'cancelled'],
             [$stoppedMovie, $activeRoom, 'active'],
         ] as $index => [$movie, $room, $status]) {
-            Showtime::query()->create([
+            $showtime = Showtime::query()->create([
                 'movie_id' => $movie->id,
                 'cinema_id' => $cinema->id,
                 'room_id' => $room->id,
-                'room_layout_id' => $room->is($activeRoom) ? $layout->id : null,
+                'room_layout_id' => $room->is($activeRoom) ? $layout->id : $inactiveLayout->id,
+                'presentation_format_id' => $format->id,
                 'show_date' => '2026-08-07',
                 'show_time' => sprintf('%02d:30:00', 16 + $index),
-                'price' => 90000,
-                'pricing_version' => 'cinema-pricing-v1',
                 'status' => $status,
             ]);
+            if ($status === 'active' && $movie->status === 'now_showing' && $room->status === 'active'
+                && $showtime->roomLayout->cells()->where('cell_type', 'seat')->exists()) {
+                $this->snapshotShowtime($showtime);
+            }
         }
 
         $response = $this->get(route('home', ['date' => '2026-08-07']));

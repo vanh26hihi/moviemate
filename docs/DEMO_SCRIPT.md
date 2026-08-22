@@ -1,46 +1,52 @@
-# MovieMate — Kịch bản demo bảo vệ 15 phút
+# MovieMate — Kịch bản demo bảo vệ 8 phút 30 giây
 
-Chuẩn bị ba profile/cửa sổ độc lập trước giờ bảo vệ:
+Chuẩn bị ba profile độc lập, không dùng công cụ impersonation:
 
-- **WINDOW A — CUSTOMER:** public hoặc `customer@moviemate.test`.
-- **WINDOW B — ADMIN/MANAGER:** `admin@moviemate.test`; mở thêm profile Manager CG nếu cần chứng minh scope.
-- **WINDOW C — STAFF:** đăng nhập `staff.cg@moviemate.test` tại `/login`, sau đó vào `/staff`.
+- **A — Manager:** mở Tổng quan chi nhánh của Manager Cầu Giấy.
+- **B — Customer:** mở trang Phim và một Đơn đặt vé đã thanh toán hợp lệ.
+- **C — Staff:** mở workspace Tra cứu & in tại quầy.
 
-Không dùng giao dịch provider giả. Nếu provider/hardware thật chưa được acceptance, dùng booking tiền mặt tạo qua luồng quầy để tiếp tục phần vé.
+Dùng PRIMARY/FALLBACK Showtime và paid Booking được `php artisan moviemate:demo-check` báo sau fresh seed local. Không phụ thuộc giao dịch provider thật. Không nhập URL trực tiếp trong lúc trình bày; toàn bộ bước dưới đây đi bằng navigation hoặc handoff hiện hữu. Checklist thực thi và chính sách bảo vệ first-print nằm tại `DEMO_REHEARSAL_CHECKLIST.md`.
 
-| Thời gian | Cửa sổ / trang | Click hoặc thao tác | Câu trình bày | Kết quả mong đợi | Phương án dự phòng |
-|---|---|---|---|---|---|
-| 0:00–1:15 | Slide 1 | Giới thiệu đề tài | “MovieMate phục vụ một chủ chuỗi rạp nhiều chi nhánh, hướng tới khách 16–40 tuổi. Hệ thống có 5 actor con người và 32 use case trình bày.” | Phạm vi rõ: không marketplace, không SaaS đa công ty. | Dùng `PRESENTATION_OUTLINE.md` nếu slide lỗi. |
-| 1:15–2:30 | A `/movies` | Mở một phim đang chiếu, đổi rạp/ngày | “Đây là movie-first: phim trước, sau đó rạp và ngày. Preference chỉ ưu tiên hiển thị, không đổi checkout đang hoạt động.” | Chỉ suất hợp lệ; rạp/phòng/giá hiện rõ. | Dùng `/cinemas/CG` để đi cinema-first. |
-| 2:30–4:00 | A `/booking/select-seat/{showtime}` tại phòng `DEMO` | Chọn D6 rồi D8 | “Nếu nhận D6 và D8 thì D7 bị cô lập; client phát hiện ngay và server cũng áp dụng cùng policy.” | Có phản hồi, không thể tiếp tục với khoảng trống một ghế. | Nếu JS lỗi, gửi trực tiếp request bằng form/devtools: server trả validation; test `SeatGapCheckoutTest` là bằng chứng. |
-| 4:00–4:30 | A seat map | Bỏ chọn và chọn D6+D7+D8; chỉ ra aisle cột 5 và cặp C1+C2 | “Aisle tách phân đoạn; sparse gap và ghế đôi không bị hiểu sai. Ghế đôi chọn cả cặp.” | Tổ hợp hợp lệ, nút tiếp tục hoạt động. | Chọn một tổ hợp liền nhau khác. |
-| 4:30–5:30 | A `/booking/food` | Thêm/bớt món, quay lại ghế rồi tiếp tục | “Đồ ăn là tùy chọn; số lượng 0 hợp lệ. Ghế và đồ ăn được giữ phía server, đồng hồ là hạn hold có thẩm quyền.” | State ghế/đồ ăn còn; không có nút “Bỏ qua đồ ăn” gây hiểu nhầm. | Chọn 0 món và tiếp tục; dùng test persistence nếu phiên demo hết hạn. |
-| 5:30–6:30 | A `/booking/review` | Mở lựa chọn VNPAY/ZaloPay/payOS | “Browser chỉ chọn provider; số tiền do server tính. Return URL không tự đánh dấu paid.” | Phương thức được trình bày; attempt chỉ được tạo khi cấu hình provider hợp lệ. | Không gửi provider nếu credential/HTTPS chưa acceptance; chuyển sang booking quầy hợp lệ. |
-| 6:30–7:15 | A vé đã chuẩn bị | Mở capability ticket | “QR là capability ký, không phải booking code. Khách chỉ xem vé điện tử, không có Print/PDF/Save image.” | Đúng booking, chi nhánh, suất, ghế; used vẫn đọc được; trạng thái không hợp lệ không có QR. | Dùng test render/ticket fixture nếu link demo đã hết hạn. |
-| 7:15–8:00 | A `/cinemas` → `/cinemas/CG` | Chọn rạp rồi phim/suất | “Cinema-first dùng cùng catalog và pricing service, nhưng cố định ngữ cảnh chi nhánh từ đầu.” | Chỉ active branch và showtime của CG. | Quay về movie-first nếu dữ liệu ngày hiện tại ít. |
-| 8:00–10:15 | C `/staff/counter` | Chọn CG, phòng demo/suất, ghế, đồ ăn 0 hoặc có món, review, thu tiền mặt | “Đây là bán vé quầy thật trong hệ thống nội bộ. Creator và settler lấy từ session, không nhận từ form.” | Booking counter paid; payment `counter_cash`; không gọi provider ngoài. | Dùng booking counter đã chuẩn bị nếu thao tác chậm. |
-| 10:15–11:30 | C `/staff/tickets` | Nhập/scan capability, xem preview, bắt đầu in, xác nhận thành công hoặc thất bại | “Preview chỉ đọc. In có start/success/failure, một retry tự động; lần sau cần Manager cho phép.” | Preview không check-in; print event/actor/time được ghi; check-in chưa đổi. | Camera/printer thật: dùng manual input và giải thích mục acceptance còn mở. |
-| 11:30–12:15 | C `/staff/tickets/check` | Check-in rồi gửi lại capability | “Check-in atomic, append-only và ghi actor thật; quét lại không đổi thời điểm đầu tiên.” | Lần đầu accepted/used, lần hai duplicate; print state độc lập. | Dùng manual fallback thay camera. |
-| 12:15–13:30 | B `/admin/cinemas`, `/admin/pricing-rules`, `/admin/showtimes`, `/admin/layout-templates`, `/admin/movies` | Chỉ nhanh giờ mở cửa, giá, cleaning window, template và lifecycle | “Manager chỉ vận hành chi nhánh được gán. Layout phát hành và booking snapshot giữ lịch sử; phim chuyển lifecycle thay vì hard-delete.” | End/cleaning window được tính; showtime có booking không thể hủy trực tiếp. | Dùng màn hình read-only, không mutate dữ liệu demo. |
-| 13:30–14:30 | B `/admin` và `/admin/reports` | Đổi ngày/rạp; xem breakdown | “Finance dùng `verified_at` cho online, `settled_at` cho tiền mặt; operations dùng ngày bắt đầu suất tại rạp.” | Revenue/ticket/channel/provider/print/check-in/actor tách đúng; Manager chỉ thấy CG. | Chọn khoảng ngày chứa booking counter vừa tạo. |
-| 14:30–15:00 | Slide 9–10 | Kết luận | “Ba lớp bảo vệ chính là scope theo chi nhánh, dữ liệu authoritative phía server và bằng chứng thanh toán/ticket bất biến.” | Kết thúc trong 15 phút. | Nêu checklist manual acceptance thay vì tuyên bố provider/hardware chưa thử. |
+## Luồng duy nhất để trình bày
 
-## Hai đường đi khách hàng để luyện trước
+| Thời gian | Profile | Thao tác trên UI | Câu nói chính | Bằng chứng quan sát |
+|---|---|---|---|---|
+| 0:00–0:30 | A | Mở Tổng quan chi nhánh | “MovieMate phục vụ một công ty rạp nhiều chi nhánh. Global Admin quản trị toàn chuỗi; Manager vận hành từ chi nhánh được phân công.” | Navigation Manager là branch-first, không phải Admin panel bị bớt nút. |
+| 0:30–1:10 | A | Từ Branch360 mở một Room | “Branch360 là workspace vận hành: action queue, phòng, suất hôm nay/sắp tới, quầy và finance context.” | Room hiển thị Loại phòng, kích thước vật lý, lưới logic và sức chứa đúng nghĩa. |
+| 1:10–1:50 | A | Room → Sơ đồ; quay lại Room → Bảo trì | “RoomLayout là cấu trúc versioned. Ghế, lối đi, vật cản cố định và ô trống khác nhau; ghế bảo trì vẫn là Seat.” | Published layout bất biến; maintenance/incident không bị gọi là BLOCKED. |
+| 1:50–2:45 | A | Room → suất chiếu sắp tới → chi tiết Showtime | “Showtime ghim đúng RoomLayout và Format. END là lúc phim hết; ROOM_READY là sau cleaning. Giá đã khóa cho suất chiếu.” | RoomType tách khỏi Định dạng trình chiếu; có START/END/cleaning/ready và frozen prices. |
+| 2:45–3:30 | B | Phim → suất chiếu → chọn ghế | “Customer đi theo Movie-first. Server quyết định branch, ghế, seat-gap và giá; Couple là hai vị trí nhưng một pricing unit.” | Seat map hiển thị ghế khả dụng và policy; không nhập giá từ browser. |
+| 3:30–4:10 | B | Tiếp tục qua Food, nhập `MOVIEMATE10`, xem Review/payment selection rồi dừng | “Food là tùy chọn. Mỗi Booking tối đa một Khuyến mãi trên ticket + food gross; quote chưa tiêu quota. Demo dừng tại đây để không phụ thuộc callback mạng.” | Review hiển thị breakdown server, đúng một lựa chọn Khuyến mãi và final payable. |
+| 4:10–5:15 | B | Mở Đơn đặt vé paid do demo-check báo | “Để demo không phụ thuộc callback mạng, phần sau dùng Booking đã có verified payment evidence. Browser return không chứng minh thanh toán. QR đơn đặt vé chỉ để Staff tra cứu; đây không phải vé vào rạp.” | Trang Customer có QR đơn, Format và lịch sử; không có digital admission action. |
+| 5:15–6:10 | C | Nhập booking code hoặc quét QR đơn tại quầy | “Lookup mở đúng một Booking và cho Staff xem bằng chứng Payment, RoomType, Format cùng hiện vật cần in.” | Staff thấy trạng thái Đã xác minh/Đã thu tiền và đúng Booking context. |
+| 6:10–7:20 | C | Mở nghiệp vụ Print All | “Một vị trí ghế vật lý tạo một AdmissionTicket; Couple tạo hai vé nhưng charge một lần. Food có một FoodPickupVoucher cho phần đồ ăn của Booking. First print không cần lý do; reprint bắt buộc lý do và có audit.” | Print All liệt kê AdmissionTickets và Food voucher; actor/thời điểm/reason được tách. Chỉ xác nhận in thật khi rehearsal đã chuẩn bị trạng thái phù hợp. |
+| 7:20–8:00 | A | Từ Showtime mở Booking liên quan; Booking → Payment | “Đây là handoff liên domain, không phải tìm kiếm thủ công. Payment detail quay lại đúng Booking; evidence đến từ provider verification hoặc counter settlement.” | Liên kết Showtime → Booking → Payment hoạt động hai chiều theo context. |
+| 8:00–8:30 | A | Mở Báo cáo từ navigation | “Báo cáo dùng Payment đã xác minh/đã thu tiền và timestamp evidence; không suy diễn từ attendance hoặc ngày tạo Booking.” | Manager chỉ thấy phạm vi chi nhánh; Global Admin mới có hợp nhất toàn chuỗi. |
 
-Movie-first: `/movies` → `/movies/{slug}` → suất/rạp/ngày → `/booking/select-seat/{showtime}` → `/booking/food` → `/booking/review` → provider → `/bookings/{booking}/ticket`.
+**Số lần chuyển role/profile có ý nghĩa:** 3 — Manager → Customer → Staff → Manager.
 
-Cinema-first: `/cinemas` → `/cinemas/CG` → phim/suất trong chi nhánh → cùng checkout authoritative ở trên.
+## Đoạn TV4 vận hành chi nhánh 2 phút 15 giây
 
-## Luồng Staff hoàn chỉnh để nghiệm thu
+Đoạn 0:30–2:45 là câu chuyện TV4 chuẩn:
 
-Đăng nhập Staff → `/staff` → chọn suất tại `/staff/counter` → chọn ghế → đồ ăn tùy chọn → nhập thông tin khách → review → thu tiền mặt → **In vé** → xác nhận kết quả in thực tế → quét QR hoặc nhập mã MMT tại `/staff/tickets` → xem trước vé → **Soát vé** → kiểm tra `/staff/sales`, `/staff/print-queue` và `/staff/check-in-history`.
+```text
+Branch360 → Room → Sơ đồ / Bảo trì → Showtime operational detail
+```
 
-Print preview và bố cục nhiệt 80 mm có thể kiểm tra trong trình duyệt. Máy in nhiệt vật lý và camera thật vẫn là **MANUAL ACCEPTANCE** khi môi trường demo không có phần cứng; không được suy diễn thành công từ việc mở hộp thoại in.
+Không quay lại sidebar để tìm Showtime. Room có handoff trực tiếp và Showtime detail là trang quan sát vận hành, không phải Edit.
 
-## Checklist ngay trước demo
+## Đường đi dự phòng đã có UI
 
-- Chạy `php artisan migrate:status`, bảo đảm không migration pending.
-- Kiểm tra phòng `DEMO` có D6/D7/D8, cặp C1/C2 và suất tương lai.
-- Mở sẵn ba profile; không logout/login liên tục.
-- Tạo trước một booking counter nếu muốn có fallback vé.
-- Không gọi payOS/VNPAY/ZaloPay nếu merchant test hoặc public webhook chưa sẵn sàng.
+- Nếu suất được chuẩn bị không còn sắp tới, chọn một suất khác ngay từ danh sách của Room; không nhập URL.
+- Nếu booking Customer chưa có bằng chứng thanh toán, dùng booking counter paid fixture đã revalidate; không gọi provider live.
+- Nếu camera không sẵn sàng, nhập booking code vào cùng form Staff lookup.
+- Nếu máy in không sẵn sàng, mở print preview và nêu manual acceptance; không xác nhận print success giả.
+
+## Checklist ngay trước rehearsal
+
+- Chạy `php artisan moviemate:demo-check`; dùng PRIMARY/FALLBACK, Booking code và report filter mà command báo, không hard-code ngày hoặc numeric ID.
+- Chuẩn bị một Booking paid có Format, RoomType, ít nhất một AdmissionTicket và tùy chọn FoodPickupVoucher.
+- Kiểm tra Booking đó đang ở first-print hay reprint state trước khi bấm hành động làm thay đổi audit.
+- Mở ba profile sẵn và kiểm tra tất cả handoff bằng click.
+- Không tuyên bố callback provider, camera hoặc máy in thật đã thành công nếu chưa thực hiện trên thiết bị trình bày.

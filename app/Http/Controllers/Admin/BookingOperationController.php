@@ -41,10 +41,10 @@ final class BookingOperationController extends Controller
         $result = $retries->retry($booking->ticketDelivery);
         if (! $result->changed) {
             $message = match ($result->category) {
-                'sent' => 'Vé đã được gửi thành công; hệ thống không tạo lượt gửi trùng.',
-                'active_claim' => 'Vé đang được tiến trình khác gửi.',
-                'already_queued' => 'Vé đã nằm trong hàng đợi gửi.',
-                default => 'Đơn không còn đủ điều kiện gửi lại vé.',
+                'sent' => 'Tài liệu nhận vé đã được gửi thành công; hệ thống không tạo lượt gửi trùng.',
+                'active_claim' => 'Tài liệu nhận vé đang được tiến trình khác gửi.',
+                'already_queued' => 'Tài liệu nhận vé đã nằm trong hàng đợi gửi.',
+                default => 'Đơn không còn đủ điều kiện gửi lại tài liệu nhận vé.',
             };
 
             return back()->with('warning', $message);
@@ -61,7 +61,7 @@ final class BookingOperationController extends Controller
         ]);
         $deliveryQuery->forgetBadge();
 
-        return back()->with('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
+        return back()->with('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
     }
 
     public function queryPayment(

@@ -41,7 +41,7 @@ final class RoomType extends Model
 
     public function pricingRules(): HasMany
     {
-        return $this->hasMany(CinemaPricingRule::class, 'room_type', 'code');
+        return $this->hasMany(PriceBookAdjustment::class, 'room_type_id');
     }
 
     public function createdBy(): BelongsTo

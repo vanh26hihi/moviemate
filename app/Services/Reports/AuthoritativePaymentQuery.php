@@ -33,6 +33,9 @@ final class AuthoritativePaymentQuery
                 })->orWhere(function (Builder $online): void {
                     $online->whereIn('p.provider', Payment::SUPPORTED_PROVIDERS)
                         ->whereNotNull('p.verified_at');
+                })->orWhere(function (Builder $internalZero): void {
+                    $internalZero->where('p.provider', Payment::PROVIDER_INTERNAL_ZERO)
+                        ->whereNotNull('p.verified_at');
                 });
             });
     }

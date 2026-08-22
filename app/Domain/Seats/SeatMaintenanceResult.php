@@ -9,5 +9,6 @@ final readonly class SeatMaintenanceResult
         public bool $changed,
         public array $unitLabels,
         public string $status,
+        public ?int $incidentId = null,
     ) {}
 }

@@ -78,13 +78,8 @@ class SeatMaintenanceOperationsTest extends TestCase
 
     public function test_room_pages_link_to_maintenance_and_index_filters_and_paginates_units(): void
     {
-        [$room, $layout, $seats] = $this->roomWithSeats('FILTER');
+        [$room, $layout, $seats] = $this->roomWithSeats('FILTER', normalCount: 18);
         $seats[1]->update(['status' => 'maintenance']);
-        foreach (range(3, 18) as $number) {
-            $seat = $this->seat($room, 'A', $number);
-            $this->cell($layout, $seat, $number, 1);
-        }
-        $room->update(['total_seats' => 18]);
         $manager = $this->userWithRole('manager');
         $url = route('admin.rooms.seat-maintenance.index', $room);
 
@@ -111,14 +106,14 @@ class SeatMaintenanceOperationsTest extends TestCase
 
     public function test_single_transition_changes_only_status_and_is_idempotent(): void
     {
-        [$room, , $seats] = $this->roomWithSeats();
+        [$room, $layout, $seats] = $this->roomWithSeats();
         $seat = $seats[0];
         $admin = $this->userWithRole('admin');
         $before = $seat->only([
             'id', 'room_id', 'row', 'number', 'seat_code', 'type', 'pair_code', 'pair_position',
             'x_position', 'y_position',
         ]);
-        $capacity = $room->total_seats;
+        $physicalSeatCount = $layout->cells()->where('cell_type', 'seat')->count();
         $layoutCount = RoomLayout::query()->count();
 
         $message = 'Đã cập nhật A1 sang đang bảo trì.';
@@ -132,7 +127,7 @@ class SeatMaintenanceOperationsTest extends TestCase
         $this->assertSame('maintenance', $seat->fresh()->status);
         $this->assertSame(1, substr_count(strip_tags($html), $message));
         $this->assertSame($before, $seat->fresh()->only(array_keys($before)));
-        $this->assertSame($capacity, $room->fresh()->total_seats);
+        $this->assertSame($physicalSeatCount, $layout->cells()->where('cell_type', 'seat')->count());
         $this->assertSame($layoutCount, RoomLayout::query()->count());
         $this->assertSame(1, ActivityLog::query()->where('action', 'seat.maintenance_updated')->count());
 
@@ -226,7 +221,7 @@ class SeatMaintenanceOperationsTest extends TestCase
         $this->assertSame('active', $left->fresh()->status);
     }
 
-    public function test_active_hold_and_paid_future_booking_block_unsafe_transition(): void
+    public function test_active_hold_is_cancelled_and_paid_future_booking_is_preserved_by_incident(): void
     {
         [$room, $layout, $seats] = $this->roomWithSeats('PROTECT');
         $admin = $this->userWithRole('admin');
@@ -250,11 +245,13 @@ class SeatMaintenanceOperationsTest extends TestCase
 
         $this->actingAs($admin)
             ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]), ['status' => 'maintenance'])
-            ->assertSessionHasErrors('status');
-        $this->assertSame('active', $seats[0]->fresh()->status);
+            ->assertRedirect();
+        $this->assertSame('maintenance', $seats[0]->fresh()->status);
+        $this->assertSame('cancelled', $hold->fresh()->booking_status);
+        $this->assertNull($holdSeat->fresh()->active_lock_key);
+        $this->assertDatabaseCount('seat_incidents', 1);
 
-        $hold->update(['booking_status' => 'expired']);
-        $holdSeat->update(['active_lock_key' => null]);
+        Seat::query()->whereKey($seats[0]->id)->update(['status' => 'active']);
         $paid = Booking::query()->create([
             'showtime_id' => $showtime->id,
             'booking_code' => 'PAID-PROTECT',
@@ -283,21 +280,24 @@ class SeatMaintenanceOperationsTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]), ['status' => 'inactive'])
-            ->assertSessionHasErrors('status');
-        $this->assertSame('active', $seats[0]->fresh()->status);
+            ->patch(route('admin.rooms.seat-maintenance.update', [$room, $seats[0]]), ['status' => 'maintenance'])
+            ->assertRedirect();
+        $this->assertSame('maintenance', $seats[0]->fresh()->status);
         $this->assertSame('paid', $paid->fresh()->booking_status);
         $this->assertTrue($ticketIssuedAt->equalTo($paid->fresh()->ticket_emailed_at));
         $this->assertSame($paymentBefore, $payment->fresh()->getAttributes());
         $this->assertSame($layoutSnapshotId, $showtime->fresh()->room_layout_id);
         $this->assertDatabaseHas('booking_seats', ['booking_id' => $paid->id, 'seat_id' => $seats[0]->id]);
-        $this->assertDatabaseCount('activity_logs', 0);
+        $this->assertDatabaseHas('seat_incident_impacts', [
+            'booking_seat_id' => $paid->bookingSeats()->firstOrFail()->id,
+            'detected_classification' => 'paid',
+            'resolution_status' => 'unresolved',
+        ]);
     }
 
     public function test_bulk_is_deduplicated_expands_couples_and_is_all_or_nothing(): void
     {
-        [$room, $layout, $normal] = $this->roomWithSeats('BULK');
-        $pair = $this->addCouple($room, $layout, 'B', 1, 'B-PAIR');
+        [$room, $layout, $normal, $pair] = $this->roomWithSeats('BULK', withAdditionalCouple: true);
         $admin = $this->userWithRole('admin');
 
         $this->actingAs($admin)
@@ -346,10 +346,11 @@ class SeatMaintenanceOperationsTest extends TestCase
         $oldLayout = $this->layout($room, 1, 'Sơ đồ cũ');
         $oldSeat = $this->seat($room, 'Z', 1, 'retired');
         $this->cell($oldLayout, $oldSeat, 1, 1);
+        $oldLayout->update(['status' => 'published', 'published_at' => now()]);
         $currentLayout = $this->layout($room, 2, 'Sơ đồ hiện hành');
         $currentSeat = $this->seat($room, 'A', 1);
         $this->cell($currentLayout, $currentSeat, 1, 1);
-        $room->update(['total_seats' => 1]);
+        $currentLayout->update(['status' => 'published', 'published_at' => now()]);
         $admin = $this->userWithRole('admin');
 
         $this->actingAs($admin)
@@ -367,8 +368,7 @@ class SeatMaintenanceOperationsTest extends TestCase
 
     public function test_query_counts_remain_bounded_for_index_and_mutations(): void
     {
-        [$room, $layout, $seats] = $this->roomWithSeats('QUERIES');
-        $pair = $this->addCouple($room, $layout, 'B', 1, 'QUERY-PAIR');
+        [$room, $layout, $seats, $pair] = $this->roomWithSeats('QUERIES', withAdditionalCouple: true);
         $admin = $this->userWithRole('admin');
         $queries = 0;
         DB::listen(function () use (&$queries): void {
@@ -425,24 +425,33 @@ class SeatMaintenanceOperationsTest extends TestCase
     }
 
     /** @return array{Room, RoomLayout, array<int, Seat>} */
-    private function roomWithSeats(string $code = 'MAINT', bool $couple = false): array
-    {
+    private function roomWithSeats(
+        string $code = 'MAINT',
+        bool $couple = false,
+        int $normalCount = 2,
+        bool $withAdditionalCouple = false,
+    ): array {
         $room = Room::factory()->create([
             'cinema_id' => app(CinemaContext::class)->id(),
             'code' => $code,
-            'total_seats' => 2,
         ]);
         $layout = $this->layout($room, 1, 'Sơ đồ hiện hành');
         if ($couple) {
-            return [$room, $layout, $this->addCouple($room, $layout, 'A', 1, 'A-PAIR')];
+            $seats = $this->addCouple($room, $layout, 'A', 1, 'A-PAIR');
+            $layout->update(['status' => 'published', 'published_at' => now()]);
+
+            return [$room, $layout, $seats];
         }
 
-        $seats = [$this->seat($room, 'A', 1), $this->seat($room, 'A', 2)];
+        $seats = collect(range(1, $normalCount))->map(fn (int $number): Seat => $this->seat($room, 'A', $number))->all();
         foreach ($seats as $index => $seat) {
             $this->cell($layout, $seat, $index + 1, 1);
         }
 
-        return [$room, $layout, $seats];
+        $pair = $withAdditionalCouple ? $this->addCouple($room, $layout, 'B', 1, 'B-PAIR') : [];
+        $layout->update(['status' => 'published', 'published_at' => now()]);
+
+        return [$room, $layout, $seats, $pair];
     }
 
     private function layout(Room $room, int $version, string $name): RoomLayout
@@ -454,8 +463,7 @@ class SeatMaintenanceOperationsTest extends TestCase
             'rows' => 5,
             'columns' => 20,
             'screen_position' => 'top',
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'draft',
         ]);
     }
 
@@ -530,6 +538,7 @@ class SeatMaintenanceOperationsTest extends TestCase
             'cinema_id' => $room->cinema_id,
             'room_id' => $room->id,
             'room_layout_id' => $layout->id,
+            'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
             'show_date' => now()->addDay()->toDateString(),
             'show_time' => '20:00:00',
             'price' => 50000,

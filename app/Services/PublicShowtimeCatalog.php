@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Domain\Pricing\TicketPrice;
 use App\Exceptions\PricingConfigurationException;
 use App\Exceptions\ShowtimeScheduleException;
 use App\Models\Cinema;
 use App\Models\Movie;
 use App\Models\Showtime;
+use App\Models\ShowtimeTicketPrice;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -20,8 +20,8 @@ final class PublicShowtimeCatalog
     public const MOVIE_STATUSES = Movie::PUBLIC_STATUSES;
 
     public function __construct(
-        private readonly TicketPricingService $pricing,
         private readonly ShowtimeScheduleService $schedule,
+        private readonly ShowtimeLifecycleService $lifecycle,
     ) {}
 
     public function date(?string $requested, ?Cinema $cinema = null): string
@@ -88,19 +88,57 @@ final class PublicShowtimeCatalog
             ->whereBetween('show_date', [$from, $to])->orderBy('show_date')->orderBy('show_time')->orderBy('id')->get());
     }
 
-    /** @return array<string, TicketPrice> */
+    /** @return array<string, ShowtimeTicketPrice> */
     public function pricesFor(Showtime $showtime): array
     {
-        return $this->pricing->calculateSeatTypes($showtime, allowLegacySnapshot: false);
+        $showtime->loadMissing(['ticketPrices.seatType', 'roomLayout.cells.seat']);
+        $structuralSeatTypeIds = $showtime->roomLayout->cells
+            ->where('cell_type', 'seat')
+            ->map(fn ($cell): int => (int) $cell->seat?->seat_type_id)
+            ->filter()
+            ->unique()->sort()->values();
+        $snapshotSeatTypeIds = $showtime->ticketPrices
+            ->pluck('seat_type_id')->map(fn ($id): int => (int) $id)->unique()->sort()->values();
+        if ($structuralSeatTypeIds->isEmpty() || $structuralSeatTypeIds->all() !== $snapshotSeatTypeIds->all()
+            || $showtime->ticketPrices->pluck('price_book_version_id')->unique()->count() !== 1) {
+            throw new PricingConfigurationException('Showtime immutable logical SeatType prices are incomplete.');
+        }
+
+        return $showtime->ticketPrices
+            ->mapWithKeys(fn ($snapshot): array => [(string) $snapshot->seatType->code => $snapshot])
+            ->all();
     }
 
     public function isSellable(Showtime $showtime): bool
     {
-        $showtime->loadMissing(['movie', 'cinema.operatingHours', 'room.cinema.operatingHours', 'roomLayout.cells']);
-        if (! $this->structurallySellable($showtime)) {
+        $showtime->loadMissing(['movie', 'cinema.operatingHours', 'room.cinema.operatingHours', 'roomLayout.cells.seat', 'ticketPrices.seatType']);
+        if (! $this->operationallySellable($showtime)) {
             return false;
         }
         try {
+            if (! $this->schedule->windowFor($showtime)->start->isFuture()) {
+                return false;
+            }
+            $this->schedule->assertWithinOperatingHours($showtime->room, $this->schedule->windowFor($showtime));
+            $this->pricesFor($showtime);
+        } catch (PricingConfigurationException|ShowtimeScheduleException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function isCustomerSellable(Showtime $showtime): bool
+    {
+        $showtime->loadMissing(['movie', 'cinema.operatingHours', 'room.cinema.operatingHours', 'roomLayout.cells.seat', 'ticketPrices.seatType']);
+        if (! $this->operationallySellable($showtime)) {
+            return false;
+        }
+
+        try {
+            if (! $this->lifecycle->isCustomerBookingOpen($showtime)) {
+                return false;
+            }
             $this->schedule->assertWithinOperatingHours($showtime->room, $this->schedule->windowFor($showtime));
             $this->pricesFor($showtime);
         } catch (PricingConfigurationException|ShowtimeScheduleException) {
@@ -113,8 +151,9 @@ final class PublicShowtimeCatalog
     private function structuralQuery(?Cinema $cinema, ?Movie $movie): Builder
     {
         return Showtime::query()->with([
-            'movie.genres', 'cinema.operatingHours', 'room.roomType', 'room.cinema.operatingHours',
-            'roomLayout.cells' => fn ($query) => $query->where('cell_type', 'seat'),
+            'movie.genres', 'cinema.operatingHours', 'presentationFormat', 'room.roomType',
+            'roomLayout.cells' => fn ($query) => $query->where('cell_type', 'seat')->with('seat'),
+            'ticketPrices.seatType',
         ])->where('status', 'active')
             ->when($cinema, fn (Builder $query) => $query->where('cinema_id', $cinema->id))
             ->when($movie, fn (Builder $query) => $query->where('movie_id', $movie->id))
@@ -129,8 +168,8 @@ final class PublicShowtimeCatalog
      */
     private function sellable(Collection $showtimes): Collection
     {
-        $showtimes = $showtimes->filter(fn (Showtime $showtime): bool => $this->structurallySellable($showtime))->values();
-        $this->pricing->warmForShowtimes($showtimes);
+        $showtimes = $showtimes->filter(fn (Showtime $showtime): bool => $this->operationallySellable($showtime)
+            && $this->lifecycle->isCustomerBookingOpen($showtime))->values();
 
         return $showtimes->filter(function (Showtime $showtime): bool {
             try {
@@ -148,7 +187,7 @@ final class PublicShowtimeCatalog
         })->values();
     }
 
-    private function structurallySellable(Showtime $showtime): bool
+    private function operationallySellable(Showtime $showtime): bool
     {
         if ($showtime->status !== 'active'
             || ! in_array($showtime->movie?->status, self::MOVIE_STATUSES, true)
@@ -160,13 +199,7 @@ final class PublicShowtimeCatalog
             || $showtime->roomLayout->cells->isEmpty()) {
             return false;
         }
-        $timezone = $showtime->cinema->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
-        $startsAt = CarbonImmutable::createFromFormat(
-            '!Y-m-d H:i:s',
-            $showtime->show_date->format('Y-m-d').' '.substr((string) $showtime->show_time, 0, 8),
-            $timezone,
-        );
 
-        return $startsAt !== false && $startsAt->isFuture();
+        return true;
     }
 }

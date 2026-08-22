@@ -31,13 +31,16 @@
                             ? 'empty'
                             : ($cell->cell_type === 'aisle'
                                 ? 'aisle'
-                                : ($cell->seat_type === 'vip'
+                                : ($cell->cell_type === 'blocked'
+                                    ? 'blocked'
+                                    : ($cell->seat_type === 'vip'
                                     ? 'vip'
-                                    : ($cell->seat_type === 'couple' ? 'couple' : 'normal')));
+                                    : ($cell->seat_type === 'couple' ? 'couple' : 'normal'))));
                         $pairPosition = $cell?->metadata['pair_position'] ?? null;
                         $label = match ($kind) {
                             'empty' => "Ô trống {$coordinate}",
                             'aisle' => "Lối đi {$coordinate}",
+                            'blocked' => "Vật cản cố định {$coordinate}, vị trí cấu trúc không bố trí ghế",
                             'vip' => 'Ghế VIP '.$cell->seat_label,
                             'couple' => 'Ghế đôi '.$cell->seat_label,
                             default => 'Ghế thường '.$cell->seat_label,
@@ -47,6 +50,7 @@
                         'layout-template-seat',
                         'is-empty' => $kind === 'empty',
                         'is-aisle' => $kind === 'aisle',
+                        'is-blocked' => $kind === 'blocked',
                         'is-normal' => $kind === 'normal',
                         'is-vip' => $kind === 'vip',
                         'is-couple' => $kind === 'couple',
@@ -55,6 +59,8 @@
                     ])>
                         @if($kind === 'aisle')
                             <i class="ph ph-arrows-down-up" aria-hidden="true"></i>
+                        @elseif($kind === 'blocked')
+                            <i class="ph ph-bricks" aria-hidden="true"></i>
                         @elseif($cell)
                             {{ $cell->seat_label }}
                             @if($kind === 'vip')<span class="layout-template-seat-accent" aria-hidden="true">★</span>@endif

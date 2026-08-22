@@ -11,7 +11,7 @@ class RoomLayoutTemplateSeeder extends Seeder
     public function run(): void
     {
         $definitions = [
-            ['code' => 'STANDARD_100', 'name' => 'Tiêu chuẩn 100 ghế', 'rows' => 10, 'columns' => 12, 'aisles' => [6, 7], 'room_type' => '2D'],
+            ['code' => 'STANDARD_100', 'name' => 'Tiêu chuẩn 100 ghế', 'rows' => 10, 'columns' => 12, 'aisles' => [6, 7], 'room_type' => 'STANDARD'],
             ['code' => 'VIP_80', 'name' => 'VIP 80 ghế', 'rows' => 8, 'columns' => 12, 'aisles' => [6, 7], 'room_type' => null],
             ['code' => 'COMPACT_48', 'name' => 'Phòng nhỏ 48 ghế', 'rows' => 6, 'columns' => 9, 'aisles' => [5], 'room_type' => null],
         ];

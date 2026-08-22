@@ -16,18 +16,14 @@ class Showtime extends Model
         'cinema_id',
         'room_id',
         'room_layout_id',
+        'presentation_format_id',
         'show_date',
         'show_time',
-        'price',
-        'vip_price',
-        'pricing_version',
         'status',
     ];
 
     protected $casts = [
         'show_date' => 'date',
-        'price' => 'decimal:2',
-        'vip_price' => 'decimal:2',
     ];
 
     public function movie(): BelongsTo
@@ -50,9 +46,24 @@ class Showtime extends Model
         return $this->belongsTo(RoomLayout::class);
     }
 
+    public function presentationFormat(): BelongsTo
+    {
+        return $this->belongsTo(PresentationFormat::class);
+    }
+
     public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
+    }
+
+    public function bookingSeats(): HasMany
+    {
+        return $this->hasMany(BookingSeat::class);
+    }
+
+    public function ticketPrices(): HasMany
+    {
+        return $this->hasMany(ShowtimeTicketPrice::class);
     }
 
     public function getStatusLabelAttribute(): string

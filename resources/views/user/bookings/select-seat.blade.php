@@ -39,6 +39,7 @@
                     <p class="text-sm app-muted">
                         {{ $showtime->cinema->name }} · {{ $showtime->show_date->format('d/m/Y') }} · {{ \Carbon\Carbon::parse($showtime->show_time)->format('H:i') }}
                     </p>
+                    <p class="mt-1 text-sm app-muted">Định dạng trình chiếu: <strong class="app-text">{{ $showtime->presentationFormat?->name ?? 'Không xác định' }}</strong></p>
                     <p class="mt-1 text-sm app-muted">{{ $showtime->cinema->address }}</p>
                 </header>
 
@@ -75,6 +76,8 @@
                                         <span class="h-10 w-10" aria-hidden="true"></span>
                                     @elseif($cell->cell_type === 'aisle')
                                         <span class="flex h-10 w-10 items-center justify-center text-xs app-muted opacity-50" aria-label="Lối đi"><i class="ph ph-arrows-down-up" aria-hidden="true"></i></span>
+                                    @elseif($cell->cell_type === 'blocked')
+                                        <span class="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-500 bg-slate-800 text-slate-200" aria-label="Vật cản cố định hàng {{ chr(64 + $y) }}, cột {{ $x }}, vị trí cấu trúc không bố trí ghế"><i class="ph ph-bricks" aria-hidden="true"></i></span>
                                     @elseif($isMergedCouple && $seat->id !== $primarySeatId)
                                         @continue
                                     @else
@@ -141,7 +144,7 @@
                     </div>
                 </form>
 
-                <div class="mt-5 grid grid-cols-2 gap-3 border-t pt-5 text-xs app-muted app-border sm:grid-cols-4 lg:grid-cols-7" aria-label="Chú thích loại ghế">
+                <div class="mt-5 grid grid-cols-2 gap-3 border-t pt-5 text-xs app-muted app-border sm:grid-cols-4 lg:grid-cols-8" aria-label="Chú thích loại ghế">
                     <span class="flex items-center gap-2"><i class="h-4 w-4 rounded border app-border app-input" aria-hidden="true"></i>Thường</span>
                     <span class="flex items-center gap-2 text-ai-start"><i class="h-4 w-4 rounded border border-ai-start/60 bg-ai-start/10" aria-hidden="true"></i>VIP</span>
                     <span class="flex items-center gap-2 text-warning"><i class="h-4 w-4 rounded border border-warning/60 bg-warning/10" aria-hidden="true"></i>Ghế đôi</span>
@@ -149,6 +152,7 @@
                     <span class="flex items-center gap-2"><i class="h-4 w-4 rounded bg-slate-600/60" aria-hidden="true"></i>Đã giữ</span>
                     <span class="flex items-center gap-2 text-warning"><i class="h-4 w-4 rounded border border-dashed border-warning/60" aria-hidden="true"></i>Bảo trì</span>
                     <span class="flex items-center gap-2"><i class="ph ph-arrows-down-up" aria-hidden="true"></i>Lối đi</span>
+                    <span class="flex items-center gap-2"><i class="ph ph-bricks text-slate-500" aria-hidden="true"></i>Vật cản cố định</span>
                 </div>
                 <details class="mt-4 rounded-xl border app-border p-4 text-sm app-muted"><summary class="cursor-pointer font-bold app-text">Giải thích giá vé</summary>
                     @foreach($seatPrices as $type => $calculation)<div class="mt-3"><strong class="app-text">{{ $seatTypeLabels[$type] ?? $type }}: {{ number_format($calculation->finalAmount,0,',','.') }} VNĐ</strong><div>Giá cơ bản {{ number_format($calculation->baseAmount,0,',','.') }} VNĐ @foreach($calculation->surcharges as $item) · {{ $item['label'] }} {{ number_format($item['amount'],0,',','.') }} VNĐ @endforeach</div></div>@endforeach

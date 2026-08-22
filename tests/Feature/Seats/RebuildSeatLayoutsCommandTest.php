@@ -27,7 +27,8 @@ class RebuildSeatLayoutsCommandTest extends TestCase
                 'code' => $code,
                 'name' => 'Phòng '.($index + 1),
                 'room_type' => '2D',
-                'total_seats' => 0,
+                'width_mm' => 8_000,
+                'length_mm' => 10_000,
                 'status' => 'active',
             ]);
         }
@@ -36,7 +37,8 @@ class RebuildSeatLayoutsCommandTest extends TestCase
             'code' => 'ARCH-12',
             'name' => 'Phòng lưu trữ',
             'room_type' => '2D',
-            'total_seats' => 0,
+            'width_mm' => 8_000,
+            'length_mm' => 10_000,
             'status' => 'inactive',
         ]);
     }
@@ -121,7 +123,7 @@ class RebuildSeatLayoutsCommandTest extends TestCase
         Room::query()->where('code', 'P03')->delete();
         $this->artisan('moviemate:rebuild-seat-layouts', ['--force' => true])->assertFailed();
 
-        Room::query()->create(['cinema_id' => $this->cinema->id, 'code' => 'P03', 'name' => 'Phòng 3', 'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive']);
+        Room::query()->create(['cinema_id' => $this->cinema->id, 'code' => 'P03', 'name' => 'Phòng 3', 'room_type' => '2D', 'status' => 'inactive']);
         $this->artisan('moviemate:rebuild-seat-layouts', ['--force' => true])->assertFailed();
         $this->assertDatabaseCount('room_layouts', 0);
     }
@@ -133,10 +135,14 @@ class RebuildSeatLayoutsCommandTest extends TestCase
             'status' => 'now_showing', 'created_at' => now(), 'updated_at' => now(),
         ]);
         $room = Room::query()->where('code', 'P01')->firstOrFail();
+        $format = $this->presentationFormatFixture($movieId, $room);
         $seat = Seat::query()->create(['room_id' => $room->id, 'row' => 'A', 'number' => 1, 'seat_code' => 'A1', 'type' => 'normal', 'status' => 'active']);
+        $layout = $this->publishedRoomLayoutFixture($room);
         $showtimeId = DB::table('showtimes')->insertGetId([
             'movie_id' => $movieId, 'cinema_id' => $this->cinema->id, 'room_id' => $room->id,
-            'show_date' => now()->toDateString(), 'show_time' => '10:00:00', 'price' => 50000,
+            'room_layout_id' => $layout->id,
+            'presentation_format_id' => $format->id,
+            'show_date' => now()->toDateString(), 'show_time' => '10:00:00',
             'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
         ]);
         $bookingId = DB::table('bookings')->insertGetId([

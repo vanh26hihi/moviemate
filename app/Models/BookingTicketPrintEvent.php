@@ -33,6 +33,11 @@ final class BookingTicketPrintEvent extends Model
         return $this->belongsTo(Booking::class);
     }
 
+    public function admissionTicket(): BelongsTo
+    {
+        return $this->belongsTo(AdmissionTicket::class);
+    }
+
     public function actor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'actor_user_id');

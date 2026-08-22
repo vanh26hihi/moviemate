@@ -4,6 +4,7 @@ namespace Tests\Feature\Showtimes;
 
 use App\Models\Cinema;
 use App\Models\Movie;
+use App\Models\PriceBook;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\ShowtimeScheduleService;
@@ -11,8 +12,10 @@ use Database\Seeders\CinemaSeeder;
 use Database\Seeders\DemoCinemaLayoutSeeder;
 use Database\Seeders\GenreSeeder;
 use Database\Seeders\MovieSeeder;
-use Database\Seeders\PricingRuleSeeder;
+use Database\Seeders\PresentationFormatSeeder;
+use Database\Seeders\PriceBookSeeder;
 use Database\Seeders\RoomSeeder;
+use Database\Seeders\RoomTypeSeeder;
 use Database\Seeders\ShowtimeSeeder;
 use Database\Seeders\Support\RealMovieCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,13 +27,17 @@ final class ShowtimeSeederTest extends TestCase
 
     public function test_demo_showtimes_are_multi_date_and_idempotent_even_when_a_slot_already_exists(): void
     {
+        if (! PriceBook::query()->exists()) {
+            $this->seed(PriceBookSeeder::class);
+        }
         $this->seed([
             GenreSeeder::class,
             CinemaSeeder::class,
+            RoomTypeSeeder::class,
+            PresentationFormatSeeder::class,
             RoomSeeder::class,
             MovieSeeder::class,
             DemoCinemaLayoutSeeder::class,
-            PricingRuleSeeder::class,
             ShowtimeSeeder::class,
         ]);
         $firstIds = Showtime::query()->orderBy('id')->pluck('id')->all();
@@ -49,7 +56,9 @@ final class ShowtimeSeederTest extends TestCase
             Room::query()->operational()->whereHas('latestPublishedLayout')->count(),
             Showtime::query()->where('status', 'active')->distinct()->count('room_id'),
         );
-        $this->assertGreaterThanOrEqual(3, Showtime::query()->join('rooms', 'rooms.id', '=', 'showtimes.room_id')->distinct()->count('rooms.room_type'));
+        $this->assertSame(2, Showtime::query()->join('rooms', 'rooms.id', '=', 'showtimes.room_id')->distinct()->count('rooms.room_type'));
+        $this->assertSame(0, Showtime::query()->whereNull('presentation_format_id')->count());
+        $this->assertGreaterThan(0, Showtime::query()->whereHas('presentationFormat', fn ($query) => $query->where('code', '3D'))->count());
         $this->assertSame(0, Showtime::query()->whereHas('movie', fn ($query) => $query->where('status', Movie::STATUS_COMING_SOON))->count());
 
         $schedule = app(ShowtimeScheduleService::class);

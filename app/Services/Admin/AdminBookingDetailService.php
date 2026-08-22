@@ -6,13 +6,12 @@ use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\BookingTicketPrintEvent;
 use App\Models\Payment;
-use App\Models\TicketCheckinEvent;
+use App\Models\SeatIncidentImpact;
 use App\Services\BookingCancellationService;
 use App\Services\Tickets\BookingTicketEligibility;
 use App\Services\Tickets\TicketDeliveryRetryService;
 use App\Support\PrivacyMask;
 use App\Support\SeatPresentation;
-use Illuminate\Support\Facades\Schema;
 
 final class AdminBookingDetailService
 {
@@ -33,6 +32,7 @@ final class AdminBookingDetailService
             'showtime.roomLayout:id,room_id,version,status',
             'bookingSeats.seat',
             'foodOrder.items.food:id,name',
+            'promotionUsage',
             'ticketDelivery',
             'ticketPrint.printedBy:id,name',
             'ticketPrint.lastFailedBy:id,name',
@@ -56,26 +56,6 @@ final class AdminBookingDetailService
                 ->where('subject_id', (string) $booking->getKey())->latest('id')->limit(100)->get()
             : collect();
 
-        $checkins = collect();
-        $acceptedCheckin = null;
-        $duplicateCount = 0;
-        $rejectedCount = 0;
-        if (Schema::hasTable('ticket_checkin_events')) {
-            $checkins = TicketCheckinEvent::query()->with('actor:id,name')
-                ->where('booking_id', $booking->id)->latest('id')->limit(20)->get();
-            $acceptedCheckin = TicketCheckinEvent::query()->with('actor:id,name')
-                ->where('booking_id', $booking->id)->where('result', TicketCheckinEvent::RESULT_ACCEPTED)
-                ->oldest('id')->first();
-            $counts = TicketCheckinEvent::query()->where('booking_id', $booking->id)
-                ->selectRaw('SUM(CASE WHEN result = ? THEN 1 ELSE 0 END) AS duplicate_count', [TicketCheckinEvent::RESULT_ALREADY_USED])
-                ->selectRaw('SUM(CASE WHEN result NOT IN (?, ?) THEN 1 ELSE 0 END) AS rejected_count', [
-                    TicketCheckinEvent::RESULT_ACCEPTED,
-                    TicketCheckinEvent::RESULT_ALREADY_USED,
-                ])->first();
-            $duplicateCount = (int) ($counts?->duplicate_count ?? 0);
-            $rejectedCount = (int) ($counts?->rejected_count ?? 0);
-        }
-
         $printState = $booking->ticketPrint;
         $printEvents = $printState
             ? BookingTicketPrintEvent::query()->with('actor:id,name')
@@ -83,6 +63,19 @@ final class AdminBookingDetailService
             : collect();
         $latestPrintEvent = $printEvents->firstWhere('event_type', 'print_started');
         $latestReprintEvent = $printEvents->firstWhere('event_type', 'reprint_requested');
+        $incidentImpacts = SeatIncidentImpact::query()
+            ->whereHas('bookingSeat', fn ($query) => $query->where('booking_id', $booking->id))
+            ->with([
+                'bookingSeat:id,booking_id,seat_id',
+                'bookingSeat.seat:id,seat_code',
+                'incident:id,room_id,status,reason,created_at',
+                'resolution:id,seat_incident_impact_id,resolution_type,original_seat_id,replacement_seat_id,reprint_required,reprint_satisfied_at',
+                'resolution.originalSeat:id,seat_code',
+                'resolution.replacementSeat:id,seat_code',
+            ])
+            ->latest('id')
+            ->limit(50)
+            ->get();
 
         return [
             'booking' => $booking,
@@ -109,10 +102,7 @@ final class AdminBookingDetailService
             'printEvents' => $printEvents,
             'latestPrintEvent' => $latestPrintEvent,
             'latestReprintEvent' => $latestReprintEvent,
-            'checkins' => $checkins,
-            'acceptedCheckin' => $acceptedCheckin,
-            'duplicateCheckinCount' => $duplicateCount,
-            'rejectedCheckinCount' => $rejectedCount,
+            'incidentImpacts' => $incidentImpacts,
         ];
     }
 

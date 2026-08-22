@@ -4,6 +4,7 @@
     $showTime = $showtime->show_time ? \Carbon\Carbon::parse($showtime->show_time)->format('H:i') : '--:--';
     $bookingUrl = route('user.bookings.selectSeat', ['showtime' => $showtime, 'cinema' => $showtime->cinema->code]);
     $detailUrl = $movie?->slug ? route('user.movies.show', $movie->slug) : ($movie?->id ? url('/movies/'.$movie->id) : route('user.movies.index'));
+    $cardPrices = collect($showtime->public_prices ?? $showtime->ticketPrices?->keyBy(fn ($price) => $price->seatType?->code) ?? []);
 @endphp
 
 <article class="cinema-card group h-full rounded-3xl border app-border p-5 transition-all duration-300 hover:-translate-y-1 hover:border-brand-start/55 hover:shadow-2xl hover:shadow-brand-start/10">
@@ -34,11 +35,11 @@
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     <span class="inline-flex items-center rounded-xl border app-border app-secondary px-3 py-1.5 text-xs font-bold app-text">
-                        {{ number_format((int) ($showtime->price ?? 0), 0, ',', '.') }} VNĐ
+                        Từ {{ number_format((int) ($showtime->starting_price ?? $cardPrices->min('final_unit_amount_vnd')), 0, ',', '.') }} VNĐ
                     </span>
-                    @if(! empty($showtime->vip_price))
+                    @if($cardPrices->has('vip'))
                         <span class="inline-flex items-center rounded-xl border border-ai-start/25 bg-ai-start/10 px-3 py-1.5 text-xs font-bold text-ai-start">
-                            VIP {{ number_format((int) $showtime->vip_price, 0, ',', '.') }} VNĐ
+                            VIP {{ number_format((int) $cardPrices->get('vip')->final_unit_amount_vnd, 0, ',', '.') }} VNĐ
                         </span>
                     @endif
                 </div>

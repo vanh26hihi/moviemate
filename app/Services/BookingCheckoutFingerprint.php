@@ -7,7 +7,7 @@ use JsonException;
 
 class BookingCheckoutFingerprint
 {
-    private const SCHEMA_VERSION = 'booking-checkout-v2';
+    private const SCHEMA_VERSION = 'booking-checkout-v4';
 
     public function __construct(private readonly FoodSelectionCanonicalizer $foodSelections) {}
 
@@ -22,8 +22,7 @@ class BookingCheckoutFingerprint
         array|Collection|null $foodSelection = null,
         string $salesChannel = 'online',
         ?int $creatorStaffId = null,
-        array $discountCodes = [],
-        int $pointsToUse = 0,
+        ?string $promotionCode = null,
     ): string {
         $normalizedSeats = collect($seatIds)
             ->map(fn ($id): int => (int) $id)
@@ -45,8 +44,7 @@ class BookingCheckoutFingerprint
             'sales_channel' => $salesChannel,
             'creator_staff_id' => $creatorStaffId,
             'food' => $this->foodSelections->canonicalize($foodSelection),
-            'discount_codes' => collect($discountCodes)->map(fn ($code) => mb_strtoupper(trim((string) $code)))->filter()->unique()->sort()->values()->all(),
-            'points_to_use' => max(0, $pointsToUse),
+            'promotion_code' => ($normalizedPromotion = mb_strtoupper(trim((string) $promotionCode))) === '' ? null : $normalizedPromotion,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
         return hash('sha256', $canonical);

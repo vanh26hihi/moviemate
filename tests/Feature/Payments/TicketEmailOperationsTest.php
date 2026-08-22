@@ -57,7 +57,7 @@ class TicketEmailOperationsTest extends PaymentTestCase
         $foreignRecipient = 'attacker@example.test';
         $this->actingAs($owner)->post(route('user.bookings.ticket-email.resend', $payment->booking), [
             'email' => $foreignRecipient,
-        ])->assertRedirect()->assertSessionHas('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
+        ])->assertRedirect()->assertSessionHas('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
 
         $this->actingAs($owner)->post(route('user.bookings.ticket-email.resend', $payment->booking))
             ->assertRedirect();
@@ -115,7 +115,7 @@ class TicketEmailOperationsTest extends PaymentTestCase
         $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.11'])
             ->post(route('user.bookings.ticket-email.resend', $booking))
             ->assertRedirect()
-            ->assertSessionHas('success', 'Yêu cầu gửi lại vé đã được ghi nhận.');
+            ->assertSessionHas('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
 
         $other = $this->payableBooking();
         $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.12'])
@@ -187,16 +187,20 @@ class TicketEmailOperationsTest extends PaymentTestCase
         Mail::assertSent(BookingTicketMail::class, function (BookingTicketMail $mail) use ($payment): bool {
             $html = $mail->render();
 
-            return str_contains($html, $payment->booking->booking_code)
-                && str_contains($html, 'Booking Foundation Movie')
-                && str_contains($html, 'Test booking room')
-                && str_contains($html, '50.000 VNĐ')
-                && str_contains($html, 'Xem vé điện tử')
-                && str_contains($html, 'Mã QR xác minh vé MovieMate')
-                && ! str_contains($html, 'Lưu PDF')
-                && ! str_contains($html, 'tracking')
-                && ! str_contains($html, 'VNPAY_HASH_SECRET')
-                && ! str_contains($html, 'api.qrserver.com');
+            $this->assertStringContainsString($payment->booking->booking_code, $html);
+            $this->assertStringContainsString('Booking Foundation Movie', $html);
+            $this->assertStringContainsString('Test booking room', $html);
+            $this->assertStringContainsString('50.000 VNĐ', $html);
+            $this->assertStringContainsString('Xem đơn đặt vé', $html);
+            $this->assertStringContainsString('QR đơn đặt vé MovieMate', $html);
+            $this->assertSame(1, substr_count($html, 'alt="QR đơn đặt vé MovieMate"'));
+            $this->assertStringNotContainsString('QR riêng cho ghế', $html);
+            $this->assertStringNotContainsString('Lưu PDF', $html);
+            $this->assertStringNotContainsString('tracking', $html);
+            $this->assertStringNotContainsString('VNPAY_HASH_SECRET', $html);
+            $this->assertStringNotContainsString('api.qrserver.com', $html);
+
+            return true;
         });
     }
 

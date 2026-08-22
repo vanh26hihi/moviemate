@@ -17,6 +17,8 @@ class MigrationSafetyHardeningTest extends TestCase
 
     public function test_versioned_layout_rollback_roundtrips_and_restores_the_room_foreign_key(): void
     {
+        $integrityMigration = $this->integrityMigration();
+        $integrityMigration->down();
         $migration = $this->layoutMigration();
 
         $migration->down();
@@ -32,10 +34,14 @@ class MigrationSafetyHardeningTest extends TestCase
         $this->assertTrue(Schema::hasColumn('showtimes', 'room_layout_id'));
         $this->assertTrue(Schema::hasTable('room_layouts'));
         $this->assertTrue($this->hasForeign('showtimes', ['room_layout_id'], 'room_layouts'));
+        $integrityMigration->up();
+        $this->assertTrue($this->hasForeign('showtimes', ['room_id', 'room_layout_id'], 'room_layouts'));
     }
 
     public function test_versioned_layout_partial_down_resumes_after_the_layout_foreign_is_missing(): void
     {
+        $integrityMigration = $this->integrityMigration();
+        $integrityMigration->down();
         Schema::table('showtimes', function (Blueprint $table): void {
             $table->dropForeign(['room_layout_id']);
         });
@@ -46,6 +52,7 @@ class MigrationSafetyHardeningTest extends TestCase
 
         $this->assertTrue($this->hasForeign('showtimes', ['room_id'], 'rooms'));
         $this->assertTrue($this->hasForeign('showtimes', ['room_layout_id'], 'room_layouts'));
+        $integrityMigration->up();
     }
 
     public function test_versioned_layout_rollback_refuses_referenced_history_without_changes(): void
@@ -144,6 +151,11 @@ class MigrationSafetyHardeningTest extends TestCase
     private function layoutMigration(): object
     {
         return require database_path('migrations/2026_08_03_200000_create_versioned_room_layouts.php');
+    }
+
+    private function integrityMigration(): object
+    {
+        return require database_path('migrations/2026_08_14_200000_harden_room_layout_history_integrity.php');
     }
 
     /** @param list<string> $columns */

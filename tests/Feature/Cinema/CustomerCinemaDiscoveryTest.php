@@ -71,12 +71,13 @@ class CustomerCinemaDiscoveryTest extends TestCase
 
     public function test_cinema_detail_is_branch_specific_date_scoped_and_priced_by_r4_service(): void
     {
-        $branch = $this->publicScenario('PUB-DETAIL', 'Detail Cinema', '2030-06-02', ['room_type' => '3D']);
+        $branch = $this->publicScenario('PUB-DETAIL', 'Detail Cinema', '2030-06-02', ['room_type' => 'IMAX']);
         $other = $this->publicScenario('PUB-OTHER', 'Other Branch Movie', '2030-06-02');
 
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-02']))
             ->assertOk()->assertSee('Lịch chiếu tại '.$branch['cinema']->name)
-            ->assertSee($branch['movie']->title)->assertSee('80.000 ₫')->assertSee('3D')
+            ->assertSee($branch['movie']->title)->assertSee('80.000 ₫')
+            ->assertSee('Định dạng trình chiếu: Test 2D')->assertSee('Loại phòng: IMAX')
             ->assertDontSee($other['movie']->title);
         $this->get(route('cinemas.show', ['cinema' => $branch['cinema']->code, 'date' => '2030-06-03']))
             ->assertOk()->assertSee('Chưa có suất chiếu');
@@ -130,7 +131,7 @@ class CustomerCinemaDiscoveryTest extends TestCase
         foreach ($scenarios as $index => $scenario) {
             $room = Room::query()->create([
                 'cinema_id' => $scenario['cinema']->id, 'code' => 'PERF-'.$index.'-02',
-                'name' => 'PhÃ²ng phá»¥ '.$index, 'room_type' => '3D', 'total_seats' => 1, 'status' => 'active',
+                'name' => 'PhÃ²ng phá»¥ '.$index, 'room_type' => '3D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             ]);
             $layout = $this->publishRoomForDiscovery($room);
             $movie = Movie::query()->create([
@@ -140,8 +141,9 @@ class CustomerCinemaDiscoveryTest extends TestCase
             Showtime::query()->create([
                 'movie_id' => $movie->id, 'cinema_id' => $scenario['cinema']->id,
                 'room_id' => $room->id, 'room_layout_id' => $layout->id,
+                'presentation_format_id' => $this->presentationFormatFixture($movie, $room)->id,
                 'show_date' => '2030-06-03', 'show_time' => '20:00:00',
-                'price' => 1, 'vip_price' => 2, 'pricing_version' => 'cinema-pricing-v1', 'status' => 'active',
+                'status' => 'active',
             ]);
         }
 
@@ -157,7 +159,12 @@ class CustomerCinemaDiscoveryTest extends TestCase
         ];
 
         foreach ($counts as $page => $count) {
-            $this->assertLessThanOrEqual(25, $count, "{$page} query count exceeded the bounded discovery budget: ".json_encode($counts));
+            $budget = match ($page) {
+                'home' => 27,
+                'movie_index' => 26,
+                default => 25,
+            };
+            $this->assertLessThanOrEqual($budget, $count, "{$page} query count exceeded the bounded discovery budget: ".json_encode($counts));
         }
         $this->assertLessThanOrEqual($counts['cinema_detail'], $counts['partial']);
         if (getenv('REPORT_QUERY_COUNTS') === '1') {

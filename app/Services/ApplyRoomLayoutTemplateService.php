@@ -51,7 +51,7 @@ class ApplyRoomLayoutTemplateService
             $reactivateSeatIds = [];
             $now = now();
             foreach ($normalized['cells'] as $cell) {
-                if ($cell['cell_type'] === 'aisle') {
+                if ($cell['cell_type'] !== 'seat') {
                     continue;
                 }
                 $metadata = $cell['metadata'];

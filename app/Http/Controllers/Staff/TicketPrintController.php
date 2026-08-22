@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdmissionTicket;
 use App\Models\Booking;
+use App\Models\SeatIncidentResolution;
+use App\Services\Tickets\BookingPrintAmountAllocator;
 use App\Services\Tickets\TicketPrintService;
-use App\Services\Tickets\TicketQrPayload;
 use App\Services\Tickets\TicketResolutionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,17 +19,93 @@ final class TicketPrintController extends Controller
 {
     public function start(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
     {
-        $booking = $tickets->authorizedBooking($booking, $request->user());
-        $operation = $this->operation($request, $booking, true);
-        $prints->start($booking, $request->user(), $operation['id'], $operation['token']);
+        $this->startResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints);
 
-        return redirect()->route('staff.tickets.print.show', $booking)
-            ->with('success', 'Đã bắt đầu lần in vé.');
+        return redirect()->route('staff.tickets.print.show', $booking)->with('success', 'Đã bắt đầu lần in vé.');
+    }
+
+    public function startTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->startResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
     }
 
     public function reprint(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
     {
-        $booking = $tickets->authorizedBooking($booking, $request->user());
+        $this->reprintResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints);
+
+        return redirect()->route('staff.tickets.print.show', $booking)->with('success', 'Đã ghi nhận lý do và bắt đầu in lại.');
+    }
+
+    public function reprintTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->reprintResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
+    }
+
+    public function incidentReprintTicket(
+        Request $request,
+        AdmissionTicket $admissionTicket,
+        SeatIncidentResolution $resolution,
+        TicketResolutionService $tickets,
+        TicketPrintService $prints,
+    ): RedirectResponse {
+        $ticket = $tickets->authorizedTicket($admissionTicket, $request->user());
+        $operation = $this->newOperation($request, $ticket);
+        $prints->incidentReprint($ticket, $resolution, $request->user(), $operation['id'], $operation['token']);
+
+        return redirect()->route('staff.admission-tickets.print.show', $ticket)
+            ->with('success', 'Đã bắt đầu in vé thay thế do đổi ghế.');
+    }
+
+    public function show(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints, BookingPrintAmountAllocator $amounts): Response|RedirectResponse
+    {
+        return $this->showResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints, $amounts);
+    }
+
+    public function showTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints, BookingPrintAmountAllocator $amounts): Response|RedirectResponse
+    {
+        return $this->showResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints, $amounts);
+    }
+
+    public function succeed(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->succeedResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints);
+    }
+
+    public function succeedTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->succeedResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
+    }
+
+    public function fail(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->failResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints);
+    }
+
+    public function failTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->failResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
+    }
+
+    public function recoverExpired(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->recoverResolved($request, $tickets->authorizedFirstTicket($booking, $request->user()), $prints);
+    }
+
+    public function recoverExpiredTicket(Request $request, AdmissionTicket $admissionTicket, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    {
+        return $this->recoverResolved($request, $tickets->authorizedTicket($admissionTicket, $request->user()), $prints);
+    }
+
+    private function startResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints): RedirectResponse
+    {
+        $operation = $this->operation($request, $ticket, true);
+        $prints->start($ticket, $request->user(), $operation['id'], $operation['token']);
+
+        return redirect()->route('staff.admission-tickets.print.show', $ticket)->with('success', 'Đã bắt đầu lần in vé.');
+    }
+
+    private function reprintResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints): RedirectResponse
+    {
         $validated = $request->validate([
             'reason_code' => ['required', 'in:'.implode(',', array_keys(TicketPrintService::REPRINT_REASONS))],
             'safe_note' => ['nullable', 'string', 'max:300', 'required_if:reason_code,other'],
@@ -35,169 +113,134 @@ final class TicketPrintController extends Controller
             'reason_code.required' => 'Vui lòng chọn lý do in lại.',
             'safe_note.required_if' => 'Vui lòng mô tả ngắn gọn khi chọn lý do khác.',
         ]);
-        $operation = $this->operation($request, $booking, true);
-        $prints->reprint(
-            $booking,
-            $request->user(),
-            $operation['id'],
-            $operation['token'],
-            $validated['reason_code'],
-            $validated['safe_note'] ?? null,
-        );
+        $operation = $this->newOperation($request, $ticket);
+        $prints->reprint($ticket, $request->user(), $operation['id'], $operation['token'], $validated['reason_code'], $validated['safe_note'] ?? null);
 
-        return redirect()->route('staff.tickets.print.show', $booking)
-            ->with('success', 'Đã ghi nhận lý do và bắt đầu lần in lại.');
+        return redirect()->route('staff.admission-tickets.print.show', $ticket)->with('success', 'Đã ghi nhận lý do và bắt đầu in lại.');
     }
 
-    public function show(
-        Request $request,
-        Booking $booking,
-        TicketResolutionService $tickets,
-        TicketPrintService $prints,
-        TicketQrPayload $payloads,
-    ): Response|RedirectResponse {
-        $booking = $tickets->authorizedBooking($booking, $request->user());
-        $operation = $this->currentOperation($request, $booking);
+    private function showResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints, BookingPrintAmountAllocator $amounts): Response|RedirectResponse
+    {
+        $operation = $this->currentOperation($request, $ticket);
         if ($operation === null) {
-            return $this->recoverPrintNavigation($booking);
+            return $this->recoverNavigation($ticket);
         }
         try {
-            $state = $prints->active($booking, $request->user(), $operation['id'], $operation['token']);
+            $state = $prints->active($ticket, $request->user(), $operation['id'], $operation['token']);
         } catch (HttpException $exception) {
             if ($exception->getStatusCode() !== 410) {
                 throw $exception;
             }
 
-            return $this->recoverPrintNavigation($booking);
+            return $this->recoverNavigation($ticket);
         }
-        $booking->loadMissing(['payments.settledBy:id,name', 'createdByStaff:id,name']);
+        $booking = $ticket->booking;
+        $booking->loadMissing([
+            'payments.settledBy:id,name',
+            'createdByStaff:id,name',
+            'foodOrder.items',
+            'showtime.presentationFormat',
+        ]);
+        $printAmounts = $amounts->allocate($booking);
 
         return response()->view('staff.tickets.print', [
+            'ticket' => $ticket,
             'booking' => $booking,
             'printState' => $state,
-            'ticketQrPayload' => $payloads->url($booking),
+            'allocatedAmount' => $printAmounts->forTicket($ticket),
             'failureReasons' => TicketPrintService::FAILURE_REASONS,
             'printOperationId' => $operation['id'],
-        ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')
-            ->header('Pragma', 'no-cache');
+        ])->header('Cache-Control', 'private, no-store, no-cache, must-revalidate')->header('Pragma', 'no-cache');
     }
 
-    public function succeed(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    private function succeedResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints): RedirectResponse
     {
-        $booking = $tickets->authorizedBooking($booking, $request->user());
-        try {
-            $operation = $this->operation($request, $booking, allowCompleted: true);
-            $prints->succeed($booking, $request->user(), $operation['id'], $operation['token']);
-        } catch (HttpException $exception) {
-            if ($exception->getStatusCode() !== 410) {
-                throw $exception;
-            }
+        $operation = $this->operation($request, $ticket, allowCompleted: true);
+        $prints->succeed($ticket, $request->user(), $operation['id'], $operation['token']);
+        $this->completeOperationSession($request, $ticket, $operation);
 
-            return $this->recoverPrintNavigation($booking);
-        }
-        $this->completeOperationSession($request, $booking, $operation);
-
-        return redirect()->route('staff.tickets.operations', $booking)
-            ->with('success', 'Đã xác nhận in vé thành công.');
+        return redirect()->route('staff.tickets.operations', $ticket->booking_id)->with('success', 'Đã xác nhận in vé thành công.');
     }
 
-    public function fail(Request $request, Booking $booking, TicketResolutionService $tickets, TicketPrintService $prints): RedirectResponse
+    private function failResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints): RedirectResponse
     {
         $validated = $request->validate([
             'failure_code' => ['required', 'in:'.implode(',', array_keys(TicketPrintService::FAILURE_REASONS))],
             'safe_note' => ['nullable', 'string', 'max:300', 'required_if:failure_code,other'],
-        ], [
-            'failure_code.required' => 'Vui lòng chọn lý do in lỗi.',
-            'safe_note.required_if' => 'Vui lòng mô tả ngắn gọn khi chọn lý do khác.',
         ]);
-        $booking = $tickets->authorizedBooking($booking, $request->user());
-        try {
-            $operation = $this->operation($request, $booking, allowCompleted: true);
-            $prints->fail($booking, $request->user(), $operation['id'], $operation['token'],
-                $validated['failure_code'], $validated['safe_note'] ?? null);
-            $this->completeOperationSession($request, $booking, $operation);
-        } catch (HttpException $exception) {
-            if ($exception->getStatusCode() !== 410) {
-                throw $exception;
-            }
-            $prints->failExpired($booking, $request->user(), $validated['failure_code'], $validated['safe_note'] ?? null);
-        }
+        $operation = $this->operation($request, $ticket, allowCompleted: true);
+        $prints->fail($ticket, $request->user(), $operation['id'], $operation['token'], $validated['failure_code'], $validated['safe_note'] ?? null);
+        $this->completeOperationSession($request, $ticket, $operation);
 
-        return redirect()->route('staff.tickets.operations', $booking)
-            ->with('success', 'Đã ghi nhận lỗi in vé.');
+        return redirect()->route('staff.tickets.operations', $ticket->booking_id)->with('success', 'Đã ghi nhận lỗi in vé.');
     }
 
-    public function recoverExpired(
-        Request $request,
-        Booking $booking,
-        TicketResolutionService $tickets,
-        TicketPrintService $prints,
-    ): RedirectResponse {
-        $booking = $tickets->authorizedBooking($booking, $request->user());
-        $prints->failExpired($booking, $request->user());
+    private function recoverResolved(Request $request, AdmissionTicket $ticket, TicketPrintService $prints): RedirectResponse
+    {
+        $prints->failExpired($ticket, $request->user());
 
-        return redirect()->route('staff.tickets.operations', $booking)
-            ->with('success', 'Đã ghi nhận phiên in bị gián đoạn. Bạn có thể in lại theo chính sách hiện tại.');
+        return redirect()->route('staff.tickets.operations', $ticket->booking_id)->with('success', 'Đã ghi nhận phiên in bị gián đoạn.');
     }
 
     /** @return array{id:string, token:string} */
-    private function operation(Request $request, Booking $booking, bool $create = false, bool $allowCompleted = false): array
+    private function operation(Request $request, AdmissionTicket $ticket, bool $create = false, bool $allowCompleted = false): array
     {
-        $key = $this->sessionKey($booking);
-        $operation = $request->session()->get($key);
+        $operation = $request->session()->get($this->sessionKey($ticket));
         if ($allowCompleted && ! is_array($operation)) {
-            $operation = $request->session()->get($this->completedSessionKey($booking));
+            $operation = $request->session()->get($this->completedSessionKey($ticket));
         }
         if ($create && (! is_array($operation) || ! isset($operation['id'], $operation['token']))) {
-            $operation = ['id' => (string) Str::uuid(), 'token' => Str::random(64)];
-            $request->session()->put($key, $operation);
+            $operation = $this->newOperation($request, $ticket);
         }
-        abort_unless(is_array($operation) && is_string($operation['id'] ?? null)
-            && is_string($operation['token'] ?? null), 410, 'Lần in này đã hết hiệu lực.');
+        abort_unless(is_array($operation) && is_string($operation['id'] ?? null) && is_string($operation['token'] ?? null), 410, 'Lần in này đã hết hiệu lực.');
 
         return $operation;
     }
 
-    /** @return array{id:string, token:string}|null */
-    private function currentOperation(Request $request, Booking $booking): ?array
+    /** @return array{id:string, token:string} */
+    private function newOperation(Request $request, AdmissionTicket $ticket): array
     {
-        $operation = $request->session()->get($this->sessionKey($booking));
+        $operation = ['id' => (string) Str::uuid(), 'token' => Str::random(64)];
+        $request->session()->put($this->sessionKey($ticket), $operation);
 
-        return is_array($operation) && is_string($operation['id'] ?? null)
-            && is_string($operation['token'] ?? null) ? $operation : null;
+        return $operation;
     }
 
-    private function recoverPrintNavigation(Booking $booking): RedirectResponse
+    private function currentOperation(Request $request, AdmissionTicket $ticket): ?array
     {
-        $state = $booking->ticketPrint;
+        $operation = $request->session()->get($this->sessionKey($ticket));
+
+        return is_array($operation) && is_string($operation['id'] ?? null) && is_string($operation['token'] ?? null) ? $operation : null;
+    }
+
+    private function recoverNavigation(AdmissionTicket $ticket): RedirectResponse
+    {
+        $state = $ticket->printState;
         $message = match ($state?->status) {
             'printed' => 'Vé này đã được ghi nhận in thành công.',
             'printing' => $state->active_operation_expires_at?->isPast()
                 ? 'Phiên in trước đã hết hiệu lực. Vui lòng xác nhận kết quả lần in trước trước khi tiếp tục.'
-                : 'Phiên in đang được xử lý trong một cửa sổ khác. Vui lòng quay lại cửa sổ đó để xác nhận kết quả.',
-            'retry_allowed' => 'Lần in trước gặp lỗi. Vui lòng ghi lý do trước khi in lại.',
-            'retry_requires_authorization', 'retry_authorized' => 'Vui lòng ghi lý do trước khi in lại.',
-            default => 'Không có phiên in hợp lệ. Vui lòng bắt đầu in từ trang vận hành vé.',
+                : 'Phiên in đang được xử lý trong một cửa sổ khác.',
+            default => 'Không có phiên in hợp lệ.',
         };
 
-        return redirect()->route('staff.tickets.operations', $booking)
+        return redirect()->route('staff.tickets.operations', $ticket->booking_id)
             ->with($state?->status === 'printed' ? 'success' : 'warning', $message);
     }
 
-    private function sessionKey(Booking $booking): string
+    private function sessionKey(AdmissionTicket $ticket): string
     {
-        return 'ticket_print_operations.'.$booking->id;
+        return 'ticket_print_operations.'.$ticket->id;
     }
 
-    /** @param array{id:string, token:string} $operation */
-    private function completeOperationSession(Request $request, Booking $booking, array $operation): void
+    private function completedSessionKey(AdmissionTicket $ticket): string
     {
-        $request->session()->put($this->completedSessionKey($booking), $operation);
-        $request->session()->forget($this->sessionKey($booking));
+        return 'ticket_print_completed_operations.'.$ticket->id;
     }
 
-    private function completedSessionKey(Booking $booking): string
+    private function completeOperationSession(Request $request, AdmissionTicket $ticket, array $operation): void
     {
-        return 'ticket_print_completed_operations.'.$booking->id;
+        $request->session()->put($this->completedSessionKey($ticket), $operation);
+        $request->session()->forget($this->sessionKey($ticket));
     }
 }

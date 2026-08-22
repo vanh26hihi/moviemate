@@ -22,7 +22,6 @@ final class BookingCancellationService
         private readonly BookingFoodService $food,
         private readonly ActivityLogger $activities,
         private readonly PromotionService $promotions,
-        private readonly LoyaltyService $loyalty,
     ) {}
 
     public function isCancellable(Booking $booking): bool
@@ -127,6 +126,43 @@ final class BookingCancellationService
         });
     }
 
+    public function cancelForSeatIncident(int $bookingId, int $incidentId): BookingCancellationResult
+    {
+        return DB::transaction(function () use ($bookingId, $incidentId): BookingCancellationResult {
+            $booking = Booking::query()->lockForUpdate()->findOrFail($bookingId);
+
+            if ($booking->booking_status === 'cancelled') {
+                return BookingCancellationResult::alreadyCancelled();
+            }
+
+            $payments = Payment::query()
+                ->where('booking_id', $booking->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $retained = $payments->contains(fn (Payment $payment): bool => in_array($payment->status, [
+                Payment::STATUS_PROCESSING,
+                Payment::STATUS_UNRESOLVED,
+                Payment::STATUS_REVIEW,
+            ], true));
+            if ($booking->booking_status !== 'pending_payment'
+                || $booking->payment_status !== 'unpaid'
+                || $retained
+                || $payments->contains(fn (Payment $payment): bool => $payment->hasAuthoritativeSuccessEvidence())) {
+                return BookingCancellationResult::notCancellable();
+            }
+
+            return $this->transitionLockedBooking(
+                $booking,
+                $this->lockActiveSeats($booking),
+                'seat_incident',
+                'booking.cancelled_by_seat_incident',
+                ['seat_incident_id' => $incidentId, 'source' => 'seat_incident'],
+            );
+        }, 3);
+    }
+
     public function cancelVerifiedPayment(
         int $paymentId,
         string $provider,
@@ -165,7 +201,7 @@ final class BookingCancellationService
                 || $payment->amount !== $amount
                 || $payments->contains(fn (Payment $candidate): bool => $candidate->hasAuthoritativeSuccessEvidence())
                 || $booking->payment_status === 'paid'
-                || in_array($booking->booking_status, ['paid', 'used'], true)) {
+                || $booking->booking_status === 'paid') {
                 return BookingCancellationResult::notCancellable();
             }
 
@@ -232,7 +268,6 @@ final class BookingCancellationService
         $released = $this->seatLocks->release($booking);
         $this->food->transitionForBooking($booking, 'cancelled');
         $this->promotions->release($booking);
-        $this->loyalty->release($booking, $reason);
 
         // One audit event per successful cancellation. Seat labels are logical and safe;
         // no capability, token or provider payload is ever recorded here.

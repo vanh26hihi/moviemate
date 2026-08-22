@@ -23,7 +23,6 @@ final class BookingHistoryController extends Controller
         $statusFilters = [
             'pending' => 'pending_payment',
             'paid' => 'paid',
-            'used' => 'used',
             'cancelled' => 'cancelled',
             'expired' => 'expired',
         ];
@@ -33,10 +32,10 @@ final class BookingHistoryController extends Controller
                 'showtime.movie',
                 'showtime.cinema',
                 'showtime.room',
+                'showtime.presentationFormat',
                 'bookingSeats.seat',
                 'payments',
-                'discountCodeRedemptions',
-                'pointRedemption',
+                'promotionUsage',
             ])
             ->when(
                 isset($statusFilters[$status]),

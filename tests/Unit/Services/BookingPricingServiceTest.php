@@ -4,7 +4,9 @@ namespace Tests\Unit\Services;
 
 use App\Domain\Money\VndAmount;
 use App\Models\Seat;
+use App\Models\SeatType;
 use App\Models\Showtime;
+use App\Models\ShowtimeTicketPrice;
 use App\Services\BookingPricingService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -81,7 +83,7 @@ class BookingPricingServiceTest extends TestCase
         $this->assertSame('VND', $result->currency);
     }
 
-    public function test_prices_a_vip_seat_from_showtime_vip_price(): void
+    public function test_prices_a_vip_seat_from_showtime_snapshot(): void
     {
         $result = $this->service()->calculate($this->showtime(), collect([$this->seat(2, 'vip')]));
 
@@ -170,21 +172,50 @@ class BookingPricingServiceTest extends TestCase
         return new BookingPricingService;
     }
 
-    private function showtime(string $price = '50000.00', string $vipPrice = '70000.00'): Showtime
+    private function showtime(string $coupleAmount = '100000'): Showtime
     {
-        return new Showtime(['price' => $price, 'vip_price' => $vipPrice]);
+        $showtime = new Showtime;
+        $showtime->setRelation('ticketPrices', collect([
+            $this->ticketPrice(1, 'normal', 50_000),
+            $this->ticketPrice(2, 'vip', 70_000),
+            $this->ticketPrice(3, 'couple', (int) $coupleAmount),
+        ]));
+
+        return $showtime;
     }
 
     private function seat(int $id, string $type, ?string $pairCode = null, ?string $position = null): Seat
     {
         $seat = new Seat([
             'type' => $type,
+            'seat_type_id' => match ($type) {
+                'normal' => 1, 'vip' => 2, 'couple' => 3
+            },
             'pair_code' => $pairCode,
             'pair_position' => $position,
         ]);
         $seat->setAttribute('id', $id);
 
         return $seat;
+    }
+
+    private function ticketPrice(int $id, string $code, int $amount): ShowtimeTicketPrice
+    {
+        $seatType = new SeatType(['code' => $code, 'name' => ucfirst($code), 'status' => true]);
+        $seatType->setAttribute('id', $id);
+        $snapshot = new ShowtimeTicketPrice([
+            'seat_type_id' => $id,
+            'price_book_version_id' => 1,
+            'base_price_vnd' => 50_000,
+            'adjustment_total_vnd' => $amount - 50_000,
+            'final_unit_amount_vnd' => $amount,
+            'breakdown_json' => ['adjustments' => [], 'final_unit_amount_vnd' => $amount],
+            'pricing_fingerprint' => str_repeat((string) $id, 64),
+        ]);
+        $snapshot->setAttribute('id', $id);
+        $snapshot->setRelation('seatType', $seatType);
+
+        return $snapshot;
     }
 
     private function couple(int $leftId, int $rightId, string $pairCode): Collection

@@ -8,7 +8,6 @@
         <h1 class="text-3xl font-extrabold app-text">Đánh giá của tôi</h1>
         <div class="mt-6 space-y-4">
             @forelse($reviews as $review)
-                @php($rewardPoints = (int) ($rewardPointsByReviewId[$review->id] ?? 0))
                 <article class="cinema-card flex gap-4 rounded-2xl p-5">
                     <div class="w-16 shrink-0">
                         <div class="poster-frame rounded-xl">
@@ -27,9 +26,6 @@
                         <p class="mt-2 line-clamp-3 whitespace-pre-line app-muted">{{ $review->comment ?: 'Không có nhận xét.' }}</p>
                         <p class="mt-2 text-xs app-muted">
                             {{ $review->created_at->format('d/m/Y H:i') }} · {{ $review->moderation_status_label }}
-                            @if($rewardPoints > 0)
-                                · +{{ number_format($rewardPoints, 0, ',', '.') }} điểm
-                            @endif
                         </p>
                         <a class="mt-3 inline-block text-sm font-bold text-brand-start" href="{{ route('user.movies.show', $review->movie->slug) }}#reviews">
                             {{ $review->moderation_status === 'rejected' ? 'Chỉnh sửa đánh giá' : 'Xem hoặc chỉnh sửa' }}

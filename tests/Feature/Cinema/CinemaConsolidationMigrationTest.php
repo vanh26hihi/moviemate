@@ -103,7 +103,7 @@ class CinemaConsolidationMigrationTest extends TestCase
         $this->seedApprovedLegacyDataset(withHistory: false);
         DB::table('rooms')->insert([
             'id' => 13, 'cinema_id' => 11, 'code' => 'P02', 'name' => 'Phòng 13',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
@@ -132,7 +132,7 @@ class CinemaConsolidationMigrationTest extends TestCase
 
         DB::table('rooms')->insert([
             'id' => 20, 'cinema_id' => $canonicalId, 'code' => 'P04', 'name' => 'Phòng 4',
-            'room_type' => '2D', 'total_seats' => 0, 'status' => 'active',
+            'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 10_000, 'status' => 'active',
             'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('movies')->insert([
@@ -140,9 +140,12 @@ class CinemaConsolidationMigrationTest extends TestCase
             'duration' => 90, 'age_rating' => 'P', 'status' => 'now_showing',
             'created_at' => $now, 'updated_at' => $now,
         ]);
+        $format = $this->presentationFormatFixture(2, 9);
         DB::table('showtimes')->insert([
             'id' => 950, 'movie_id' => 2, 'cinema_id' => $canonicalId, 'room_id' => 9,
-            'show_date' => '2026-08-20', 'show_time' => '20:00:00', 'price' => 90000,
+            'room_layout_id' => 9001,
+            'presentation_format_id' => $format->id,
+            'show_date' => '2026-08-20', 'show_time' => '20:00:00',
             'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('orders')->insert([
@@ -337,10 +340,15 @@ class CinemaConsolidationMigrationTest extends TestCase
             ],
         ]);
         DB::table('rooms')->insert([
-            ['id' => 9, 'cinema_id' => 6, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => 10, 'cinema_id' => 6, 'code' => 'P02', 'name' => 'Phòng 2', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => 11, 'cinema_id' => 11, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'total_seats' => 121, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => 12, 'cinema_id' => 6, 'code' => 'R0012', 'name' => self::MYSQL_ROOM_12_NAME, 'room_type' => '2D', 'total_seats' => 0, 'status' => 'inactive', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 9, 'cinema_id' => 6, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'width_mm' => 7_500, 'length_mm' => 10_000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 10, 'cinema_id' => 6, 'code' => 'P02', 'name' => 'Phòng 2', 'room_type' => '2D', 'width_mm' => 8_000, 'length_mm' => 11_000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 11, 'cinema_id' => 11, 'code' => 'P01', 'name' => 'Phòng 1', 'room_type' => '2D', 'width_mm' => 7_500, 'length_mm' => 10_000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 12, 'cinema_id' => 6, 'code' => 'R0012', 'name' => self::MYSQL_ROOM_12_NAME, 'room_type' => '2D', 'width_mm' => null, 'length_mm' => null, 'status' => 'inactive', 'created_at' => $now, 'updated_at' => $now],
+        ]);
+        DB::table('room_layouts')->insert([
+            ['id' => 9001, 'room_id' => 9, 'version' => 1, 'name' => 'Legacy layout 9', 'rows' => 1, 'columns' => 1, 'screen_position' => 'top', 'status' => 'published', 'published_at' => $now, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 9002, 'room_id' => 10, 'version' => 1, 'name' => 'Legacy layout 10', 'rows' => 1, 'columns' => 1, 'screen_position' => 'top', 'status' => 'published', 'published_at' => $now, 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 9003, 'room_id' => 11, 'version' => 1, 'name' => 'Legacy layout 11', 'rows' => 1, 'columns' => 1, 'screen_position' => 'top', 'status' => 'published', 'published_at' => $now, 'created_at' => $now, 'updated_at' => $now],
         ]);
 
         if (! $withHistory) {
@@ -367,6 +375,9 @@ class CinemaConsolidationMigrationTest extends TestCase
             'duration' => 90, 'age_rating' => 'P', 'status' => 'now_showing',
             'created_at' => $now, 'updated_at' => $now,
         ]);
+        $format = $this->presentationFormatFixture(1, 9);
+        $this->presentationFormatFixture(1, 10);
+        $this->presentationFormatFixture(1, 11);
 
         $showtimes = [];
         $showtimeId = 900;
@@ -374,8 +385,12 @@ class CinemaConsolidationMigrationTest extends TestCase
             for ($index = 0; $index < $count; $index++) {
                 $showtimes[] = [
                     'id' => ++$showtimeId, 'movie_id' => 1, 'cinema_id' => $cinemaId, 'room_id' => $roomId,
+                    'room_layout_id' => match ($roomId) {
+                        9 => 9001, 10 => 9002, 11 => 9003
+                    },
+                    'presentation_format_id' => $format->id,
                     'show_date' => '2026-08-10', 'show_time' => sprintf('%02d:00:00', 8 + $index),
-                    'price' => 80000, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
+                    'status' => 'active', 'created_at' => $now, 'updated_at' => $now,
                 ];
             }
         }

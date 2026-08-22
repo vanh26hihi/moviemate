@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Bookings;
 
-use App\Services\Tickets\TicketCheckinCapability;
+use App\Services\Tickets\BookingLookupCapability;
+use App\Services\Tickets\BookingQrPayload;
 use App\Services\Tickets\TicketQrCode;
-use App\Services\Tickets\TicketQrPayload;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
 use Tests\Feature\Payments\PaymentTestCase;
@@ -18,7 +18,7 @@ final class FinalTicketUxHotfixTest extends PaymentTestCase
         $this->seedRbac();
     }
 
-    public function test_secure_qr_decodes_to_public_verification_page_for_the_exact_booking(): void
+    public function test_secure_booking_qr_decodes_to_the_exact_counter_lookup_capability(): void
     {
         $owner = $this->userWithRole('user');
         $scenario = $this->bookingScenario(false);
@@ -27,7 +27,7 @@ final class FinalTicketUxHotfixTest extends PaymentTestCase
         $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))
             ->assertJsonPath('return_code', 1);
         $booking = $booking->fresh();
-        $payload = app(TicketQrPayload::class)->url($booking);
+        $payload = app(BookingQrPayload::class)->value($booking);
         $png = app(TicketQrCode::class)->png($payload);
 
         $this->assertStringStartsWith("\x89PNG\r\n\x1a\n", $png);
@@ -36,26 +36,21 @@ final class FinalTicketUxHotfixTest extends PaymentTestCase
         $decoder->mustRun();
         $this->assertSame($payload, $decoder->getOutput());
 
-        $this->get($payload)->assertOk()
-            ->assertSee('Mã vé')
-            ->assertSee($booking->booking_code)
-            ->assertSee($booking->showtime->movie->title)
-            ->assertSee($booking->showtime->cinema->name)
-            ->assertSee($booking->showtime->room->name)
-            ->assertSee($booking->seat_codes);
+        $this->assertTrue(app(BookingLookupCapability::class)->isValid($booking, $payload));
     }
 
     public function test_qr_wrapper_rejects_tampering_foreign_hosts_and_queries(): void
     {
-        $booking = $this->pendingPayment()->booking;
-        $capability = app(TicketCheckinCapability::class)->issue($booking);
-        $payload = route('tickets.verify', ['capability' => $capability]);
-        $tampered = substr($payload, 0, -1).($payload[-1] === 'A' ? 'B' : 'A');
+        $payment = $this->pendingPayment();
+        $this->postJson(route('payments.zalopay.callback'), $this->callbackBody($payment))->assertJsonPath('return_code', 1);
+        $booking = $payment->booking->fresh();
+        $capability = app(BookingLookupCapability::class)->issue($booking);
+        $tampered = substr($capability, 0, -1).($capability[-1] === 'A' ? 'B' : 'A');
 
-        $this->get($tampered)->assertNotFound();
-        $this->assertNull(app(TicketQrPayload::class)->capabilityFrom('https://attacker.example/tickets/verify/'.$capability));
-        $this->assertNull(app(TicketQrPayload::class)->capabilityFrom($payload.'?redirect=https://attacker.example'));
-        $this->assertSame($capability, app(TicketQrPayload::class)->capabilityFrom($payload));
+        $this->assertFalse(app(BookingLookupCapability::class)->isValid($booking, $tampered));
+        $this->assertNull(app(BookingQrPayload::class)->capabilityFrom('https://attacker.example/'.$capability));
+        $this->assertNull(app(BookingQrPayload::class)->capabilityFrom($capability.'?redirect=https://attacker.example'));
+        $this->assertSame($capability, app(BookingQrPayload::class)->capabilityFrom($capability));
     }
 
     public function test_customer_cancel_modal_is_centered_accessible_and_guarded(): void

@@ -4,7 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\Genre;
 use App\Models\Movie;
+use App\Models\PresentationFormat;
+use Database\Seeders\Support\DemoPresentationFormatConfiguration;
 use Database\Seeders\Support\RealMovieCatalog;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
@@ -12,6 +15,13 @@ class MovieSeeder extends Seeder
 {
     public function run(): void
     {
+        $formatIds = PresentationFormat::query()->whereIn('code', ['2D', '3D'])->pluck('id', 'code');
+        foreach (['2D', '3D'] as $requiredCode) {
+            if (! $formatIds->has($requiredCode)) {
+                throw (new ModelNotFoundException)->setModel(PresentationFormat::class, [$requiredCode]);
+            }
+        }
+
         $fictionalMovies = [
             [
                 'title' => 'The Great Adventure',
@@ -101,6 +111,7 @@ class MovieSeeder extends Seeder
 
             $genreIds = Genre::whereIn('name', $data['genres'])->pluck('id')->toArray();
             $movie->genres()->sync($genreIds);
+            $this->syncPresentationFormats($movie, $formatIds->all());
         }
 
         foreach (RealMovieCatalog::movies() as $data) {
@@ -116,6 +127,21 @@ class MovieSeeder extends Seeder
             ]);
 
             $movie->genres()->sync(Genre::query()->whereIn('name', $data['genres'])->pluck('id'));
+            $this->syncPresentationFormats($movie, $formatIds->all());
         }
+    }
+
+    /** @param array<string, int> $formatIds */
+    private function syncPresentationFormats(Movie $movie, array $formatIds): void
+    {
+        $codes = ['2D'];
+        if (in_array($movie->slug, DemoPresentationFormatConfiguration::THREE_D_MOVIE_SLUGS, true)) {
+            $codes[] = '3D';
+        }
+
+        $movie->supportedPresentationFormats()->sync(array_map(
+            fn (string $code): int => $formatIds[$code],
+            $codes,
+        ));
     }
 }

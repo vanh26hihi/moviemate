@@ -39,6 +39,11 @@ final class BookingTicketPrint extends Model
         return $this->belongsTo(Booking::class);
     }
 
+    public function admissionTicket(): BelongsTo
+    {
+        return $this->belongsTo(AdmissionTicket::class);
+    }
+
     public function printedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'printed_by_user_id');

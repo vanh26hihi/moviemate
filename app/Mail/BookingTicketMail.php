@@ -24,13 +24,16 @@ class BookingTicketMail extends Mailable
             'showtime.movie',
             'showtime.cinema',
             'showtime.room',
+            'showtime.presentationFormat',
             'bookingSeats.seat',
+            'admissionTickets.bookingSeat.seat',
             'payments',
             'foodOrder.items',
+            'foodPickupVoucher',
         ]);
 
         return $this
-            ->subject('Vé điện tử MovieMate - '.$this->booking->booking_code)
+            ->subject('Đơn đặt vé MovieMate - '.$this->booking->booking_code)
             ->view('emails.booking-ticket');
     }
 }
