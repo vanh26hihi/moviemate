@@ -16,8 +16,16 @@ final class TicketQrCode
             throw new \InvalidArgumentException('QR payload must not be empty.');
         }
 
-        return (new Writer(new GDLibRenderer(max(160, min(800, $size)), 4, 'png')))
-            ->writeString($payload);
+        // bacon-qr-code currently calls a GD function that PHP 8.5 marks as
+        // deprecated. Keep QR generation usable until the dependency replaces it.
+        set_error_handler(static fn (): bool => true, E_DEPRECATED);
+
+        try {
+            return (new Writer(new GDLibRenderer(max(160, min(800, $size)), 4, 'png')))
+                ->writeString($payload);
+        } finally {
+            restore_error_handler();
+        }
     }
 
     public function svg(string $payload, int $size = 240): string
