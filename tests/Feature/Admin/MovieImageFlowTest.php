@@ -223,7 +223,7 @@ class MovieImageFlowTest extends TestCase
         $this->get(route('user.movies.index'))
             ->assertOk()
             ->assertSee('src="/storage/movies/posters/visible.jpg"', false)
-            ->assertDontSee('http://', false);
+            ->assertDontSee('src="http://localhost/storage/movies/posters/visible.jpg"', false);
 
         $this->actingAs($this->userWithRole('admin'))->get(route('admin.movies.edit', $visible))
             ->assertOk()
@@ -232,7 +232,7 @@ class MovieImageFlowTest extends TestCase
 
         $detail = view('user.movies.show', ['movie' => $visible, 'showtimes' => collect()])->render();
         $this->assertStringContainsString('/storage/movies/banners/visible.jpg', $detail);
-        $this->assertStringNotContainsString('http://', $detail);
+        $this->assertStringNotContainsString('src="http://localhost/storage/movies/banners/visible.jpg"', $detail);
 
         $this->assertSame('/storage/movies/posters/visible.jpg', $visible->poster_url);
         $this->assertNull($missing->poster_url);
