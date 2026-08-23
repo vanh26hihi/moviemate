@@ -159,65 +159,440 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
         
-            const dateInput = document.getElementById('show-date');
-            const timeInput = document.getElementById('show-time');
-            const preview = document.getElementById('showtime-preview');
-            const previewValue = document.getElementById('showtime-preview-value');
+            const movieInput =
+                document.getElementById('movie-select');
         
-            function updateShowtimePreview() {
+            const dateInput =
+                document.getElementById('show-date');
         
-                if (
-                    !dateInput ||
-                    !timeInput ||
-                    !preview ||
-                    !previewValue
-                ) {
+            const timeInput =
+                document.getElementById('show-time');
+        
+            const preview =
+                document.getElementById('showtime-preview');
+        
+            const previewValue =
+                document.getElementById('showtime-preview-value');
+        
+            const movieName =
+                document.getElementById('schedule-movie-name');
+        
+            const durationValue =
+                document.getElementById('schedule-duration');
+        
+            const endTimeValue =
+                document.getElementById('schedule-end-time');
+        
+            const roomReadyValue =
+                document.getElementById('schedule-room-ready');
+        
+            const warning =
+                document.getElementById('schedule-warning');
+        
+            const warningMessage =
+                document.getElementById('schedule-warning-message');
+        
+            const success =
+                document.getElementById('schedule-success');
+        
+            const quickButtons =
+                document.querySelectorAll('.showtime-quick-time');
+        
+            const cleaningBuffer =
+                Number(@json($cleaningBufferMinutes ?? 0));
+        
+        
+            function selectedMovie() {
+        
+                if (!movieInput) {
+                    return null;
+                }
+        
+                return movieInput.options[
+                    movieInput.selectedIndex
+                ] ?? null;
+            }
+        
+        
+            function movieDuration() {
+        
+                const option = selectedMovie();
+        
+                if (!option) {
+                    return 0;
+                }
+        
+                return Number(
+                    option.dataset.duration || 0
+                );
+            }
+        
+        
+            function updateMovieInformation() {
+        
+                const option = selectedMovie();
+        
+                if (!option || !option.value) {
+        
+                    if (movieName) {
+                        movieName.textContent =
+                            'Chưa chọn phim';
+                    }
+        
+                    if (durationValue) {
+                        durationValue.textContent =
+                            'Chưa xác định';
+                    }
+        
                     return;
                 }
         
-                const date = dateInput.value;
-                const time = timeInput.value;
-        
-                if (!date || !time) {
-                    preview.classList.add('hidden');
-                    return;
+                if (movieName) {
+                    movieName.textContent =
+                        option.dataset.title
+                        || option.textContent.trim();
                 }
         
-                const parts = date.split('-');
+                const duration =
+                    movieDuration();
+        
+                if (durationValue) {
+        
+                    durationValue.textContent =
+                        duration > 0
+                            ? duration + ' phút'
+                            : 'Chưa cập nhật';
+                }
+            }
+        
+        
+            function formatDate(date) {
+        
+                const parts =
+                    date.split('-');
         
                 if (parts.length !== 3) {
-                    preview.classList.add('hidden');
-                    return;
+                    return date;
                 }
         
-                const formattedDate =
-                    parts[2]
+                return parts[2]
                     + '/'
                     + parts[1]
                     + '/'
                     + parts[0];
+            }
+        
+        
+            function formatTime(date) {
+        
+                const hours =
+                    String(
+                        date.getHours()
+                    ).padStart(2, '0');
+        
+                const minutes =
+                    String(
+                        date.getMinutes()
+                    ).padStart(2, '0');
+        
+                return hours + ':' + minutes;
+            }
+        
+        
+            function buildStartDate() {
+        
+                if (
+                    !dateInput?.value
+                    || !timeInput?.value
+                ) {
+                    return null;
+                }
+        
+                const value =
+                    dateInput.value
+                    + 'T'
+                    + timeInput.value
+                    + ':00';
+        
+                const start =
+                    new Date(value);
+        
+                if (
+                    Number.isNaN(
+                        start.getTime()
+                    )
+                ) {
+                    return null;
+                }
+        
+                return start;
+            }
+        
+        
+            function updateEndTime() {
+        
+                const start =
+                    buildStartDate();
+        
+                const duration =
+                    movieDuration();
+        
+                if (
+                    !start
+                    || duration <= 0
+                ) {
+        
+                    if (endTimeValue) {
+                        endTimeValue.textContent =
+                            'Chưa xác định';
+                    }
+        
+                    if (roomReadyValue) {
+                        roomReadyValue.textContent =
+                            'Chưa xác định';
+                    }
+        
+                    return;
+                }
+        
+                const movieEnd =
+                    new Date(
+                        start.getTime()
+                        + duration * 60000
+                    );
+        
+                const roomReady =
+                    new Date(
+                        movieEnd.getTime()
+                        + cleaningBuffer * 60000
+                    );
+        
+                if (endTimeValue) {
+                    endTimeValue.textContent =
+                        formatTime(movieEnd);
+                }
+        
+                if (roomReadyValue) {
+        
+                    roomReadyValue.textContent =
+                        formatTime(roomReady)
+                        + (
+                            cleaningBuffer > 0
+                                ? ' (+' + cleaningBuffer + ' phút)'
+                                : ''
+                        );
+                }
+            }
+        
+        
+            function hideMessages() {
+        
+                warning?.classList.add(
+                    'hidden'
+                );
+        
+                success?.classList.add(
+                    'hidden'
+                );
+            }
+        
+        
+            function showWarning(message) {
+        
+                success?.classList.add(
+                    'hidden'
+                );
+        
+                if (warningMessage) {
+                    warningMessage.textContent =
+                        message;
+                }
+        
+                warning?.classList.remove(
+                    'hidden'
+                );
+            }
+        
+        
+            function showSuccess() {
+        
+                warning?.classList.add(
+                    'hidden'
+                );
+        
+                success?.classList.remove(
+                    'hidden'
+                );
+            }
+        
+        
+            function validateSchedule() {
+        
+                hideMessages();
+        
+                if (
+                    !dateInput?.value
+                    || !timeInput?.value
+                ) {
+                    return;
+                }
+        
+                const start =
+                    buildStartDate();
+        
+                if (!start) {
+        
+                    showWarning(
+                        'Ngày hoặc giờ chiếu không hợp lệ.'
+                    );
+        
+                    return;
+                }
+        
+                const now =
+                    new Date();
+        
+                if (
+                    start.getTime()
+                    <= now.getTime()
+                ) {
+        
+                    showWarning(
+                        'Thời gian bắt đầu suất chiếu phải nằm trong tương lai.'
+                    );
+        
+                    return;
+                }
+        
+                const duration =
+                    movieDuration();
+        
+                if (
+                    movieInput?.value
+                    && duration <= 0
+                ) {
+        
+                    showWarning(
+                        'Phim đã chọn chưa có thời lượng hợp lệ.'
+                    );
+        
+                    return;
+                }
+        
+                showSuccess();
+            }
+        
+        
+            function updatePreview() {
+        
+                if (
+                    !dateInput
+                    || !timeInput
+                    || !preview
+                    || !previewValue
+                ) {
+                    return;
+                }
+        
+                const date =
+                    dateInput.value;
+        
+                const time =
+                    timeInput.value;
+        
+                if (
+                    !date
+                    || !time
+                ) {
+        
+                    preview.classList.add(
+                        'hidden'
+                    );
+        
+                    return;
+                }
         
                 previewValue.textContent =
-                    time + ' - ' + formattedDate;
+                    time
+                    + ' - '
+                    + formatDate(date);
         
-                preview.classList.remove('hidden');
-            }
-        
-            if (dateInput) {
-                dateInput.addEventListener(
-                    'change',
-                    updateShowtimePreview
+                preview.classList.remove(
+                    'hidden'
                 );
             }
         
-            if (timeInput) {
-                timeInput.addEventListener(
-                    'change',
-                    updateShowtimePreview
-                );
+        
+            function updateAll() {
+        
+                updateMovieInformation();
+        
+                updatePreview();
+        
+                updateEndTime();
+        
+                validateSchedule();
             }
         
-            updateShowtimePreview();
+        
+            quickButtons.forEach(
+                function (button) {
+        
+                    button.addEventListener(
+                        'click',
+                        function () {
+        
+                            if (!timeInput) {
+                                return;
+                            }
+        
+                            timeInput.value =
+                                button.dataset.time || '';
+        
+                            quickButtons.forEach(
+                                function (item) {
+        
+                                    item.classList.remove(
+                                        'border-brand-start',
+                                        'text-brand-start'
+                                    );
+                                }
+                            );
+        
+                            button.classList.add(
+                                'border-brand-start',
+                                'text-brand-start'
+                            );
+        
+                            updateAll();
+                        }
+                    );
+                }
+            );
+        
+        
+            movieInput?.addEventListener(
+                'change',
+                updateAll
+            );
+        
+            dateInput?.addEventListener(
+                'change',
+                updateAll
+            );
+        
+            timeInput?.addEventListener(
+                'change',
+                updateAll
+            );
+        
+            timeInput?.addEventListener(
+                'input',
+                updateAll
+            );
+        
+        
+            updateAll();
         
         });
         </script>

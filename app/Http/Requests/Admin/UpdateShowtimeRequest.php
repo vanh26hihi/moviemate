@@ -74,4 +74,32 @@ public function messages(): array
         'status.in' => 'Trạng thái suất chiếu không hợp lệ.',
     ];
 }
+protected function prepareForValidation(): void
+{
+    $showDate = $this->input('show_date');
+    $showTime = $this->input('show_time');
+
+    $this->merge([
+        'show_date' => is_string($showDate)
+            ? trim($showDate)
+            : $showDate,
+
+        'show_time' => is_string($showTime)
+            ? trim($showTime)
+            : $showTime,
+    ]);
+}
+
+public function attributes(): array
+{
+    return [
+        'movie_id' => 'phim',
+        'room_id' => 'phòng chiếu',
+        'show_date' => 'ngày chiếu',
+        'show_time' => 'giờ chiếu',
+        'price' => 'giá vé thường',
+        'vip_price' => 'giá vé VIP',
+        'status' => 'trạng thái',
+    ];
+}
 }
