@@ -94,6 +94,36 @@ class AdminPaymentOperationsTest extends PaymentTestCase
             ->assertDontSee($vnpay->booking->booking_code)->assertDontSee($counter->booking->booking_code);
     }
 
+    public function test_reconciliation_export_is_scoped_read_only_and_excludes_payment_secrets(): void
+    {
+        $payment = $this->paymentMatchingBooking([
+            'status' => Payment::STATUS_REVIEW,
+            'failure_reason' => 'review-needed',
+            'app_trans_id' => 'private-app-id',
+            'transaction_code' => 'private-transaction-code',
+        ]);
+        $payment->booking->update(['booking_code' => 'EXPORT-BOOKING']);
+
+        $response = $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.payment-reconciliation.export'));
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=UTF-8')
+            ->assertHeader('x-content-type-options', 'nosniff');
+        $content = $response->streamedContent();
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $this->assertStringContainsString('EXPORT-BOOKING', $content);
+        $this->assertStringContainsString('Giao dịch đang chờ kiểm tra', $content);
+        $this->assertStringNotContainsString('review-needed', $content);
+        $this->assertStringNotContainsString('private-app-id', $content);
+        $this->assertStringNotContainsString('private-transaction-code', $content);
+        $this->assertSame(Payment::STATUS_REVIEW, $payment->fresh()->status);
+
+        $this->actingAs($this->userWithRole('staff'))
+            ->get(route('admin.payment-reconciliation.export'))
+            ->assertForbidden();
+    }
+
     public function test_detail_marks_authoritative_payment_and_exposes_only_safe_evidence(): void
     {
         $booking = $this->payableBooking();

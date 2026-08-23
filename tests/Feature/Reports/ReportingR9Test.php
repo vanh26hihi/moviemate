@@ -150,6 +150,34 @@ final class ReportingR9Test extends TestCase
         $this->get(route('admin.reports.index', $this->filters()))->assertForbidden();
     }
 
+    public function test_report_csv_export_is_authoritative_scoped_and_privacy_safe(): void
+    {
+        $fixture = $this->fixture();
+
+        $response = $this->actingAs($fixture['admin'])->get(route('admin.reports.export', $this->filters()));
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=UTF-8')
+            ->assertHeader('cache-control', 'max-age=0, no-store, private')
+            ->assertHeader('x-content-type-options', 'nosniff')
+            ->assertHeader('content-disposition');
+        $content = $response->streamedContent();
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $this->assertSame(4, substr_count($content, 'Report Movie'));
+        $this->assertStringContainsString('Report Movie A', $content);
+        $this->assertStringContainsString('100000', $content);
+        $this->assertStringContainsString('120000', $content);
+        $this->assertStringContainsString('90000', $content);
+        $this->assertStringContainsString('70000', $content);
+        $this->assertStringNotContainsString('R9-SECRET-TRANSACTION', $content);
+        $this->assertStringNotContainsString('private-customer@example.test', $content);
+        $this->assertStringNotContainsString('failed', $content);
+
+        $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.reports.export', [...$this->filters(), 'cinema' => $fixture['other']->id]))
+            ->assertForbidden();
+    }
+
     public function test_report_filters_are_bounded_allowlisted_and_shareable(): void
     {
         $admin = $this->userWithRole('admin');

@@ -7,6 +7,7 @@
 <div class="space-y-6">
     <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div><h1 class="text-3xl font-extrabold app-heading">Đối soát giao dịch</h1><p class="mt-2 app-muted">Kiểm tra các giao dịch cần xác minh hoặc có sai lệch với dữ liệu nhà cung cấp. Không tự suy đoán kết quả provider.</p></div>
+        <a class="btn-secondary" href="{{ route('admin.payment-reconciliation.export') }}"><i class="ph ph-download-simple"></i>Xuất hàng đợi</a>
         <form method="GET"><label class="cinema-label">Số dòng<select class="cinema-input mt-1" name="per_page" onchange="this.form.submit()">@foreach([15,25,50] as $size)<option value="{{ $size }}" @selected($perPage === $size)>{{ $size }}</option>@endforeach</select></label></form>
     </header>
     <div class="cinema-card overflow-hidden"><div class="overflow-x-auto"><table class="admin-table min-w-[86rem]">

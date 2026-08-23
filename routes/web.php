@@ -298,6 +298,8 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:dashboard.view')->name('dashboard');
         Route::get('/reports', AdminReportController::class)
             ->middleware('permission:reports.view')->name('reports.index');
+        Route::get('/reports/export', [AdminReportController::class, 'export'])
+            ->middleware('permission:reports.view')->name('reports.export');
 
         Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])
             ->middleware('permission:activity_logs.view')->name('activity-logs.index');
@@ -499,6 +501,8 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:payments.view')->name('payments.show');
         Route::get('/payment-reconciliation', [AdminPaymentReconciliationController::class, 'index'])
             ->middleware('permission:payments.reconcile')->name('payment-reconciliation.index');
+        Route::get('/payment-reconciliation/export', [AdminPaymentReconciliationController::class, 'export'])
+            ->middleware('permission:payments.reconcile')->name('payment-reconciliation.export');
         Route::post('/payments/{payment}/query-provider', [AdminPaymentReconciliationController::class, 'queryProvider'])
             ->whereNumber('payment')
             ->middleware(['permission:payments.reconcile', 'throttle:12,1'])
