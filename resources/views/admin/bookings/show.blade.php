@@ -50,7 +50,428 @@
 
     <div class="grid gap-6 xl:grid-cols-2">
         <section class="cinema-card p-6">
-            <h2 class="text-xl font-extrabold app-heading">Thông tin bán vé</h2>
+
+            @php
+                $recipientEmail = $booking->recipient_email;
+        
+                $delivery = $booking->ticketDelivery;
+        
+                $deliveryStatus = match($delivery?->status) {
+        
+                    'sent' => [
+                        'label' => 'Đã gửi',
+                        'description' => 'Vé đã được gửi thành công tới email khách hàng.',
+                        'icon' => 'ph-check-circle',
+                        'class' => 'border-success/20 bg-success/10 text-success',
+                    ],
+        
+                    'pending' => [
+                        'label' => 'Đang chờ gửi',
+                        'description' => 'Yêu cầu gửi vé đang nằm trong hàng đợi xử lý.',
+                        'icon' => 'ph-clock-countdown',
+                        'class' => 'border-warning/20 bg-warning/10 text-warning',
+                    ],
+        
+                    'processing' => [
+                        'label' => 'Đang gửi',
+                        'description' => 'Hệ thống đang xử lý yêu cầu gửi email.',
+                        'icon' => 'ph-spinner-gap',
+                        'class' => 'border-brand-start/20 bg-brand-start/10 text-brand-start',
+                    ],
+        
+                    'failed' => [
+                        'label' => 'Gửi thất bại',
+                        'description' => 'Lần gửi gần nhất gặp lỗi. Admin có thể thử gửi lại.',
+                        'icon' => 'ph-warning-circle',
+                        'class' => 'border-error/20 bg-error/10 text-error',
+                    ],
+        
+                    default => $recipientEmail
+                        ? [
+                            'label' => 'Chưa gửi',
+                            'description' => 'Chưa ghi nhận lần gửi vé nào cho đơn này.',
+                            'icon' => 'ph-envelope',
+                            'class' => 'border-slate-500/20 bg-slate-500/10 text-slate-400',
+                        ]
+                        : [
+                            'label' => 'Không có email',
+                            'description' => 'Khách hàng chưa có email hợp lệ để nhận vé.',
+                            'icon' => 'ph-envelope-simple-open',
+                            'class' => 'border-error/20 bg-error/10 text-error',
+                        ],
+                };
+            @endphp
+        
+        
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        
+                <div class="flex items-start gap-3">
+        
+                    <div
+                        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-start/10 text-brand-start"
+                    >
+                        <i
+                            class="ph ph-envelope-simple text-xl"
+                            aria-hidden="true"
+                        ></i>
+                    </div>
+        
+                    <div>
+                        <h2 class="text-xl font-extrabold app-heading">
+                            Gửi vé qua email
+                        </h2>
+        
+                        <p class="mt-1 max-w-2xl text-sm app-muted">
+                            Admin có thể kiểm tra địa chỉ email,
+                            trạng thái gửi và gửi lại vé cho khách hàng.
+                        </p>
+                    </div>
+        
+                </div>
+        
+        
+                <span
+                    class="inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-extrabold {{ $deliveryStatus['class'] }}"
+                >
+                    <i
+                        class="ph {{ $deliveryStatus['icon'] }}"
+                        aria-hidden="true"
+                    ></i>
+        
+                    {{ $deliveryStatus['label'] }}
+                </span>
+        
+            </div>
+        
+        
+            <div class="mt-6 rounded-2xl border app-border p-5">
+        
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        
+                    <div class="min-w-0">
+        
+                        <p class="text-xs font-bold uppercase tracking-wider app-muted">
+                            Email nhận vé
+                        </p>
+        
+                        @if($recipientEmail)
+        
+                            <p class="mt-2 break-all text-lg font-extrabold app-text">
+                                {{ $recipientEmail }}
+                            </p>
+        
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+        
+                                <span
+                                    class="inline-flex items-center gap-1 rounded-full border app-border px-2.5 py-1 text-xs font-bold app-muted"
+                                >
+                                    <i
+                                        class="ph ph-user-circle"
+                                        aria-hidden="true"
+                                    ></i>
+        
+                                    {{ $booking->recipient_email_source_label }}
+                                </span>
+        
+                                @if($booking->recipient_email_source === 'account')
+        
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success/10 px-2.5 py-1 text-xs font-bold text-success"
+                                    >
+                                        <i
+                                            class="ph ph-check-circle"
+                                            aria-hidden="true"
+                                        ></i>
+        
+                                        Lấy từ tài khoản
+                                    </span>
+        
+                                @endif
+        
+                            </div>
+        
+                        @else
+        
+                            <p class="mt-2 text-lg font-extrabold text-error">
+                                Chưa có email hợp lệ
+                            </p>
+        
+                            <p class="mt-2 text-sm app-muted">
+                                Không tìm thấy email hợp lệ trong tài khoản
+                                hoặc thông tin đặt vé.
+                            </p>
+        
+                        @endif
+        
+                    </div>
+        
+                </div>
+        
+            </div>
+        
+        
+            <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        
+                <div class="rounded-2xl border app-border p-4">
+        
+                    <div class="flex items-center gap-2">
+        
+                        <i
+                            class="ph ph-paper-plane-tilt text-brand-start"
+                            aria-hidden="true"
+                        ></i>
+        
+                        <p class="text-xs font-bold uppercase tracking-wider app-muted">
+                            Trạng thái
+                        </p>
+        
+                    </div>
+        
+                    <p class="mt-3 font-extrabold app-text">
+                        {{ $deliveryStatus['label'] }}
+                    </p>
+        
+                    <p class="mt-1 text-xs leading-relaxed app-muted">
+                        {{ $deliveryStatus['description'] }}
+                    </p>
+        
+                </div>
+        
+        
+                <div class="rounded-2xl border app-border p-4">
+        
+                    <div class="flex items-center gap-2">
+        
+                        <i
+                            class="ph ph-arrow-counter-clockwise text-brand-start"
+                            aria-hidden="true"
+                        ></i>
+        
+                        <p class="text-xs font-bold uppercase tracking-wider app-muted">
+                            Số lần thử
+                        </p>
+        
+                    </div>
+        
+                    <p class="mt-3 text-2xl font-extrabold app-text">
+                        {{ $delivery?->attempts ?? 0 }}
+                    </p>
+        
+                    <p class="mt-1 text-xs app-muted">
+                        Tổng số lần hệ thống đã thử gửi.
+                    </p>
+        
+                </div>
+        
+        
+                <div class="rounded-2xl border app-border p-4">
+        
+                    <div class="flex items-center gap-2">
+        
+                        <i
+                            class="ph ph-clock text-brand-start"
+                            aria-hidden="true"
+                        ></i>
+        
+                        <p class="text-xs font-bold uppercase tracking-wider app-muted">
+                            Cập nhật gần nhất
+                        </p>
+        
+                    </div>
+        
+                    <p class="mt-3 font-extrabold app-text">
+                        {{
+                            $delivery?->updated_at
+                                ?->format('d/m/Y H:i:s')
+                                ?? 'Chưa có'
+                        }}
+                    </p>
+        
+                </div>
+        
+        
+                <div class="rounded-2xl border app-border p-4">
+        
+                    <div class="flex items-center gap-2">
+        
+                        <i
+                            class="ph ph-check-fat text-brand-start"
+                            aria-hidden="true"
+                        ></i>
+        
+                        <p class="text-xs font-bold uppercase tracking-wider app-muted">
+                            Gửi thành công
+                        </p>
+        
+                    </div>
+        
+                    <p class="mt-3 font-extrabold app-text">
+                        {{
+                            $delivery?->sent_at
+                                ?->format('d/m/Y H:i:s')
+                                ?? 'Chưa gửi thành công'
+                        }}
+                    </p>
+        
+                </div>
+        
+            </div>
+        
+        
+            @if($delivery?->last_error_code)
+        
+                <div
+                    class="mt-5 rounded-2xl border border-error/20 bg-error/5 p-5"
+                >
+        
+                    <div class="flex items-start gap-3">
+        
+                        <div
+                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-error/10 text-error"
+                        >
+                            <i
+                                class="ph ph-warning-circle text-xl"
+                                aria-hidden="true"
+                            ></i>
+                        </div>
+        
+                        <div class="min-w-0">
+        
+                            <p class="font-extrabold text-error">
+                                Lần gửi gần nhất gặp lỗi
+                            </p>
+        
+                            <p class="mt-1 text-sm leading-relaxed app-muted">
+                                {{
+                                    \App\Support\TicketDeliveryPresentation::error(
+                                        $delivery->last_error_code
+                                    )
+                                }}
+                            </p>
+        
+                            <div class="mt-3">
+        
+                                <span
+                                    class="inline-flex max-w-full items-center rounded-lg border border-error/20 bg-error/5 px-2.5 py-1 font-mono text-xs text-error"
+                                >
+                                    {{ $delivery->last_error_code }}
+                                </span>
+        
+                            </div>
+        
+                            <p class="mt-3 text-xs app-muted">
+                                Lỗi gửi email đã được hệ thống ghi nhận.
+                                Admin có thể thử gửi lại khi nguyên nhân đã được xử lý.
+                            </p>
+        
+                        </div>
+        
+                    </div>
+        
+                </div>
+        
+            @endif
+        
+        
+            @if(!$recipientEmail)
+        
+                <div
+                    class="mt-5 rounded-2xl border border-warning/20 bg-warning/5 p-5"
+                >
+        
+                    <div class="flex items-start gap-3">
+        
+                        <i
+                            class="ph ph-info mt-0.5 text-xl text-warning"
+                            aria-hidden="true"
+                        ></i>
+        
+                        <div>
+        
+                            <p class="font-extrabold text-warning">
+                                Chưa thể gửi vé
+                            </p>
+        
+                            <p class="mt-1 text-sm leading-relaxed app-muted">
+                                Khách hàng chưa có địa chỉ email hợp lệ.
+                                Hệ thống sẽ không tạo yêu cầu gửi vé
+                                cho đến khi có email nhận vé.
+                            </p>
+        
+                        </div>
+        
+                    </div>
+        
+                </div>
+        
+            @endif
+        
+        
+            <div class="mt-6 border-t app-border pt-5">
+        
+                @can('ticket_deliveries.retry')
+        
+                    @if($deliveryRetryAllowed && $recipientEmail)
+        
+                        <form
+                            method="POST"
+                            action="{{ route('admin.bookings.ticket-email.resend', $booking) }}"
+                            onsubmit="return confirm('Xác nhận gửi vé tới email {{ $recipientEmail }}?');"
+                        >
+        
+                            @csrf
+        
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        
+                                <button
+                                    class="btn-primary"
+                                    type="submit"
+                                >
+        
+                                    <i
+                                        class="ph ph-envelope-simple"
+                                        aria-hidden="true"
+                                    ></i>
+        
+                                    @if($delivery?->status === 'sent')
+                                        Gửi lại vé qua email
+                                    @else
+                                        Gửi vé qua email
+                                    @endif
+        
+                                </button>
+        
+                                <p class="text-xs app-muted">
+                                    Vé sẽ được đưa vào hàng đợi gửi email an toàn.
+                                </p>
+        
+                            </div>
+        
+                        </form>
+        
+                    @elseif(!$recipientEmail)
+        
+                        <button
+                            type="button"
+                            class="btn-secondary cursor-not-allowed opacity-50"
+                            disabled
+                        >
+                            <i
+                                class="ph ph-envelope-simple"
+                                aria-hidden="true"
+                            ></i>
+        
+                            Không thể gửi email
+                        </button>
+        
+                    @endif
+        git status
+git diff --stat
+                @endcan
+        
+            </div>
+        
+        </section>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2">
                 <div><dt class="text-sm app-muted">Kênh bán</dt><dd class="font-bold app-text">{{ $booking->sales_channel === 'counter' ? 'Tại quầy' : 'Online' }}</dd></div>
                 <div><dt class="text-sm app-muted">Chi nhánh</dt><dd class="font-bold app-text">{{ $booking->showtime?->cinema?->name ?? '—' }}</dd></div>
