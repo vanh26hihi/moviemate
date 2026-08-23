@@ -4,10 +4,12 @@ namespace Tests\Feature\Ai;
 
 use App\Ai\AiConversationContext;
 use App\Ai\AiStreamCompletionGate;
+use App\Ai\AiStructuredResultCollector;
 use App\Ai\Contracts\AiTextStreamer;
 use App\Models\AiMessage;
 use App\Models\FoodItem;
 use App\Models\User;
+use App\Services\AiChatStreamService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use RuntimeException;
 use Tests\TestCase;
@@ -76,6 +78,52 @@ class AiStreamingExperienceTest extends TestCase
         $this->assertStringContainsString('Bắp rang', $content);
         $this->assertDatabaseCount('ai_conversations', 0);
         $this->assertDatabaseCount('ai_messages', 0);
+    }
+
+    public function test_empty_provider_stream_completes_only_from_authoritative_tool_cards(): void
+    {
+        $collector = app(AiStructuredResultCollector::class);
+        $this->app->instance(AiTextStreamer::class, new class($collector) implements AiTextStreamer
+        {
+            public function __construct(private AiStructuredResultCollector $collector) {}
+
+            public function enabledAndConfigured(): bool
+            {
+                return true;
+            }
+
+            public function source(): string
+            {
+                return 'nine_router';
+            }
+
+            public function deltas(string $message, AiConversationContext $context): iterable
+            {
+                $this->collector->record('search_movies', ['movies' => [[
+                    'id' => 41,
+                    'title' => 'Grounded Stream Movie',
+                    'slug' => 'grounded-stream-movie',
+                    'status' => 'now_showing',
+                ]]]);
+
+                yield from [];
+            }
+        });
+
+        $stream = app(AiChatStreamService::class)->stream(
+            'Phim nào đang chiếu?',
+            AiConversationContext::empty(),
+            'guest',
+        );
+        $text = '';
+        foreach ($stream as $delta) {
+            $text .= $delta;
+        }
+        $result = $stream->getReturn();
+
+        $this->assertSame('Mình tìm thấy 1 phim trên MovieMate:', $text);
+        $this->assertSame('nine_router', $result['source']);
+        $this->assertSame(41, $result['structured_response']['cards'][0]['id']);
     }
 
     public function test_stream_ownership_is_checked_before_any_message_is_written(): void

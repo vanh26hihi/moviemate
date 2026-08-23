@@ -114,6 +114,32 @@ class NineRouterProviderTest extends TestCase
         $this->assertStringContainsString('Nine Router Grounded Movie', $toolOutput['output']);
     }
 
+    public function test_nine_router_showtime_tool_clamps_an_oversized_provider_limit(): void
+    {
+        $this->enableNineRouter('tool-compatible-model');
+
+        Http::preventStrayRequests();
+        Http::fakeSequence()
+            ->push($this->toolCallResponse(
+                'find_showtimes',
+                '{"date":"2026-08-23","limit":10}',
+                'call_nine_router_showtimes_initial',
+            ))
+            ->push($this->toolCallResponse(
+                'find_showtimes',
+                '{"date":"2026-08-23","limit":50}',
+                'call_nine_router_showtimes_oversized',
+            ))
+            ->push($this->completedResponse('Không có suất chiếu phù hợp tối nay.'));
+
+        $result = app(AiChatbotService::class)->answer('Tối nay có suất nào?');
+
+        $this->assertTrue($result['assistant_completed'], json_encode($result));
+        $this->assertSame('nine_router', $result['source']);
+        $this->assertSame('Không có suất chiếu phù hợp tối nay.', $result['answer']);
+        $this->assertCount(3, Http::recorded());
+    }
+
     public function test_nine_router_streaming_transport_stays_explicit_and_executes_tools(): void
     {
         Movie::query()->create([
@@ -323,8 +349,11 @@ class NineRouterProviderTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function toolCallResponse(string $name, string $arguments): array
-    {
+    private function toolCallResponse(
+        string $name,
+        string $arguments,
+        string $callId = 'call_nine_router_search',
+    ): array {
         return [
             'id' => 'chatcmpl_nine_router_tool',
             'object' => 'chat.completion',
@@ -335,7 +364,7 @@ class NineRouterProviderTest extends TestCase
                     'role' => 'assistant',
                     'content' => null,
                     'tool_calls' => [[
-                        'id' => 'call_nine_router_search',
+                        'id' => $callId,
                         'type' => 'function',
                         'function' => ['name' => $name, 'arguments' => $arguments],
                     ]],

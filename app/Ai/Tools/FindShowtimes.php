@@ -23,7 +23,12 @@ final class FindShowtimes extends ReadOnlyTool implements Tool
 
     public function handle(Request $request): string
     {
-        $input = $this->validate($request, [
+        $arguments = $request->all();
+        if (is_int($arguments['limit'] ?? null)) {
+            $arguments['limit'] = min($arguments['limit'], CustomerShowtimeReadService::MAX_RESULTS);
+        }
+
+        $input = $this->validate(new Request($arguments), [
             'movie_id' => ['sometimes', 'nullable', 'prohibits:movie_slug', 'integer', 'min:1'],
             'movie_slug' => ['sometimes', 'nullable', 'prohibits:movie_id', 'string', 'max:191'],
             'cinema_code' => ['sometimes', 'nullable', 'string', 'max:50'],

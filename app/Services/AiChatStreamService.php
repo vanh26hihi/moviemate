@@ -51,12 +51,18 @@ final class AiChatStreamService
         }
 
         $answer = trim($answer);
-        if ($answer === '') {
-            throw new UnexpectedValueException('Malformed AI stream response.');
-        }
-
         $structuredResponse = $this->structuredResponses
             ->assemble($answer, $this->structuredResults)->toArray();
+        if ($answer === '') {
+            if ($structuredResponse['cards'] === []) {
+                throw new UnexpectedValueException('Malformed AI stream response.');
+            }
+
+            $answer = $structuredResponse['text'];
+            foreach ($this->chunks($answer) as $chunk) {
+                yield $chunk;
+            }
+        }
 
         return [
             'answer' => $structuredResponse['text'],

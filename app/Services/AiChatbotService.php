@@ -44,12 +44,15 @@ final class AiChatbotService
             $this->toolGuard->reset();
             try {
                 $answer = $this->runtime->prompt($this->assistant, $message, $context);
-                if ($answer === '' || mb_strlen($answer) > max(500, (int) config('moviemate-ai.max_response_characters', 6000))) {
+                if (mb_strlen($answer) > max(500, (int) config('moviemate-ai.max_response_characters', 6000))) {
                     throw new \UnexpectedValueException('Malformed AI response.');
                 }
 
                 $structuredResponse = $this->structuredResponses
                     ->assemble($answer, $this->structuredResults)->toArray();
+                if ($answer === '' && $structuredResponse['cards'] === []) {
+                    throw new \UnexpectedValueException('Malformed AI response.');
+                }
                 $result = [
                     'answer' => $structuredResponse['text'],
                     'source' => $this->runtime->provider(),

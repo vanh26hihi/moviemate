@@ -296,6 +296,27 @@ class AiOrchestrationHardeningTest extends TestCase
         $this->assertSame('malformed', $oversized['failure_category']);
     }
 
+    public function test_empty_provider_text_can_complete_only_with_authoritative_tool_cards(): void
+    {
+        $movie = Movie::query()->create([
+            'title' => 'Grounded Empty Text Movie',
+            'slug' => 'grounded-empty-text-movie',
+            'duration' => 105,
+            'status' => 'now_showing',
+        ]);
+        $this->enableAssistant();
+        MovieMateCinemaAssistant::fake([
+            new ToolCall('grounded-empty-text', 'search_movies', ['limit' => 5]),
+            '   ',
+        ])->preventStrayPrompts();
+
+        $result = app(AiChatbotService::class)->answer('Phim nào đang chiếu?');
+
+        $this->assertTrue($result['assistant_completed'], json_encode($result));
+        $this->assertSame('Mình tìm thấy 1 phim trên MovieMate:', $result['answer']);
+        $this->assertSame($movie->id, $result['structured_response']['cards'][0]['id']);
+    }
+
     public function test_guest_chat_and_recommendation_rate_limits_are_named_and_bounded(): void
     {
         config()->set('moviemate-ai.enabled', false);
