@@ -25,6 +25,103 @@ use LogicException;
 
 class ShowtimeScheduleService
 {
+    public function validateRequestedSchedule(
+        int $movieId,
+        int $roomId,
+        string $showDate,
+        string $showTime,
+        ?int $ignoreShowtimeId = null
+    ): void {
+        $movie = Movie::query()->findOrFail($movieId);
+    
+        $room = Room::query()
+            ->with('cinema')
+            ->findOrFail($roomId);
+    
+        if ($room->status !== 'active') {
+            throw new ShowtimeScheduleException(
+                'room_id',
+                'Phòng chiếu hiện không hoạt động.'
+            );
+        }
+    
+        $start = Carbon::createFromFormat(
+            'Y-m-d H:i',
+            $showDate.' '.$showTime,
+            $room->cinema?->timezone ?? config('app.timezone')
+        );
+    
+        if ($start->isPast()) {
+            throw new ShowtimeScheduleException(
+                'show_time',
+                'Thời gian chiếu không được nằm trong quá khứ.'
+            );
+        }
+    
+        if (! $movie->duration || (int) $movie->duration <= 0) {
+            throw new ShowtimeScheduleException(
+                'movie_id',
+                'Phim chưa có thời lượng hợp lệ.'
+            );
+        }
+    
+        $movieEnd = $start
+            ->copy()
+            ->addMinutes((int) $movie->duration);
+    
+        $cleaningBuffer = $this->cleaningBufferMinutes();
+    
+        $operationalEnd = $movieEnd
+            ->copy()
+            ->addMinutes($cleaningBuffer);
+    
+        $query = Showtime::query()
+            ->where('room_id', $roomId)
+            ->where('status', '!=', 'cancelled');
+    
+        if ($ignoreShowtimeId !== null) {
+            $query->whereKeyNot($ignoreShowtimeId);
+        }
+    
+        $existingShowtimes = $query
+            ->whereDate('show_date', $showDate)
+            ->with('movie')
+            ->get();
+    
+        foreach ($existingShowtimes as $existing) {
+            if (
+                ! $existing->show_date
+                || ! $existing->show_time
+                || ! $existing->movie?->duration
+            ) {
+                continue;
+            }
+    
+            $existingStart = Carbon::createFromFormat(
+                'Y-m-d H:i',
+                $existing->show_date->format('Y-m-d')
+                    .' '
+                    .Carbon::parse($existing->show_time)->format('H:i'),
+                $room->cinema?->timezone ?? config('app.timezone')
+            );
+    
+            $existingEnd = $existingStart
+                ->copy()
+                ->addMinutes((int) $existing->movie->duration)
+                ->addMinutes($cleaningBuffer);
+    
+            $hasConflict =
+                $start->lt($existingEnd)
+                && $operationalEnd->gt($existingStart);
+    
+            if ($hasConflict) {
+                throw new ShowtimeScheduleException(
+                    'show_time',
+                    'Khung giờ này bị trùng với suất chiếu khác trong cùng phòng.'
+                );
+            }
+        }
+    }
     public const MAX_RUNTIME_MINUTES = 600;
 
     public const MAX_CLEANING_BUFFER_MINUTES = 180;

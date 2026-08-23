@@ -229,6 +229,30 @@ class ShowtimeController extends Controller
     {
         $this->assertViewableShowtime($showtime);
         $validated = $request->validated();
+        try {
+            DB::transaction(function () use ($validated): void {
+                $showtime = $this->schedule->schedule($validated);
+        
+                $this->activityLogger->log(
+                    'showtime.created',
+                    $showtime,
+                    after: $this->auditData($showtime),
+                );
+            });
+        } catch (
+            ShowtimeScheduleException |
+            PricingConfigurationException $exception
+        ) {
+            $field = $exception instanceof ShowtimeScheduleException
+                ? $exception->field
+                : 'room_id';
+        
+            return back()
+                ->withErrors([
+                    $field => $exception->getMessage(),
+                ])
+                ->withInput();
+        }
         $cancellation = $cancellations->cancel(
             $showtime,
             $request->user(),
