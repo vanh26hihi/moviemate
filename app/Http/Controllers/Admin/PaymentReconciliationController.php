@@ -14,6 +14,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\ActivityLogger;
 use App\Services\Admin\PaymentReconciliationQuery;
+use App\Services\Admin\PaymentReconciliationExportService;
 use App\Services\Payments\PaymentReconciliationService;
 use App\Services\Payments\PaymentReviewResolutionService;
 use App\Support\StatusLabel;
@@ -34,6 +35,11 @@ final class PaymentReconciliationController extends Controller
             'payments' => $payments->paginate($perPage),
             'perPage' => $perPage,
         ]);
+    }
+
+    public function export(PaymentReconciliationExportService $exports): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return $exports->download();
     }
 
     public function queryProvider(
