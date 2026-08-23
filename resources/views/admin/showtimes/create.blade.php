@@ -156,7 +156,71 @@
         </div>
 
     </div>
-
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        
+            const dateInput = document.getElementById('show-date');
+            const timeInput = document.getElementById('show-time');
+            const preview = document.getElementById('showtime-preview');
+            const previewValue = document.getElementById('showtime-preview-value');
+        
+            function updateShowtimePreview() {
+        
+                if (
+                    !dateInput ||
+                    !timeInput ||
+                    !preview ||
+                    !previewValue
+                ) {
+                    return;
+                }
+        
+                const date = dateInput.value;
+                const time = timeInput.value;
+        
+                if (!date || !time) {
+                    preview.classList.add('hidden');
+                    return;
+                }
+        
+                const parts = date.split('-');
+        
+                if (parts.length !== 3) {
+                    preview.classList.add('hidden');
+                    return;
+                }
+        
+                const formattedDate =
+                    parts[2]
+                    + '/'
+                    + parts[1]
+                    + '/'
+                    + parts[0];
+        
+                previewValue.textContent =
+                    time + ' - ' + formattedDate;
+        
+                preview.classList.remove('hidden');
+            }
+        
+            if (dateInput) {
+                dateInput.addEventListener(
+                    'change',
+                    updateShowtimePreview
+                );
+            }
+        
+            if (timeInput) {
+                timeInput.addEventListener(
+                    'change',
+                    updateShowtimePreview
+                );
+            }
+        
+            updateShowtimePreview();
+        
+        });
+        </script>
 </section>
 </div>
 @endsection

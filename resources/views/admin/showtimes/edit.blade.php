@@ -20,7 +20,13 @@
                 <a href="{{ route('admin.showtimes.index') }}" class="btn-secondary mt-5">Quay lại danh sách</a>
             </div>
         @else
-            <form method="POST" action="{{ route('admin.showtimes.update', $showtime) }}" class="space-y-6">
+            <form method="POST" action="{{ route('admin.showtimes.update', $showtime) }}" class="space-y-6"
+            value="{{ old(
+                'show_time',
+                $showtime->show_time
+                    ? \Carbon\Carbon::parse($showtime->show_time)->format('H:i')
+                    : ''
+            ) }}">
                 @csrf
                 @method('PUT')
                 @include('admin.showtimes._form-fields')
