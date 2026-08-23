@@ -182,9 +182,100 @@ class Booking extends Model
 
     public function getRecipientEmailAttribute(): ?string
     {
-        $email = is_string($this->customer_email) ? trim($this->customer_email) : '';
-
-        return $email !== '' ? $email : null;
+        /*
+         * Nếu booking thuộc một tài khoản,
+         * ưu tiên email hiện tại của tài khoản.
+         */
+        if ($this->user_id !== null) {
+            $this->loadMissing('user');
+    
+            $accountEmail = $this->normalizeRecipientEmail(
+                $this->user?->email
+            );
+    
+            if ($accountEmail !== null) {
+                return $accountEmail;
+            }
+        }
+    
+        /*
+         * Nếu không có email tài khoản hợp lệ,
+         * sử dụng email snapshot của booking.
+         */
+        return $this->normalizeRecipientEmail(
+            $this->customer_email
+        );
+    }
+    
+    public function getRecipientEmailSourceAttribute(): string
+    {
+        if ($this->user_id !== null) {
+            $this->loadMissing('user');
+    
+            if (
+                $this->normalizeRecipientEmail(
+                    $this->user?->email
+                ) !== null
+            ) {
+                return 'account';
+            }
+        }
+    
+        if (
+            $this->normalizeRecipientEmail(
+                $this->customer_email
+            ) !== null
+        ) {
+            return 'booking';
+        }
+    
+        return 'missing';
+    }
+    
+    public function getRecipientEmailSourceLabelAttribute(): string
+    {
+        return match (
+            $this->recipient_email_source
+        ) {
+            'account'
+                => 'Email tài khoản khách hàng',
+    
+            'booking'
+                => 'Email được lưu khi đặt vé',
+    
+            default
+                => 'Chưa có email nhận vé',
+        };
+    }
+    
+    public function getHasRecipientEmailAttribute(): bool
+    {
+        return $this->recipient_email !== null;
+    }
+    
+    private function normalizeRecipientEmail(
+        mixed $email
+    ): ?string {
+        if (! is_string($email)) {
+            return null;
+        }
+    
+        $email = trim($email);
+    
+        if ($email === '') {
+            return null;
+        }
+    
+        if (
+            filter_var(
+                $email,
+                FILTER_VALIDATE_EMAIL
+            ) === false
+        ) {
+            return null;
+        }
+    
+        return mb_strtolower($email);
     }
 
     public function getSeatCodesAttribute(): string

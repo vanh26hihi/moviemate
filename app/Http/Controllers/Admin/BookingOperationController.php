@@ -24,44 +24,65 @@ final class BookingOperationController extends Controller
     public function resendTicket(
         Request $request,
         Booking $booking,
-        BookingTicketEligibility $eligibility,
-        TicketDeliveryRetryService $retries,
-        ActivityLogger $activities,
-        AdminTicketDeliveryQuery $deliveryQuery,
+        AdminTicketEmailService $ticketEmails,
     ): RedirectResponse {
-        $booking->load(['payments', 'ticketDelivery']);
-        abort_unless($eligibility->isDeliverable($booking), 404);
-        abort_unless($booking->ticketDelivery, 404);
-        if ($booking->ticketDelivery->status !== BookingTicketDelivery::STATUS_FAILED) {
-            return back()->with('warning', 'Chỉ vé gửi lỗi mới có thể được đưa lại vào hàng đợi.');
-        }
-        $this->assertRateLimit('ticket-resend', $request, $booking->id, 3);
-
-        $before = $booking->ticketDelivery->status;
-        $result = $retries->retry($booking->ticketDelivery);
-        if (! $result->changed) {
-            $message = match ($result->category) {
-                'sent' => 'Tài liệu nhận vé đã được gửi thành công; hệ thống không tạo lượt gửi trùng.',
-                'active_claim' => 'Tài liệu nhận vé đang được tiến trình khác gửi.',
-                'already_queued' => 'Tài liệu nhận vé đã nằm trong hàng đợi gửi.',
-                default => 'Đơn không còn đủ điều kiện gửi lại tài liệu nhận vé.',
+        abort_unless(
+            $request->user()?->can(
+                'ticket_deliveries.retry'
+            ),
+            403
+        );
+    
+        $this->assertRateLimit(
+            'ticket-resend',
+            $request,
+            $booking->id,
+            3
+        );
+    
+        try {
+            $delivery = $ticketEmails->send(
+                $booking,
+                $request->user()?->id,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+    
+            $message = match (
+                $exception->getMessage()
+            ) {
+                'Khách hàng chưa có email hợp lệ để nhận vé.'
+                    => 'Khách hàng chưa có email hợp lệ để nhận vé.',
+    
+                'ticket_booking_not_eligible'
+                    => 'Đơn đặt vé hiện tại chưa đủ điều kiện để gửi vé.',
+    
+                default
+                    => 'Không thể gửi vé qua email lúc này. Hệ thống đã ghi nhận lỗi.',
             };
-
-            return back()->with('warning', $message);
+    
+            return redirect()
+                ->route(
+                    'admin.bookings.show',
+                    $booking
+                )
+                ->with(
+                    'error',
+                    $message
+                );
         }
-
-        $activities->log('booking.ticket_resend_requested', $booking, [
-            'delivery_status' => $before,
-        ], [
-            'delivery_status' => $result->delivery->status,
-        ], [
-            'booking_id' => $booking->id,
-            'booking_code' => $booking->booking_code,
-            'recipient_mask' => PrivacyMask::email($booking->recipient_email),
-        ]);
-        $deliveryQuery->forgetBadge();
-
-        return back()->with('success', 'Yêu cầu gửi lại tài liệu nhận vé đã được ghi nhận.');
+    
+        return redirect()
+            ->route(
+                'admin.bookings.show',
+                $booking
+            )
+            ->with(
+                'success',
+                $delivery->status === 'processing'
+                    ? 'Yêu cầu gửi vé đang được hệ thống xử lý.'
+                    : 'Đã đưa vé vào hàng đợi gửi email cho khách hàng.'
+            );
     }
 
     public function queryPayment(
