@@ -18,11 +18,477 @@
 
 @section('content')
 <div class="space-y-6">
+
+    {{-- =========================================================
+        HEADER
+        Giữ giao diện mới từ main + nút thêm phim từ feature
+    ========================================================== --}}
     <header class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+
         <div>
-            <span class="status-badge bg-brand-start/10 text-brand-start"><i class="ph ph-film-slate" aria-hidden="true"></i> Danh mục toàn chuỗi</span>
-            <h1 class="mt-3 text-2xl font-extrabold app-heading sm:text-3xl">{{ $canManageGlobalCatalog ? 'Quản lý phim' : 'Danh mục phim dùng chung' }}</h1>
-            <p class="mt-2 max-w-3xl app-muted">Mỗi phim có một hồ sơ dùng chung. Vòng đời được quản lý tại hồ sơ phim; ngày khởi chiếu là thông tin phát hành, còn việc một chi nhánh có chiếu phim hay không được quyết định bởi lịch suất chiếu.</p>
+            <span class="status-badge bg-brand-start/10 text-brand-start">
+                <i class="ph ph-film-slate" aria-hidden="true"></i>
+                Danh mục toàn chuỗi
+            </span>
+
+            <h1 class="mt-3 text-2xl font-extrabold app-heading sm:text-3xl">
+                {{ $canManageGlobalCatalog ? 'Quản lý phim' : 'Danh mục phim dùng chung' }}
+            </h1>
+
+            <p class="mt-2 max-w-3xl app-muted">
+                Mỗi phim có một hồ sơ dùng chung.
+                Vòng đời được quản lý tại hồ sơ phim;
+                ngày khởi chiếu là thông tin phát hành,
+                còn việc một chi nhánh có chiếu phim hay không
+                được quyết định bởi lịch suất chiếu.
+            </p>
+        </div>
+
+        @can('movies.create')
+            <a
+                href="{{ route('admin.movies.create') }}"
+                class="admin-btn-primary"
+            >
+                <i class="ph-bold ph-plus"></i>
+                Thêm mới
+            </a>
+        @endcan
+
+    </header>
+
+
+    {{-- =========================================================
+        THANH TÌM KIẾM + BỘ LỌC
+    ========================================================== --}}
+    <div class="admin-toolbar">
+
+        <form
+            method="GET"
+            action="{{ route('admin.movies.index') }}"
+            class="flex w-full flex-col gap-3 xl:flex-row"
+        >
+
+            {{-- Tìm kiếm --}}
+            <label class="relative flex-1">
+
+                <i
+                    class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 app-text-muted"
+                    aria-hidden="true"
+                ></i>
+
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ $searchValue ?? '' }}"
+                    placeholder="Tìm theo tên phim, mô tả, quốc gia hoặc trạng thái..."
+                    class="admin-input pl-11"
+                    autocomplete="off"
+                >
+
+            </label>
+
+
+            {{-- Lọc trạng thái --}}
+            <select
+                name="status"
+                class="admin-input xl:w-52"
+            >
+                <option value="">
+                    Tất cả trạng thái
+                </option>
+
+                <option
+                    value="draft"
+                    {{ ($statusValue ?? '') === 'draft' ? 'selected' : '' }}
+                >
+                    Bản nháp
+                </option>
+
+                <option
+                    value="now_showing"
+                    {{ ($statusValue ?? '') === 'now_showing' ? 'selected' : '' }}
+                >
+                    Đang chiếu
+                </option>
+
+                <option
+                    value="coming_soon"
+                    {{ ($statusValue ?? '') === 'coming_soon' ? 'selected' : '' }}
+                >
+                    Sắp chiếu
+                </option>
+
+                <option
+                    value="inactive"
+                    {{ ($statusValue ?? '') === 'inactive' ? 'selected' : '' }}
+                >
+                    Ngừng hoạt động
+                </option>
+
+                <option
+                    value="archived"
+                    {{ ($statusValue ?? '') === 'archived' ? 'selected' : '' }}
+                >
+                    Đã lưu trữ
+                </option>
+            </select>
+
+
+            {{-- Lọc thể loại --}}
+            <select
+                name="genre"
+                class="admin-input xl:w-52"
+            >
+                <option value="">
+                    Tất cả thể loại
+                </option>
+
+                @foreach(($genres ?? collect()) as $genre)
+                    <option
+                        value="{{ $genre->id }}"
+                        {{ ($genreValue ?? '') === (string) $genre->id ? 'selected' : '' }}
+                    >
+                        {{ $genre->name }}
+                    </option>
+                @endforeach
+
+            </select>
+
+
+            {{-- Lọc quốc gia --}}
+            <select
+                name="country"
+                class="admin-input xl:w-52"
+            >
+                <option value="">
+                    Tất cả quốc gia
+                </option>
+
+                @foreach(($countries ?? collect()) as $countryItem)
+                    <option
+                        value="{{ $countryItem }}"
+                        {{ ($countryValue ?? '') === $countryItem ? 'selected' : '' }}
+                    >
+                        {{ $countryItem }}
+                    </option>
+                @endforeach
+
+            </select>
+
+
+            {{-- Submit --}}
+            <button
+                type="submit"
+                class="admin-btn-primary"
+            >
+                <i class="ph-bold ph-magnifying-glass"></i>
+                Tìm kiếm
+            </button>
+
+
+            {{-- Xóa lọc --}}
+            @if(
+                ($searchValue ?? '') !== '' ||
+                ($statusValue ?? '') !== '' ||
+                ($genreValue ?? '') !== '' ||
+                ($countryValue ?? '') !== ''
+            )
+                <a
+                    href="{{ route('admin.movies.index') }}"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border app-border px-4 py-3 text-sm font-bold app-text transition-colors hover:border-brand-start hover:text-brand-start"
+                >
+                    <i class="ph ph-x"></i>
+                    Xóa lọc
+                </a>
+            @endif
+
+        </form>
+
+    </div>
+
+
+    {{-- =========================================================
+        KẾT QUẢ TÌM KIẾM
+    ========================================================== --}}
+    @if(
+        ($searchValue ?? '') !== '' ||
+        ($statusValue ?? '') !== '' ||
+        ($genreValue ?? '') !== '' ||
+        ($countryValue ?? '') !== ''
+    )
+
+        <div class="rounded-2xl border app-border app-card px-4 py-3 text-sm app-text-muted">
+
+            Tìm thấy
+
+            <span class="font-extrabold app-text">
+                {{ $movies->total() }}
+            </span>
+
+            phim phù hợp
+
+            @if(($countryValue ?? '') !== '')
+
+                tại quốc gia
+
+                <span class="font-extrabold text-brand-start">
+                    {{ $countryValue }}
+                </span>
+
+            @endif
+
+            .
+
+        </div>
+
+    @endif
+
+
+    {{-- =========================================================
+        BẢNG PHIM
+    ========================================================== --}}
+    <div class="admin-table-card">
+
+        <div class="overflow-x-auto">
+
+            <table class="admin-table">
+
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Áp phích</th>
+                        <th>Tiêu đề</th>
+                        <th>Thể loại</th>
+                        <th>Trạng thái</th>
+                        <th class="text-right">
+                            Hành động
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    @forelse($movies as $movie)
+
+                        @php
+                            $statusMeta = [
+                                'draft' => [
+                                    'label' => 'Bản nháp',
+                                    'class' => 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
+                                ],
+
+                                'coming_soon' => [
+                                    'label' => 'Sắp chiếu',
+                                    'class' => 'bg-warning/10 text-warning border border-warning/20',
+                                ],
+
+                                'now_showing' => [
+                                    'label' => 'Đang chiếu',
+                                    'class' => 'bg-success/10 text-success border border-success/20',
+                                ],
+
+                                'inactive' => [
+                                    'label' => 'Ngừng chiếu',
+                                    'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
+                                ],
+
+                                'archived' => [
+                                    'label' => 'Đã lưu trữ',
+                                    'class' => 'bg-slate-700/20 text-slate-400 border border-slate-600/20',
+                                ],
+                            ];
+
+                            $movieStatus = $statusMeta[$movie->status] ?? [
+                                'label' => $movie->status ?: 'Chưa rõ',
+                                'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
+                            ];
+                        @endphp
+
+
+                        <tr>
+
+                            {{-- ID --}}
+                            <td class="font-mono text-xs app-text-muted">
+                                #{{ $movie->id }}
+                            </td>
+
+
+                            {{-- Poster --}}
+                            <td>
+
+                                <div class="h-20 w-14 overflow-hidden rounded-xl border app-border bg-slate-950">
+
+                                    @if($movie->poster_url)
+
+                                        <img
+                                            src="{{ $movie->poster_url }}"
+                                            alt="{{ $movie->title }}"
+                                            class="h-full w-full object-cover"
+                                            loading="lazy"
+                                        >
+
+                                    @else
+
+                                        <div class="admin-media-fallback h-full w-full text-xs">
+                                            MM
+                                        </div>
+
+                                    @endif
+
+                                </div>
+
+                            </td>
+
+
+                            {{-- Tên phim --}}
+                            <td>
+
+                                <div class="max-w-sm">
+
+                                    <a
+                                        href="{{ route('admin.movies.show', $movie) }}"
+                                        class="font-extrabold app-heading transition-colors hover:text-brand-start"
+                                    >
+                                        {{ $movie->title }}
+                                    </a>
+
+                                    @if($movie->slug)
+                                        <p class="mt-1 truncate text-xs app-text-muted">
+                                            {{ $movie->slug }}
+                                        </p>
+                                    @endif
+
+                                    @if($movie->country)
+                                        <p class="mt-1 text-xs app-text-muted">
+                                            <i class="ph ph-globe-hemisphere-east"></i>
+                                            {{ $movie->country }}
+                                        </p>
+                                    @endif
+
+                                </div>
+
+                            </td>
+
+
+                            {{-- Thể loại --}}
+                            <td>
+
+                                <div class="max-w-xs text-sm app-text-muted">
+
+                                    {{ $movie->genres->pluck('name')->join(', ') ?: 'Chưa phân loại' }}
+
+                                </div>
+
+                            </td>
+
+
+                            {{-- Trạng thái --}}
+                            <td>
+
+                                <span class="admin-badge {{ $movieStatus['class'] }}">
+                                    {{ $movieStatus['label'] }}
+                                </span>
+
+                            </td>
+
+
+                            {{-- Hành động --}}
+                            <td>
+
+                                <div class="flex items-center justify-end gap-2">
+
+                                    <a
+                                        href="{{ route('admin.movies.show', $movie) }}"
+                                        class="admin-btn-info admin-action-btn"
+                                        title="Xem"
+                                        aria-label="Xem phim {{ $movie->title }}"
+                                        data-tooltip="Xem"
+                                    >
+                                        <i class="ph ph-eye"></i>
+                                    </a>
+
+
+                                    @can('movies.update')
+
+                                        <a
+                                            href="{{ route('admin.movies.edit', $movie) }}"
+                                            class="admin-btn-warning admin-action-btn"
+                                            title="Sửa"
+                                            aria-label="Sửa phim {{ $movie->title }}"
+                                            data-tooltip="Sửa"
+                                        >
+                                            <i class="ph ph-pencil-simple"></i>
+                                        </a>
+
+                                    @endcan
+
+                                </div>
+
+                            </td>
+
+                        </tr>
+
+
+                    @empty
+
+                        <tr>
+
+                            <td
+                                colspan="6"
+                                class="admin-empty"
+                            >
+
+                                <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
+
+                                    <i class="ph-fill ph-film-slate text-3xl"></i>
+
+                                </div>
+
+
+                                @if(
+                                    ($searchValue ?? '') !== '' ||
+                                    ($statusValue ?? '') !== '' ||
+                                    ($genreValue ?? '') !== '' ||
+                                    ($countryValue ?? '') !== ''
+                                )
+
+                                    Không tìm thấy phim phù hợp với điều kiện lọc.
+
+                                @else
+
+                                    Chưa có phim nào.
+
+                                @endif
+
+                            </td>
+
+                        </tr>
+
+                    @endforelse
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        {{-- =====================================================
+            PHÂN TRANG
+        ====================================================== --}}
+        @if($movies->hasPages())
+
+            <div class="border-t app-border px-5 py-4">
+
+                {{ $movies->links() }}
+
+            </div>
+
+        @endif
+
+    </div>
+
+</div>
         </div>
         <div class="flex flex-wrap gap-2">
             @if($canManageGlobalCatalog)
