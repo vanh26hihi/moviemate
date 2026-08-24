@@ -553,7 +553,8 @@
 
     @if($hasFilters)<p class="text-sm app-muted">Tìm thấy <strong class="app-text">{{ number_format($movies->total()) }}</strong> phim phù hợp.</p>@endif
 
-    <section class="cinema-card overflow-hidden" aria-labelledby="movie-list-title">
+    @include('admin.movies.movie-list')
+        
         <div class="border-b app-border px-5 py-4"><h2 id="movie-list-title" class="font-extrabold app-text">Danh sách phim</h2><p class="mt-1 text-sm app-muted">Vòng đời được quản lý tại hồ sơ phim; ngày khởi chiếu là thông tin phát hành. Số suất được tính trong phạm vi {{ $scopeLabel }}.</p></div>
 
         <div class="space-y-3 p-4 md:hidden" aria-label="Danh sách phim trên điện thoại">
