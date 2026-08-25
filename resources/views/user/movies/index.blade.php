@@ -52,6 +52,7 @@
             class="mt-6 cinema-card p-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"
         >
             <label class="flex items-center gap-3 px-4 app-input border app-border rounded-2xl">
+                <span class="sr-only">Tìm kiếm phim</span>
                 <i class="ph ph-magnifying-glass app-muted text-xl"></i>
 
                 <input
@@ -62,7 +63,7 @@
                     class="w-full bg-transparent app-text placeholder:text-text-sub/70 focus:outline-none py-3"
                 >
             </label>
-            <select name="duration" class="cinema-input">
+            <label><span class="sr-only">Lọc theo thời lượng</span><select name="duration" class="cinema-input">
                 <option value="">Tất cả thời lượng</option>
 
                 <option value="short" {{ request('duration') === 'short' ? 'selected' : '' }}>
@@ -76,8 +77,8 @@
                 <option value="long" {{ request('duration') === 'long' ? 'selected' : '' }}>
                     Trên 120 phút
                 </option>
-            </select>
-            <select name="genre" class="cinema-input">
+            </select></label>
+            <label><span class="sr-only">Lọc theo thể loại</span><select name="genre" class="cinema-input">
                 <option value="">Tất cả thể loại</option>
 
                 @foreach($genres as $genre)
@@ -88,13 +89,13 @@
                         {{ $genre->name }}
                     </option>
                 @endforeach
-            </select>
+            </select></label>
 
             <label><span class="sr-only">Chi nhánh</span><select name="cinema" class="cinema-input"><option value="">Tất cả rạp</option>@foreach($cinemas as $filterCinema)<option value="{{ $filterCinema->code }}" @selected($selectedCinema?->is($filterCinema))>{{ $filterCinema->name }}</option>@endforeach</select></label>
 
             <label><span class="sr-only">Ngày chiếu</span><select name="date" class="cinema-input">@foreach($dates as $date)<option value="{{ $date['date'] }}" @selected($selectedDate === $date['date'])>{{ $date['label'] }} · {{ $date['day'] }}</option>@endforeach</select></label>
 
-            <select name="country" class="cinema-input">
+            <label><span class="sr-only">Lọc theo quốc gia</span><select name="country" class="cinema-input">
                 <option value="">Tất cả quốc gia</option>
 
                 @foreach($countries as $country)
@@ -105,9 +106,9 @@
                         {{ $country }}
                     </option>
                 @endforeach
-            </select>
+            </select></label>
 
-            <select name="status" class="cinema-input">
+            <label><span class="sr-only">Lọc theo trạng thái phim</span><select name="status" class="cinema-input">
                 <option value="">Tất cả trạng thái</option>
 
                 <option
@@ -123,8 +124,8 @@
                 >
                     Sắp chiếu
                 </option>
-            </select>
-            <select name="age_rating" class="cinema-input">
+            </select></label>
+            <label><span class="sr-only">Lọc theo độ tuổi</span><select name="age_rating" class="cinema-input">
                 <option value="">Tất cả độ tuổi</option>
 
                 @foreach($ageRatings as $age)
@@ -135,8 +136,8 @@
                         {{ $age }}
                     </option>
                 @endforeach
-            </select>
-            <select name="sort" class="cinema-input">
+            </select></label>
+            <label><span class="sr-only">Sắp xếp phim</span><select name="sort" class="cinema-input">
                 <option value="latest" {{ request('sort', 'latest') === 'latest' ? 'selected' : '' }}>
                     Mới nhất
                 </option>
@@ -156,7 +157,7 @@
                 <option value="oldest" {{ request('sort') === 'oldest' ? 'selected' : '' }}>
                     Cũ nhất
                 </option>
-            </select>
+            </select></label>
 
             <button type="submit" class="btn-primary !rounded-2xl">
                 <i class="ph ph-sliders-horizontal"></i>
@@ -218,7 +219,7 @@
 
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
         @forelse($movies as $movie)
-            @include('user.movies._card', ['movie' => $movie])
+            @include('user.movies._card', ['movie' => $movie, 'bookingAvailable' => $movie->allowsCustomerBooking() && (bool) $movie->customer_booking_available])
         @empty
             <div class="col-span-full cinema-card p-10 text-center">
                 <div class="w-16 h-16 rounded-2xl bg-brand-start/10 text-brand-start flex items-center justify-center mx-auto mb-4">

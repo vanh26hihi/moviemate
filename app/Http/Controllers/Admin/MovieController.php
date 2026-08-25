@@ -4,14 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\ShowtimeScheduleException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ListMoviesRequest;
 use App\Http\Requests\Admin\SaveMovieRequest;
 use App\Models\Genre;
 use App\Models\Movie;
 use App\Models\PresentationFormat;
+use App\Models\Showtime;
+use App\Services\CinemaAccessService;
 use App\Services\MovieImageService;
 use App\Services\MovieLifecycleService;
 use App\Services\MoviePresentationFormatService;
 use App\Services\ShowtimeScheduleService;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -20,25 +25,44 @@ use Throwable;
 
 class MovieController extends Controller
 {
-    public function index(Request $request)
+    public function index(ListMoviesRequest $request, CinemaAccessService $cinemaAccess)
     {
-        $search = trim((string) $request->query('search', ''));
-        $status = (string) $request->query('status', '');
-        $genreId = $request->integer('genre') ?: null;
-        $country = trim((string) $request->query('country', ''));
+        $filters = $request->validated();
+        $search = (string) ($filters['search'] ?? '');
+        $status = (string) ($filters['status'] ?? '');
+        $genreId = isset($filters['genre']) ? (int) $filters['genre'] : null;
+        $country = (string) ($filters['country'] ?? '');
+        $sort = (string) ($filters['sort'] ?? 'updated_at');
+        $direction = (string) ($filters['direction'] ?? 'desc');
+        $currentCinema = $cinemaAccess->currentCinema($request->user());
+        $timezone = $currentCinema?->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
+        $now = CarbonImmutable::now($timezone);
+        $upcomingScope = function (Builder $query) use ($currentCinema, $now): Builder {
+            return $query->where('status', 'active')
+                ->when($currentCinema, fn (Builder $query): Builder => $query->where('cinema_id', $currentCinema->id))
+                ->where(function (Builder $query) use ($now): void {
+                    $query->whereDate('show_date', '>', $now->toDateString())
+                        ->orWhere(function (Builder $query) use ($now): void {
+                            $query->whereDate('show_date', $now->toDateString())
+                                ->whereTime('show_time', '>', $now->format('H:i:s'));
+                        });
+                })
+                ->whereHas('cinema', fn (Builder $query): Builder => $query->active())
+                ->whereHas('room', fn (Builder $query): Builder => $query->where('status', 'active'));
+        };
 
-        $query = Movie::query()->with('genres');
+        $query = Movie::query()->with('genres')
+            ->withCount(['showtimes as upcoming_showtimes_count' => $upcomingScope]);
 
         if ($search !== '') {
             $query->where(function ($query) use ($search): void {
                 $query->where('title', 'like', "%{$search}%")
                     ->orWhere('slug', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%")
-                    ->orWhere('country', 'like', "%{$search}%")
-                    ->orWhere('status', 'like', "%{$search}%");
+                    ->orWhere('country', 'like', "%{$search}%");
             });
         }
-        if (in_array($status, [Movie::STATUS_DRAFT, Movie::STATUS_COMING_SOON, Movie::STATUS_NOW_SHOWING, Movie::STATUS_INACTIVE, Movie::STATUS_ARCHIVED], true)) {
+        if ($status !== '') {
             $query->where('status', $status);
         }
         if ($genreId) {
@@ -48,12 +72,30 @@ class MovieController extends Controller
             $query->where('country', $country);
         }
 
-        $movies = $query->latest()->paginate(15)->withQueryString();
+        $sortColumn = match ($sort) {
+            'title' => 'title',
+            'release_date' => 'release_date',
+            default => 'updated_at',
+        };
+        $movies = $query->orderBy($sortColumn, $direction)->orderBy('id', $direction)
+            ->paginate(15)->withQueryString();
         $genres = Genre::query()->orderBy('name')->get(['id', 'name']);
         $countries = Movie::query()->whereNotNull('country')->where('country', '!=', '')
             ->distinct()->orderBy('country')->pluck('country');
+        $summary = [
+            'movies' => Movie::query()->where('status', '!=', Movie::STATUS_ARCHIVED)->count(),
+            'drafts' => Movie::query()->where('status', Movie::STATUS_DRAFT)->count(),
+            'missing_release_dates' => Movie::query()
+                ->where('status', '!=', Movie::STATUS_ARCHIVED)
+                ->whereNull('release_date')
+                ->count(),
+            'upcoming_showtimes' => $upcomingScope(Showtime::query())->count(),
+        ];
 
-        return view('admin.movies.index', compact('movies', 'search', 'status', 'genreId', 'country', 'genres', 'countries'));
+        return view('admin.movies.index', compact(
+            'movies', 'search', 'status', 'genreId', 'country', 'genres', 'countries',
+            'sort', 'direction', 'currentCinema', 'summary',
+        ));
     }
 
     /**

@@ -60,7 +60,7 @@ class ZaloPayReturnController extends Controller
         );
 
         $payment->refresh();
-        $payment->load('booking');
+        $payment->load(['booking.showtimeCancellationImpact', 'booking.refundCase']);
         $canViewBooking = Auth::check() || $guestAccess->allows($request, $payment->booking);
 
         return view('payments.return', [

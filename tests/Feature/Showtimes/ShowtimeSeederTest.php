@@ -8,6 +8,7 @@ use App\Models\PriceBook;
 use App\Models\Room;
 use App\Models\Showtime;
 use App\Services\ShowtimeScheduleService;
+use Carbon\CarbonImmutable;
 use Database\Seeders\CinemaSeeder;
 use Database\Seeders\DemoCinemaLayoutSeeder;
 use Database\Seeders\GenreSeeder;
@@ -25,11 +26,22 @@ final class ShowtimeSeederTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-12 08:00:00', 'Asia/Ho_Chi_Minh'));
+    }
+
+    protected function tearDown(): void
+    {
+        CarbonImmutable::setTestNow();
+
+        parent::tearDown();
+    }
+
     public function test_demo_showtimes_are_multi_date_and_idempotent_even_when_a_slot_already_exists(): void
     {
-        if (! PriceBook::query()->exists()) {
-            $this->seed(PriceBookSeeder::class);
-        }
         $this->seed([
             GenreSeeder::class,
             CinemaSeeder::class,
@@ -38,8 +50,11 @@ final class ShowtimeSeederTest extends TestCase
             RoomSeeder::class,
             MovieSeeder::class,
             DemoCinemaLayoutSeeder::class,
-            ShowtimeSeeder::class,
         ]);
+        if (! PriceBook::query()->exists()) {
+            $this->seed(PriceBookSeeder::class);
+        }
+        $this->seed(ShowtimeSeeder::class);
         $firstIds = Showtime::query()->orderBy('id')->pluck('id')->all();
 
         $this->seed(ShowtimeSeeder::class);

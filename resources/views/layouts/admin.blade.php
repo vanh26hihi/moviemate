@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Khu vực quản trị MovieMate')</title>
     <x-brand.head-icons />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -14,9 +15,10 @@
     </script>
 </head>
 <body class="app-page font-sans antialiased flex h-screen overflow-hidden">
-    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden hidden"></div>
+    <a href="#admin-main-content" class="sr-only focus:not-sr-only fixed left-4 top-4 z-[100] rounded-xl bg-brand-start px-4 py-3 font-bold text-white shadow-xl focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-brand-start">Bỏ qua điều hướng, đến nội dung chính</a>
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden hidden" aria-hidden="true"></div>
 
-    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 app-sidebar border-r app-border transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col h-full overflow-hidden">
+    <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-50 w-64 app-sidebar border-r app-border transform -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col h-full overflow-hidden" tabindex="-1" data-admin-mobile-drawer aria-label="Điều hướng quản trị">
         <div class="h-16 lg:h-20 flex items-center px-6 border-b app-border shrink-0" data-admin-sidebar-logo>
             <a href="{{ route('home') }}" class="min-w-0" aria-label="MovieMate - Trang chủ">
                 <x-brand.logo class="brand-logo--sidebar" />
@@ -51,6 +53,7 @@
                 'foods' => ['route' => 'admin.foods.index', 'active' => 'admin.foods.*', 'permission' => 'foods.view', 'label' => 'Món ăn', 'icon' => 'ph-burger'],
                 'reviews' => ['route' => 'admin.reviews.index', 'active' => 'admin.reviews.*', 'permission' => 'reviews.view', 'label' => 'Đánh giá phim', 'icon' => 'ph-star'],
                 'payments' => ['route' => 'admin.payments.index', 'active' => 'admin.payments.*', 'permission' => 'payments.view', 'label' => 'Thanh toán', 'icon' => 'ph-credit-card'],
+                'refunds' => ['route' => 'admin.refunds.index', 'active' => 'admin.refunds.*', 'permission' => 'refunds.view', 'label' => 'Nghĩa vụ cần xử lý', 'icon' => 'ph-arrow-u-down-left'],
                 'reports' => ['route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'permission' => 'reports.view', 'label' => 'Báo cáo', 'icon' => 'ph-chart-line-up'],
                 'roomTypes' => ['route' => 'admin.room-types.index', 'active' => 'admin.room-types.*', 'permission' => 'room_types.view', 'label' => 'Loại phòng', 'icon' => 'ph-stack'],
                 'layoutTemplates' => ['route' => 'admin.layout-templates.index', 'active' => 'admin.layout-templates.*', 'permission' => 'layout_templates.view', 'label' => 'Mẫu sơ đồ', 'icon' => 'ph-grid-four'],
@@ -65,13 +68,14 @@
                 ['label' => 'Vận hành', 'items' => [$navItems['cinemas'], $navItems['showtimes'], $navItems['rooms'], $navItems['bookings'], $navItems['foodOrders']]],
                 ['label' => 'Kinh doanh', 'items' => [$navItems['movies'], $navItems['priceBooks'], $navItems['discounts'], $navItems['foods']]],
                 ['label' => 'Khách hàng', 'items' => [$navItems['reviews']]],
-                ['label' => 'Tài chính', 'items' => [$navItems['payments'], $navItems['reports']]],
+                ['label' => 'Tài chính', 'items' => [$navItems['payments'], $navItems['refunds'], $navItems['reports']]],
                 ['label' => 'Cấu hình', 'items' => [$navItems['roomTypes'], $navItems['layoutTemplates'], $navItems['presentationFormats'], $navItems['users'], $navItems['roles'], $navItems['activityLogs']]],
             ] : [
                 ['label' => 'Tổng quan chi nhánh', 'items' => [[...$navItems['dashboard'], 'label' => 'Tổng quan chi nhánh']]],
                 ['label' => 'Vận hành', 'items' => [
                     $navItems['showtimes'], $navItems['rooms'], $navItems['bookings'],
                     [...$navItems['payments'], 'label' => 'Thanh toán chi nhánh'],
+                    $navItems['refunds'],
                     $navItems['foodOrders'],
                     [...$navItems['users'], 'label' => 'Nhân sự chi nhánh'],
                 ]],
@@ -114,10 +118,10 @@
         </div>
     </aside>
 
-    <main class="admin-shell flex-grow flex flex-col min-w-0 app-bg relative h-full overflow-hidden">
+    <main id="admin-main-content" class="admin-shell flex-grow flex flex-col min-w-0 app-bg relative h-full overflow-hidden" tabindex="-1">
         <header class="h-16 lg:h-20 flex items-center justify-between px-4 sm:px-8 border-b app-border app-card backdrop-blur-md sticky top-0 z-30 shrink-0">
             <div class="flex items-center gap-4">
-                <button id="mobile-menu-btn" type="button" class="lg:hidden app-muted hover:app-text" aria-label="Mở menu" aria-expanded="false" aria-controls="sidebar"><i class="ph ph-list text-2xl"></i></button>
+                <button id="mobile-menu-btn" type="button" class="lg:hidden rounded-lg p-2 app-muted hover:app-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-start" aria-label="Mở menu" aria-expanded="false" aria-controls="sidebar"><i class="ph ph-list text-2xl" aria-hidden="true"></i></button>
                 <p class="text-lg font-bold app-text hidden sm:block">@yield('page-title')</p>
             </div>
             <div class="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -132,11 +136,6 @@
                     </select>
                 </form>
                 <span class="hidden xl:inline-flex rounded-full border app-border px-3 py-1 text-xs font-bold text-brand-start">{{ $adminCurrentCinema?->name ?? ($adminHasGlobalCinemaAccess ? 'Toàn hệ thống' : 'Chưa phân công') }}</span>
-                <div class="relative hidden md:block w-56">
-                    <i class="ph ph-magnifying-glass app-muted text-sm absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"></i>
-                    <input type="text" class="app-input w-full pl-9 pr-3 py-2 rounded-lg border app-border focus:outline-none focus:border-brand-start transition-colors text-sm" placeholder="Tìm kiếm (Ctrl+K)" aria-label="Tìm kiếm quản trị">
-                </div>
-                <button type="button" class="relative app-muted hover:app-text transition-colors p-2" aria-label="Thông báo"><i class="ph ph-bell text-lg"></i></button>
                 <button data-theme-toggle type="button" class="flex items-center gap-1.5 px-3 py-2 rounded-xl app-card border app-border app-muted hover:border-brand-start transition-all text-sm" aria-label="Đổi giao diện sáng/tối" aria-pressed="false"><span class="theme-icon flex items-center text-base"><i class="ph-fill ph-moon"></i></span><span class="theme-text hidden lg:inline text-xs font-medium">Tối</span></button>
                 <div class="flex items-center gap-3 pl-3 border-l app-border">
                     <div class="hidden sm:block text-right">
@@ -154,6 +153,7 @@
             </div>
             <div class="sm:hidden mb-4"><p class="text-xl font-bold app-heading">@yield('page-title')</p></div>
             <x-flash-messages :error-bag="$errors" :include-validation="! \Illuminate\Support\Facades\View::hasSection('suppress-global-validation-summary')" />
+            <x-form-validation-state :errors="$errors" />
             @yield('content')
         </div></div>
     </main>
@@ -164,12 +164,93 @@
         const sidebar = document.getElementById('sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
         const toggleBtn = document.getElementById('mobile-menu-btn');
-        function toggleSidebar() {
-            const isHidden = sidebar.classList.toggle('-translate-x-full');
-            backdrop.classList.toggle('hidden');
-            toggleBtn.setAttribute('aria-expanded', isHidden ? 'false' : 'true');
+        const adminMain = document.getElementById('admin-main-content');
+        const desktopSidebar = window.matchMedia('(min-width: 1024px)');
+        const drawerFocusableSelector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+        function drawerFocusableElements() {
+            return Array.from(sidebar.querySelectorAll(drawerFocusableSelector))
+                .filter((element) => element.getClientRects().length > 0);
         }
-        if (toggleBtn && sidebar && backdrop) { toggleBtn.addEventListener('click', toggleSidebar); backdrop.addEventListener('click', toggleSidebar); }
+
+        function isSidebarOpen() {
+            return !desktopSidebar.matches && toggleBtn.getAttribute('aria-expanded') === 'true';
+        }
+
+        function openSidebar() {
+            if (desktopSidebar.matches) return;
+
+            sidebar.classList.remove('-translate-x-full');
+            sidebar.removeAttribute('aria-hidden');
+            sidebar.inert = false;
+            backdrop.classList.remove('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+            toggleBtn.setAttribute('aria-label', 'Đóng menu');
+            adminMain.inert = true;
+            adminMain.setAttribute('aria-hidden', 'true');
+            window.requestAnimationFrame(() => (drawerFocusableElements()[0] || sidebar).focus());
+        }
+
+        function closeSidebar(restoreFocus = true) {
+            sidebar.classList.add('-translate-x-full');
+            backdrop.classList.add('hidden');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            toggleBtn.setAttribute('aria-label', 'Mở menu');
+            adminMain.inert = false;
+            adminMain.removeAttribute('aria-hidden');
+
+            if (restoreFocus && !desktopSidebar.matches) toggleBtn.focus();
+
+            if (desktopSidebar.matches) {
+                sidebar.inert = false;
+                sidebar.removeAttribute('aria-hidden');
+            } else {
+                sidebar.inert = true;
+                sidebar.setAttribute('aria-hidden', 'true');
+            }
+        }
+
+        function syncSidebarViewport() {
+            closeSidebar(false);
+        }
+
+        if (toggleBtn && sidebar && backdrop && adminMain) {
+            toggleBtn.addEventListener('click', () => isSidebarOpen() ? closeSidebar() : openSidebar());
+            backdrop.addEventListener('click', () => closeSidebar());
+            document.addEventListener('keydown', (event) => {
+                if (!isSidebarOpen()) return;
+
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeSidebar();
+                    return;
+                }
+
+                if (event.key !== 'Tab') return;
+                const focusable = drawerFocusableElements();
+                if (focusable.length === 0) {
+                    event.preventDefault();
+                    sidebar.focus();
+                    return;
+                }
+
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (!sidebar.contains(document.activeElement)) {
+                    event.preventDefault();
+                    (event.shiftKey ? last : first).focus();
+                } else if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            });
+            if (typeof desktopSidebar.addEventListener === 'function') desktopSidebar.addEventListener('change', syncSidebarViewport);
+            else desktopSidebar.addListener(syncSidebarViewport);
+            syncSidebarViewport();
+        }
     </script>
     @stack('scripts')
 </body>

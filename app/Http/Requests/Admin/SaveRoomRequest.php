@@ -6,6 +6,7 @@ use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Services\CinemaAccessService;
+use App\Support\AdminUniqueRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -53,8 +54,7 @@ class SaveRoomRequest extends FormRequest
             'cinema_id' => ['nullable', 'integer', 'exists:cinemas,id'],
             'code' => [
                 'required', 'string', 'max:32',
-                Rule::unique('rooms', 'code')->where('cinema_id', $cinemaId ?? 0)
-                    ->ignore($room instanceof Room ? $room->id : null),
+                AdminUniqueRules::roomCode($cinemaId ?? 0, $room instanceof Room ? $room : null),
             ],
             'name' => ['required', 'string', 'max:255'],
             'room_type' => ['required', Rule::exists('room_types', 'code')->where(
@@ -121,6 +121,14 @@ class SaveRoomRequest extends FormRequest
             'layout_name' => 'tên phiên bản sơ đồ',
             'presentation_format_ids' => 'khả năng trình chiếu',
             'presentation_format_ids.*' => 'khả năng trình chiếu',
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'code.unique' => 'Mã phòng này đã tồn tại trong chi nhánh đã chọn.',
         ];
     }
 

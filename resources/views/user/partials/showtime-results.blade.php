@@ -8,6 +8,8 @@
         ->values();
 @endphp
 
+<span hidden data-showtime-result-meta data-showtime-result-date="{{ $selectedDate }}" data-showtime-result-count="{{ $showtimes->count() }}"></span>
+
 @if($showtimes->isEmpty())
     <div class="cinema-card rounded-3xl p-8 text-center" data-showtime-empty>
         <i class="ph-fill ph-calendar-x text-4xl text-brand-start" aria-hidden="true"></i>

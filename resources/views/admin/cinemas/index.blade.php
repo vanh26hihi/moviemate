@@ -16,7 +16,12 @@
                 <span class="rounded-full px-3 py-1 text-xs font-bold {{ $cinema->status === 'active' ? 'bg-success/10 text-success' : 'bg-error/10 text-error' }}">{{ $cinema->status === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' }}</span>
             </div>
             <div class="mt-5 grid grid-cols-3 gap-3 text-center"><div><strong class="block app-text">{{ $cinema->rooms_count }}</strong><span class="text-xs app-muted">Phòng</span></div><div><strong class="block app-text">{{ $cinema->active_rooms_count }}</strong><span class="text-xs app-muted">Phòng mở</span></div><div><strong class="block app-text">{{ $cinema->active_assignments_count }}</strong><span class="text-xs app-muted">Nhân sự</span></div></div>
-            <a href="{{ route('admin.cinemas.show', $cinema) }}" class="admin-btn-secondary mt-5">Xem chi tiết</a>
+            <div class="mt-5 flex flex-wrap gap-3">
+                <a href="{{ route('admin.cinemas.show', $cinema) }}" class="admin-btn-primary"><i class="ph ph-chart-line-up" aria-hidden="true"></i> Tổng quan chi nhánh</a>
+                @can('cinemas.manage')
+                    <a href="{{ route('admin.cinemas.edit', $cinema) }}" class="admin-btn-secondary"><i class="ph ph-pencil-simple" aria-hidden="true"></i> Chỉnh sửa</a>
+                @endcan
+            </div>
         </article>
     @empty
         <x-empty-state title="Chưa có chi nhánh" description="Tạo chi nhánh đầu tiên để bắt đầu cấu hình vận hành." />

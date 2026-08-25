@@ -180,6 +180,9 @@ class LayoutTemplateAndMovieLifecycleTest extends TestCase
             ->assertSee('data-layout-tool="blocked"', false)
             ->assertSee('data-layout-tool="empty"', false)
             ->assertSee('type="button" data-layout-tool', false)
+            ->assertSee('Vẽ sơ đồ phòng theo 2 bước')
+            ->assertDontSee('Tạo nhanh một dải lối đi')
+            ->assertDontSee('data-layout-fill-aisle=', false)
             ->assertSee($roomType->name)
             ->assertSee('Mọi loại phòng')
             ->assertSee('Mã dùng để nhận diện mẫu trong hệ thống và không được trùng.');

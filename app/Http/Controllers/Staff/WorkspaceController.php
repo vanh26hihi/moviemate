@@ -12,6 +12,7 @@ use App\Models\Seat;
 use App\Models\SeatIncidentResolution;
 use App\Models\Showtime;
 use App\Services\CinemaAccessService;
+use App\Services\Tickets\BookingTicketEligibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -25,21 +26,102 @@ final class WorkspaceController extends Controller
         $timezone = $cinema?->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
         $now = CarbonImmutable::now($timezone);
         $day = $this->dayWindow($now);
-        $stats = ['sold' => 0, 'waiting_print' => 0, 'print_attention' => 0, 'pending_counter' => 0];
+        $stats = [
+            'paid_bookings_today' => 0,
+            'tickets_sold_today' => 0,
+            'waiting_print' => 0,
+            'print_attention' => 0,
+            'pending_counter' => 0,
+        ];
+        $attentionItems = collect();
         $showtimes = collect();
+        $completedShowtimes = collect();
 
         if ($cinema) {
             $base = Booking::query()->where('cinema_id', $cinema->id);
-            $stats['sold'] = (clone $base)->whereBetween('paid_at', $day)->where('booking_status', 'paid')->count();
+            $paidToday = (clone $base)->whereBetween('paid_at', $day)
+                ->where('payment_status', 'paid')->where('booking_status', 'paid')
+                ->whereHas('authoritativePayment');
+            $stats['paid_bookings_today'] = (clone $paidToday)->count();
+            $stats['tickets_sold_today'] = AdmissionTicket::query()
+                ->whereHas('booking', fn (Builder $query) => $query->where('cinema_id', $cinema->id)
+                    ->whereBetween('paid_at', $day)->where('payment_status', 'paid')->where('booking_status', 'paid')
+                    ->whereHas('authoritativePayment'))
+                ->count();
             $stats['waiting_print'] = AdmissionTicket::query()->where('print_count', 0)
                 ->whereHas('booking', fn (Builder $query) => $query->where('cinema_id', $cinema->id)
-                    ->where('payment_status', 'paid')->where('booking_status', 'paid'))->count();
+                    ->where('payment_status', 'paid')->where('booking_status', 'paid')
+                    ->whereHas('authoritativePayment'))->count();
             $stats['print_attention'] = BookingTicketPrint::query()
                 ->whereIn('status', [BookingTicketPrint::STATUS_RETRY_ALLOWED, BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION])
-                ->whereHas('booking', fn (Builder $query) => $query->where('cinema_id', $cinema->id))->count();
+                ->whereHas('booking', fn (Builder $query) => $query->where('cinema_id', $cinema->id)
+                    ->where('payment_status', 'paid')->where('booking_status', 'paid')
+                    ->whereHas('authoritativePayment'))->count();
             $stats['pending_counter'] = (clone $base)->where('sales_channel', Booking::SALES_CHANNEL_COUNTER)
                 ->where('created_by_staff_id', $request->user()->id)->where('booking_status', 'pending_payment')
-                ->where('expires_at', '>', now())->count();
+                ->where('expires_at', '>', $now->utc())->count();
+
+            $pendingCounterBookings = (clone $base)
+                ->where('sales_channel', Booking::SALES_CHANNEL_COUNTER)
+                ->where('created_by_staff_id', $request->user()->id)
+                ->where('booking_status', 'pending_payment')
+                ->where('expires_at', '>', $now->utc())
+                ->with([
+                    'payment:payments.id,payments.booking_id,payments.provider,payments.status',
+                    'showtime:id,movie_id,room_id,show_date,show_time',
+                    'showtime.movie:id,title',
+                    'showtime.room:id,name',
+                    'bookingSeats.seat:id,row,number,seat_code,type,pair_code,pair_position',
+                ])
+                ->oldest('expires_at')->limit(3)->get();
+
+            $printAttentionBookings = (clone $base)
+                ->where('payment_status', 'paid')->where('booking_status', 'paid')
+                ->whereHas('authoritativePayment')
+                ->whereHas('admissionTickets.printState', fn (Builder $query) => $query->whereIn('status', [
+                    BookingTicketPrint::STATUS_RETRY_ALLOWED,
+                    BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION,
+                ]))
+                ->withCount(['admissionTickets as attention_ticket_count' => fn (Builder $query) => $query
+                    ->whereHas('printState', fn (Builder $print) => $print->whereIn('status', [
+                        BookingTicketPrint::STATUS_RETRY_ALLOWED,
+                        BookingTicketPrint::STATUS_RETRY_REQUIRES_AUTHORIZATION,
+                    ]))])
+                ->with(['showtime.movie:id,title'])
+                ->oldest('paid_at')->limit(3)->get();
+
+            $printAttentionBookingIds = $printAttentionBookings->pluck('id');
+            $unprintedBookings = (clone $base)
+                ->where('payment_status', 'paid')->where('booking_status', 'paid')
+                ->whereHas('authoritativePayment')
+                ->whereHas('admissionTickets', fn (Builder $query) => $query->where('print_count', 0))
+                ->when($printAttentionBookingIds->isNotEmpty(), fn (Builder $query) => $query->whereNotIn('id', $printAttentionBookingIds))
+                ->withCount(['admissionTickets as unprinted_ticket_count' => fn (Builder $query) => $query->where('print_count', 0)])
+                ->with(['showtime.movie:id,title'])
+                ->oldest('paid_at')->limit(3)->get();
+
+            $attentionItems = $pendingCounterBookings->map(fn (Booking $booking): array => [
+                'type' => 'payment',
+                'booking' => $booking,
+                'count' => null,
+                'expires_at' => $booking->expires_at?->toImmutable()->timezone($timezone),
+                'payment_provider' => $booking->payment?->provider,
+                'payment_status' => $booking->payment?->status,
+            ])->concat($printAttentionBookings->map(fn (Booking $booking): array => [
+                'type' => 'print_attention',
+                'booking' => $booking,
+                'count' => (int) $booking->attention_ticket_count,
+                'expires_at' => null,
+                'payment_provider' => null,
+                'payment_status' => null,
+            ]))->concat($unprintedBookings->map(fn (Booking $booking): array => [
+                'type' => 'unprinted',
+                'booking' => $booking,
+                'count' => (int) $booking->unprinted_ticket_count,
+                'expires_at' => null,
+                'payment_provider' => null,
+                'payment_status' => null,
+            ]))->take(5)->values();
 
             $showtimes = Showtime::query()->where('cinema_id', $cinema->id)
                 ->where('status', 'active')
@@ -59,13 +141,26 @@ final class WorkspaceController extends Controller
                     ->whereColumn('booking_seats.showtime_id', 'showtimes.id')
                     ->where('active_lock_key', BookingSeat::ACTIVE_LOCK_KEY), 'sold_seats_count')
                 ->orderBy('show_time')->get();
+
+            $completedShowtimes = $showtimes->filter(function (Showtime $showtime) use ($cinema, $now): bool {
+                $startsAt = CarbonImmutable::parse(
+                    $showtime->show_date->format('Y-m-d').' '.$showtime->show_time,
+                    $cinema->timezone ?: config('cinema.timezone'),
+                );
+
+                return $now->greaterThanOrEqualTo($startsAt->addMinutes((int) ($showtime->movie->duration ?: 90)));
+            })->values();
+            $showtimes = $showtimes->reject(fn (Showtime $showtime): bool => $completedShowtimes->contains('id', $showtime->id))->values();
         }
 
-        return view('staff.dashboard', compact('cinema', 'now', 'stats', 'showtimes'));
+        return view('staff.dashboard', compact('cinema', 'now', 'stats', 'attentionItems', 'showtimes', 'completedShowtimes'));
     }
 
-    public function sales(Request $request, CinemaAccessService $cinemas): View
-    {
+    public function sales(
+        Request $request,
+        CinemaAccessService $cinemas,
+        BookingTicketEligibility $ticketEligibility,
+    ): View {
         $cinema = $cinemas->currentCinema($request->user());
         $timezone = $cinema?->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
         $validated = $request->validate([
@@ -83,9 +178,13 @@ final class WorkspaceController extends Controller
                 ->when($validated['status'] ?? null, fn (Builder $query, string $status) => $query->where('booking_status', $status))
                 ->when($validated['channel'] ?? null, fn (Builder $query, string $channel) => $query->where('sales_channel', $channel))
                 ->with(['showtime.movie:id,title', 'showtime.room:id,name', 'bookingSeats.seat', 'createdByStaff:id,name',
-                    'authoritativePayment.settledBy:id,name', 'admissionTickets.printState'])
+                    'payments', 'authoritativePayment.settledBy:id,name', 'admissionTickets.printState'])
                 ->latest('id')->paginate(20)->withQueryString();
         }
+
+        $bookings->getCollection()->each(
+            fn (Booking $booking) => $booking->setAttribute('can_print', $ticketEligibility->isPrintable($booking)),
+        );
 
         return view('staff.sales.index', compact('cinema', 'date', 'bookings'));
     }

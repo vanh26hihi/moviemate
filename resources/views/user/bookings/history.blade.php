@@ -36,13 +36,13 @@
                 </div>
 
                 <form method="GET" action="{{ route('user.bookings.history') }}" class="flex gap-2">
-                    <select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
+                    <label><span class="sr-only">Lọc đơn theo trạng thái</span><select name="status" class="app-input border app-border rounded-xl text-sm px-3 py-2">
                         <option value="">Tất cả</option>
                         <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Chờ thanh toán</option>
                         <option value="paid" {{ request('status') == 'paid' ? 'selected' : '' }}>Đã thanh toán</option>
                         <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Đã hủy</option>
                         <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Hết hạn</option>
-                    </select>
+                    </select></label>
                     <button type="submit" class="px-4 py-2 bg-brand-start text-white text-sm font-bold rounded-xl">Lọc</button>
                 </form>
             </div>
@@ -88,6 +88,21 @@
                                     <div><p class="app-muted mb-0.5">Định dạng trình chiếu</p><p class="app-text font-semibold">{{ $booking->showtime?->presentationFormat?->name ?? 'Không xác định' }}</p></div>
                                 </div>
 
+                                @if($booking->showtimeCancellationImpact)
+                                    <div class="mb-4 rounded-2xl border border-error/30 bg-error/10 p-4" role="status">
+                                        <p class="font-extrabold text-error">Suất chiếu đã bị rạp hủy</p>
+                                        @if($booking->refundCase?->status === \App\Models\RefundCase::STATUS_REQUIRED)
+                                            <p class="mt-1 text-sm font-bold app-text">Cần xử lý hoàn tiền</p>
+                                            <p class="mt-1 text-xs app-muted">Rạp đang xử lý nghĩa vụ {{ number_format($booking->refundCase->required_amount, 0, ',', '.') }} {{ $booking->refundCase->currency === 'VND' ? 'VNĐ' : $booking->refundCase->currency }}. Payment gốc vẫn được giữ trong lịch sử.</p>
+                                        @elseif($booking->refundCase?->status === \App\Models\RefundCase::STATUS_RESOLVED)
+                                            <p class="mt-1 text-sm font-bold text-success">Đã ghi nhận hoàn tiền</p>
+                                            <p class="mt-1 text-xs app-muted">Rạp đã ghi nhận hoàn tiền bên ngoài hệ thống lúc {{ $booking->refundCase->resolved_at?->format('d/m/Y H:i') }} · {{ \App\Models\RefundCase::RESOLUTION_METHODS[$booking->refundCase->resolution_method] ?? $booking->refundCase->resolution_method }} · tham chiếu {{ $booking->refundCase->resolution_reference }}.</p>
+                                        @else
+                                            <p class="mt-1 text-sm app-text">Bạn chưa có khoản thanh toán cần hoàn.</p>
+                                        @endif
+                                    </div>
+                                @endif
+
                                 <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t app-border">
                                     <div>
                                         <p class="text-xs app-muted mb-0.5">Tổng tiền</p>
@@ -116,6 +131,8 @@
                                                     Gửi lại tài liệu nhận vé
                                                 </button>
                                             </form>
+                                        @elseif($booking->showtimeCancellationImpact)
+                                            <a href="{{ route('user.bookings.ticket', $booking) }}" class="px-4 py-2 border app-border app-text rounded-xl text-xs font-bold hover:border-brand-start transition-colors">Xem lịch sử đơn</a>
                                         @endif
 
                                         @if($actions['can_cancel_local'])

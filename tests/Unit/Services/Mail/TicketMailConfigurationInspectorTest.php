@@ -74,7 +74,7 @@ class TicketMailConfigurationInspectorTest extends TestCase
             'missing selected mailer' => ['missing', ['smtp' => ['transport' => 'smtp']], 'MAILER_NOT_CONFIGURED'],
             'malformed registry' => ['smtp', 'invalid', 'MAILER_NOT_CONFIGURED'],
             'smtp missing host' => ['smtp', ['smtp' => ['transport' => 'smtp', 'port' => 587]], 'MAILER_NOT_CONFIGURED'],
-            'unavailable optional provider' => ['ses', ['ses' => ['transport' => 'ses']], 'MAILER_NOT_CONFIGURED'],
+            'unavailable optional provider' => ['resend', ['resend' => ['transport' => 'resend']], 'MAILER_NOT_CONFIGURED'],
             'composite reaches log' => [
                 'delivery',
                 [

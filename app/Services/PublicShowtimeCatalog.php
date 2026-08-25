@@ -11,6 +11,7 @@ use App\Models\ShowtimeTicketPrice;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class PublicShowtimeCatalog
@@ -88,6 +89,50 @@ final class PublicShowtimeCatalog
             ->whereBetween('show_date', [$from, $to])->orderBy('show_date')->orderBy('show_time')->orderBy('id')->get());
     }
 
+    public function withCustomerBookingAvailability(Builder $movies, ?Cinema $cinema = null): Builder
+    {
+        $timezone = $cinema?->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
+        $today = CarbonImmutable::today($timezone);
+        $bookingThreshold = CarbonImmutable::now($timezone)->subMinutes(ShowtimeLifecycleService::BOOKING_CUTOFF_MINUTES);
+        $driver = DB::connection()->getDriverName();
+        $dayOfWeekExpression = $driver === 'sqlite'
+            ? "((CAST(strftime('%w', showtimes.show_date) AS INTEGER) + 6) % 7) + 1"
+            : 'WEEKDAY(showtimes.show_date) + 1';
+
+        return $movies->withExists(['showtimes as customer_booking_available' => fn (Builder $showtimes) => $showtimes
+            ->where('showtimes.status', 'active')
+            ->when($cinema, fn (Builder $query) => $query->where('showtimes.cinema_id', $cinema->id))
+            ->whereBetween('showtimes.show_date', [
+                $today->toDateString(),
+                $today->addDays(self::WINDOW_DAYS - 1)->toDateString(),
+            ])
+            ->where(function (Builder $query) use ($bookingThreshold): void {
+                $query->whereDate('showtimes.show_date', '>', $bookingThreshold->toDateString())
+                    ->orWhere(function (Builder $sameDay) use ($bookingThreshold): void {
+                        $sameDay->whereDate('showtimes.show_date', $bookingThreshold->toDateString())
+                            ->whereTime('showtimes.show_time', '>', $bookingThreshold->format('H:i:s'));
+                    });
+            })
+            ->whereHas('cinema', fn (Builder $query) => $query->active())
+            ->whereHas('room', fn (Builder $query) => $query->where('status', 'active')
+                ->whereColumn('rooms.cinema_id', 'showtimes.cinema_id'))
+            ->whereHas('roomLayout', fn (Builder $query) => $query->where('status', 'published')
+                ->whereColumn('room_layouts.room_id', 'showtimes.room_id')
+                ->whereHas('cells', fn (Builder $cells) => $cells->where('cell_type', 'seat')->whereHas('seat')))
+            ->whereHas('ticketPrices')
+            ->whereRaw('(SELECT COUNT(DISTINCT stp.seat_type_id) FROM showtime_ticket_prices stp WHERE stp.showtime_id = showtimes.id) = (SELECT COUNT(DISTINCT seats.seat_type_id) FROM room_layout_cells rlc JOIN seats ON seats.id = rlc.seat_id WHERE rlc.room_layout_id = showtimes.room_layout_id AND rlc.cell_type = ?)', ['seat'])
+            ->whereRaw('(SELECT COUNT(DISTINCT stp.price_book_version_id) FROM showtime_ticket_prices stp WHERE stp.showtime_id = showtimes.id) = 1')
+            ->where(function (Builder $query) use ($dayOfWeekExpression): void {
+                $query->whereDoesntHave('cinema.operatingHours', fn (Builder $hours) => $hours
+                    ->whereRaw("cinema_operating_hours.day_of_week = {$dayOfWeekExpression}"))
+                    ->orWhereHas('cinema.operatingHours', fn (Builder $hours) => $hours
+                        ->whereRaw("cinema_operating_hours.day_of_week = {$dayOfWeekExpression}")
+                        ->where('cinema_operating_hours.is_closed', false)
+                        ->whereColumn('cinema_operating_hours.opens_at', '<=', 'showtimes.show_time')
+                        ->whereColumn('cinema_operating_hours.latest_show_start_at', '>=', 'showtimes.show_time'));
+            })]);
+    }
+
     /** @return array<string, ShowtimeTicketPrice> */
     public function pricesFor(Showtime $showtime): array
     {
@@ -131,7 +176,8 @@ final class PublicShowtimeCatalog
     public function isCustomerSellable(Showtime $showtime): bool
     {
         $showtime->loadMissing(['movie', 'cinema.operatingHours', 'room.cinema.operatingHours', 'roomLayout.cells.seat', 'ticketPrices.seatType']);
-        if (! $this->operationallySellable($showtime)) {
+        if (! $showtime->movie?->allowsCustomerBooking()
+            || ! $this->operationallySellable($showtime)) {
             return false;
         }
 

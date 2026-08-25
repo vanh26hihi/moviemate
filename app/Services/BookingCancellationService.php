@@ -69,9 +69,12 @@ final class BookingCancellationService
         });
     }
 
-    public function cancelCustomer(int $bookingId): BookingCancellationResult
-    {
-        return DB::transaction(function () use ($bookingId): BookingCancellationResult {
+    public function cancelCustomer(
+        int $bookingId,
+        string $reason = 'customer_cancelled_unpaid',
+        string $activity = 'booking.cancelled',
+    ): BookingCancellationResult {
+        return DB::transaction(function () use ($bookingId, $reason, $activity): BookingCancellationResult {
             $booking = Booking::query()->lockForUpdate()->findOrFail($bookingId);
 
             if ($booking->booking_status === 'cancelled') {
@@ -107,7 +110,9 @@ final class BookingCancellationService
             if ($activeAttempt !== null) {
                 $activeAttempt->forceFill([
                     'status' => Payment::STATUS_FAILED,
-                    'failure_reason' => 'customer_cancelled_pending_payment',
+                    'failure_reason' => $reason === 'customer_cancelled_unpaid'
+                        ? 'customer_cancelled_pending_payment'
+                        : $reason.'_pending_payment',
                     'failed_at' => now(),
                 ])->save();
             }
@@ -115,8 +120,8 @@ final class BookingCancellationService
             return $this->transitionLockedBooking(
                 $booking,
                 $lockedSeatRows,
-                'customer_cancelled_unpaid',
-                'booking.cancelled',
+                $reason,
+                $activity,
                 $activeAttempt === null ? [] : [
                     'payment_id' => $activeAttempt->id,
                     'provider' => $activeAttempt->provider,
@@ -232,12 +237,33 @@ final class BookingCancellationService
                 'callback_received_at',
                 'callback_payload_hash',
             ]));
+            $previousPaymentStatus = $payment->status;
             $payment->forceFill([
                 ...$allowedOutcome,
                 'status' => Payment::STATUS_FAILED,
                 'failure_reason' => $reason,
                 'failed_at' => now(),
             ])->save();
+
+            if ($booking->sales_channel === Booking::SALES_CHANNEL_COUNTER) {
+                $this->activities->log(
+                    'counter.provider_payment_failed',
+                    $payment,
+                    ['payment_status' => $previousPaymentStatus],
+                    ['payment_status' => Payment::STATUS_FAILED],
+                    [
+                        ...$activityContext,
+                        'booking_id' => $booking->id,
+                        'booking_code' => $booking->booking_code,
+                        'cinema_id' => $booking->cinema_id,
+                        'payment_id' => $payment->id,
+                        'provider' => $payment->provider,
+                        'result' => 'attempt_failed_booking_retained',
+                    ],
+                );
+
+                return BookingCancellationResult::notCancellable();
+            }
 
             return $this->transitionLockedBooking(
                 $booking,

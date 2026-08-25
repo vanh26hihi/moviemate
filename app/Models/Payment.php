@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\StatusLabel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Payment extends Model
 {
@@ -138,6 +139,11 @@ class Payment extends Model
     public function settledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'settled_by_user_id');
+    }
+
+    public function refundCases(): HasMany
+    {
+        return $this->hasMany(RefundCase::class);
     }
 
     public function hasAuthoritativeSuccessEvidence(): bool

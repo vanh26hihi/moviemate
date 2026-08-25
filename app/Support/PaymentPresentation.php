@@ -35,6 +35,7 @@ final class PaymentPresentation
         'manual_review' => 'Giao dịch đang chờ kiểm tra',
         'duplicate_active_attempt_migration' => 'Phát hiện nhiều lần thử đang hoạt động',
         'vnpay_customer_cancelled' => 'Khách hàng đã hủy giao dịch tại VNPAY',
+        'vnpay_terminal_expired' => 'Lần thanh toán VNPAY đã hết thời gian',
         'payos_cancelled' => 'payOS xác nhận giao dịch đã hủy',
         'payos_pending' => 'payOS đang chờ thanh toán',
         'payos_processing' => 'payOS đang xử lý giao dịch',

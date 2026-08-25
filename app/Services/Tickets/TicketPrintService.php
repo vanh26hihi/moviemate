@@ -189,10 +189,13 @@ final class TicketPrintService
 
     public function active(AdmissionTicket $ticket, User $actor, string $operationId, string $token): BookingTicketPrint
     {
-        $state = BookingTicketPrint::query()->where('admission_ticket_id', $ticket->id)->first();
-        abort_unless($state && $this->sameActiveOperation($state, $actor, $operationId, $token), 410, 'Lần in này đã hết hiệu lực.');
+        return DB::transaction(function () use ($ticket, $actor, $operationId, $token): BookingTicketPrint {
+            $ticket = $this->authorizedLockedTicket($ticket, $actor);
+            $state = BookingTicketPrint::query()->where('admission_ticket_id', $ticket->id)->lockForUpdate()->first();
+            abort_unless($state && $this->sameActiveOperation($state, $actor, $operationId, $token), 410, 'Lần in này đã hết hiệu lực.');
 
-        return $state;
+            return $state;
+        }, 3);
     }
 
     public function succeed(AdmissionTicket $ticket, User $actor, string $operationId, string $token): BookingTicketPrint

@@ -112,6 +112,9 @@ final class TicketPrintController extends Controller
         ], [
             'reason_code.required' => 'Vui lòng chọn lý do in lại.',
             'safe_note.required_if' => 'Vui lòng mô tả ngắn gọn khi chọn lý do khác.',
+        ], [
+            'reason_code' => 'lý do in lại',
+            'safe_note' => 'ghi chú in lại',
         ]);
         $operation = $this->newOperation($request, $ticket);
         $prints->reprint($ticket, $request->user(), $operation['id'], $operation['token'], $validated['reason_code'], $validated['safe_note'] ?? null);
@@ -167,6 +170,12 @@ final class TicketPrintController extends Controller
         $validated = $request->validate([
             'failure_code' => ['required', 'in:'.implode(',', array_keys(TicketPrintService::FAILURE_REASONS))],
             'safe_note' => ['nullable', 'string', 'max:300', 'required_if:failure_code,other'],
+        ], [
+            'failure_code.required' => 'Vui lòng chọn lý do in lỗi.',
+            'safe_note.required_if' => 'Vui lòng nhập ghi chú an toàn khi chọn lý do khác.',
+        ], [
+            'failure_code' => 'lý do in lỗi',
+            'safe_note' => 'ghi chú an toàn',
         ]);
         $operation = $this->operation($request, $ticket, allowCompleted: true);
         $prints->fail($ticket, $request->user(), $operation['id'], $operation['token'], $validated['failure_code'], $validated['safe_note'] ?? null);

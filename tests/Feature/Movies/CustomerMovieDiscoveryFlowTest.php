@@ -63,8 +63,8 @@ class CustomerMovieDiscoveryFlowTest extends TestCase
         $this->assertStringNotContainsString('Chưa có', $card);
         $this->assertStringContainsString('0.0', $card);
         $this->assertStringContainsString('0 đánh giá', $card);
-        $this->assertSame(1, substr_count($card, 'data-movie-booking-action'));
-        $this->assertSame(1, substr_count($card, 'Đặt vé'));
+        $this->assertSame(0, substr_count($card, 'data-movie-booking-action'));
+        $this->assertSame(0, substr_count($card, 'Đặt vé'));
         $this->assertStringContainsString('Chi tiết', $card);
     }
 

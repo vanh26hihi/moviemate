@@ -11,6 +11,7 @@
     @include('staff.tickets._print-styles')
 </head>
 <body data-print-operation-id="{{ $printOperationId }}">
+<x-form-validation-state :errors="$errors" />
 <main>
     @include('staff.tickets._physical-ticket', [
         'ticket' => $ticket,
@@ -25,9 +26,9 @@
         <form method="POST" action="{{ route('staff.admission-tickets.print.succeed', $ticket) }}" data-submit-once>@csrf
             <button type="submit" class="btn-primary">Đã in thành công</button>
         </form>
-        <form method="POST" action="{{ route('staff.admission-tickets.print.fail', $ticket) }}" class="space-y-3" data-submit-once>@csrf
+        <form method="POST" action="{{ route('staff.admission-tickets.print.fail', $ticket) }}" class="space-y-3" data-submit-once data-inline-validation>@csrf
             <label class="cinema-label">Lý do in lỗi<select name="failure_code" class="cinema-input mt-1" required><option value="">Chọn lý do</option>@foreach($failureReasons as $code => $label)<option value="{{ $code }}">{{ $label }}</option>@endforeach</select></label>
-            <label class="cinema-label">Ghi chú an toàn<textarea name="safe_note" class="cinema-input mt-1" maxlength="300"></textarea></label>
+            <label class="cinema-label">Ghi chú an toàn<textarea name="safe_note" class="cinema-input mt-1" maxlength="300" data-validation-required-if="failure_code:other"></textarea></label>
             <button type="submit" class="btn-secondary text-error">Báo lỗi in</button>
         </form>
     </section>

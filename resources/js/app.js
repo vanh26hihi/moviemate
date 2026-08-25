@@ -9,6 +9,11 @@ import './bulk-showtime-scheduling';
 import './showtime-schedule-copy';
 import './seat-gap-guard';
 import './layout-template-editor';
+import './form-validation';
+
+if (document.querySelector('[data-ai-assistant]')) {
+    import('./ai-chat');
+}
 
 const ticketScannerWorkspaces = document.querySelectorAll('[data-ticket-scanner]');
 if (ticketScannerWorkspaces.length > 0) {

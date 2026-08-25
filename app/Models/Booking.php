@@ -170,6 +170,16 @@ class Booking extends Model
         return $this->hasOne(Order::class);
     }
 
+    public function showtimeCancellationImpact(): HasOne
+    {
+        return $this->hasOne(ShowtimeCancellationImpact::class);
+    }
+
+    public function refundCase(): HasOne
+    {
+        return $this->hasOne(RefundCase::class);
+    }
+
     public function getRecipientEmailAttribute(): ?string
     {
         $email = is_string($this->customer_email) ? trim($this->customer_email) : '';

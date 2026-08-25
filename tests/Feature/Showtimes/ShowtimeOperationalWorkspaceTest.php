@@ -26,6 +26,50 @@ final class ShowtimeOperationalWorkspaceTest extends ShowtimeTestCase
         $this->withoutVite();
     }
 
+    public function test_list_uses_plain_filters_responsive_views_and_helpful_empty_state(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2030-06-10 08:00:00', 'Asia/Ho_Chi_Minh'));
+
+        try {
+            $movie = $this->movie(110, [
+                'title' => 'A deliberately long movie title that must remain readable in the operational workspace',
+            ]);
+            $showtime = $this->existing($movie, $this->rooms['P01'], [
+                'show_date' => '2030-06-10',
+                'show_time' => '09:00:00',
+            ]);
+            $admin = $this->userWithRole('admin');
+
+            $this->actingAs($admin)->get(route('admin.showtimes.index', [
+                'show_date' => '2030-06-10',
+                'movie_id' => $movie->id,
+            ]))
+                ->assertOk()
+                ->assertSee('for="showtime-show-date"', false)
+                ->assertSee('for="showtime-movie"', false)
+                ->assertSee('for="showtime-lifecycle"', false)
+                ->assertSee('2 bộ lọc đang dùng')
+                ->assertSee('Xóa bộ lọc')
+                ->assertSee('data-showtime-desktop-list', false)
+                ->assertSee('data-showtime-mobile-list', false)
+                ->assertSee('data-showtime-card', false)
+                ->assertSee($movie->title)
+                ->assertSee('Phòng sẵn sàng')
+                ->assertSee('Xem chi tiết')
+                ->assertSee('Chỉnh sửa')
+                ->assertSee(route('admin.showtimes.show', $showtime), false);
+
+            $this->get(route('admin.showtimes.index', ['show_date' => '1900-01-01']))
+                ->assertOk()
+                ->assertSee('Không tìm thấy suất chiếu phù hợp.')
+                ->assertSee('Hãy thử đổi ngày, chọn phim khác hoặc xóa bớt bộ lọc.')
+                ->assertSee('Xóa bộ lọc')
+                ->assertSee('Thêm suất chiếu');
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+    }
+
     public function test_canonical_detail_route_enforces_admin_manager_staff_and_guest_authority(): void
     {
         $showtime = $this->existing($this->movie(), $this->rooms['P01']);

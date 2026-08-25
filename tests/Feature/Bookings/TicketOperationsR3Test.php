@@ -8,6 +8,7 @@ use App\Models\Cinema;
 use App\Models\UserCinemaAssignment;
 use App\Services\Tickets\BookingQrPayload;
 use Illuminate\Database\QueryException;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use LogicException;
@@ -306,6 +307,7 @@ final class TicketOperationsR3Test extends PaymentTestCase
 
     public function test_ineligible_bookings_cannot_print(): void
     {
+        $this->withoutMiddleware(ThrottleRequests::class);
         $staff = $this->userWithRole('staff');
         $bookings = [
             $this->payableBooking(),
@@ -315,6 +317,12 @@ final class TicketOperationsR3Test extends PaymentTestCase
         ];
         foreach ($bookings as $booking) {
             $this->actingAs($staff)->post(route('staff.tickets.print.start', $booking))->assertStatus(409);
+            $this->post(route('staff.tickets.print-all', $booking))->assertStatus(409);
+            $this->get(route('staff.tickets.operations', $booking))->assertOk()
+                ->assertSee('Đơn chỉ được xem, không được in')
+                ->assertDontSee('In toàn bộ')
+                ->assertDontSee('>In vé<', false)
+                ->assertDontSee('In phiếu nhận đồ ăn');
         }
         $this->assertDatabaseCount('booking_ticket_prints', 0);
 
