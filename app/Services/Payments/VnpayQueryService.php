@@ -60,8 +60,24 @@ class VnpayQueryService
         }
 
         $responseCode = $payload['vnp_ResponseCode'] ?? null;
+        if (! is_string($responseCode)) {
+            return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_response_schema_invalid', $payload, $response->hash, $allowReview);
+        }
+        if ($responseCode !== '00') {
+            $safeCode = preg_match('/^[0-9]{2}$/D', $responseCode) === 1 ? $responseCode : 'invalid';
+
+            return $this->applyOutcome(
+                $payment,
+                Payment::STATUS_REVIEW,
+                'vnpay_query_response_'.$safeCode,
+                $payload,
+                $response->hash,
+                $allowReview,
+            );
+        }
+
         $transactionStatus = $payload['vnp_TransactionStatus'] ?? null;
-        if (! is_string($responseCode) || ! is_string($transactionStatus)) {
+        if (! is_string($transactionStatus)) {
             return $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_response_schema_invalid', $payload, $response->hash, $allowReview);
         }
 
@@ -93,6 +109,7 @@ class VnpayQueryService
         return match ($transactionStatus) {
             '01' => $this->storePending($payment, $payload, $response->hash, $allowReview),
             '02' => $this->applyTerminalFailure($payment, 'vnpay_terminal_failed', $payload, $response->hash, $allowReview),
+            '08' => $this->applyTerminalFailure($payment, 'vnpay_terminal_expired', $payload, $response->hash, $allowReview),
             '04', '07' => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_requires_review', $payload, $response->hash, $allowReview),
             default => $this->applyOutcome($payment, Payment::STATUS_REVIEW, 'query_unknown_status', $payload, $response->hash, $allowReview),
         };
@@ -115,7 +132,8 @@ class VnpayQueryService
             $allowReview,
         );
 
-        if ($status === Payment::STATUS_FAILED) {
+        if ($status === Payment::STATUS_FAILED
+            && $payment->booking()->value('sales_channel') !== Booking::SALES_CHANNEL_COUNTER) {
             $this->cancellations->cancel(
                 $payment->booking_id,
                 $reason,

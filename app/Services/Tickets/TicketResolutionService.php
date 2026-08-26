@@ -79,6 +79,8 @@ final class TicketResolutionService
             'ticketDelivery',
             'foodOrder.items',
             'foodPickupVoucher.printEvents.actor:id,name',
+            'showtimeCancellationImpact.cancellation',
+            'refundCase',
         ]);
     }
 

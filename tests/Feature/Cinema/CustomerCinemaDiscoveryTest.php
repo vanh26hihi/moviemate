@@ -7,6 +7,7 @@ use App\Models\Cinema;
 use App\Models\Movie;
 use App\Models\Room;
 use App\Models\Showtime;
+use App\Models\User;
 use App\Services\CinemaAccessService;
 use App\Services\CinemaContext;
 use Carbon\CarbonImmutable;
@@ -109,15 +110,33 @@ class CustomerCinemaDiscoveryTest extends TestCase
             ->assertSessionMissing(CinemaContext::SESSION_KEY);
     }
 
-    public function test_customer_navigation_has_cinema_link_one_shared_branch_selector_and_accessible_filters(): void
+    public function test_customer_navigation_preserves_routes_auth_actions_and_shared_cinema_context(): void
     {
         $this->publicScenario('PUB-NAV', 'Navigation Branch', '2030-06-02');
-        $response = $this->get(route('cinemas.index'))->assertOk()->assertSee('Rạp')->assertSee('Tất cả rạp');
+        $response = $this->get(route('cinemas.index'))->assertOk()
+            ->assertSee('Rạp')->assertSee('Tất cả rạp')
+            ->assertSee(route('home'), false)
+            ->assertSee(route('user.movies.index'), false)
+            ->assertSee(route('cinemas.index'), false)
+            ->assertSee(route('foods.index'), false)
+            ->assertSee(route('user.ai.recommend'), false)
+            ->assertSee(route('user.bookings.history'), false)
+            ->assertSee('Đăng nhập')->assertSee('Đăng ký')
+            ->assertDontSee('Đăng xuất')->assertDontSee('Quản trị')->assertDontSee('Khu vực nhân viên');
         $html = $response->getContent();
         $this->assertSame(1, substr_count($html, 'id="customer-cinema-selector"'));
+        $this->assertSame(1, substr_count($html, 'data-customer-desktop-nav'));
+        $this->assertSame(1, substr_count($html, 'data-customer-mobile-nav'));
+        $this->assertStringContainsString('aria-label="Điều hướng chính"', $html);
+        $this->assertStringContainsString('Rạp ưu tiên', $html);
         $this->assertSame(1, substr_count($html, 'id="nearbyCinemaBtn"'));
         $this->assertStringContainsString('aria-label="Lọc danh sách rạp"', $html);
         $this->assertStringContainsString('aria-live="polite"', $html);
+
+        $customer = User::factory()->create(['name' => 'Customer Navigation']);
+        $this->actingAs($customer)->get(route('cinemas.index'))->assertOk()
+            ->assertSee('Customer Navigation')->assertSee('Hồ sơ')->assertSee('Đăng xuất')
+            ->assertDontSee('Đăng ký')->assertDontSee('Quản trị')->assertDontSee('Khu vực nhân viên');
         $this->get(route('home'))->assertDontSee('cinema_id=', false);
     }
 

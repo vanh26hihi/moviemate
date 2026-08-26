@@ -18,6 +18,8 @@ use App\Http\Controllers\Admin\PaymentReconciliationController as AdminPaymentRe
 use App\Http\Controllers\Admin\PaymentReviewController as AdminPaymentReviewController;
 use App\Http\Controllers\Admin\PresentationFormatController as AdminPresentationFormatController;
 use App\Http\Controllers\Admin\PriceBookController as AdminPriceBookController;
+use App\Http\Controllers\Admin\RealtimeFieldValidationController as AdminRealtimeFieldValidationController;
+use App\Http\Controllers\Admin\RefundCaseController as AdminRefundCaseController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\ReviewController as AdminReviewController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
@@ -52,7 +54,10 @@ use App\Http\Controllers\Staff\PrintAllController as StaffPrintAllController;
 use App\Http\Controllers\Staff\TicketPrintController as StaffTicketPrintController;
 use App\Http\Controllers\Staff\TicketWorkspaceController as StaffTicketWorkspaceController;
 use App\Http\Controllers\Staff\WorkspaceController as StaffWorkspaceController;
+use App\Http\Controllers\User\AiChatStreamController;
 use App\Http\Controllers\User\AiController;
+use App\Http\Controllers\User\AiConversationController;
+use App\Http\Controllers\User\AiConversationMessageController;
 use App\Http\Controllers\User\BookingCancellationController;
 use App\Http\Controllers\User\BookingCheckoutConfirmController;
 use App\Http\Controllers\User\BookingController;
@@ -256,6 +261,36 @@ Route::post('/booking/access/{booking}', [GuestBookingAccessController::class, '
     ->name('user.bookings.access.exchange');
 
 Route::middleware(['auth', 'active'])->group(function () {
+    Route::get('/ai/conversations', [AiConversationController::class, 'index'])
+        ->name('user.ai.conversations.index');
+    Route::post('/ai/conversations', [AiConversationController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('user.ai.conversations.store');
+    Route::get('/ai/conversations/{conversation}', [AiConversationController::class, 'show'])
+        ->whereNumber('conversation')
+        ->name('user.ai.conversations.show');
+    Route::patch('/ai/conversations/{conversation}', [AiConversationController::class, 'update'])
+        ->whereNumber('conversation')
+        ->middleware('throttle:20,1')
+        ->name('user.ai.conversations.update');
+    Route::delete('/ai/conversations/{conversation}', [AiConversationController::class, 'destroy'])
+        ->whereNumber('conversation')
+        ->middleware('throttle:20,1')
+        ->name('user.ai.conversations.destroy');
+    Route::get('/ai/conversations/{conversation}/messages', [AiConversationMessageController::class, 'index'])
+        ->whereNumber('conversation')
+        ->name('user.ai.conversations.messages.index');
+    Route::post('/ai/conversations/{conversation}/messages', AiConversationMessageController::class)
+        ->whereNumber('conversation')
+        ->middleware('throttle:ai-chat')
+        ->name('user.ai.conversations.messages.store');
+    Route::post('/ai/conversations/{conversation}/messages/stream', [AiChatStreamController::class, 'authenticated'])
+        ->whereNumber('conversation')->middleware('throttle:ai-chat')
+        ->name('user.ai.conversations.messages.stream');
+    Route::post('/ai/conversations/{conversation}/messages/{message}/retry-stream', [AiChatStreamController::class, 'retryAuthenticated'])
+        ->whereNumber('conversation')->whereNumber('message')->middleware('throttle:ai-chat')
+        ->name('user.ai.conversations.messages.retry');
+
     Route::get('/booking-history', BookingHistoryController::class)
         ->name('user.bookings.history');
 
@@ -272,11 +307,15 @@ Route::middleware(['auth', 'active'])->group(function () {
 
 Route::get('/ai/recommend', [AiController::class, 'recommend'])->name('user.ai.recommend');
 Route::post('/ai/recommend', [AiController::class, 'recommendStore'])
-    ->middleware('throttle:10,1')->name('user.ai.recommend.submit');
+    ->middleware('throttle:ai-recommendation')->name('user.ai.recommend.submit');
 
 Route::get('/ai/chatbot', [AiController::class, 'chatbot'])->name('user.ai.chatbot');
 Route::post('/ai/chatbot', [AiController::class, 'chatbotStore'])
-    ->middleware('throttle:20,1')->name('user.ai.chatbot.submit');
+    ->middleware('throttle:ai-chat')->name('user.ai.chatbot.submit');
+Route::post('/ai/chatbot/stream', [AiChatStreamController::class, 'guest'])
+    ->middleware('throttle:ai-chat')->name('user.ai.chatbot.stream');
+Route::post('/ai/chatbot/stream/retry', [AiChatStreamController::class, 'retryGuest'])
+    ->middleware('throttle:ai-chat')->name('user.ai.chatbot.stream.retry');
 
 Route::get('/admin/rooms/{room}/layout/preview', [AdminSeatController::class, 'preview'])
     ->middleware(['auth', 'active', 'permission:admin.access', 'permission:seats.view'])
@@ -294,10 +333,14 @@ Route::get('/foods/success/{order}', [UserOrderController::class, 'retired'])
 Route::prefix('admin')->name('admin.')
     ->middleware(['auth', 'active', 'permission:admin.access', 'admin.cinema.scope'])
     ->group(function () {
+        Route::post('/validation/field', AdminRealtimeFieldValidationController::class)
+            ->middleware(['permission:dashboard.view', 'throttle:60,1'])->name('validation.field');
         Route::get('/', AdminDashboardController::class)
             ->middleware('permission:dashboard.view')->name('dashboard');
         Route::get('/reports', AdminReportController::class)
             ->middleware('permission:reports.view')->name('reports.index');
+        Route::get('/reports/export', [AdminReportController::class, 'export'])
+            ->middleware('permission:reports.view')->name('reports.export');
 
         Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])
             ->middleware('permission:activity_logs.view')->name('activity-logs.index');
@@ -333,6 +376,8 @@ Route::prefix('admin')->name('admin.')
 
         Route::get('/price-books', [AdminPriceBookController::class, 'index'])
             ->middleware('permission:pricing.view')->name('price-books.index');
+        Route::get('/price-books/preview', [AdminPriceBookController::class, 'previewRedirect'])
+            ->middleware('permission:pricing.view')->name('price-books.preview.redirect');
         Route::post('/price-books/preview', [AdminPriceBookController::class, 'preview'])
             ->middleware(['permission:pricing.view', 'throttle:60,1'])->name('price-books.preview');
         Route::get('/price-books/versions/{version}', [AdminPriceBookController::class, 'show'])
@@ -341,6 +386,8 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.copy');
         Route::patch('/price-books/versions/{version}', [AdminPriceBookController::class, 'update'])
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.update');
+        Route::patch('/price-books/versions/{version}/simple-prices', [AdminPriceBookController::class, 'updateSimplePrices'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.simple-prices.update');
         Route::post('/price-books/versions/{version}/adjustments', [AdminPriceBookController::class, 'storeAdjustment'])
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.adjustments.store');
         Route::patch('/price-books/versions/{version}/adjustments/{adjustment}', [AdminPriceBookController::class, 'updateAdjustment'])
@@ -351,6 +398,12 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.publish');
         Route::post('/price-books/versions/{version}/retire', [AdminPriceBookController::class, 'retire'])
             ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.retire');
+        Route::get('/price-books/versions/{version}/schedule-change/preview', [AdminPriceBookController::class, 'scheduleChangePreviewRedirect'])
+            ->whereNumber('version')->middleware('permission:pricing.manage')->name('price-books.versions.schedule-change.preview.redirect');
+        Route::post('/price-books/versions/{version}/schedule-change/preview', [AdminPriceBookController::class, 'previewScheduleChange'])
+            ->whereNumber('version')->middleware(['permission:pricing.manage', 'throttle:30,1'])->name('price-books.versions.schedule-change.preview');
+        Route::post('/price-books/versions/{version}/schedule-change/apply', [AdminPriceBookController::class, 'applyScheduleChange'])
+            ->whereNumber('version')->middleware(['permission:pricing.manage', 'throttle:10,1'])->name('price-books.versions.schedule-change.apply');
         Route::get('/reviews', [AdminReviewController::class, 'index'])->middleware('permission:reviews.view')->name('reviews.index');
         Route::patch('/reviews/{review}', [AdminReviewController::class, 'moderate'])->middleware('permission:reviews.moderate')->name('reviews.moderate');
         Route::resource('movies', AdminMovieController::class)->except(['destroy'])
@@ -453,12 +506,22 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('room')
             ->middleware('permission:seats.maintenance.update')->name('rooms.seat-maintenance.bulk');
 
+<<<<<<< HEAD
         Route::get('/seats', [AdminSeatController::class, 'index'])
             ->middleware('permission:seats.maintenance.view')->name('seats.index');
         Route::get('/seats/manage/{room}', [AdminSeatController::class, 'manage'])
             ->middleware('permission:seats.manage')->name('seats.manage');
         Route::post('/seats/generate/{room}', [AdminSeatController::class, 'generate'])
             ->middleware('permission:seats.manage')->name('seats.generate');
+=======
+    Route::resource('foods', AdminFoodController::class)->except(['show']);
+    Route::resource('food-orders', AdminFoodOrderController::class)->only(['index', 'show']);
+    Route::resource('vouchers', AdminVoucherController::class)->except(['show']);
+    
+    Route::patch('/movies/{movie}/lifecycle', [AdminMovieController::class, 'lifecycle'])
+    ->name('movies.lifecycle');
+
+>>>>>>> origin/feature/admin-update-movie-status
 
         Route::post('/showtimes/preview', AdminShowtimePreviewController::class)
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
@@ -481,6 +544,9 @@ Route::prefix('admin')->name('admin.')
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.bulk.store');
 
+        Route::get('/showtimes/{showtime}/cancellation', [AdminShowtimeController::class, 'cancellation'])
+            ->whereNumber('showtime')->middleware('permission:showtimes.delete')->name('showtimes.cancellation');
+
         Route::resource('showtimes', AdminShowtimeController::class)
             ->middlewareFor(['index', 'show'], 'permission:showtimes.view')
             ->middlewareFor(['create', 'store'], 'permission:showtimes.create')
@@ -497,8 +563,14 @@ Route::prefix('admin')->name('admin.')
         Route::get('/payments/{payment}', [AdminPaymentController::class, 'show'])
             ->whereNumber('payment')
             ->middleware('permission:payments.view')->name('payments.show');
+        Route::get('/refunds', [AdminRefundCaseController::class, 'index'])
+            ->middleware('permission:refunds.view')->name('refunds.index');
+        Route::patch('/refunds/{refundCase}', [AdminRefundCaseController::class, 'update'])
+            ->whereNumber('refundCase')->middleware(['permission:refunds.resolve', 'throttle:12,1'])->name('refunds.update');
         Route::get('/payment-reconciliation', [AdminPaymentReconciliationController::class, 'index'])
             ->middleware('permission:payments.reconcile')->name('payment-reconciliation.index');
+        Route::get('/payment-reconciliation/export', [AdminPaymentReconciliationController::class, 'export'])
+            ->middleware('permission:payments.reconcile')->name('payment-reconciliation.export');
         Route::post('/payments/{payment}/query-provider', [AdminPaymentReconciliationController::class, 'queryProvider'])
             ->whereNumber('payment')
             ->middleware(['permission:payments.reconcile', 'throttle:12,1'])
@@ -607,6 +679,8 @@ Route::prefix('staff')->name('staff.')
             ->whereNumber('booking')->middleware('permission:counter_sales.create')->name('counter.food.update');
         Route::get('/counter/bookings/{booking}/review', [StaffCounterSaleController::class, 'review'])
             ->whereNumber('booking')->middleware('permission:counter_sales.view')->name('counter.review');
+        Route::post('/counter/bookings/{booking}/promotion', [StaffCounterSaleController::class, 'applyPromotion'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.promotion');
         Route::post('/counter/bookings/{booking}/cash', [StaffCounterSaleController::class, 'cash'])
             ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.cash');
         Route::post('/counter/bookings/{booking}/payments/{provider}', [StaffCounterPaymentController::class, 'initiate'])
@@ -614,6 +688,10 @@ Route::prefix('staff')->name('staff.')
             ->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payments.initiate');
         Route::post('/counter/bookings/{booking}/payment/resume', [StaffCounterPaymentController::class, 'resume'])
             ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payment.resume');
+        Route::post('/counter/bookings/{booking}/payment/reconcile', [StaffCounterPaymentController::class, 'reconcile'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payment.reconcile');
+        Route::post('/counter/bookings/{booking}/payment/cancel-payos-attempt', [StaffCounterPaymentController::class, 'cancelPayOsAttempt'])
+            ->whereNumber('booking')->middleware(['permission:counter_sales.settle', 'throttle:12,1'])->name('counter.payment.cancel-payos-attempt');
         Route::get('/counter/bookings/{booking}/payment-result', [StaffCounterPaymentController::class, 'result'])
             ->whereNumber('booking')->middleware('permission:counter_sales.view')->name('counter.payment-result');
         Route::post('/counter/bookings/{booking}/cancel', [StaffCounterSaleController::class, 'cancel'])

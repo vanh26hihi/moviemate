@@ -29,6 +29,7 @@ class Role extends Model
         'bookings.view', 'bookings.operate',
         'counter_sales.view', 'counter_sales.create', 'counter_sales.settle', 'counter_sales.cancel',
         'payments.view', 'payments.reconcile',
+        'refunds.view', 'refunds.resolve',
         'ticket_deliveries.view', 'ticket_deliveries.retry',
         'seats.maintenance.view', 'seats.maintenance.update',
         'discounts.view', 'discounts.manage',

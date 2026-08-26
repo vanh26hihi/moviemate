@@ -94,18 +94,33 @@ function partialUrl(form, pageUrl) {
     return url;
 }
 
-function syncForm(form, pageUrl) {
+function syncForm(form, pageUrl, effectiveDate = null) {
     for (const name of ['cinema', 'date']) {
-        const value = pageUrl.searchParams.get(name) || '';
+        const value = name === 'date'
+            ? effectiveDate || pageUrl.searchParams.get(name) || form.dataset.defaultDate || ''
+            : pageUrl.searchParams.get(name) || '';
         form.querySelectorAll(`[name="${name}"]`).forEach((control) => {
             if (control instanceof HTMLSelectElement) control.value = value;
             if (control instanceof HTMLButtonElement) {
                 const button = control;
                 const selected = button.value === value;
                 button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+                if (selected) button.setAttribute('aria-current', 'date');
+                else button.removeAttribute('aria-current');
             }
         });
     }
+
+    if (effectiveDate) form.dataset.defaultDate = effectiveDate;
+}
+
+function syncResultSummary(target) {
+    const metadata = target.querySelector('[data-showtime-result-meta]');
+    const summary = document.querySelector('[data-showtime-count]');
+    if (!(metadata instanceof HTMLElement) || !(summary instanceof HTMLElement)) return;
+
+    const count = Number.parseInt(metadata.dataset.showtimeResultCount || '', 10);
+    if (Number.isFinite(count)) summary.textContent = `${count} suất chiếu đang khả dụng`;
 }
 
 async function updateShowtimes(form, pageUrl, pushHistory) {
@@ -123,7 +138,10 @@ async function updateShowtimes(form, pageUrl, pushHistory) {
         const html = await response.text();
         if (sequence !== requestSequence) return;
         target.innerHTML = html;
-        syncForm(form, pageUrl);
+        const metadata = target.querySelector('[data-showtime-result-meta]');
+        const effectiveDate = metadata instanceof HTMLElement ? metadata.dataset.showtimeResultDate : null;
+        syncForm(form, pageUrl, effectiveDate);
+        syncResultSummary(target);
         if (pushHistory) window.history.pushState({ showtimeFilters: true }, '', pageUrl);
         if (status) status.textContent = 'Đã cập nhật lịch chiếu.';
     } catch (error) {

@@ -5,19 +5,21 @@ namespace App\Http\Controllers\Admin;
 use App\Exceptions\PricingConfigurationException;
 use App\Exceptions\ShowtimeScheduleException;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\CancelShowtimeRequest;
 use App\Http\Requests\Admin\StoreShowtimeRequest;
 use App\Http\Requests\Admin\UpdateShowtimeRequest;
 use App\Models\Movie;
 use App\Models\PresentationFormat;
 use App\Models\Room;
 use App\Models\Showtime;
+use App\Models\ShowtimeCancellation;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
+use App\Services\ShowtimeCancellationPreviewService;
+use App\Services\ShowtimeCancellationService;
 use App\Services\ShowtimeLifecycleService;
 use App\Services\ShowtimeScheduleService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 
 class ShowtimeController extends Controller
 {
@@ -32,7 +34,11 @@ class ShowtimeController extends Controller
     {
         $query = Showtime::query()
             ->with(['movie', 'cinema', 'room.cinema', 'roomLayout', 'presentationFormat', 'ticketPrices.seatType'])
-            ->withExists(['bookings', 'bookingSeats']);
+            ->withExists(['bookings', 'bookingSeats'])
+            ->withCount([
+                'bookings as pending_bookings_count' => fn ($query) => $query->where('booking_status', 'pending_payment'),
+                'bookings as paid_bookings_count' => fn ($query) => $query->where('payment_status', 'paid'),
+            ]);
         $this->cinemaAccess->scope($query, $request->user(), 'showtimes.cinema_id');
 
         if ($movieId = $request->query('movie_id')) {
@@ -86,6 +92,8 @@ class ShowtimeController extends Controller
             'ticketPrices' => fn ($query) => $query->orderBy('seat_type_id'),
             'ticketPrices.seatType:id,code,name,is_pair,sort_order',
             'ticketPrices.priceBookVersion:id,version_number,status',
+            'cancellation.cancelledBy:id,name',
+            'cancellation.refundCases',
         ])->loadExists(['bookings', 'bookingSeats']);
 
         $lifecycle = $this->lifecycle->snapshot($showtime);
@@ -104,8 +112,7 @@ class ShowtimeController extends Controller
             && $lifecycle['state'] === ShowtimeLifecycleService::UPCOMING
             && ! $hasBookingHistory;
         $canCancel = $showtime->status === 'active'
-            && in_array($lifecycle['state'], [ShowtimeLifecycleService::UPCOMING, ShowtimeLifecycleService::PLAYING], true)
-            && ! $hasBookingHistory;
+            && in_array($lifecycle['state'], [ShowtimeLifecycleService::UPCOMING, ShowtimeLifecycleService::PLAYING], true);
         $roomState = match (true) {
             $lifecycle['state'] === ShowtimeLifecycleService::CANCELLED => [
                 'key' => 'cancelled', 'label' => 'Không áp dụng — suất đã hủy',
@@ -204,37 +211,37 @@ class ShowtimeController extends Controller
         return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được cập nhật.');
     }
 
-    public function destroy(Showtime $showtime)
+    public function cancellation(Showtime $showtime, ShowtimeCancellationPreviewService $previews)
     {
-        $this->assertOperationalShowtime($showtime);
-        DB::transaction(function () use ($showtime): void {
-            $locked = Showtime::query()->whereKey($showtime->id)->lockForUpdate()->firstOrFail();
-            if ($locked->status === 'cancelled') {
-                return;
-            }
-            if ($locked->status !== 'active') {
-                throw ValidationException::withMessages([
-                    'showtime' => 'Chỉ suất chiếu đang hoạt động mới có thể hủy.',
-                ]);
-            }
-            $locked->loadMissing(['movie', 'room.cinema']);
-            if ($this->lifecycle->state($locked) === ShowtimeLifecycleService::COMPLETED) {
-                throw ValidationException::withMessages([
-                    'showtime' => 'Suất chiếu đã kết thúc nên không thể hủy.',
-                ]);
-            }
-            if ($locked->bookings()->exists()) {
-                throw ValidationException::withMessages([
-                    'showtime' => 'Suất chiếu đã có lịch sử đặt vé nên không thể hủy trực tiếp.',
-                ]);
-            }
+        $this->assertViewableShowtime($showtime);
+        abort_unless($showtime->status === 'active'
+            && in_array($this->lifecycle->state($showtime), [ShowtimeLifecycleService::UPCOMING, ShowtimeLifecycleService::PLAYING], true), 409);
+        $showtime->loadMissing(['movie', 'cinema', 'room', 'presentationFormat']);
 
-            $before = $this->auditData($locked);
-            $locked->forceFill(['status' => 'cancelled'])->save();
-            $this->activityLogger->log('showtime.cancelled', $locked, $before, ['status' => 'cancelled']);
-        });
+        return view('admin.showtimes.cancellation', [
+            'showtime' => $showtime,
+            'impact' => $previews->summarize($showtime),
+            'reasons' => ShowtimeCancellation::REASONS,
+        ]);
+    }
 
-        return redirect()->route('admin.showtimes.index')->with('success', 'Suất chiếu đã được hủy và giữ lại trong lịch sử.');
+    public function destroy(CancelShowtimeRequest $request, Showtime $showtime, ShowtimeCancellationService $cancellations)
+    {
+        $this->assertViewableShowtime($showtime);
+        $validated = $request->validated();
+        $cancellation = $cancellations->cancel(
+            $showtime,
+            $request->user(),
+            $validated['reason_code'],
+            $validated['reason_note'] ?? null,
+        );
+
+        return redirect()->route('admin.showtimes.show', $showtime)->with(
+            'success',
+            $cancellation->refundCases->isEmpty()
+                ? 'Đã hủy suất chiếu. Các đơn và lịch sử liên quan được giữ nguyên.'
+                : 'Đã hủy suất chiếu và tạo nghĩa vụ hoàn tiền thủ công cho các đơn đã thanh toán.',
+        );
     }
 
     private function formData(): array

@@ -185,6 +185,30 @@ final class PriceBookAdminWorkspaceTest extends TestCase
         $this->assertLessThan(strpos($html, 'data-preview-dimension="room"'), strpos($html, 'data-preview-dimension="cinema"'));
     }
 
+    public function test_preview_get_recovers_safely_without_changing_the_authoritative_post_endpoint(): void
+    {
+        [$cinema] = $this->pricingContext('PREVIEW-GET');
+        $admin = $this->userWithRole('admin');
+        $manager = $this->managerFor($cinema->id);
+        $session = [CinemaAccessService::SESSION_KEY => $cinema->id];
+
+        $this->get(route('admin.price-books.preview.redirect'))
+            ->assertRedirect(route('login'));
+
+        $this->actingAs($admin)
+            ->get(route('admin.price-books.preview.redirect'))
+            ->assertRedirect(route('admin.price-books.index'));
+
+        $this->actingAs($manager)->withSession($session)
+            ->get(route('admin.price-books.preview.redirect'))
+            ->assertRedirect(route('admin.price-books.index'));
+
+        $this->assertSame(
+            route('admin.price-books.preview'),
+            route('admin.price-books.preview.redirect'),
+        );
+    }
+
     public function test_authoritative_preview_prices_vip_and_couple_as_logical_units(): void
     {
         [$cinema, , $room] = $this->pricingContext('LOGICAL');

@@ -12,6 +12,7 @@ final class BookingTicketEligibility
     {
         return $booking->payment_status === 'paid'
             && $booking->booking_status === 'paid'
+            && ! $this->isCinemaCancelled($booking)
             && $this->verifiedPayment($booking) !== null;
     }
 
@@ -19,6 +20,7 @@ final class BookingTicketEligibility
     {
         return $booking->payment_status === 'paid'
             && $booking->booking_status === 'paid'
+            && ! $this->isCinemaCancelled($booking)
             && $this->verifiedPayment($booking) !== null;
     }
 
@@ -32,6 +34,8 @@ final class BookingTicketEligibility
         return $query
             ->where('bookings.payment_status', 'paid')
             ->where('bookings.booking_status', 'paid')
+            ->whereDoesntHave('showtimeCancellationImpact')
+            ->whereHas('showtime', fn (Builder $showtime): Builder => $showtime->where('status', 'active'))
             ->whereHas('payments', fn (Builder $payments): Builder => $this->applyAuthoritativePaymentEvidence($payments));
     }
 
@@ -62,5 +66,17 @@ final class BookingTicketEligibility
                             ->whereNotNull('settled_by_user_id');
                     });
             });
+    }
+
+    private function isCinemaCancelled(Booking $booking): bool
+    {
+        $showtimeCancelled = $booking->relationLoaded('showtime')
+            ? $booking->showtime?->status === 'cancelled'
+            : false;
+        $hasImpact = $booking->relationLoaded('showtimeCancellationImpact')
+            ? $booking->showtimeCancellationImpact !== null
+            : false;
+
+        return $showtimeCancelled || $hasImpact;
     }
 }

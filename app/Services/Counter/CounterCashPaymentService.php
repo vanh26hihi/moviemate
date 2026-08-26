@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Services\ActivityLogger;
 use App\Services\CinemaAccessService;
+use App\Services\PromotionService;
 use App\Services\Tickets\TicketDeliveryOutbox;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +18,7 @@ final class CounterCashPaymentService
 {
     public function __construct(
         private readonly CinemaAccessService $cinemas,
+        private readonly PromotionService $promotions,
         private readonly TicketDeliveryOutbox $ticketDeliveries,
         private readonly ActivityLogger $activities,
     ) {}
@@ -59,7 +61,14 @@ final class CounterCashPaymentService
             }
 
             $amount = (int) $locked->total_amount;
-            if ($amount < 0 || $amount !== (int) $locked->seat_subtotal + (int) $locked->food_subtotal) {
+            $gross = (int) $locked->seat_subtotal + (int) $locked->food_subtotal;
+            $discount = (int) $locked->promotion_discount_amount;
+            if ($gross <= 0
+                || (int) $locked->gross_amount !== $gross
+                || $discount < 0
+                || $discount > $gross
+                || $amount <= 0
+                || $amount !== $gross - $discount) {
                 throw ValidationException::withMessages(['booking' => 'Tổng tiền lưu trên đơn không hợp lệ.']);
             }
 
@@ -89,6 +98,7 @@ final class CounterCashPaymentService
             ])->save();
             Order::query()->where('booking_id', $locked->id)->where('status', 'pending')
                 ->lockForUpdate()->update(['status' => 'paid']);
+            $this->promotions->redeem($locked);
 
             if ($locked->recipient_email !== null) {
                 $this->ticketDeliveries->enqueueVerifiedBooking($locked);

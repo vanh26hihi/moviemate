@@ -38,13 +38,15 @@ class HomeController extends Controller
         $nowShowing = Movie::query()->where('status', 'now_showing')->orderByDesc('created_at')->get();
         $comingSoon = Movie::query()->where('status', 'coming_soon')->orderBy('release_date')->get();
         $scheduleDates = $this->catalog->dates($cinema)->take(7)->values();
-        $scheduleShowtimes = $this->customerCatalog->between(
-            $today->toDateString(), $today->copy()->addDays(6)->toDateString(), $cinema,
-        );
+        $bookingWindowShowtimes = $this->customerCatalog->bookingWindow($cinema);
+        $bookableMovieIds = $this->customerCatalog->bookableMovieIds($bookingWindowShowtimes);
+        $scheduleShowtimes = $bookingWindowShowtimes
+            ->where('date', '<=', $today->copy()->addDays(6)->toDateString())
+            ->values();
 
         return view('user.home', compact(
             'nowShowing', 'comingSoon', 'cinema', 'scheduleDates',
-            'selectedDate', 'scheduleShowtimes', 'cinemas'
+            'selectedDate', 'scheduleShowtimes', 'cinemas', 'bookableMovieIds'
         ));
     }
 }

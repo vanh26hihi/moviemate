@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Cinema;
 use App\Models\Movie;
 use App\Models\Showtime;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
@@ -30,42 +31,70 @@ final class CustomerShowtimeCatalogService
         return $this->present($this->catalog->between($from, $to, $cinema, $movie));
     }
 
+    /** @return Collection<int, array<string, mixed>> */
+    public function bookingWindow(?Cinema $cinema = null, ?Movie $movie = null): Collection
+    {
+        $timezone = $cinema?->timezone ?: config('cinema.timezone', 'Asia/Ho_Chi_Minh');
+        $today = CarbonImmutable::today($timezone);
+
+        return $this->between(
+            $today->toDateString(),
+            $today->addDays(PublicShowtimeCatalog::WINDOW_DAYS - 1)->toDateString(),
+            $cinema,
+            $movie,
+        );
+    }
+
+    /** @param Collection<int, array<string, mixed>> $showtimes
+     * @return Collection<int, int>
+     */
+    public function bookableMovieIds(Collection $showtimes): Collection
+    {
+        return $showtimes->where('bookable', true)
+            ->pluck('movie.id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+    }
+
     /** @param Collection<int, Showtime> $showtimes
      * @return Collection<int, array<string, mixed>>
      */
     public function present(Collection $showtimes): Collection
     {
-        return $showtimes->map(function (Showtime $showtime): array {
-            $lifecycle = $this->lifecycle->snapshot($showtime);
+        return $showtimes
+            ->filter(fn (Showtime $showtime): bool => (bool) $showtime->movie?->allowsCustomerBooking())
+            ->map(function (Showtime $showtime): array {
+                $lifecycle = $this->lifecycle->snapshot($showtime);
 
-            return [
-                'id' => (int) $showtime->id,
-                'date' => $showtime->show_date->toDateString(),
-                'cinema' => $showtime->cinema,
-                'movie' => $showtime->movie,
-                'poster' => $showtime->movie->poster_url,
-                'genres' => $showtime->movie->genres,
-                'duration' => $showtime->movie->duration,
-                'age_rating' => $showtime->movie->age_rating,
-                'presentation_format' => $showtime->presentationFormat ? [
-                    'code' => $showtime->presentationFormat->code,
-                    'name' => $showtime->presentationFormat->name,
-                    'sort_order' => (int) $showtime->presentationFormat->sort_order,
-                ] : null,
-                'room_type' => $showtime->room->room_type_label,
-                'starts_at' => $lifecycle['starts_at'],
-                'customer_visible_ends_at' => $lifecycle['ends_at'],
-                'booking_closes_at' => $lifecycle['booking_closes_at'],
-                'server_now' => $lifecycle['now'],
-                'booking_url' => route('user.bookings.selectSeat', [
-                    'showtime' => $showtime->id,
-                    'cinema' => $showtime->cinema->code,
-                ]),
-                'bookable' => $this->lifecycle->isCustomerBookingOpen($showtime, $lifecycle['now']),
-                'starting_price' => $showtime->getAttribute('starting_price') === null
-                    ? null
-                    : (int) $showtime->getAttribute('starting_price'),
-            ];
-        })->values();
+                return [
+                    'id' => (int) $showtime->id,
+                    'date' => $showtime->show_date->toDateString(),
+                    'cinema' => $showtime->cinema,
+                    'movie' => $showtime->movie,
+                    'poster' => $showtime->movie->poster_url,
+                    'genres' => $showtime->movie->genres,
+                    'duration' => $showtime->movie->duration,
+                    'age_rating' => $showtime->movie->age_rating,
+                    'presentation_format' => $showtime->presentationFormat ? [
+                        'code' => $showtime->presentationFormat->code,
+                        'name' => $showtime->presentationFormat->name,
+                        'sort_order' => (int) $showtime->presentationFormat->sort_order,
+                    ] : null,
+                    'room_type' => $showtime->room->room_type_label,
+                    'starts_at' => $lifecycle['starts_at'],
+                    'customer_visible_ends_at' => $lifecycle['ends_at'],
+                    'booking_closes_at' => $lifecycle['booking_closes_at'],
+                    'server_now' => $lifecycle['now'],
+                    'booking_url' => route('user.bookings.selectSeat', [
+                        'showtime' => $showtime->id,
+                        'cinema' => $showtime->cinema->code,
+                    ]),
+                    'bookable' => $this->lifecycle->isCustomerBookingOpen($showtime, $lifecycle['now']),
+                    'starting_price' => $showtime->getAttribute('starting_price') === null
+                        ? null
+                        : (int) $showtime->getAttribute('starting_price'),
+                ];
+            })->values();
     }
 }

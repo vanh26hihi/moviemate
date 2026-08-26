@@ -51,7 +51,7 @@ final class PayOsReturnController extends Controller
             ->where('provider', 'payos')->findOrFail((int) $attempt);
         $this->authorizePayment($request, $payment, $returnTokens, false);
         $integrityVerified = (bool) $request->session()->pull('payment_return_integrity.'.$payment->id, false);
-        $payment->refresh()->load('booking');
+        $payment->refresh()->load(['booking.showtimeCancellationImpact', 'booking.refundCase']);
         $canViewBooking = Auth::check() || $guestAccess->allows($request, $payment->booking);
         if ($this->usesStaffCounterResult($payment)) {
             return redirect()->route('staff.counter.payment-result', [

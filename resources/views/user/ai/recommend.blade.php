@@ -172,8 +172,12 @@
                     @foreach($recommendations as $index => $item)
                         @php
                             $poster = \App\Models\Movie::imageUrl($item['poster'] ?? null);
-                            $detailUrl = route('user.movies.show', $item['slug']);
-                            $showtimeUrl = $detailUrl . '#showtimes';
+                            $detailUrl = $item['details_url'] ?? route('user.movies.show', $item['slug']);
+                            $showtimeUrl = $item['showtimes_url'] ?? ($detailUrl . '#showtimes');
+                            $bookingUrl = ($item['bookable'] ?? false) === true
+                                ? ($item['booking_url'] ?? null)
+                                : null;
+                            $isUpcoming = ($item['status'] ?? null) === \App\Models\Movie::STATUS_COMING_SOON;
                         @endphp
 
                         <article class="{{ $index === 0 ? 'dark-surface bg-gradient-to-br from-[#1E1B4B] to-dark-main border-ai-start/30 shadow-ai-start/10' : 'app-card app-border' }} border rounded-3xl p-5 sm:p-6 relative overflow-hidden shadow-2xl">
@@ -238,12 +242,20 @@
                                     </div>
 
                                     <div class="flex flex-wrap gap-3">
-                                        <a href="{{ $showtimeUrl }}" class="px-5 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-2xl font-bold hover:shadow-lg hover:shadow-brand-start/30 transition-all">
-                                            Đặt vé ngay
-                                        </a>
-                                        <a href="{{ $detailUrl }}" class="px-5 py-3 app-card border app-border app-text rounded-2xl font-bold hover:border-ai-start transition-colors">
-                                            Xem chi tiết
-                                        </a>
+                                        @if($bookingUrl)
+                                            <a href="{{ $bookingUrl }}" data-ai-recommendation-booking-action class="px-5 py-3 bg-gradient-to-r from-brand-start to-brand-end text-white rounded-2xl font-bold hover:shadow-lg hover:shadow-brand-start/30 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-start">
+                                                Đặt vé ngay
+                                            </a>
+                                        @else
+                                            <a href="{{ $isUpcoming ? $detailUrl : $showtimeUrl }}" class="px-5 py-3 app-card border app-border app-text rounded-2xl font-bold hover:border-ai-start transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ai-start">
+                                                {{ $isUpcoming ? 'Chi tiết' : 'Xem lịch chiếu' }}
+                                            </a>
+                                        @endif
+                                        @if($bookingUrl || ! $isUpcoming)
+                                            <a href="{{ $detailUrl }}" class="px-5 py-3 app-card border app-border app-text rounded-2xl font-bold hover:border-ai-start transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ai-start">
+                                                Xem chi tiết
+                                            </a>
+                                        @endif
                                     </div>
                                 </div>
                             </div>

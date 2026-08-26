@@ -3,8 +3,8 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\PresentationFormat;
+use App\Support\AdminUniqueRules;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 final class SavePresentationFormatRequest extends FormRequest
 {
@@ -35,11 +35,11 @@ final class SavePresentationFormatRequest extends FormRequest
         return [
             'code' => [
                 'required', 'string', 'max:40', 'regex:/^[A-Z0-9]+(?:_[A-Z0-9]+)*$/',
-                Rule::unique('presentation_formats', 'code')->ignore($format instanceof PresentationFormat ? $format->id : null),
+                AdminUniqueRules::presentationFormatCode($format instanceof PresentationFormat ? $format : null),
             ],
             'name' => [
                 'required', 'string', 'max:120',
-                Rule::unique('presentation_formats', 'name')->ignore($format instanceof PresentationFormat ? $format->id : null),
+                AdminUniqueRules::presentationFormatName($format instanceof PresentationFormat ? $format : null),
             ],
             'description' => ['nullable', 'string', 'max:2000'],
             'sort_order' => ['nullable', 'integer', 'between:0,4294967295'],
@@ -54,6 +54,14 @@ final class SavePresentationFormatRequest extends FormRequest
             'name' => 'tên định dạng',
             'description' => 'mô tả',
             'sort_order' => 'thứ tự',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'code.unique' => 'Mã định dạng trình chiếu này đã tồn tại.',
+            'name.unique' => 'Tên định dạng trình chiếu này đã tồn tại.',
         ];
     }
 }

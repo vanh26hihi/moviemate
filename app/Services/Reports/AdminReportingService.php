@@ -70,6 +70,12 @@ final class AdminReportingService
         ];
     }
 
+    /** @return Collection<int, object> */
+    public function financeRows(ReportScope $scope): Collection
+    {
+        return $this->rows($scope, 'finance');
+    }
+
     /** @return list<array{date: string, label: string, revenue: int, transactions: int, heightPercent: int}> */
     public function revenueSeries(ReportScope $scope, ?Collection $financeRows = null): array
     {

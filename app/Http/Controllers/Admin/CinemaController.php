@@ -7,6 +7,7 @@ use App\Models\Cinema;
 use App\Services\ActivityLogger;
 use App\Services\Admin\Branch360ReadModel;
 use App\Services\CinemaAccessService;
+use App\Support\AdminUniqueRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -117,7 +118,7 @@ final class CinemaController extends Controller
         $request->merge(['code' => mb_strtoupper(trim((string) $request->input('code')))]);
 
         return $request->validate([
-            'code' => ['required', 'string', 'max:32', 'regex:/^[A-Z0-9-]+$/', Rule::unique('cinemas', 'code')->ignore($cinema?->id)],
+            'code' => ['required', 'string', 'max:32', 'regex:/^[A-Z0-9-]+$/', AdminUniqueRules::cinemaCode($cinema)],
             'name' => ['required', 'string', 'max:255'],
             'address' => ['required', 'string', 'max:500'],
             'city' => ['required', 'string', 'max:120'],
@@ -127,6 +128,19 @@ final class CinemaController extends Controller
             'timezone' => ['required', 'timezone:all'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'description' => ['nullable', 'string', 'max:5000'],
+        ], [
+            'code.unique' => 'Mã chi nhánh này đã tồn tại.',
+        ], [
+            'code' => 'mã chi nhánh',
+            'name' => 'tên chi nhánh',
+            'address' => 'địa chỉ chi nhánh',
+            'city' => 'tỉnh hoặc thành phố',
+            'district' => 'quận hoặc huyện',
+            'country' => 'quốc gia',
+            'phone' => 'điện thoại',
+            'timezone' => 'múi giờ',
+            'status' => 'trạng thái chi nhánh',
+            'description' => 'mô tả chi nhánh',
         ]);
     }
 

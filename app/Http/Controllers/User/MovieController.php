@@ -43,6 +43,7 @@ class MovieController extends Controller
             $availableMovieIds = $this->catalog->forDate($selectedDate, $selectedCinema)->pluck('movie_id')->unique();
             $query->whereIn('id', $availableMovieIds);
         }
+        $this->catalog->withCustomerBookingAvailability($query, $selectedCinema);
         $preferredCinema = $this->cinemaContext->preference();
         if (! $selectedCinema && $preferredCinema) {
             $query->withExists(['showtimes as preferred_branch_available' => fn ($showtimes) => $showtimes
@@ -232,18 +233,20 @@ class MovieController extends Controller
      */
     public function show(Request $request, string $slug)
     {
-        $movie = Movie::query()
+        $selectedCinema = $request->filled('cinema')
+            ? Cinema::query()->active()->where('code', mb_strtoupper((string) $request->query('cinema')))->firstOrFail()
+            : null;
+        $movieQuery = Movie::query()
             ->where('slug', $slug)
             ->whereIn('status', PublicShowtimeCatalog::MOVIE_STATUSES)
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
-            ->with('genres')
-            ->firstOrFail();
-        $selectedCinema = $request->filled('cinema')
-            ? Cinema::query()->active()->where('code', mb_strtoupper((string) $request->query('cinema')))->firstOrFail()
-            : null;
+            ->with('genres');
+        $this->catalog->withCustomerBookingAvailability($movieQuery, $selectedCinema);
+        $movie = $movieQuery->firstOrFail();
         $selectedDate = $this->catalog->date($request->query('date'), $selectedCinema);
         $showtimes = $this->customerCatalog->forDate($selectedDate, $selectedCinema, $movie);
+        $bookingAvailable = $movie->allowsCustomerBooking() && (bool) $movie->customer_booking_available;
         $preferredCinema = $this->cinemaContext->preference();
         if (! $selectedCinema && $preferredCinema) {
             $showtimes = $showtimes->sortBy(fn ($showtime): array => [
@@ -276,6 +279,7 @@ class MovieController extends Controller
             'publicReviews' => $publicReviews,
             'existingReview' => $existingReview,
             'reviewBooking' => $reviewBooking,
+            'bookingAvailable' => $bookingAvailable,
         ]);
     }
 }

@@ -194,6 +194,7 @@ class BookingController extends Controller
             'foodOrder.items',
             'foodPickupVoucher',
         ]);
+        $this->loadCancellationContext($booking);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $verifiedPayment = $this->ticketEligibility->verifiedPayment($booking);
@@ -227,6 +228,7 @@ class BookingController extends Controller
             'foodOrder.items',
             'foodPickupVoucher',
         ]);
+        $this->loadCancellationContext($booking);
 
         $isUsable = $this->ticketEligibility->isUsable($booking);
         $isDeliverable = $this->ticketEligibility->isDeliverable($booking);
@@ -263,6 +265,15 @@ class BookingController extends Controller
             $this->guestAccess->allows($request, $booking),
             404,
         );
+    }
+
+    private function loadCancellationContext(Booking $booking): void
+    {
+        $booking->setRelation('showtimeCancellationImpact', null);
+        $booking->setRelation('refundCase', null);
+        if ($booking->booking_status === 'cancelled') {
+            $booking->load(['showtimeCancellationImpact.cancellation', 'refundCase']);
+        }
     }
 
     /**

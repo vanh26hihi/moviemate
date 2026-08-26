@@ -172,6 +172,11 @@ class Movie extends Model
         return $this->hasMany(Showtime::class);
     }
 
+    public function allowsCustomerBooking(): bool
+    {
+        return $this->status === self::STATUS_NOW_SHOWING;
+    }
+
     /**
      * Only visible reviews count toward the public rating so hidden/moderated entries never
      * influence the aggregates rendered on the movie list.

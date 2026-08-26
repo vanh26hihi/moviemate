@@ -8,6 +8,7 @@
     $poster = $movie->poster_url;
     $detailUrl = $movie->slug ? route('user.movies.show', $movie->slug) : route('user.movies.index');
     $bookingUrl = $detailUrl.'#showtimes';
+    $bookingAvailable = (bool) ($bookingAvailable ?? false);
     $cardBg = $isComingSoon
         ? 'bg-[linear-gradient(180deg,#131A2E_0%,#0B1020_100%)]'
         : 'bg-[linear-gradient(180deg,#111827_0%,#0B1020_100%)]';
@@ -16,7 +17,7 @@
         : 'hover:shadow-[0_20px_44px_rgba(255,77,109,0.18)]';
 @endphp
 
-<article class="group dark-surface flex h-full flex-col overflow-hidden rounded-3xl border border-white/[0.08] {{ $cardBg }} shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-orange-400/25 {{ $cinemaGlow }}">
+<article data-home-movie-card="{{ $movie->id }}" class="group dark-surface flex h-full flex-col overflow-hidden rounded-3xl border border-white/[0.08] {{ $cardBg }} shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-orange-400/25 {{ $cinemaGlow }}">
     <a href="{{ $detailUrl }}" class="block">
         <div class="relative aspect-[2/3] overflow-hidden rounded-t-3xl bg-slate-950">
             <x-movie-media
@@ -68,14 +69,16 @@
             </div>
         </div>
 
-        <div class="mt-2 grid grid-cols-2 gap-3">
+        <div @class(['mt-2 grid gap-3', 'grid-cols-2' => $bookingAvailable, 'grid-cols-1' => ! $bookingAvailable])>
             <a href="{{ $detailUrl }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-white/10 bg-transparent px-3 text-sm font-bold text-white transition-all duration-300 hover:border-white/25 hover:bg-white/[0.07]">
                 Chi tiết
             </a>
-            <a href="{{ $bookingUrl }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 px-3 text-sm font-bold text-white shadow-lg shadow-pink-500/15 transition-all duration-300 hover:scale-[1.02] hover:brightness-110 hover:shadow-pink-500/30">
-                <i class="ph-fill ph-ticket"></i>
-                Đặt vé
-            </a>
+            @if($bookingAvailable)
+                <a data-home-movie-booking-action href="{{ $bookingUrl }}" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500 via-red-500 to-orange-500 px-3 text-sm font-bold text-white shadow-lg shadow-pink-500/15 transition-all duration-300 hover:scale-[1.02] hover:brightness-110 hover:shadow-pink-500/30">
+                    <i class="ph-fill ph-ticket"></i>
+                    Đặt vé
+                </a>
+            @endif
         </div>
     </div>
 </article>

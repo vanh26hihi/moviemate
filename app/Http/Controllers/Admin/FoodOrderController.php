@@ -3,32 +3,27 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ListFoodOrdersRequest;
 use App\Models\Order;
-use App\Services\CinemaAccessService;
-use Illuminate\Http\Request;
+use App\Services\Admin\AdminFoodOrderQuery;
+use Illuminate\View\View;
 
 class FoodOrderController extends Controller
 {
-    public function __construct(private readonly CinemaAccessService $cinemaAccess) {}
+    public function __construct(private readonly AdminFoodOrderQuery $foodOrders) {}
 
-    public function index(Request $request)
+    public function index(ListFoodOrdersRequest $request): View
     {
-        $query = Order::query()->with(['items.food', 'pickupCinema']);
-        $cinemaId = $this->cinemaAccess->currentCinemaId($request->user());
-        if ($cinemaId !== null) {
-            $query->where(fn ($query) => $query->where('pickup_cinema_id', $cinemaId)
-                ->orWhereHas('booking', fn ($booking) => $booking->where('cinema_id', $cinemaId)));
-        } elseif (! $this->cinemaAccess->hasGlobalAccess($request->user())) {
-            $query->whereRaw('1 = 0');
-        }
-        $orders = $query->orderBy('created_at', 'desc')->paginate(20);
+        $filters = $request->validated();
+        $orders = $this->foodOrders->paginate($filters);
+        $summary = $this->foodOrders->summary($filters);
 
-        return view('admin.food-orders.index', compact('orders'));
+        return view('admin.food-orders.index', compact('orders', 'summary', 'filters'));
     }
 
-    public function show(Order $order)
+    public function show(Order $order): View
     {
-        $order->load('items.food');
+        $order = $this->foodOrders->findSuccessful((int) $order->getKey());
 
         return view('admin.food-orders.show', compact('order'));
     }

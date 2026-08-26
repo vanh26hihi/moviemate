@@ -15,6 +15,7 @@ use App\Models\RoomLayoutCell;
 use App\Models\Seat;
 use App\Models\Showtime;
 use App\Models\User;
+use App\Services\CinemaAccessService;
 use App\Services\Reports\AdminReportingService;
 use App\Services\Reports\ReportScopeFactory;
 use Carbon\CarbonImmutable;
@@ -150,6 +151,34 @@ final class ReportingR9Test extends TestCase
         $this->get(route('admin.reports.index', $this->filters()))->assertForbidden();
     }
 
+    public function test_report_csv_export_is_authoritative_scoped_and_privacy_safe(): void
+    {
+        $fixture = $this->fixture();
+
+        $response = $this->actingAs($fixture['admin'])->get(route('admin.reports.export', $this->filters()));
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'text/csv; charset=UTF-8')
+            ->assertHeader('cache-control', 'max-age=0, no-store, private')
+            ->assertHeader('x-content-type-options', 'nosniff')
+            ->assertHeader('content-disposition');
+        $content = $response->streamedContent();
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $this->assertSame(4, substr_count($content, 'Report Movie'));
+        $this->assertStringContainsString('Report Movie A', $content);
+        $this->assertStringContainsString('100000', $content);
+        $this->assertStringContainsString('120000', $content);
+        $this->assertStringContainsString('90000', $content);
+        $this->assertStringContainsString('70000', $content);
+        $this->assertStringNotContainsString('R9-SECRET-TRANSACTION', $content);
+        $this->assertStringNotContainsString('private-customer@example.test', $content);
+        $this->assertStringNotContainsString('failed', $content);
+
+        $this->actingAs($this->userWithRole('manager'))
+            ->get(route('admin.reports.export', [...$this->filters(), 'cinema' => $fixture['other']->id]))
+            ->assertForbidden();
+    }
+
     public function test_report_filters_are_bounded_allowlisted_and_shareable(): void
     {
         $admin = $this->userWithRole('admin');
@@ -167,22 +196,21 @@ final class ReportingR9Test extends TestCase
             ->assertSee('name="to" value="2026-08-07"', false);
     }
 
-    public function test_dashboard_and_report_ui_are_complete_privacy_safe_and_query_bounded(): void
+    public function test_dashboard_is_operational_report_is_analytical_and_both_are_privacy_safe_and_query_bounded(): void
     {
         $fixture = $this->fixture();
         DB::flushQueryLog();
         DB::enableQueryLog();
         $response = $this->actingAs($fixture['admin'])->get(route('admin.dashboard', $this->filters()))
             ->assertOk()
-            ->assertSee('380.000 ₫')
-            ->assertSee('Top phim')
-            ->assertSee('Khung giờ cao điểm')
-            ->assertSee('Thể loại được quan tâm')
-            ->assertSee('Phim đang chiếu')
-            ->assertSee('Kênh bán')
-            ->assertSee('Phương thức thanh toán')
-            ->assertSee('Vận hành in vé', false)
-            ->assertSee('Giao dịch cần hỗ trợ')
+            ->assertSee('Trung tâm điều hành hôm nay')
+            ->assertSee('Report Movie A')
+            ->assertSee('Việc cần xử lý')
+            ->assertDontSee('380.000 ₫')
+            ->assertDontSee('Top phim')
+            ->assertDontSee('Khung giờ cao điểm')
+            ->assertDontSee('Thể loại được quan tâm')
+            ->assertDontSee('Bộ lọc báo cáo')
             ->assertDontSee('private-customer@example.test')
             ->assertDontSee('R9-SECRET-TRANSACTION')
             ->assertDontSee('ticket_email_token');
@@ -196,7 +224,8 @@ final class ReportingR9Test extends TestCase
         $this->assertLessThanOrEqual(30, $reportQueries);
 
         DB::flushQueryLog();
-        $this->get(route('admin.dashboard', [...$this->filters(), 'cinema' => $fixture['primary']->id]))->assertOk();
+        $this->withSession([CinemaAccessService::SESSION_KEY => $fixture['primary']->id])
+            ->get(route('admin.dashboard'))->assertOk()->assertSee($fixture['primary']->name);
         $branchDashboardQueries = count(DB::getQueryLog());
         $this->assertLessThanOrEqual(30, $branchDashboardQueries);
 

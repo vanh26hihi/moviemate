@@ -59,6 +59,8 @@ class PermissionSeeder extends Seeder
         'counter_sales.cancel' => 'Hủy đơn giữ chỗ tại quầy',
         'payments.view' => 'Xem thanh toán',
         'payments.reconcile' => 'Đối soát giao dịch',
+        'refunds.view' => 'Xem nghĩa vụ hoàn tiền',
+        'refunds.resolve' => 'Ghi nhận hoàn tiền thủ công',
         'ticket_deliveries.view' => 'Xem lịch sử gửi tài liệu nhận vé',
         'ticket_deliveries.retry' => 'Gửi lại tài liệu nhận vé',
         'seats.maintenance.view' => 'Xem trạng thái bảo trì ghế',

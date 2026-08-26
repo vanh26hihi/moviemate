@@ -12,8 +12,8 @@
     @csrf
     @if($presentationFormat->exists) @method('PUT') @endif
     <div class="grid gap-5 md:grid-cols-2">
-        <label><span class="admin-label">Mã định dạng *</span><input class="admin-input" name="code" required maxlength="40" value="{{ old('code', $presentationFormat->code) }}" placeholder="Ví dụ: 4DX"><span class="admin-help">Mã được chuẩn hóa viết hoa và không thể đổi sau khi đã được sử dụng.</span></label>
-        <label><span class="admin-label">Tên định dạng *</span><input class="admin-input" name="name" required maxlength="120" value="{{ old('name', $presentationFormat->name) }}" placeholder="Ví dụ: 4DX"></label>
+        <label><span class="admin-label">Mã định dạng *</span><input class="admin-input" name="code" required maxlength="40" pattern="[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*" value="{{ old('code', $presentationFormat->code) }}" placeholder="Ví dụ: 4DX" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="presentation-format.code" data-validation-record="{{ $presentationFormat->exists ? $presentationFormat->getKey() : '' }}"><span class="admin-help">Mã được chuẩn hóa viết hoa và không thể đổi sau khi đã được sử dụng.</span></label>
+        <label><span class="admin-label">Tên định dạng *</span><input class="admin-input" name="name" required maxlength="120" value="{{ old('name', $presentationFormat->name) }}" placeholder="Ví dụ: 4DX" data-validation-url="{{ route('admin.validation.field') }}" data-validation-rule="presentation-format.name" data-validation-record="{{ $presentationFormat->exists ? $presentationFormat->getKey() : '' }}"></label>
     </div>
     <label><span class="admin-label">Mô tả</span><textarea class="admin-input" name="description" rows="4" maxlength="2000">{{ old('description', $presentationFormat->description) }}</textarea></label>
     <label><span class="admin-label">Thứ tự</span><input class="admin-input" type="number" min="0" max="4294967295" name="sort_order" value="{{ old('sort_order', $presentationFormat->sort_order ?? 0) }}"></label>

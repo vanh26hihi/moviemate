@@ -5,6 +5,7 @@
 @php
     $featuredMovie = $nowShowing->first() ?? $comingSoon->first();
     $featuredGenres = $featuredMovie?->genres?->pluck('name')->take(3)->join(', ') ?: 'Điện ảnh';
+    $featuredBookingAvailable = $featuredMovie && $bookableMovieIds->contains((int) $featuredMovie->id);
 @endphp
 
 @section('content')
@@ -38,10 +39,12 @@
                 @endif
 
                 <div class="mt-8 flex flex-col sm:flex-row gap-3">
-                    <a href="{{ $featuredMovie ? route('user.movies.show', $featuredMovie->slug) . '#showtimes' : route('user.movies.index') }}" class="btn-primary">
-                        <i class="ph-fill ph-ticket"></i>
-                        Đặt vé ngay
-                    </a>
+                    @if($featuredBookingAvailable)
+                        <a data-featured-booking-action href="{{ route('user.movies.show', $featuredMovie->slug) }}#showtimes" class="btn-primary">
+                            <i class="ph-fill ph-ticket"></i>
+                            Đặt vé ngay
+                        </a>
+                    @endif
                     @if($featuredMovie)
                         <a href="{{ route('user.movies.show', $featuredMovie->slug) }}" class="btn-secondary">
                             <i class="ph ph-info"></i>
@@ -88,7 +91,7 @@
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         @forelse($nowShowing as $movie)
-            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'now_showing'])
+            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'now_showing', 'bookingAvailable' => $bookableMovieIds->contains((int) $movie->id)])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                 <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-start/10 text-brand-start">
@@ -119,7 +122,7 @@
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         @forelse($comingSoon as $movie)
-            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'coming_soon'])
+            @include('components.home-movie-card', ['movie' => $movie, 'type' => 'coming_soon', 'bookingAvailable' => $bookableMovieIds->contains((int) $movie->id)])
         @empty
             <div class="col-span-full dark-surface rounded-3xl border border-white/[0.08] p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                 <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-pink-500/10 text-pink-400">

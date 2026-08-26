@@ -85,6 +85,29 @@ final class Phase4DSingleShowtimeFormatTest extends ShowtimeTestCase
         $this->assertSame($threeD->id, $showtime->presentation_format_id);
     }
 
+    public function test_single_showtime_form_explains_and_encodes_room_format_filtering(): void
+    {
+        $movie = $this->movie(90);
+        $threeD = $this->format('3D');
+        $movie->supportedPresentationFormats()->attach($threeD);
+        $this->rooms['P03']->presentationCapabilities()->attach($threeD);
+
+        $response = $this->actingAs($this->userWithRole('admin'))
+            ->get(route('admin.showtimes.create'))
+            ->assertOk();
+
+        $response
+            ->assertSee('-- Chọn định dạng trước --')
+            ->assertSee('data-room-guidance', false)
+            ->assertSee('chỉ hiển thị những phòng có thiết bị phù hợp')
+            ->assertSee('data-format-codes="2D"', false)
+            ->assertSee('data-format-codes="2D, 3D"', false)
+            ->assertSee('hỗ trợ 2D, 3D')
+            ->assertSee('option.hidden = !compatible', false)
+            ->assertSee('Không có phòng đang hoạt động hỗ trợ', false)
+            ->assertSee('các phòng không tương thích đã được ẩn', false);
+    }
+
     public function test_update_revalidates_full_tuple_and_format_is_booking_protected(): void
     {
         $movieA = $this->movie(90);

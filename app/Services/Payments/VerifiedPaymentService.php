@@ -8,8 +8,10 @@ use App\Models\Booking;
 use App\Models\BookingSeat;
 use App\Models\Order;
 use App\Models\Payment;
+use App\Models\ShowtimeCancellationImpact;
 use App\Services\ActivityLogger;
 use App\Services\PromotionService;
+use App\Services\ShowtimeCancellationService;
 use App\Services\Tickets\TicketDeliveryOutbox;
 use Illuminate\Support\Facades\DB;
 
@@ -19,6 +21,7 @@ class VerifiedPaymentService
         private readonly TicketDeliveryOutbox $ticketDeliveries,
         private readonly ActivityLogger $activities,
         private readonly PromotionService $promotions,
+        private readonly ShowtimeCancellationService $showtimeCancellations,
     ) {}
 
     public function verify(Payment $payment, VerifiedPaymentData $data): PaymentVerificationResult
@@ -44,7 +47,12 @@ class VerifiedPaymentService
                 return PaymentVerificationResult::duplicate();
             }
 
-            if ($lockedPayment->status === Payment::STATUS_FAILED) {
+            $showtimeCancellationImpactExists = ShowtimeCancellationImpact::query()
+                ->where('booking_id', $booking->id)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($lockedPayment->status === Payment::STATUS_FAILED && ! $showtimeCancellationImpactExists) {
                 $this->markReview(
                     $lockedPayment,
                     $data,
@@ -58,9 +66,10 @@ class VerifiedPaymentService
                 );
             }
 
-            $eligible = $allowReview
-                ? $lockedPayment->status === Payment::STATUS_REVIEW
-                : in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true);
+            $eligible = $showtimeCancellationImpactExists
+                || ($allowReview
+                    ? $lockedPayment->status === Payment::STATUS_REVIEW
+                    : in_array($lockedPayment->status, Payment::RECONCILABLE_STATUSES, true));
 
             if (! $eligible) {
                 return PaymentVerificationResult::rejected(
@@ -124,6 +133,10 @@ class VerifiedPaymentService
                 return PaymentVerificationResult::rejected(
                     'A later payment attempt exists for this booking.',
                 );
+            }
+
+            if ($showtimeCancellationImpactExists) {
+                return $this->settleLateShowtimeCancellationPayment($booking, $lockedPayment, $payment, $data);
             }
 
             $seatLocks = $booking->bookingSeats()->lockForUpdate()->get();
@@ -195,6 +208,45 @@ class VerifiedPaymentService
 
             return PaymentVerificationResult::transitioned();
         });
+    }
+
+    private function settleLateShowtimeCancellationPayment(
+        Booking $booking,
+        Payment $lockedPayment,
+        Payment $originalPayment,
+        VerifiedPaymentData $data,
+    ): PaymentVerificationResult {
+        $now = now();
+        $this->applyAuditFields($lockedPayment, $data);
+        $lockedPayment->forceFill([
+            'status' => Payment::STATUS_SUCCESS,
+            'verified_at' => $now,
+            'paid_at' => $now,
+            'failed_at' => null,
+            'failure_reason' => null,
+        ])->save();
+        $booking->forceFill([
+            'payment_method' => $lockedPayment->provider,
+            'payment_status' => 'paid',
+            'paid_at' => $booking->paid_at ?? $now,
+        ])->save();
+        $refundCase = $this->showtimeCancellations->recordLateAuthoritativeSuccess($booking, $lockedPayment);
+        $this->activities->log(
+            'payment.late_success_after_showtime_cancellation',
+            $lockedPayment,
+            ['payment_status' => $originalPayment->status],
+            ['payment_status' => Payment::STATUS_SUCCESS],
+            [
+                'payment_id' => $lockedPayment->id,
+                'booking_id' => $booking->id,
+                'cinema_id' => $booking->cinema_id,
+                'refund_case_id' => $refundCase->id,
+                'provider' => $lockedPayment->provider,
+                'result' => 'success_preserved_refund_required',
+            ],
+        );
+
+        return PaymentVerificationResult::transitioned();
     }
 
     private function markReview(

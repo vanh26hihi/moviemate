@@ -43,7 +43,14 @@ final class MultiCinemaAuthorizationTest extends TestCase
         $primary = $this->scenario($this->primary);
 
         $this->actingAs($admin)->get(route('admin.cinemas.index'))
-            ->assertOk()->assertSee($this->primary->name)->assertSee($this->other->name);
+            ->assertOk()
+            ->assertSee($this->primary->name)
+            ->assertSee($this->other->name)
+            ->assertSee('Tổng quan chi nhánh')
+            ->assertSee('Chỉnh sửa')
+            ->assertSee(route('admin.cinemas.show', $this->primary), false)
+            ->assertSee(route('admin.cinemas.edit', $this->primary), false)
+            ->assertDontSee('Xem chi tiết');
         $this->post(route('admin.cinema-context.update'), ['cinema_id' => (string) $this->other->id])
             ->assertRedirect()->assertSessionHas(CinemaAccessService::SESSION_KEY, $this->other->id);
         $this->get(route('admin.rooms.show', $other['room']))->assertOk();
@@ -60,7 +67,13 @@ final class MultiCinemaAuthorizationTest extends TestCase
         $customer = $this->userWithRole('user');
 
         $this->actingAs($manager)->get(route('admin.cinemas.index'))
-            ->assertOk()->assertSee($this->primary->name)->assertDontSee($this->other->name);
+            ->assertOk()
+            ->assertSee($this->primary->name)
+            ->assertDontSee($this->other->name)
+            ->assertSee('Tổng quan chi nhánh')
+            ->assertSee(route('admin.cinemas.show', $this->primary), false)
+            ->assertDontSee(route('admin.cinemas.edit', $this->primary), false)
+            ->assertDontSee('Xem chi tiết');
 
         // Staff keeps operational-only permissions and no admin panel access, so its branch
         // scope is asserted through the access service and the staff area instead.

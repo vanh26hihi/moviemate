@@ -58,7 +58,9 @@
                 </div>
 
                 <div class="flex flex-wrap gap-3">
-                    <a href="#showtimes" class="btn-primary"><i class="ph-fill ph-ticket"></i> Xem lịch chiếu</a>
+                    @if($bookingAvailable ?? false)
+                        <a data-movie-detail-booking-action href="#showtimes" class="btn-primary"><i class="ph-fill ph-ticket"></i> Xem lịch chiếu</a>
+                    @endif
                     @if($movie->trailer_url)
                         <a href="{{ $movie->trailer_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary"><i class="ph-fill ph-play-circle text-xl"></i> Xem video giới thiệu</a>
                     @endif
@@ -66,17 +68,17 @@
             </div>
         </div>
 
-        <section id="showtimes" class="mt-14">
+        <section id="showtimes" class="mt-14 scroll-mt-24">
             <div class="mb-6 flex items-center gap-3">
                 <span class="h-8 w-1 rounded-full bg-gradient-to-b from-brand-start to-brand-end"></span>
                 <div>
                     <h2 class="text-2xl font-extrabold app-text md:text-3xl">Lịch chiếu theo rạp</h2>
-                    <p class="mt-1 text-sm font-semibold text-brand-start">{{ $availableShowtimesCount ?? $showtimes->count() }} suất chiếu đang khả dụng</p>
+                    <p class="mt-1 text-sm font-semibold text-brand-start" data-showtime-count>{{ $availableShowtimesCount ?? $showtimes->count() }} suất chiếu đang khả dụng</p>
                     <p class="mt-1 text-sm app-muted">Chọn chi nhánh và ngày; các rạp khác vẫn hiển thị khi chưa lọc.</p>
                 </div>
             </div>
             <div class="mb-3 flex flex-wrap items-center gap-3"><button id="nearbyCinemaBtn" type="button" class="btn-secondary" data-nearby-target="movieCinemaSelect"><i class="ph-fill ph-navigation-arrow" aria-hidden="true"></i> Gần bạn</button><p id="nearbyCinemaStatus" class="text-sm app-muted" role="status" aria-live="polite"></p></div>
-            <form method="GET" action="{{ route('user.movies.show', $movie->slug) }}" data-showtime-filter-form data-filter-endpoint="{{ route('showtimes.filter') }}" data-filter-context="movie" data-movie-slug="{{ $movie->slug }}" class="cinema-card mb-6 grid gap-4 p-4">
+            <form method="GET" action="{{ route('user.movies.show', $movie->slug) }}#showtimes" data-showtime-filter-form data-filter-endpoint="{{ route('showtimes.filter') }}" data-filter-context="movie" data-movie-slug="{{ $movie->slug }}" data-default-date="{{ $selectedDate }}" class="cinema-card mb-6 grid gap-4 p-4">
                 <label><span class="mb-1 block text-sm font-bold app-text">Rạp</span><select id="movieCinemaSelect" name="cinema" class="cinema-input"><option value="">Tất cả rạp</option>@foreach($cinemas as $filterCinema)<option value="{{ $filterCinema->code }}" data-latitude="{{ $filterCinema->latitude }}" data-longitude="{{ $filterCinema->longitude }}" @selected($selectedCinema?->is($filterCinema))>{{ $filterCinema->name }}</option>@endforeach</select></label>
                 <x-customer.showtimes.date-rail :dates="$dates" :selected-date="$selectedDate" />
                 <button type="submit" class="btn-primary self-end">Xem lịch</button>
