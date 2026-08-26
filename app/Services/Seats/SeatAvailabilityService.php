@@ -6,7 +6,6 @@ use App\Models\BookingSeat;
 use App\Models\RoomLayout;
 use App\Models\SeatHold;
 use App\Models\Showtime;
-use Illuminate\Support\Collection;
 
 final class SeatAvailabilityService
 {

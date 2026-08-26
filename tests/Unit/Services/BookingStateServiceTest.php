@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Services;
 
-use App\Models\Booking;
 use App\Services\BookingStateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\CreatesBookingFixtures;

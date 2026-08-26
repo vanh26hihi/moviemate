@@ -6,6 +6,8 @@ use App\Models\Booking;
 use App\Models\SeatHold;
 use App\Models\Showtime;
 use App\Models\User;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -43,7 +45,7 @@ class SeatHoldService
         return $expired;
     }
 
-    public function holdSeats(User $user, Showtime $showtime, array $seatIds): \Carbon\CarbonInterface
+    public function holdSeats(User $user, Showtime $showtime, array $seatIds): CarbonInterface
     {
         $normalizedSeatIds = $this->normalizeSeatIds($seatIds);
 
@@ -85,7 +87,7 @@ class SeatHoldService
         });
     }
 
-    public function assertHeldBy(User $user, Showtime $showtime, array $seatIds): \Carbon\CarbonInterface
+    public function assertHeldBy(User $user, Showtime $showtime, array $seatIds): CarbonInterface
     {
         $normalizedSeatIds = $this->normalizeSeatIds($seatIds);
         $holds = SeatHold::where('user_id', $user->id)->where('showtime_id', $showtime->id)
@@ -154,14 +156,14 @@ class SeatHoldService
         return $normalized;
     }
 
-    protected function calculateExpiration(Showtime $showtime, $existingHolds, array $requestedSeatIds, array $heldSeatIds): \Carbon\CarbonInterface
+    protected function calculateExpiration(Showtime $showtime, $existingHolds, array $requestedSeatIds, array $heldSeatIds): CarbonInterface
     {
         if ($existingHolds->count() === count($requestedSeatIds) && $heldSeatIds === $requestedSeatIds) {
             return $existingHolds->min('expires_at');
         }
 
         $expiresAt = now()->addMinutes(self::HOLD_MINUTES);
-        $startsAt = \Carbon\Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time, 'Asia/Ho_Chi_Minh');
+        $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time, 'Asia/Ho_Chi_Minh');
         $bookingDeadline = $startsAt->addMinutes(30);
 
         if ($expiresAt->greaterThan($bookingDeadline)) {

@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Booking;
-use Carbon\CarbonInterface;
 
 final class BookingStateService
 {

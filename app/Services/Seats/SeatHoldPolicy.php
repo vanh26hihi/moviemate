@@ -6,7 +6,6 @@ use App\Models\SeatHold;
 use App\Models\Showtime;
 use App\Models\User;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Collection;
 
 final class SeatHoldPolicy
 {

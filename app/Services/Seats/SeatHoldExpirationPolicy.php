@@ -4,6 +4,7 @@ namespace App\Services\Seats;
 
 use App\Models\SeatHold;
 use App\Models\Showtime;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
 final class SeatHoldExpirationPolicy
@@ -44,7 +45,7 @@ final class SeatHoldExpirationPolicy
 
     public function holdDeadline(Showtime $showtime, int $windowMinutes = 7): CarbonInterface
     {
-        $startsAt = \Carbon\Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time, 'Asia/Ho_Chi_Minh');
+        $startsAt = Carbon::parse($showtime->show_date->format('Y-m-d').' '.$showtime->show_time, 'Asia/Ho_Chi_Minh');
         $bookingDeadline = $startsAt->addMinutes(30);
         $holdExpiry = now()->addMinutes($windowMinutes);
 

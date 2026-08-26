@@ -27,7 +27,7 @@ class PayosController extends Controller
             $paymentInfo = $payos->getPaymentInfo($orderCode);
 
             if ($payos->isPaidStatus($paymentInfo['status'] ?? null)) {
-            $wasMarkedPaid = $this->markBookingPaid($booking, $paymentInfo);
+                $wasMarkedPaid = $this->markBookingPaid($booking, $paymentInfo);
 
                 if ($wasMarkedPaid) {
                     $this->sendTicketEmail($booking);
@@ -130,6 +130,7 @@ class PayosController extends Controller
                 $booking->bookingSeats()->delete();
 
                 Log::warning('payOS payment ignored because the seat hold expired', ['booking_id' => $booking->id]);
+
                 return false;
             }
 
