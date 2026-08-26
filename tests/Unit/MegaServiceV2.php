@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace Tests\Unit;
 
 class MegaServiceV2
 {
@@ -11,7 +11,7 @@ class MegaServiceV2
         for ($i = 0; $i < $n; $i++) {
             $data[] = [
                 'id' => $i,
-                'name' => 'Item ' . $i,
+                'name' => 'Item '.$i,
                 'price' => rand(100, 10000),
                 'status' => ['new', 'old', 'sale'][rand(0, 2)],
                 'created_at' => now(),
@@ -124,7 +124,7 @@ class MegaServiceV2
         $arr = [];
 
         for ($i = 0; $i < 500; $i++) {
-            $arr[] = (bool)rand(0, 1);
+            $arr[] = (bool) rand(0, 1);
         }
 
         return $arr;
@@ -205,7 +205,7 @@ class MegaServiceV2
         $txt = '';
 
         for ($i = 0; $i < 1500; $i++) {
-            $txt .= "DATA-{$i}-" . rand(1, 999) . "\n";
+            $txt .= "DATA-{$i}-".rand(1, 999)."\n";
         }
 
         return $txt;
@@ -227,7 +227,7 @@ class MegaServiceV2
         for ($i = 0; $i < 200; $i++) {
             $result[] = [
                 'index' => $i,
-                'value' => md5($i . time()),
+                'value' => md5($i.time()),
                 'rand' => rand(1, 999999),
             ];
         }
