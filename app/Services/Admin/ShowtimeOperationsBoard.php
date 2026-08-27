@@ -38,7 +38,8 @@ final class ShowtimeOperationsBoard
                 'bookings as bookings_count',
                 'bookings as paid_bookings_count' => fn (Builder $query): Builder => $query->where('payment_status', 'paid'),
             ])
-            ->whereBetween('show_date', [$from->toDateString(), $to->toDateString()]);
+            ->whereDate('show_date', '>=', $from->toDateString())
+            ->whereDate('show_date', '<=', $to->toDateString());
 
         $this->cinemaAccess->scope($query, $user, 'showtimes.cinema_id');
         $this->applyFilters($query, $filters);
