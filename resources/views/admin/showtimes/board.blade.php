@@ -23,6 +23,7 @@
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
+            <a href="{{ route('admin.showtimes.board.export', $queryWithoutPage) }}" class="admin-btn-secondary"><i class="ph-bold ph-download-simple"></i>Xuất CSV</a>
             <a href="{{ route('admin.showtimes.index') }}" class="admin-btn-secondary"><i class="ph-bold ph-list"></i>Danh sách</a>
             @can('showtimes.create')
                 <a href="{{ route('admin.showtimes.create') }}" class="admin-btn-primary"><i class="ph-bold ph-plus"></i>Thêm suất</a>
