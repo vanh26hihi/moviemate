@@ -4,6 +4,9 @@
 @section('page-title', 'Quản lý suất chiếu')
 
 @section('content')
+<div class="mb-4 flex justify-end">
+    <a href="{{ route('admin.showtimes.board') }}" class="admin-btn-secondary"><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i>Bảng điều hành</a>
+</div>
 @php
     $hasActiveFilters = request()->filled('show_date') || request()->filled('movie_id') || request()->filled('lifecycle');
     $activeFilterCount = collect(['show_date', 'movie_id', 'lifecycle'])->filter(fn ($filter) => request()->filled($filter))->count();
