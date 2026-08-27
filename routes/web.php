@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\RoomTypeController as AdminRoomTypeController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\SeatIncidentResolutionController as AdminSeatIncidentResolutionController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
+use App\Http\Controllers\Admin\ShowtimeBoardController as AdminShowtimeBoardController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\ShowtimePreviewController as AdminShowtimePreviewController;
 use App\Http\Controllers\Admin\ShowtimeScheduleCopyController as AdminShowtimeScheduleCopyController;
@@ -532,6 +533,10 @@ Route::prefix('admin')->name('admin.')
         Route::post('/showtimes/bulk', [AdminBulkShowtimeController::class, 'store'])
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.bulk.store');
+
+        Route::get('/showtimes-board', AdminShowtimeBoardController::class)
+            ->middleware('permission:showtimes.view')
+            ->name('showtimes.board');
 
         Route::get('/showtimes/{showtime}/cancellation', [AdminShowtimeController::class, 'cancellation'])
             ->whereNumber('showtime')->middleware('permission:showtimes.delete')->name('showtimes.cancellation');
