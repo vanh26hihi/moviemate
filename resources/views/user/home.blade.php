@@ -51,10 +51,6 @@
                             Xem chi tiết
                         </a>
                     @endif
-                    <a href="{{ route('foods.index') }}" class="btn-secondary hover:!border-brand-start hover:!text-brand-start">
-                        <i class="ph-fill ph-burger"></i>
-                        Đặt đồ ăn
-                    </a>
                     <a href="{{ route('user.ai.recommend') }}" class="btn-secondary hover:!border-ai-start hover:!text-ai-start">
                         <i class="ph-fill ph-sparkle"></i>
                         AI gợi ý phim

@@ -67,7 +67,8 @@ class PayOsQueryCountTest extends PayOsPaymentTestCase
 
         $counts = compact('selection', 'beforeHttp', 'return', 'webhook', 'adminIndex', 'adminDetail');
         $diagnostic = json_encode($counts, JSON_THROW_ON_ERROR);
-        $this->assertLessThanOrEqual(19, $selection, 'Payment selection page query count is unbounded. '.$diagnostic);
+        // The review page now includes one active seat-hold lookup.
+        $this->assertLessThanOrEqual(20, $selection, 'Payment selection page query count is unbounded. '.$diagnostic);
         $this->assertLessThanOrEqual(14, $beforeHttp, 'payOS initiation performs too many queries before HTTP. '.$diagnostic);
         $this->assertLessThanOrEqual(15, $return, 'payOS return query count is unbounded. '.$diagnostic);
         $this->assertLessThanOrEqual(22, $webhook, 'payOS webhook finalization query count is unbounded. '.$diagnostic);

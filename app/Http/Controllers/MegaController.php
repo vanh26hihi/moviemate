@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-
 class MegaController extends Controller
 {
     // ================= BASIC =================
@@ -11,7 +9,7 @@ class MegaController extends Controller
     public function index()
     {
         return response()->json([
-            'message' => 'Mega One Page Controller Ready 🚀'
+            'message' => 'Mega One Page Controller Ready 🚀',
         ]);
     }
 
@@ -24,7 +22,7 @@ class MegaController extends Controller
         for ($i = 1; $i <= 100; $i++) {
             $data[] = [
                 'id' => $i,
-                'code' => 'BK' . rand(1000, 9999),
+                'code' => 'BK'.rand(1000, 9999),
                 'amount' => rand(10000, 500000),
                 'status' => ['paid', 'pending'][rand(0, 1)],
             ];
@@ -109,7 +107,7 @@ class MegaController extends Controller
             'amount' => rand(1000, 10000),
             'status' => rand(0, 1) ? 'success' : 'failed',
             'transaction_id' => uniqid('txn_'),
-            'time' => now()
+            'time' => now(),
         ];
     }
 
@@ -125,7 +123,7 @@ class MegaController extends Controller
 
         return response()->json([
             'status' => true,
-            'data' => $arr
+            'data' => $arr,
         ]);
     }
 }

@@ -82,7 +82,7 @@ final class RoomLayoutHistoryIntegrityTest extends TestCase
             'room_layout_cells_prevent_immutable_update',
             'room_layout_cells_prevent_immutable_delete',
             'room_layouts_prevent_structural_mutation',
-        ], $names->filter(fn (string $name): bool => str_starts_with($name, 'room_layout'))->all());
+        ], $names->filter(fn (string $name): bool => str_starts_with($name, 'room_layout'))->values()->all());
     }
 
     public function test_draft_cells_allow_raw_insert_update_and_delete(): void

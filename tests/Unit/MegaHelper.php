@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Utils;
+namespace Tests\Unit;
 
 class MegaHelper
 {
@@ -27,7 +27,7 @@ class MegaHelper
 
         for ($i = 1; $i <= $count; $i++) {
             $bookings[] = [
-                'code' => 'BK' . rand(10000, 99999),
+                'code' => 'BK'.rand(10000, 99999),
                 'amount' => rand(50000, 500000),
                 'status' => ['paid', 'pending', 'cancelled'][rand(0, 2)],
                 'time' => date('Y-m-d H:i:s'),
@@ -110,7 +110,7 @@ class MegaHelper
     public static function fakeLogs()
     {
         for ($i = 0; $i < 500; $i++) {
-            error_log("Log dòng số: " . $i);
+            error_log('Log dòng số: '.$i);
         }
     }
 
@@ -209,7 +209,7 @@ class MegaHelper
         $list = [];
 
         for ($i = 0; $i < 300; $i++) {
-            $list[] = (bool)rand(0, 1);
+            $list[] = (bool) rand(0, 1);
         }
 
         return $list;
