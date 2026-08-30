@@ -506,22 +506,12 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('room')
             ->middleware('permission:seats.maintenance.update')->name('rooms.seat-maintenance.bulk');
 
-<<<<<<< HEAD
         Route::get('/seats', [AdminSeatController::class, 'index'])
             ->middleware('permission:seats.maintenance.view')->name('seats.index');
         Route::get('/seats/manage/{room}', [AdminSeatController::class, 'manage'])
             ->middleware('permission:seats.manage')->name('seats.manage');
         Route::post('/seats/generate/{room}', [AdminSeatController::class, 'generate'])
             ->middleware('permission:seats.manage')->name('seats.generate');
-=======
-    Route::resource('foods', AdminFoodController::class)->except(['show']);
-    Route::resource('food-orders', AdminFoodOrderController::class)->only(['index', 'show']);
-    Route::resource('vouchers', AdminVoucherController::class)->except(['show']);
-    
-    Route::patch('/movies/{movie}/lifecycle', [AdminMovieController::class, 'lifecycle'])
-    ->name('movies.lifecycle');
-
->>>>>>> origin/feature/admin-update-movie-status
 
         Route::post('/showtimes/preview', AdminShowtimePreviewController::class)
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
