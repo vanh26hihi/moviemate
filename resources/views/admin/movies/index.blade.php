@@ -271,7 +271,7 @@
                     @forelse($movies as $movie)
 
                         @php
-                            $statusMeta = [
+                            $tableStatusMeta = [
                                 'draft' => [
                                     'label' => 'Bản nháp',
                                     'class' => 'bg-blue-500/10 text-blue-400 border border-blue-500/20',
@@ -298,7 +298,7 @@
                                 ],
                             ];
 
-                            $movieStatus = $statusMeta[$movie->status] ?? [
+                            $movieStatus = $tableStatusMeta[$movie->status] ?? [
                                 'label' => $movie->status ?: 'Chưa rõ',
                                 'class' => 'bg-slate-500/10 text-slate-500 border border-slate-500/20',
                             ];

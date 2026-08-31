@@ -514,10 +514,6 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:seats.manage')->name('seats.manage');
         Route::post('/seats/generate/{room}', [AdminSeatController::class, 'generate'])
             ->middleware('permission:seats.manage')->name('seats.generate');
-<<<<<<< HEAD
-
-=======
->>>>>>> bb8a3367620f65f83dced268410e2c64135fcead
         Route::post('/showtimes/preview', AdminShowtimePreviewController::class)
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.preview');
