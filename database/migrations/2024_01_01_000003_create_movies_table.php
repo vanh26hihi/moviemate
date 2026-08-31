@@ -26,10 +26,10 @@ return new class extends Migration
             $table->enum('status', [
                 'now_showing',
                 'coming_soon',
-                'stopped'
+                'stopped',
             ])->default('now_showing');
             $table->timestamps();
-            
+
         });
     }
 

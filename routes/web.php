@@ -29,6 +29,8 @@ use App\Http\Controllers\Admin\RoomTypeController as AdminRoomTypeController;
 use App\Http\Controllers\Admin\SeatController as AdminSeatController;
 use App\Http\Controllers\Admin\SeatIncidentResolutionController as AdminSeatIncidentResolutionController;
 use App\Http\Controllers\Admin\SeatMaintenanceController as AdminSeatMaintenanceController;
+use App\Http\Controllers\Admin\ShowtimeBoardController as AdminShowtimeBoardController;
+use App\Http\Controllers\Admin\ShowtimeBoardExportController as AdminShowtimeBoardExportController;
 use App\Http\Controllers\Admin\ShowtimeController as AdminShowtimeController;
 use App\Http\Controllers\Admin\ShowtimePreviewController as AdminShowtimePreviewController;
 use App\Http\Controllers\Admin\ShowtimeScheduleCopyController as AdminShowtimeScheduleCopyController;
@@ -339,6 +341,8 @@ Route::prefix('admin')->name('admin.')
             ->middleware('permission:dashboard.view')->name('dashboard');
         Route::get('/reports', AdminReportController::class)
             ->middleware('permission:reports.view')->name('reports.index');
+        Route::get('/reports/export', [AdminReportController::class, 'export'])
+            ->middleware('permission:reports.view')->name('reports.export');
 
         Route::get('/activity-logs', [AdminActivityLogController::class, 'index'])
             ->middleware('permission:activity_logs.view')->name('activity-logs.index');
@@ -504,23 +508,16 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('room')
             ->middleware('permission:seats.maintenance.update')->name('rooms.seat-maintenance.bulk');
 
-<<<<<<< HEAD
         Route::get('/seats', [AdminSeatController::class, 'index'])
             ->middleware('permission:seats.maintenance.view')->name('seats.index');
         Route::get('/seats/manage/{room}', [AdminSeatController::class, 'manage'])
             ->middleware('permission:seats.manage')->name('seats.manage');
         Route::post('/seats/generate/{room}', [AdminSeatController::class, 'generate'])
             ->middleware('permission:seats.manage')->name('seats.generate');
+<<<<<<< HEAD
+
 =======
-    Route::resource('foods', AdminFoodController::class)->except(['show']);
-    Route::resource('food-orders', AdminFoodOrderController::class)->only(['index', 'show']);
-    Route::resource('vouchers', AdminVoucherController::class)->except(['show']);
-    
-    Route::patch('/movies/{movie}/lifecycle', [AdminMovieController::class, 'lifecycle'])
-    ->name('movies.lifecycle');
-
->>>>>>> origin/feature/admin-update-movie-status
-
+>>>>>>> bb8a3367620f65f83dced268410e2c64135fcead
         Route::post('/showtimes/preview', AdminShowtimePreviewController::class)
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.preview');
@@ -541,6 +538,13 @@ Route::prefix('admin')->name('admin.')
         Route::post('/showtimes/bulk', [AdminBulkShowtimeController::class, 'store'])
             ->middleware(['permission:showtimes.create', 'throttle:60,1'])
             ->name('showtimes.bulk.store');
+
+        Route::get('/showtimes-board', AdminShowtimeBoardController::class)
+            ->middleware('permission:showtimes.view')
+            ->name('showtimes.board');
+        Route::get('/showtimes-board/export', AdminShowtimeBoardExportController::class)
+            ->middleware(['permission:showtimes.view', 'throttle:30,1'])
+            ->name('showtimes.board.export');
 
         Route::get('/showtimes/{showtime}/cancellation', [AdminShowtimeController::class, 'cancellation'])
             ->whereNumber('showtime')->middleware('permission:showtimes.delete')->name('showtimes.cancellation');
@@ -567,6 +571,8 @@ Route::prefix('admin')->name('admin.')
             ->whereNumber('refundCase')->middleware(['permission:refunds.resolve', 'throttle:12,1'])->name('refunds.update');
         Route::get('/payment-reconciliation', [AdminPaymentReconciliationController::class, 'index'])
             ->middleware('permission:payments.reconcile')->name('payment-reconciliation.index');
+        Route::get('/payment-reconciliation/export', [AdminPaymentReconciliationController::class, 'export'])
+            ->middleware('permission:payments.reconcile')->name('payment-reconciliation.export');
         Route::post('/payments/{payment}/query-provider', [AdminPaymentReconciliationController::class, 'queryProvider'])
             ->whereNumber('payment')
             ->middleware(['permission:payments.reconcile', 'throttle:12,1'])
@@ -585,6 +591,10 @@ Route::prefix('admin')->name('admin.')
 
         Route::get('/users', [AdminUserController::class, 'index'])
             ->middleware('permission:users.view')->name('users.index');
+        Route::get('/users/{user}', [AdminUserController::class, 'show'])
+            ->whereNumber('user')->middleware('permission:users.view')->name('users.show');
+        Route::get('/users/{user}/bookings/export', [AdminUserController::class, 'exportBookings'])
+            ->whereNumber('user')->middleware(['permission:users.view', 'throttle:20,1'])->name('users.bookings.export');
         Route::get('/users/{user}/edit', [AdminUserController::class, 'edit'])
             ->middleware('permission:users.view')->name('users.edit');
         Route::patch('/users/{user}/role', [AdminUserController::class, 'updateRole'])
